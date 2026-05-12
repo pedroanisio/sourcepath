@@ -9,6 +9,7 @@ from pathlib import Path
 from .emit_bundle import emit
 from .pipeline import map_codebase
 from .reconstruct import reconstruct, verify_roundtrip
+from .regenerate import regenerate
 from .self_test import self_test
 
 
@@ -25,10 +26,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--self-test", action="store_true")
     p.add_argument("--reconstruct", action="store_true",
                    help="Reconstruct a codebase from --inventory + --blobs into --out.")
+    p.add_argument("--regenerate", action="store_true",
+                   help="Regenerate source from --inventory + cbm:astSummary alone "
+                        "(no blobs). Semantic roundtrip; not byte-identical.")
     p.add_argument("--inventory", type=Path,
-                   help="Path to inventory.ttl (used with --reconstruct).")
+                   help="Path to inventory.ttl (used with --reconstruct/--regenerate).")
     p.add_argument("--blobs", type=Path,
                    help="Path to blobs/ directory (used with --reconstruct).")
+    p.add_argument("--report", type=Path,
+                   help="Optional report destination (used with --regenerate).")
     p.add_argument("--verify-roundtrip", action="store_true",
                    help="Map the repo, reconstruct from emitted artifacts, verify identity.")
     args = p.parse_args(argv)
@@ -43,6 +49,17 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0 if report["missing_blob_count"] == 0 else 1
 
+    if args.regenerate:
+        if not (args.inventory and args.out):
+            p.error("--regenerate requires --inventory and --out")
+        rp = args.report.resolve() if args.report else None
+        report = regenerate(args.inventory.resolve(), args.out.resolve(), rp)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        failures = (len(report["ast_parse_errors"])
+                    + len(report["regenerate_errors"])
+                    + sum(v.get("failed", 0) for v in report["by_language"].values()))
+        return 0 if failures == 0 else 1
+
     if args.verify_roundtrip:
         if not args.repo:
             p.error("--verify-roundtrip requires --repo")
@@ -51,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report["roundtrip_ok"] else 1
 
     if not args.repo or not args.out:
-        p.error("--repo and --out are required unless --self-test/--reconstruct/--verify-roundtrip is given")
+        p.error("--repo and --out are required unless --self-test/--reconstruct/--regenerate/--verify-roundtrip is given")
 
     repo = args.repo.resolve()
     repo_name = args.name or repo.name

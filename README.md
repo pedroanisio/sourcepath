@@ -73,6 +73,60 @@ backends fall back to substring matching. The bundle is loaded once per
 process — restart to pick up a new output dir. See
 [frontend/backend/README.md](frontend/backend/README.md) for endpoint details.
 
+## Regenerate
+
+`codebase_mapper.regenerate` materializes source from `inventory.ttl` and
+`cbm:astSummary` **alone** — no `blobs/` directory required. Companion to
+`reconstruct`, with a different fidelity model:
+
+| Path | Source of truth | Fidelity |
+|---|---|---|
+| `reconstruct` | `inventory.ttl` + `blobs/` | **byte-identical** every file |
+| `regenerate` (new) | `inventory.ttl` + `cbm:astSummary` | Python: **semantic** (re-parses to the same AST); TS/JS: **byte-identical** via leaf-text CST |
+
+Currently supported by `regenerate`: Python, TypeScript (`.ts`, `.tsx`,
+`.cts`, `.mts`), JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`). Other files
+(markdown, configs, lockfiles, binaries) are enumerated in the report
+under `ast_unsupported` / `no_ast_summary` and not written to disk.
+
+```bash
+codebase-mapper --regenerate \
+  --inventory _tmp/out/inventory.ttl \
+  --out _tmp/regen \
+  --report _tmp/regen-report.json
+```
+
+The report records `files_regenerated`, per-language `ok`/`failed` counts,
+and the lists of files skipped or errored.
+
+### What's lost
+
+- **Python** (semantic-perfect): comments, blank lines, string-quote style,
+  trailing commas. The regenerated source re-parses to the same
+  `ast.dump`, but bytes differ. If byte-identical Python from TTL+AST is
+  ever required, swap the `ast`-based extractor for a `libcst`-based one
+  — `libcst` preserves the concrete syntax tree (comments + whitespace).
+- **TS/JS** (byte-perfect): nothing — every leaf token plus interstitial
+  gaps and any header/footer bytes are captured. Tree-sitter has no
+  `unparse`, so the extractor stores enough of the CST to walk back to
+  source.
+
+### Size cost
+
+`cbm:astSummary` grows with full-body capture. Measured ratios:
+
+| Language | `ast_summary` JSON / source |
+|---|---|
+| Python | ~6.6× |
+| TypeScript/JS | ~12.5× |
+
+`run_manifest.json` reports `counts.ast_full_bodies_python`,
+`counts.ast_full_bodies_tsjs`, and `counts.ast_summary_total_bytes` so
+the cost is measurable per run. If TTL size becomes a problem, the
+short retrofit is to move the full-body literals to a sidecar
+`ast_summaries.jsonl` keyed by `cbm:contentSha256` and reference them
+from `inventory.ttl` as URIs.
+
 ## Extension model
 
 `codebase_mapper.extensions` exposes seven protocols:
@@ -96,9 +150,11 @@ them after a clear.
 ## Verify
 
 ```bash
+python tests/verify_roundtrip.py            # blob-based byte-perfect roundtrip
+python tests/verify_regenerate.py           # TTL+AST regenerate (Python semantic + TS/JS byte)
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
 python tests/verify_l3.py                   # concept_graph contract + cross-layer
 ```
 
-Both verifiers resolve `repo_root` from their own `__file__`, so they run
-correctly regardless of the caller's cwd.
+All four verifiers resolve `repo_root` from their own `__file__`, so they
+run correctly regardless of the caller's cwd.

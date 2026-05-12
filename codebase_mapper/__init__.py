@@ -38,6 +38,7 @@ from .models import DeclaresDependencyEdge, FileRecord, ImportEdge, ImportExtern
 from .pipeline import map_codebase
 from .rdf_emit import build_inventory_graph, build_ontology_mapping_graph, build_shacl_graph, file_iri, package_iri, phase_iri, release_iri, type_iri
 from .reconstruct import reconstruct, verify_reconstructed, verify_roundtrip
+from .regenerate import regenerate, supported_languages
 from .self_test import self_test
 from .tests_edges import infer_tests_edges
 
@@ -132,6 +133,7 @@ __all__ = [
     'pinned_dependencies',
     'read_blob',
     'reconstruct',
+    'regenerate',
     'refine_phases',
     'release_iri',
     'resolve_c_includes',
@@ -145,6 +147,7 @@ __all__ = [
     'resolve_swift_imports',
     'resolve_tsjs_import',
     'self_test',
+    'supported_languages',
     'tsjs_bare_package_root',
     'type_iri',
     'verify_reconstructed',

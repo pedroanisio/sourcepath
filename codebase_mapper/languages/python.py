@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import ast
+import base64
+import math
 
 from collections import defaultdict
 from pathlib import PurePosixPath
-from typing import Callable
+from typing import Any, Callable
 
 try:
     import tomllib
@@ -14,6 +16,89 @@ except ImportError:
 
 
 from ..models import FileRecord
+
+
+PY_AST_SCHEMA_VERSION = 1
+
+
+def _ast_to_jsonable(node: Any) -> Any:
+    """Serialize a Python ast.AST tree (or leaf) to a JSON-safe value.
+
+    Captures only ``_fields`` (not ``lineno``/``col_offset``) so the encoding
+    is independent of source positions. Bytes/complex/Ellipsis/inf/nan get
+    tagged dict wrappers so JSON can round-trip them.
+    """
+    if isinstance(node, ast.AST):
+        out: dict = {"_type": type(node).__name__}
+        for field in node._fields:
+            if hasattr(node, field):
+                out[field] = _ast_to_jsonable(getattr(node, field))
+        return out
+    if isinstance(node, list):
+        return [_ast_to_jsonable(x) for x in node]
+    if isinstance(node, tuple):
+        return {"_tuple": [_ast_to_jsonable(x) for x in node]}
+    if isinstance(node, bytes):
+        return {"_bytes": base64.b64encode(node).decode("ascii")}
+    if isinstance(node, complex):
+        return {"_complex": [node.real, node.imag]}
+    if node is Ellipsis:
+        return {"_ellipsis": True}
+    if isinstance(node, float):
+        if math.isinf(node):
+            return {"_float": "inf" if node > 0 else "-inf"}
+        if math.isnan(node):
+            return {"_float": "nan"}
+        return node
+    # bool is a subclass of int — both pass through unchanged
+    if isinstance(node, (str, bool, int)) or node is None:
+        return node
+    raise TypeError(f"unsupported ast value type {type(node).__name__}: {node!r}")
+
+
+def _jsonable_to_ast(obj: Any) -> Any:
+    """Inverse of _ast_to_jsonable."""
+    if isinstance(obj, dict):
+        if "_type" in obj:
+            cls = getattr(ast, obj["_type"])
+            kwargs = {k: _jsonable_to_ast(v) for k, v in obj.items() if k != "_type"}
+            return cls(**kwargs)
+        if "_tuple" in obj:
+            return tuple(_jsonable_to_ast(x) for x in obj["_tuple"])
+        if "_bytes" in obj:
+            return base64.b64decode(obj["_bytes"])
+        if "_complex" in obj:
+            r, i = obj["_complex"]
+            return complex(r, i)
+        if "_ellipsis" in obj:
+            return Ellipsis
+        if "_float" in obj:
+            v = obj["_float"]
+            if v == "inf":
+                return float("inf")
+            if v == "-inf":
+                return float("-inf")
+            return float("nan")
+        return obj
+    if isinstance(obj, list):
+        return [_jsonable_to_ast(x) for x in obj]
+    return obj
+
+
+def regenerate_python_source(summary: dict) -> str:
+    """Reconstitute Python source from an ``extract_python_ast_summary`` result.
+
+    Returns source that re-parses to the same AST as the original (semantic
+    round-trip via ``ast.unparse``). NOT byte-identical: comments, blank
+    lines, string-quote style, and trailing commas are dropped.
+    """
+    if "ast_json" not in summary or summary["ast_json"] is None:
+        raise ValueError("summary missing 'ast_json' (schema_version < 1 or serialize failed)")
+    module = _jsonable_to_ast(summary["ast_json"])
+    if not isinstance(module, ast.Module):
+        raise ValueError(f"expected ast.Module root, got {type(module).__name__}")
+    ast.fix_missing_locations(module)
+    return ast.unparse(module) + "\n"
 
 
 def extract_python_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[str]]:
@@ -45,11 +130,20 @@ def extract_python_ast_summary(content: bytes, path: str) -> tuple[dict | None, 
             funcs.append(node.name)
         elif isinstance(node, ast.ClassDef):
             classes.append(node.name)
+
+    ast_json: Any = None
+    try:
+        ast_json = _ast_to_jsonable(tree)
+    except Exception as e:
+        errors.append(f"ast_serialize_error: {type(e).__name__}: {e}")
+
     return {
         "language": "python",
+        "schema_version": PY_AST_SCHEMA_VERSION,
         "imports": imports,
         "top_level_functions": sorted(funcs),
         "top_level_classes": sorted(classes),
+        "ast_json": ast_json,
     }, errors
 
 def detect_python_source_roots(

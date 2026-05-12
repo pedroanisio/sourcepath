@@ -92,6 +92,19 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
     def sha256_file(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
 
+    ast_full_bodies_python = 0
+    ast_full_bodies_tsjs = 0
+    ast_summary_total_bytes = 0
+    for r in mapped["records"]:
+        if r.ast_summary is None:
+            continue
+        ast_summary_total_bytes += len(json.dumps(r.ast_summary, sort_keys=True))
+        if r.language == "python" and r.ast_summary.get("ast_json") is not None:
+            ast_full_bodies_python += 1
+        elif (r.language in ("typescript", "javascript")
+              and r.ast_summary.get("cst_json") is not None):
+            ast_full_bodies_tsjs += 1
+
     manifest = {
         "tool_version": TOOL_VERSION,
         "vocabulary_version": VOCABULARY_VERSION,
@@ -115,6 +128,9 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
             "pins_dependency_edges": len(mapped["pin_edges"]),
             "tests_edges": len(mapped["tests_edges"]),
             "unique_blobs_written": blob_count,
+            "ast_full_bodies_python": ast_full_bodies_python,
+            "ast_full_bodies_tsjs": ast_full_bodies_tsjs,
+            "ast_summary_total_bytes": ast_summary_total_bytes,
         },
         "files_by_type": dict(sorted(
             Counter(r.type_ for r in mapped["records"]).items(),

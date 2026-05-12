@@ -13,6 +13,75 @@ from ..ts_setup import _TS_LANGS, _TS_QUERIES, _strip_quotes, _ts_setup
 from ..ts_setup import TS_AVAILABLE, ts
 
 
+TSJS_AST_SCHEMA_VERSION = 1
+
+
+def _ts_node_to_jsonable(node, content: bytes):
+    """Serialize a tree-sitter Node to a JSON-safe structure with full byte coverage.
+
+    Encoding (chosen for compactness — JSON dicts have a high per-token tax):
+      * Anonymous leaves whose ``type == text`` (keywords like ``function``,
+        punctuation like ``;``) collapse to a **bare string**.
+      * Named leaves (identifiers, strings, numbers) become
+        ``{"type": ..., "text": ...}``.
+      * Interstitial gaps between siblings (whitespace, line breaks) are
+        emitted as **bare strings** in the children list.
+      * Internal nodes are ``{"type": ..., "children": [...]}``.
+
+    Walking the result pre-order and concatenating every string / ``text``
+    field reproduces the original bytes exactly (for valid UTF-8 input).
+    """
+    children = node.children
+    if not children:
+        text = content[node.start_byte:node.end_byte].decode("utf-8")
+        # Anonymous leaf whose label equals its source — round-trip needs
+        # only the text, so drop the redundant type.
+        if not node.is_named and node.type == text:
+            return text
+        return {"type": node.type, "text": text}
+    out_children: list = []
+    cursor = node.start_byte
+    for child in children:
+        if child.start_byte > cursor:
+            gap = content[cursor:child.start_byte].decode("utf-8")
+            if gap:
+                out_children.append(gap)
+        out_children.append(_ts_node_to_jsonable(child, content))
+        cursor = child.end_byte
+    if cursor < node.end_byte:
+        gap = content[cursor:node.end_byte].decode("utf-8")
+        if gap:
+            out_children.append(gap)
+    return {"type": node.type, "children": out_children}
+
+
+def regenerate_tsjs_source(summary: dict) -> str:
+    """Reconstitute TS/JS source from an ``extract_tsjs_ast_summary`` result.
+
+    Byte-identical to the original file (for valid UTF-8 input) because the
+    extractor stored every leaf token's text plus interstitial gaps and the
+    optional header/footer bytes outside the root node's span.
+    """
+    if summary.get("cst_json") is None:
+        raise ValueError("summary missing 'cst_json' (schema_version < 1 or extraction failed)")
+    parts: list[str] = []
+
+    def walk(node) -> None:
+        if isinstance(node, str):
+            parts.append(node)
+            return
+        if "text" in node:
+            parts.append(node["text"])
+            return
+        for c in node.get("children", ()):
+            walk(c)
+
+    parts.append(summary.get("header", "") or "")
+    walk(summary["cst_json"])
+    parts.append(summary.get("footer", "") or "")
+    return "".join(parts)
+
+
 def extract_tsjs_ast_summary(content: bytes, path: str, grammar: str) -> tuple[dict | None, list[str]]:
     if not TS_AVAILABLE:
         return None, ["tree_sitter_unavailable"]
@@ -41,11 +110,36 @@ def extract_tsjs_ast_summary(content: bytes, path: str, grammar: str) -> tuple[d
             elif cap in ("class_name", "export_class"):
                 classes.append(text)
     imports.sort(key=lambda x: (x["lineno"], x["source"]))
+
+    cst_json: dict | None = None
+    header = ""
+    footer = ""
+    try:
+        # Strict decode; if the file isn't valid UTF-8 we skip CST capture
+        # rather than silently lose bytes. classify() should already have
+        # flagged truly-binary files before we got here.
+        root = tree.root_node
+        cst_json = _ts_node_to_jsonable(root, content)
+        if root.start_byte > 0:
+            header = content[:root.start_byte].decode("utf-8")
+        if root.end_byte < len(content):
+            footer = content[root.end_byte:].decode("utf-8")
+    except UnicodeDecodeError as e:
+        errors.append(f"cst_decode_error: {e}")
+        cst_json = None
+    except Exception as e:
+        errors.append(f"cst_serialize_error: {type(e).__name__}: {e}")
+        cst_json = None
+
     return {
         "language": grammar,
+        "schema_version": TSJS_AST_SCHEMA_VERSION,
         "imports": imports,
         "top_level_functions": sorted(set(funcs)),
         "top_level_classes": sorted(set(classes)),
+        "cst_json": cst_json,
+        "header": header,
+        "footer": footer,
     }, errors
 
 TSJS_EXT_CANDIDATES = (".ts", ".tsx", ".d.ts", ".js", ".jsx", ".mjs", ".cjs")
