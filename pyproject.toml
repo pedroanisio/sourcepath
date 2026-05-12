@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codebase-mapper"
+version = "0.1.0"
+description = "Map source code repositories into RDF graphs with a pluggable extension surface (chunks/embeddings, concept graph)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "rdflib",
+    "pyshacl",
+    "tree-sitter",
+    "tree-sitter-c",
+    "tree-sitter-go",
+    "tree-sitter-javascript",
+    "tree-sitter-kotlin",
+    "tree-sitter-ruby",
+    "tree-sitter-rust",
+    "tree-sitter-swift",
+    "tree-sitter-typescript",
+    "numpy",
+    "sentence-transformers",
+    "pyyaml",
+    "tomli; python_version < '3.11'",
+]
+
+[project.scripts]
+codebase-mapper = "codebase_mapper.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["codebase_mapper*", "plugins*"]
+exclude = ["tests*", "scripts*"]
