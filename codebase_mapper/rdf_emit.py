@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from urllib.parse import quote
 
 from rdflib import Graph
 from rdflib import Literal
@@ -18,8 +19,7 @@ from .models import DeclaresDependencyEdge, FileRecord, ImportEdge, ImportExtern
 
 
 def file_iri(path: str) -> URIRef:
-    safe = path.replace("/", "%2F").replace(" ", "%20")
-    return URIRef(f"{CBMI_NS}file/{safe}")
+    return URIRef(f"{CBMI_NS}file/{quote(path, safe='')}")
 
 def package_iri(name: str) -> URIRef:
     safe = re.sub(r"[^A-Za-z0-9._@/-]", "_", name).replace("/", "%2F")

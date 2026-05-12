@@ -229,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         case("malformed contentSha256 (too short)", False,
              lambda gc: (gc.remove((first_chunk, CBML2.contentSha256, None)),
                          gc.add((first_chunk, CBML2.contentSha256,
-                                 Literal("abc", datatype=XSD.hexBinary)))))
+                                 Literal("abcd", datatype=XSD.hexBinary)))))
         case("negative beginLine", False,
              lambda gc: (gc.remove((first_chunk, CBML2.beginLine, None)),
                          gc.add((first_chunk, CBML2.beginLine,

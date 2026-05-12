@@ -22,6 +22,10 @@ plugins/
 scripts/
 ├── run_l2.py           host + chunks_embeddings registered
 └── run_l3.py           host + chunks_embeddings + concept_graph (--no-l2 skips L2)
+frontend/
+├── backend/            FastAPI service that reads an output bundle and serves
+│                       summary/graph/chunk/concept JSON to the UI
+└── ui/                 React UI (scaffold, in progress)
 tests/
 ├── verify_l2.py        chunks_embeddings contract suite
 └── verify_l3.py        concept_graph contract + cross-layer (with/without L2)
@@ -48,6 +52,26 @@ python scripts/run_l3.py --repo /path/to/repo --out /tmp/out --backend sbert
 
 `--backend sbert` uses `sentence-transformers/all-MiniLM-L6-v2`; `--backend hash`
 uses a deterministic SHA-256 fake (no semantics, useful for contract tests).
+
+## Visualize
+
+`frontend/backend` is a FastAPI service that reads an output bundle and exposes
+JSON endpoints (`/api/summary`, `/api/file-graph`, `/api/concept-graph`,
+`/api/chunks`, `POST /api/chunks/search`, `/api/concept/{name}`,
+`/api/chunk-blob/{sha}`).
+
+```bash
+# Point at any output dir containing run_manifest.json + inventory.ttl +
+# embeddings.npz + embeddings_meta.json + concepts.json.
+CBM_OUTPUT_DIR=_tmp/usl-ng-core-map \
+  .venv/bin/uvicorn frontend.backend.app:app --port 8000 --reload
+```
+
+Semantic search (`POST /api/chunks/search`) uses cosine NN over the chunk
+matrix when the bundle's embedding backend is a sentence-transformer; hash
+backends fall back to substring matching. The bundle is loaded once per
+process — restart to pick up a new output dir. See
+[frontend/backend/README.md](frontend/backend/README.md) for endpoint details.
 
 ## Extension model
 
