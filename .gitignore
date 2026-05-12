@@ -25,3 +25,4 @@ htmlcov/
 .vscode/
 .DS_Store
 _tmp/
+frontend/ui/node_modules/

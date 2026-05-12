@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      args:
+        WITH_SBERT: "${WITH_SBERT:-0}"
+    image: cbm-backend:${TAG:-latest}
+    container_name: cbm-backend
+    environment:
+      CBM_OUTPUT_DIR: /data
+    volumes:
+      - "${CBM_BUNDLE:-../_tmp/usl-ng-core-map}:/data:ro"
+    expose:
+      - "8765"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./ui
+    image: cbm-frontend:${TAG:-latest}
+    container_name: cbm-frontend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

@@ -1,0 +1,4 @@
+# Optional: enables real semantic search on /api/chunks/search.
+# Adds ~2 GB to the image (torch + transformers + a sentence-transformer model).
+# Skip unless your bundle was generated with `--backend sbert`.
+sentence-transformers>=3.0,<6.0
