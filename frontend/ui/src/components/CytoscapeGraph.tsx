@@ -28,9 +28,10 @@ function colorFor(group: string | undefined, palette: Map<string, string>): stri
 type Props = {
   data: GraphResp;
   layout?: string;
+  onNodeClick?: (id: string) => void;
 };
 
-export default function CytoscapeGraph({ data, layout = "cose" }: Props) {
+export default function CytoscapeGraph({ data, layout = "cose", onNodeClick }: Props) {
   const cyRef = useRef<cytoscape.Core | null>(null);
   const palette = useMemo(() => new Map<string, string>(), [data]);
   const [details, setDetails] = useState<string | null>(null);
@@ -88,8 +89,13 @@ export default function CytoscapeGraph({ data, layout = "cose" }: Props) {
                 ([k, v]) => `${k}: ${Array.isArray(v) ? `[${(v as any[]).length}]` : String(v)}`
               ),
             ];
-            setDetails(lines.join("\n"));
+            setDetails(lines.join("\n") + (onNodeClick ? "\n\n(double-click to open details)" : ""));
           });
+          if (onNodeClick) {
+            cy.on("dbltap", "node", (evt: cytoscape.EventObject) => {
+              onNodeClick(evt.target.data().id);
+            });
+          }
           cy.on("tap", (evt: cytoscape.EventObject) => {
             if (evt.target === cy) setDetails(null);
           });

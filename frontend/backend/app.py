@@ -39,8 +39,16 @@ class Bundle:
     concept_vectors: np.ndarray | None
     concept_ids: list[str]
     files: list[dict[str, Any]]  # path, language, type, size, contentSha256
+    file_by_path: dict[str, dict[str, Any]]
     imports: list[tuple[str, str]]  # (src_path, dst_path)
-    chunks: list[dict[str, Any]]  # symbol, kind, file, beginLine, endLine, contentSha256
+    imports_out: dict[str, list[str]]
+    imports_in: dict[str, list[str]]
+    chunks: list[dict[str, Any]]  # adds: idx
+    chunks_by_uri: dict[str, int]  # uri -> idx
+    chunks_by_file: dict[str, list[int]]  # file path -> [idx,...]
+    chunk_concepts: dict[int, list[str]]  # idx -> [concept_name,...]
+    concept_chunks: dict[str, list[int]]  # concept_name -> [idx,...]
+    cooccur: dict[str, list[tuple[str, int]]]  # concept -> [(neighbor, weight), ...] sorted desc
 
 
 def _resolve_file_type_uri(uri: str) -> str:
@@ -109,13 +117,18 @@ def load_bundle(output_dir: Path) -> Bundle:
     files.sort(key=lambda r: r["path"])
 
     imports: list[tuple[str, str]] = []
+    imports_out: dict[str, list[str]] = {}
+    imports_in: dict[str, list[str]] = {}
     for s, o in g.subject_objects(CBM.imports):
         s_path = file_by_uri.get(str(s), {}).get("path")
         o_path = file_by_uri.get(str(o), {}).get("path")
         if s_path and o_path:
             imports.append((s_path, o_path))
+            imports_out.setdefault(s_path, []).append(o_path)
+            imports_in.setdefault(o_path, []).append(s_path)
 
     chunks: list[dict[str, Any]] = []
+    chunk_uri_to_idx: dict[str, int] = {}
     for c in g.subjects(RDF.type, CBML2.Chunk):
         sym = g.value(c, CBML2.symbol)
         kind = g.value(c, CBML2.kind)
@@ -135,6 +148,38 @@ def load_bundle(output_dir: Path) -> Bundle:
             "contentSha256": str(sha) if sha is not None else None,
         })
     chunks.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0))
+    chunks_by_file: dict[str, list[int]] = {}
+    for i, c in enumerate(chunks):
+        c["idx"] = i
+        chunk_uri_to_idx[c["uri"]] = i
+        if c["file"]:
+            chunks_by_file.setdefault(c["file"], []).append(i)
+
+    # chunk -> concepts via cbml3:lexicalizes
+    chunk_concepts: dict[int, list[str]] = {}
+    concept_chunks: dict[str, list[int]] = {}
+    for s, o in g.subject_objects(CBML3.lexicalizes):
+        idx = chunk_uri_to_idx.get(str(s))
+        if idx is None:
+            continue
+        name = _concept_name_from_uri(str(o))
+        if not name:
+            continue
+        chunk_concepts.setdefault(idx, []).append(name)
+        concept_chunks.setdefault(name, []).append(idx)
+
+    # cooccurrence neighbor index (descending weight)
+    cooccur: dict[str, list[tuple[str, int]]] = {}
+    for entry in concepts.get("cooccurrence", []) or []:
+        if len(entry) != 3:
+            continue
+        a, b_, w = entry
+        cooccur.setdefault(a, []).append((b_, int(w)))
+        cooccur.setdefault(b_, []).append((a, int(w)))
+    for k in cooccur:
+        cooccur[k].sort(key=lambda t: t[1], reverse=True)
+
+    file_by_path = {r["path"]: r for r in files}
 
     return Bundle(
         output_dir=output_dir,
@@ -146,9 +191,26 @@ def load_bundle(output_dir: Path) -> Bundle:
         concept_vectors=concept_vectors,
         concept_ids=concept_ids,
         files=files,
+        file_by_path=file_by_path,
         imports=imports,
+        imports_out=imports_out,
+        imports_in=imports_in,
         chunks=chunks,
+        chunks_by_uri=chunk_uri_to_idx,
+        chunks_by_file=chunks_by_file,
+        chunk_concepts=chunk_concepts,
+        concept_chunks=concept_chunks,
+        cooccur=cooccur,
     )
+
+
+def _concept_name_from_uri(uri: str) -> str | None:
+    """Extract 'foo' from '...#concept/foo' or '.../concept/foo'."""
+    if "#concept/" in uri:
+        return uri.rsplit("#concept/", 1)[-1]
+    if "/concept/" in uri:
+        return uri.rsplit("/concept/", 1)[-1]
+    return None
 
 
 @lru_cache(maxsize=1)
@@ -197,6 +259,7 @@ class GraphResp(BaseModel):
 
 
 class ChunkResp(BaseModel):
+    idx: int | None = None
     symbol: str | None
     kind: str | None
     file: str | None
@@ -336,7 +399,7 @@ def chunks(
     total = len(rows)
     rows = rows[offset:offset + limit]
     return ChunkListResp(
-        chunks=[ChunkResp(**{k: r.get(k) for k in ("symbol", "kind", "file", "beginLine", "endLine", "embeddingRow")}) for r in rows],
+        chunks=[ChunkResp(**{k: r.get(k) for k in ("idx", "symbol", "kind", "file", "beginLine", "endLine", "embeddingRow")}) for r in rows],
         total=total,
         backend=(b.embeddings_meta.get("backend") or {}).get("name"),
         mode="lexical",
@@ -365,7 +428,7 @@ def chunk_search(req: SearchReq) -> ChunkListResp:
         scored.sort(key=lambda s: s[1], reverse=True)
         out = scored[:req.k]
         return ChunkListResp(
-            chunks=[ChunkResp(**{k: r.get(k) for k in ("symbol", "kind", "file", "beginLine", "endLine", "embeddingRow")}, score=score) for r, score in out],
+            chunks=[ChunkResp(**{k: r.get(k) for k in ("idx", "symbol", "kind", "file", "beginLine", "endLine", "embeddingRow")}, score=score) for r, score in out],
             total=len(scored),
             backend=backend_name,
             mode="lexical",
@@ -419,19 +482,83 @@ def chunk_blob(sha: str) -> dict[str, str]:
 
 
 @app.get("/api/concept/{name}")
-def concept_detail(name: str) -> dict[str, Any]:
+def concept_detail(
+    name: str,
+    cooccur_k: int = Query(default=30, ge=1, le=500),
+    chunk_k: int = Query(default=50, ge=1, le=500),
+    file_k: int = Query(default=100, ge=1, le=1000),
+) -> dict[str, Any]:
     b = get_bundle()
     c = b.concepts.get("concepts", {}).get(name)
     if not c:
         raise HTTPException(status_code=404, detail="concept not found")
-    # files that lexicalize this concept
     files: list[str] = []
     for path, names in (b.concepts.get("per_path_concepts") or {}).items():
         if name in names:
             files.append(path)
-            if len(files) > 200:
+            if len(files) >= file_k:
                 break
-    return {"concept": c, "files": files}
+    cooc = [{"name": n, "weight": w} for n, w in b.cooccur.get(name, [])[:cooccur_k]]
+    chunk_idxs = b.concept_chunks.get(name, [])[:chunk_k]
+    chunks = [
+        {k: b.chunks[i].get(k) for k in ("idx", "symbol", "kind", "file", "beginLine", "endLine")}
+        for i in chunk_idxs
+    ]
+    return {
+        "concept": c,
+        "files": files,
+        "cooccurring": cooc,
+        "chunks": chunks,
+        "components": c.get("components", []),
+        "file_count_total": len([
+            p for p, ns in (b.concepts.get("per_path_concepts") or {}).items() if name in ns
+        ]),
+        "chunk_count_total": len(b.concept_chunks.get(name, [])),
+    }
+
+
+@app.get("/api/file/{path:path}")
+def file_detail(path: str) -> dict[str, Any]:
+    b = get_bundle()
+    rec = b.file_by_path.get(path)
+    if not rec:
+        raise HTTPException(status_code=404, detail="file not found")
+    chunk_idxs = b.chunks_by_file.get(path, [])
+    chunks = [
+        {k: b.chunks[i].get(k) for k in ("idx", "symbol", "kind", "beginLine", "endLine", "embeddingRow")}
+        for i in chunk_idxs
+    ]
+    concepts = list((b.concepts.get("per_path_concepts") or {}).get(path, []))
+    return {
+        "file": rec,
+        "imports_out": sorted(b.imports_out.get(path, [])),
+        "imports_in": sorted(b.imports_in.get(path, [])),
+        "chunks": chunks,
+        "concepts": concepts,
+    }
+
+
+@app.get("/api/chunk/{idx}")
+def chunk_detail(idx: int) -> dict[str, Any]:
+    b = get_bundle()
+    if idx < 0 or idx >= len(b.chunks):
+        raise HTTPException(status_code=404, detail="chunk idx out of range")
+    rec = b.chunks[idx]
+    concepts = list(b.chunk_concepts.get(idx, []))
+    blob_preview: str | None = None
+    sha = rec.get("contentSha256")
+    if sha and len(sha) == 64 and all(ch in "0123456789abcdef" for ch in sha):
+        p = b.output_dir / "blobs" / sha
+        if p.exists():
+            try:
+                blob_preview = p.read_text(errors="replace")[:8000]
+            except Exception:
+                blob_preview = None
+    return {
+        "chunk": rec,
+        "concepts": concepts,
+        "blob_preview": blob_preview,
+    }
 
 
 @app.get("/api/healthz")

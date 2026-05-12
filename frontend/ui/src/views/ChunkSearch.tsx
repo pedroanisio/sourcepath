@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, ChunkListResp } from "../api";
 
 export default function ChunkSearch() {
@@ -79,8 +80,22 @@ export default function ChunkSearch() {
               <tr key={i}>
                 <td>{c.score != null ? c.score.toFixed(3) : "—"}</td>
                 <td>{c.kind ?? "—"}</td>
-                <td>{c.symbol ?? "—"}</td>
-                <td>{c.file ?? "—"}</td>
+                <td>
+                  {c.idx != null ? (
+                    <Link to={`/chunk/${c.idx}`}>{c.symbol ?? "—"}</Link>
+                  ) : (
+                    c.symbol ?? "—"
+                  )}
+                </td>
+                <td>
+                  {c.file ? (
+                    <Link to={`/file/${c.file.split("/").map(encodeURIComponent).join("/")}`}>
+                      {c.file}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td>
                   {c.beginLine ?? "—"}–{c.endLine ?? "—"}
                 </td>

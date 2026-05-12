@@ -3,6 +3,9 @@ import Dashboard from "./views/Dashboard";
 import FileGraph from "./views/FileGraph";
 import ConceptGraph from "./views/ConceptGraph";
 import ChunkSearch from "./views/ChunkSearch";
+import FileDetail from "./views/FileDetail";
+import ChunkDetail from "./views/ChunkDetail";
+import ConceptDetail from "./views/ConceptDetail";
 
 export default function App() {
   return (
@@ -23,6 +26,9 @@ export default function App() {
           <Route path="/files" element={<FileGraph />} />
           <Route path="/concepts" element={<ConceptGraph />} />
           <Route path="/chunks" element={<ChunkSearch />} />
+          <Route path="/file/*" element={<FileDetail />} />
+          <Route path="/chunk/:idx" element={<ChunkDetail />} />
+          <Route path="/concept/:name" element={<ConceptDetail />} />
         </Routes>
       </main>
     </div>

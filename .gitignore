@@ -19,6 +19,8 @@ env/
 .tox/
 .coverage
 htmlcov/
+coverage/
+frontend/ui/coverage/
 
 # Editor / OS
 .idea/

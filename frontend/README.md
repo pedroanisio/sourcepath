@@ -7,8 +7,32 @@ React + FastAPI visualizer for codebase-mapper output bundles in `_tmp/`.
 ```
 frontend/
 ├── backend/        FastAPI service (reads inventory.ttl + embeddings + concepts.json)
+│   └── tests/      pytest suite over /api/*  (driven through fastapi.testclient)
 └── ui/             Vite + React + TS + cytoscape SPA
+    └── src/__tests__/  vitest + RTL smoke tests with mocked fetch
 ```
+
+## Tests
+
+```bash
+# backend: 28 cases via fastapi.testclient, gates at ≥90% coverage
+.venv/bin/python -m pytest frontend/backend/tests/
+
+# ui: 37 cases via vitest + RTL with mocked /api/*, gates at ≥90% coverage
+cd frontend/ui && npm test -- --coverage
+```
+
+Both suites enforce **≥90% coverage** (statements, branches, functions,
+lines) and fail when the threshold drops. Current state:
+
+| Layer | Tests | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|---|
+| backend (`app.py`) | 28 | 98% | n/a | n/a | 98% |
+| ui (`src/**/*.tsx`) | 37 | 100% | 92% | 92% | 100% |
+
+The backend tests auto-skip if `_tmp/usl-ng-core-map/run_manifest.json` is
+missing (override the path with `CBM_OUTPUT_DIR=...`). Thresholds are
+configured in `frontend/backend/pytest.ini` and `frontend/ui/vite.config.ts`.
 
 ## Docker (recommended for delivery)
 

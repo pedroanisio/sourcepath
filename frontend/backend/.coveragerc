@@ -1,0 +1,13 @@
+[run]
+source = frontend/backend
+omit =
+    frontend/backend/tests/*
+    frontend/backend/pytest.ini
+    frontend/backend/.coveragerc
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+show_missing = True

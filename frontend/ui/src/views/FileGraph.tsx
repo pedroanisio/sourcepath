@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api, GraphResp } from "../api";
 import CytoscapeGraph from "../components/CytoscapeGraph";
 
 export default function FileGraph() {
+  const navigate = useNavigate();
   const [limit, setLimit] = useState(300);
   const [data, setData] = useState<GraphResp | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -53,7 +55,13 @@ export default function FileGraph() {
         )}
       </div>
       {err && <div className="error">{err}</div>}
-      {data && <CytoscapeGraph data={data} layout="cose" />}
+      {data && (
+        <CytoscapeGraph
+          data={data}
+          layout="cose"
+          onNodeClick={(id) => navigate(`/file/${id.split("/").map(encodeURIComponent).join("/")}`)}
+        />
+      )}
     </>
   );
 }

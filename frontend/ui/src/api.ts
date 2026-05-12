@@ -36,6 +36,7 @@ export interface GraphResp {
 }
 
 export interface ChunkRow {
+  idx?: number | null;
   symbol: string | null;
   kind: string | null;
   file: string | null;
@@ -43,6 +44,67 @@ export interface ChunkRow {
   endLine: number | null;
   embeddingRow: number | null;
   score?: number | null;
+}
+
+export interface FileDetail {
+  file: {
+    path: string;
+    language: string | null;
+    type: string | null;
+    size: number | null;
+    contentSha256: string | null;
+  };
+  imports_out: string[];
+  imports_in: string[];
+  chunks: Array<{
+    idx: number;
+    symbol: string | null;
+    kind: string | null;
+    beginLine: number | null;
+    endLine: number | null;
+    embeddingRow: number | null;
+  }>;
+  concepts: string[];
+}
+
+export interface ChunkDetail {
+  chunk: {
+    idx: number;
+    uri: string;
+    symbol: string | null;
+    kind: string | null;
+    file: string | null;
+    beginLine: number | null;
+    endLine: number | null;
+    embeddingRow: number | null;
+    contentSha256: string | null;
+  };
+  concepts: string[];
+  blob_preview: string | null;
+}
+
+export interface ConceptDetail {
+  concept: {
+    label: string;
+    alt_labels: string[];
+    components: string[];
+    frequency: number;
+    file_count: number;
+    embedding_row: number | null;
+  };
+  files: string[];
+  cooccurring: Array<{ name: string; weight: number }>;
+  chunks: Array<{
+    idx: number;
+    symbol: string | null;
+    kind: string | null;
+    file: string | null;
+    beginLine: number | null;
+    endLine: number | null;
+  }>;
+  components: string[];
+  file_count_total: number;
+  chunk_count_total: number;
 }
 
 export interface ChunkListResp {
@@ -79,5 +141,11 @@ export const api = {
     ),
   searchChunks: (q: string, k = 20) =>
     post<ChunkListResp>("/api/chunks/search", { q, k }),
-  concept: (name: string) => get<any>(`/api/concept/${encodeURIComponent(name)}`),
+  concept: (name: string) =>
+    get<ConceptDetail>(`/api/concept/${encodeURIComponent(name)}`),
+  file: (path: string) =>
+    get<FileDetail>(
+      "/api/file/" + path.split("/").map(encodeURIComponent).join("/")
+    ),
+  chunk: (idx: number) => get<ChunkDetail>(`/api/chunk/${idx}`),
 };
