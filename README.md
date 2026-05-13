@@ -51,16 +51,69 @@ python scripts/run_l2.py --repo /path/to/repo --out /tmp/out --backend sbert
 
 # Host + chunks/embeddings + concept graph
 python scripts/run_l3.py --repo /path/to/repo --out /tmp/out --backend sbert
+
+# Host + chunks/embeddings + concept graph + symbol xrefs
+python scripts/run_xrefs.py --repo /path/to/repo --out /tmp/out --backend hash --concepts
 ```
 
 `--backend sbert` uses `sentence-transformers/all-MiniLM-L6-v2`; `--backend hash`
 uses a deterministic SHA-256 fake (no semantics, useful for contract tests).
 
+`--repo` accepts either a local path or a Git URL. GitHub HTTPS, SSH, and the
+`github.com/OWNER/REPO` shorthand are supported. Remote repositories are cloned
+into a temporary directory, analyzed, and removed when the run exits.
+
+```bash
+python scripts/run_xrefs.py \
+  --repo https://github.com/OWNER/REPO.git \
+  --out _tmp/repo-map \
+  --backend hash \
+  --concepts
+
+python scripts/run_xrefs.py \
+  --repo git@github.com:OWNER/REPO.git \
+  --out _tmp/repo-map \
+  --backend sbert \
+  --concepts
+
+python scripts/run_xrefs.py \
+  --repo github.com/OWNER/REPO \
+  --out _tmp/repo-map \
+  --backend hash \
+  --concepts
+```
+
+For a complete walkthrough, including Docker usage, branch selection, excludes,
+and bundle inspection, see [docs/analyze.md](docs/analyze.md).
+
+### Docker
+
+Build an isolated analyzer image:
+
+```bash
+docker build -t codebase-mapper .
+```
+
+Run all layers against a GitHub URL:
+
+```bash
+mkdir -p _tmp
+docker run --rm -v "$PWD/_tmp:/work" codebase-mapper \
+  https://github.com/OWNER/REPO.git --out /work/repo-map
+```
+
+The default image is optimized for `--backend hash`. Build semantic embedding
+dependencies only when needed:
+
+```bash
+docker build --build-arg WITH_SBERT=1 -t codebase-mapper:sbert .
+```
+
 ### Excluding files
 
 Per-invocation: `--exclude PATTERN` (repeatable; POSIX-glob; bare names like
 `.repo` also exclude descendants). Available on the host CLI and on
-`scripts/run_l2.py` / `scripts/run_l3.py`.
+`scripts/run_l2.py` / `scripts/run_l3.py` / `scripts/run_xrefs.py`.
 
 Per-repo: drop a `.cbmignore` at the repo root. One pattern per line, `#`
 comments, blank lines OK. Patterns merge with `--exclude` and appear in
@@ -180,13 +233,14 @@ them after a clear.
 python tests/verify_roundtrip.py            # blob-based byte-perfect roundtrip
 python tests/verify_regenerate.py           # TTL+AST regenerate (Python semantic + TS/JS byte)
 python tests/verify_excludes.py             # --exclude flag + .cbmignore behavior
+python tests/verify_repo_source.py          # local path + Git URL --repo handling
 python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
 python tests/verify_l3.py                   # concept_graph contract + cross-layer
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 ```
 
-All seven verifiers resolve `repo_root` from their own `__file__`, so they
+All eight verifiers resolve `repo_root` from their own `__file__`, so they
 run correctly regardless of the caller's cwd.
 
 ### File timestamps
@@ -213,6 +267,8 @@ In-flight design work lives under [docs/](docs/):
 
 - [docs/regenerate.md](docs/regenerate.md) — extender's contract for
   adding a new language to `_REGENERATORS`.
+- [docs/analyze.md](docs/analyze.md) — local path, GitHub URL, Docker, and
+  bundle inspection workflow.
 - [docs/symbol-xrefs-plan.md](docs/symbol-xrefs-plan.md) — proposed
   symbol-level xref edge layer (SCIP / Stack Graphs analogue), broken
   into 10 shippable steps. Design only; no code yet.

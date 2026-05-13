@@ -1,0 +1,244 @@
+# Analyze a Codebase
+
+`codebase-mapper` can analyze either a local Git checkout or a cloneable Git
+URL. For a full bundle with all current layers, use `scripts/run_xrefs.py`
+with `--concepts`.
+
+## Full Analysis
+
+```bash
+python scripts/run_xrefs.py \
+  --repo /path/to/repo \
+  --out _tmp/repo-map \
+  --backend hash \
+  --concepts
+```
+
+This runs:
+
+| Layer | Output |
+|---|---|
+| L1 host | file inventory, AST summaries, imports, dependency/test edges |
+| L2 chunks | source chunks and embedding vectors |
+| L3 concepts | canonical concepts, co-occurrence graph, concept centroids |
+| xrefs | symbol-level call, subclass, and override edges |
+
+The output directory is a bundle containing `run_manifest.json`,
+`inventory.ttl`, `inventory.jsonld`, `shapes.shacl.ttl`, chunk embedding
+sidecars, concept sidecars, `xrefs.jsonl`, and optional `blobs/`.
+
+## Local Repositories
+
+The `--repo` value can be any local Git worktree:
+
+```bash
+python scripts/run_xrefs.py \
+  --repo ~/src/my-project \
+  --out _tmp/my-project-map \
+  --backend hash \
+  --concepts
+```
+
+Use `--state` to analyze a specific commit, tag, or branch:
+
+```bash
+python scripts/run_xrefs.py \
+  --repo ~/src/my-project \
+  --state v1.2.0 \
+  --out _tmp/my-project-v1.2.0-map \
+  --backend hash \
+  --concepts
+```
+
+## GitHub URLs
+
+The same `--repo` option accepts cloneable Git URLs. Remote repositories are
+cloned into a temporary directory, checked out, analyzed, and removed when the
+process exits.
+
+Supported forms:
+
+```bash
+https://github.com/OWNER/REPO.git
+git@github.com:OWNER/REPO.git
+ssh://git@github.com/OWNER/REPO.git
+github.com/OWNER/REPO
+```
+
+Examples:
+
+```bash
+python scripts/run_xrefs.py \
+  --repo https://github.com/OWNER/REPO.git \
+  --out _tmp/repo-map \
+  --backend hash \
+  --concepts
+
+python scripts/run_xrefs.py \
+  --repo git@github.com:OWNER/PRIVATE_REPO.git \
+  --out _tmp/private-map \
+  --backend hash \
+  --concepts
+```
+
+For a remote branch or tag:
+
+```bash
+python scripts/run_xrefs.py \
+  --repo https://github.com/OWNER/REPO.git \
+  --state feature-branch \
+  --out _tmp/repo-feature-map \
+  --backend hash \
+  --concepts
+```
+
+When a branch name is not available as a local ref after cloning, the CLI also
+tries `origin/<branch>`.
+
+## Embedding Backends
+
+Use `hash` for fast, deterministic output:
+
+```bash
+--backend hash
+```
+
+Use `sbert` for semantic chunk search:
+
+```bash
+--backend sbert
+```
+
+`sbert` uses `sentence-transformers/all-MiniLM-L6-v2` by default and may
+download model files on first use. Override the model with:
+
+```bash
+--sbert-model sentence-transformers/all-MiniLM-L6-v2
+```
+
+## Excluding Files
+
+Exclude generated or vendored paths per invocation:
+
+```bash
+python scripts/run_xrefs.py \
+  --repo https://github.com/OWNER/REPO.git \
+  --out _tmp/repo-map \
+  --backend hash \
+  --concepts \
+  --exclude 'node_modules/**' \
+  --exclude 'vendor/**' \
+  --exclude 'dist/**'
+```
+
+Quote glob patterns in shells such as zsh so the shell does not expand them
+before Python receives the argument.
+
+You can also add a `.cbmignore` file at the target repo root:
+
+```gitignore
+.git
+node_modules/**
+vendor/**
+dist/**
+build/**
+```
+
+Patterns from `--exclude` and `.cbmignore` are merged and recorded in
+`run_manifest.json`.
+
+## Docker
+
+The root `Dockerfile` builds an isolated analyzer image with Git, SSH client
+support, Python dependencies, and `codebase-mapper` installed.
+
+```bash
+docker build -t codebase-mapper .
+```
+
+Run all layers against a GitHub URL and write the bundle to a mounted output
+directory:
+
+```bash
+mkdir -p _tmp
+docker run --rm -v "$PWD/_tmp:/work" codebase-mapper \
+  https://github.com/OWNER/REPO.git --out /work/repo-map
+```
+
+The image defaults to:
+
+```bash
+python /opt/codebase-mapper/scripts/run_xrefs.py --concepts
+```
+
+You can pass the explicit `--repo` form if preferred:
+
+```bash
+docker run --rm -v "$PWD/_tmp:/work" codebase-mapper \
+  --repo https://github.com/OWNER/REPO.git \
+  --out /work/repo-map \
+  --backend hash
+```
+
+Analyze a local checkout through Docker:
+
+```bash
+docker run --rm \
+  -v "$PWD:/src:ro" \
+  -v "$PWD/_tmp:/work" \
+  codebase-mapper \
+  --repo /src \
+  --out /work/current-map \
+  --backend hash \
+  --exclude '_tmp/**'
+```
+
+For private GitHub repositories over SSH, mount your SSH config read-only:
+
+```bash
+docker run --rm \
+  -v "$PWD/_tmp:/work" \
+  -v "$HOME/.ssh:/root/.ssh:ro" \
+  codebase-mapper \
+  git@github.com:OWNER/PRIVATE_REPO.git --out /work/private-map
+```
+
+The default Docker image is optimized for `--backend hash` and does not install
+the semantic embedding stack. Build a semantic image when you need `sbert`:
+
+```bash
+docker build --build-arg WITH_SBERT=1 -t codebase-mapper:sbert .
+
+docker run --rm -v "$PWD/_tmp:/work" codebase-mapper:sbert \
+  https://github.com/OWNER/REPO.git \
+  --out /work/repo-map \
+  --backend sbert
+```
+
+## Inspect the Bundle
+
+Start the FastAPI backend against the generated bundle:
+
+```bash
+CBM_OUTPUT_DIR=_tmp/repo-map \
+  uv run uvicorn frontend.backend.app:app --port 8000 --reload
+```
+
+Useful endpoints:
+
+```bash
+curl http://localhost:8000/api/summary
+curl 'http://localhost:8000/api/file-graph?limit=100'
+curl 'http://localhost:8000/api/concept-graph?limit=100'
+curl 'http://localhost:8000/api/chunks?limit=20'
+```
+
+For the React UI, run the backend on port `8765`, then:
+
+```bash
+cd frontend/ui
+npm install
+npm run dev
+```
+
+The Vite dev server prints the local UI URL.

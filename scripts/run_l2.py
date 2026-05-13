@@ -14,11 +14,13 @@ from pathlib import Path
 
 from plugins import chunks_embeddings
 from codebase_mapper import emit, map_codebase, reset_registries
+from codebase_mapper.repo_source import resolve_repo_source
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--repo", type=Path, required=True)
+    p.add_argument("--repo", required=True,
+                   help="Local repository path or Git URL, including GitHub URLs.")
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--name", default=None)
     p.add_argument("--state", default="HEAD")
@@ -43,10 +45,11 @@ def main(argv: list[str] | None = None) -> int:
         backend = chunks_embeddings.DeterministicHashBackend(args.hash_dim)
     chunks_embeddings.register_all(backend)
 
-    repo_name = args.name or args.repo.resolve().name
-    mapped = map_codebase(args.repo.resolve(), args.state, exclude_patterns=args.exclude)
-    manifest = emit(repo_name, mapped, args.out.resolve(),
-                    emit_blobs_flag=not args.no_emit_blobs)
+    with resolve_repo_source(args.repo, args.state) as repo:
+        repo_name = args.name or repo.name
+        mapped = map_codebase(repo.path, repo.state, exclude_patterns=args.exclude)
+        manifest = emit(repo_name, mapped, args.out.resolve(),
+                        emit_blobs_flag=not args.no_emit_blobs)
     print(json.dumps(manifest, indent=2, sort_keys=True))
     return 0 if manifest.get("shacl_self_check", {}).get("conforms") else 1
 

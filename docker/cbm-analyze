@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_all=(python /opt/codebase-mapper/scripts/run_xrefs.py --concepts)
+
+if [[ $# -eq 0 ]]; then
+  cat <<'USAGE'
+Usage:
+  docker run --rm -v "$PWD/_tmp:/work" codebase-mapper \
+    --repo https://github.com/OWNER/REPO.git \
+    --out /work/REPO-map
+
+Shortcut:
+  docker run --rm -v "$PWD/_tmp:/work" codebase-mapper \
+    https://github.com/OWNER/REPO.git --out /work/REPO-map
+
+The default command runs all analysis layers: L1 + L2 + L3 + symbol xrefs.
+Pass --backend sbert for semantic embeddings; the default is --backend hash.
+USAGE
+  exit 0
+fi
+
+case "$1" in
+  bash|sh|python|python3|pip|git|codebase-mapper)
+    exec "$@"
+    ;;
+  --*)
+    exec "${run_all[@]}" "$@"
+    ;;
+  *)
+    exec "${run_all[@]}" --repo "$@"
+    ;;
+esac

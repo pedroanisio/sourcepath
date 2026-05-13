@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .emit_bundle import emit
 from .pipeline import map_codebase
+from .repo_source import resolve_repo_source
 from .reconstruct import reconstruct, verify_roundtrip
 from .regenerate import regenerate
 from .self_test import self_test
@@ -15,7 +16,8 @@ from .self_test import self_test
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Map a codebase to RDF + SHACL; optionally roundtrip-verify.")
-    p.add_argument("--repo", type=Path)
+    p.add_argument("--repo",
+                   help="Local repository path or Git URL, including GitHub URLs.")
     p.add_argument("--state", default="HEAD")
     p.add_argument("--out", type=Path)
     p.add_argument("--name", default=None)
@@ -66,17 +68,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.verify_roundtrip:
         if not args.repo:
             p.error("--verify-roundtrip requires --repo")
-        report = verify_roundtrip(args.repo.resolve(), args.state, args.exclude)
-        print(json.dumps(report, indent=2, sort_keys=True))
-        return 0 if report["roundtrip_ok"] else 1
+        with resolve_repo_source(args.repo, args.state) as repo:
+            report = verify_roundtrip(repo.path, repo.state, args.exclude)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 0 if report["roundtrip_ok"] else 1
 
     if not args.repo or not args.out:
         p.error("--repo and --out are required unless --self-test/--reconstruct/--regenerate/--verify-roundtrip is given")
 
-    repo = args.repo.resolve()
-    repo_name = args.name or repo.name
-    mapped = map_codebase(repo, args.state, exclude_patterns=args.exclude)
-    manifest = emit(repo_name, mapped, args.out.resolve(),
-                    emit_blobs_flag=not args.no_emit_blobs)
+    with resolve_repo_source(args.repo, args.state) as repo:
+        repo_name = args.name or repo.name
+        mapped = map_codebase(repo.path, repo.state, exclude_patterns=args.exclude)
+        manifest = emit(repo_name, mapped, args.out.resolve(),
+                        emit_blobs_flag=not args.no_emit_blobs)
     print(json.dumps(manifest, indent=2, sort_keys=True))
     return 0 if manifest["shacl_self_check"]["conforms"] else 1
