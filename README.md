@@ -202,3 +202,13 @@ runs over an untouched working tree still produce byte-identical
 mappings the working tree may not match the mapped commit; in that case
 the filesystem times reflect whatever's on disk and `cbm:gitCommitTime`
 remains correct for the mapped commit.
+
+## Design docs
+
+In-flight design work lives under [docs/](docs/):
+
+- [docs/regenerate.md](docs/regenerate.md) — extender's contract for
+  adding a new language to `_REGENERATORS`.
+- [docs/symbol-xrefs-plan.md](docs/symbol-xrefs-plan.md) — proposed
+  symbol-level xref edge layer (SCIP / Stack Graphs analogue), broken
+  into 10 shippable steps. Design only; no code yet.
