@@ -185,6 +185,34 @@ export const fileImpactFixture: FileImpact = {
       embeddingRow: 0,
     },
   ],
+  symbol_callers: [
+    {
+      idx: 21,
+      symbol: "caller_one",
+      kind: "function",
+      file: "c.py",
+      beginLine: 5,
+      endLine: 10,
+    },
+  ],
+  symbol_callees: [
+    {
+      idx: 31,
+      symbol: "downstream_helper",
+      kind: "function",
+      file: "b.py",
+      beginLine: 12,
+      endLine: 18,
+    },
+    {
+      idx: 32,
+      symbol: "deeper_helper",
+      kind: "function",
+      file: "e.py",
+      beginLine: 1,
+      endLine: 4,
+    },
+  ],
   truncated: false,
 };
 

@@ -154,6 +154,51 @@ describe("FileDetail route", () => {
     expect(exactBadges[0]).not.toHaveClass("muted");
   });
 
+  it("renders Symbol callers/callees sections with chunk + file links", async () => {
+    renderAt("/file/a.py");
+    // Wait for impact card to load (Change impact heading appears once
+    // /api/impact resolves) before asserting the symbol-level sections.
+    await screen.findByText("Change impact");
+    expect(screen.getByText(/Symbol callers, depth 2 \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Symbol callees, depth 2 \(2\)/)).toBeInTheDocument();
+    // Each row links to its chunk by idx and shows the parent file.
+    expect(screen.getByRole("link", { name: "caller_one" })).toHaveAttribute(
+      "href",
+      "/chunk/21",
+    );
+    expect(screen.getByRole("link", { name: "downstream_helper" })).toHaveAttribute(
+      "href",
+      "/chunk/31",
+    );
+    expect(screen.getByRole("link", { name: "deeper_helper" })).toHaveAttribute(
+      "href",
+      "/chunk/32",
+    );
+    // The parent-file link is rendered for context.
+    const eLinks = screen.getAllByRole("link", { name: "e.py" });
+    expect(eLinks[0]).toHaveAttribute("href", "/file/e.py");
+  });
+
+  it("renders empty Symbol caller/callee sections when bundle has no transitive edges", async () => {
+    const originalFetch = (globalThis as any).fetch;
+    (globalThis as any).fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/impact/")) {
+        const stripped = {
+          ...((await (await originalFetch(input)).json()) as any),
+        };
+        stripped.symbol_callers = [];
+        stripped.symbol_callees = [];
+        return new Response(JSON.stringify(stripped), { status: 200 });
+      }
+      return originalFetch(input);
+    };
+    renderAt("/file/a.py");
+    await screen.findByText("Change impact");
+    expect(screen.getByText(/Symbol callers, depth 2 \(0\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Symbol callees, depth 2 \(0\)/)).toBeInTheDocument();
+  });
+
   it("renders empty xrefs panels when the bundle has no edges", async () => {
     // Patch fetch to return a FileDetail without xrefs_out / xrefs_in.
     const originalFetch = (globalThis as any).fetch;

@@ -89,6 +89,11 @@ export interface FileImpact {
   tested_subjects: string[];
   concepts: string[];
   chunks: ChunkRow[];
+  // Symbol-level transitive impact (BFS over cbmxr:Edge). Optional —
+  // older bundles without xrefs.jsonl return empty lists; absent on
+  // pre-Phase-9 backends.
+  symbol_callers?: ChunkRow[];
+  symbol_callees?: ChunkRow[];
   truncated: boolean;
 }
 

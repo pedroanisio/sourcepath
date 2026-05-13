@@ -536,6 +536,13 @@ class ImpactResp(BaseModel):
     tested_subjects: list[str]
     concepts: list[str]
     chunks: list[ChunkResp]
+    # Symbol-level transitive impact via cbmxr:Edge walks. Seeds are every
+    # chunk in the file; ``symbol_callees`` walks outgoing call edges (this
+    # file's chunks → who they reach), ``symbol_callers`` walks incoming
+    # call edges (who reaches into this file's chunks). Lists exclude the
+    # seed chunks themselves. Empty for bundles without xrefs.jsonl.
+    symbol_callers: list[ChunkResp] = []
+    symbol_callees: list[ChunkResp] = []
     truncated: bool = False
 
 
@@ -950,6 +957,45 @@ def _walk_paths(
     return out, truncated
 
 
+def _walk_xref_chunks(
+    seeds: list[int],
+    adjacency: dict[int, list[int]],
+    edges: list[dict[str, Any]],
+    peer_key: str,
+    depth: int,
+    limit: int,
+) -> tuple[list[int], bool]:
+    """BFS over the xref graph from a set of seed chunk indices.
+
+    ``adjacency`` maps a chunk_idx to the edge_indices touching it
+    (``xrefs_by_src_idx`` for downstream walks, ``xrefs_by_dst_idx`` for
+    upstream). ``peer_key`` selects the other end of each edge:
+    ``"dst_idx"`` when walking downstream, ``"src_idx"`` upstream.
+
+    Seeds are marked seen so they don't appear in the result. Returns the
+    reached chunk_idxs in discovery order plus a truncation flag.
+    """
+    seen = set(seeds)
+    frontier = list(seeds)
+    out: list[int] = []
+    for _ in range(depth):
+        next_frontier: list[int] = []
+        for node in frontier:
+            for e_idx in adjacency.get(node, []):
+                peer = edges[e_idx][peer_key]
+                if peer in seen:
+                    continue
+                seen.add(peer)
+                out.append(peer)
+                next_frontier.append(peer)
+                if len(out) >= limit:
+                    return out, True
+        frontier = next_frontier
+        if not frontier:
+            break
+    return out, False
+
+
 @app.get("/api/impact/{path:path}", response_model=ImpactResp)
 def impact(
     path: str,
@@ -977,6 +1023,29 @@ def impact(
     for impacted in dependents:
         related_tests.update(b.tests_for_subject.get(impacted, []))
 
+    # Symbol-level transitive walk. Seed = every chunk in the file. The
+    # outgoing walk follows xrefs_by_src_idx (this file's chunks → who they
+    # reach); the incoming walk follows xrefs_by_dst_idx (who reaches into
+    # this file). Seeds are excluded from the results.
+    file_chunk_seeds = list(b.chunks_by_file.get(path, []))
+    callee_idxs, callees_trunc = _walk_xref_chunks(
+        file_chunk_seeds, b.xrefs_by_src_idx, b.xrefs, "dst_idx", depth, limit,
+    )
+    caller_idxs, callers_trunc = _walk_xref_chunks(
+        file_chunk_seeds, b.xrefs_by_dst_idx, b.xrefs, "src_idx", depth, limit,
+    )
+
+    def _as_chunk_resp(i: int) -> ChunkResp:
+        return ChunkResp(**{
+            k: b.chunks[i].get(k)
+            for k in ("idx", "symbol", "kind", "file", "beginLine", "endLine", "embeddingRow")
+        })
+
+    symbol_callees = [_as_chunk_resp(i) for i in callee_idxs]
+    symbol_callers = [_as_chunk_resp(i) for i in caller_idxs]
+    symbol_callees.sort(key=lambda r: (r.file or "", r.beginLine or 0, r.symbol or ""))
+    symbol_callers.sort(key=lambda r: (r.file or "", r.beginLine or 0, r.symbol or ""))
+
     return ImpactResp(
         file=path,
         depth=depth,
@@ -988,7 +1057,9 @@ def impact(
         tested_subjects=sorted(tested_subjects),
         concepts=list((b.concepts.get("per_path_concepts") or {}).get(path, [])),
         chunks=chunks,
-        truncated=dep_truncated or rev_truncated,
+        symbol_callers=symbol_callers,
+        symbol_callees=symbol_callees,
+        truncated=dep_truncated or rev_truncated or callees_trunc or callers_trunc,
     )
 
 

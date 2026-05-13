@@ -113,6 +113,14 @@ export default function FileDetail() {
               title={`Related tests (${impact.related_tests.length})`}
               items={impact.related_tests}
             />
+            <SymbolImpactList
+              title={`Symbol callers, depth ${impact.depth} (${(impact.symbol_callers ?? []).length})`}
+              rows={impact.symbol_callers ?? []}
+            />
+            <SymbolImpactList
+              title={`Symbol callees, depth ${impact.depth} (${(impact.symbol_callees ?? []).length})`}
+              rows={impact.symbol_callees ?? []}
+            />
           </div>
           {impact.truncated && (
             <div className="impact-note">Results truncated by backend limit.</div>
@@ -253,6 +261,41 @@ function ImpactList({ title, items }: { title: string; items: string[] }) {
       )}
       {items.length > 12 && (
         <div className="impact-note">+{items.length - 12} more</div>
+      )}
+    </section>
+  );
+}
+
+
+function SymbolImpactList({ title, rows }: { title: string; rows: ChunkRow[] }) {
+  return (
+    <section className="impact-list">
+      <h4>{title}</h4>
+      {rows.length === 0 ? (
+        <div className="empty compact">none</div>
+      ) : (
+        <ul>
+          {rows.slice(0, 12).map((r) => (
+            <li key={`${r.idx}-${r.file ?? ""}`}>
+              {r.idx != null ? (
+                <Link to={`/chunk/${r.idx}`}>{r.symbol ?? "—"}</Link>
+              ) : (
+                r.symbol ?? "—"
+              )}
+              {r.file && (
+                <>
+                  {" "}
+                  <span className="impact-note" style={{ display: "inline" }}>
+                    in <Link to={fileLink(r.file)}>{r.file}</Link>
+                  </span>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {rows.length > 12 && (
+        <div className="impact-note">+{rows.length - 12} more</div>
       )}
     </section>
   );

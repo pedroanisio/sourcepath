@@ -305,6 +305,131 @@ def test_symbol_graph_empty_bundle(tmp_path: Path):
         assert body["total_nodes_available"] == 0
 
 
+# ----------------------------------------------- /api/impact (Phase 9: symbol)
+# Chain fixture: a.py → b.py → c.py, each module exposes a single top-level
+# function that calls the next. Tests transitive walks across multiple hops.
+CHAIN_A = '''\
+from b import b
+def a():
+    b()
+'''
+CHAIN_B = '''\
+from c import c
+def b():
+    c()
+'''
+CHAIN_C = '''\
+def c():
+    return 1
+'''
+
+
+@pytest.fixture(scope="module")
+def chain_bundle() -> Path:
+    work = Path(tempfile.mkdtemp(prefix="backend_xrefs_chain_"))
+    try:
+        fixture = work / "fixture"
+        fixture.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=fixture, check=True)
+        subprocess.run(
+            ["git", "-C", str(fixture), "config", "user.email", "t@t"], check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(fixture), "config", "user.name", "t"], check=True,
+        )
+        (fixture / "a.py").write_text(CHAIN_A)
+        (fixture / "b.py").write_text(CHAIN_B)
+        (fixture / "c.py").write_text(CHAIN_C)
+        subprocess.run(["git", "-C", str(fixture), "add", "-A"], check=True)
+        subprocess.run(
+            ["git", "-C", str(fixture), "commit", "-q", "-m", "init"], check=True,
+        )
+
+        bundle = work / "bundle"
+        env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
+        r = subprocess.run(
+            [
+                sys.executable, "scripts/run_xrefs.py",
+                "--repo", str(fixture), "--out", str(bundle),
+                "--backend", "hash", "--hash-dim", "64", "--no-emit-blobs",
+            ],
+            env=env, cwd=str(REPO_ROOT),
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            pytest.fail(f"chain bundle build failed: {r.stderr[-1000:]}")
+        yield bundle
+    finally:
+        if not os.environ.get("XREF_TEST_KEEP"):
+            import shutil
+            shutil.rmtree(work, ignore_errors=True)
+
+
+@pytest.fixture(scope="module")
+def chain_client(chain_bundle: Path):
+    os.environ["CBM_OUTPUT_DIR"] = str(chain_bundle)
+    import app as app_module  # type: ignore
+    app_module.get_bundle.cache_clear()
+    with TestClient(app_module.app) as c:
+        yield c
+
+
+def test_impact_symbol_callees_transitive_downstream(chain_client: TestClient):
+    """From a.py with depth=3 the symbol-level callees include b AND c."""
+    body = chain_client.get("/api/impact/a.py?depth=3").json()
+    callee_symbols = {r["symbol"] for r in body["symbol_callees"]}
+    assert {"b", "c"}.issubset(callee_symbols), body["symbol_callees"]
+
+
+def test_impact_symbol_callers_transitive_upstream(chain_client: TestClient):
+    """From c.py with depth=3 the symbol-level callers include b AND a."""
+    body = chain_client.get("/api/impact/c.py?depth=3").json()
+    caller_symbols = {r["symbol"] for r in body["symbol_callers"]}
+    assert {"a", "b"}.issubset(caller_symbols), body["symbol_callers"]
+
+
+def test_impact_symbol_depth_one_limits_to_direct_neighbors(chain_client: TestClient):
+    """From b.py with depth=1 only direct neighbors appear in each direction."""
+    body = chain_client.get("/api/impact/b.py?depth=1").json()
+    assert {r["symbol"] for r in body["symbol_callees"]} == {"c"}
+    assert {r["symbol"] for r in body["symbol_callers"]} == {"a"}
+
+
+def test_impact_symbol_seeds_excluded_from_their_own_result(chain_client: TestClient):
+    """The file's own chunks must not appear in symbol_callers/callees."""
+    body = chain_client.get("/api/impact/b.py?depth=3").json()
+    callee_idxs = {r["idx"] for r in body["symbol_callees"]}
+    caller_idxs = {r["idx"] for r in body["symbol_callers"]}
+    # b.py's own chunk is the seed; it must not be reported.
+    b_file = chain_client.get("/api/file/b.py").json()
+    seed_idxs = {c["idx"] for c in b_file["chunks"]}
+    assert callee_idxs.isdisjoint(seed_idxs), (callee_idxs, seed_idxs)
+    assert caller_idxs.isdisjoint(seed_idxs), (caller_idxs, seed_idxs)
+
+
+def test_impact_file_level_walk_unchanged_by_phase9(chain_client: TestClient):
+    """The pre-existing file-level fields must be byte-identical to a
+    bundle without xrefs — Phase 9 must not touch the file-level walk."""
+    body = chain_client.get("/api/impact/a.py?depth=3").json()
+    # Each module imports the next; the file-level transitive walk should
+    # still produce {b.py, c.py} downstream.
+    assert set(body["transitive_dependencies"]) == {"b.py", "c.py"}
+    assert body["transitive_dependents"] == []
+    assert set(body["direct_dependencies"]) == {"b.py"}
+
+
+def test_impact_rows_carry_chunk_metadata(chain_client: TestClient):
+    """Each symbol_caller/callee row carries idx + file + symbol + lines so
+    the UI can render and link without a second round-trip."""
+    body = chain_client.get("/api/impact/a.py?depth=3").json()
+    for r in body["symbol_callees"]:
+        assert r["idx"] is not None
+        assert r["symbol"]
+        assert r["file"]
+        assert r["beginLine"] is not None
+        assert r["endLine"] is not None
+
+
 # ---------------------------------------------------------------- backward compat
 def test_backend_serves_bundle_without_xrefs_jsonl(tmp_path: Path):
     """A bundle missing xrefs.jsonl should still load and serve empty
@@ -350,3 +475,8 @@ def test_backend_serves_bundle_without_xrefs_jsonl(tmp_path: Path):
         file_body = c.get("/api/file/app.py").json()
         assert file_body["xrefs_out"] == []
         assert file_body["xrefs_in"] == []
+        # Phase 9: impact response also degrades gracefully — empty
+        # symbol_callers/callees, but the file-level walks still work.
+        impact_body = c.get("/api/impact/app.py?depth=2").json()
+        assert impact_body["symbol_callers"] == []
+        assert impact_body["symbol_callees"] == []
