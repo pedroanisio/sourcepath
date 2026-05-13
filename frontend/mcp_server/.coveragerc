@@ -1,0 +1,15 @@
+[run]
+source = frontend/mcp_server
+omit =
+    frontend/mcp_server/tests/*
+    frontend/mcp_server/pytest.ini
+    frontend/mcp_server/.coveragerc
+    frontend/mcp_server/__main__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+show_missing = True

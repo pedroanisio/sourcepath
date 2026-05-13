@@ -18,6 +18,11 @@ frontend/
 # backend: 28 cases via fastapi.testclient, gates at ≥90% coverage
 .venv/bin/python -m pytest frontend/backend/tests/
 
+# mcp server: 357 cases (schemas, handlers, stdio + HTTP transport,
+# resources, prompts, subscriptions, OAuth, hardening, SPARQL),
+# gates at ≥90% coverage
+.venv/bin/python -m pytest frontend/mcp_server/tests/
+
 # ui: 37 cases via vitest + RTL with mocked /api/*, gates at ≥90% coverage
 cd frontend/ui && npm test -- --coverage
 ```
@@ -28,6 +33,7 @@ lines) and fail when the threshold drops. Current state:
 | Layer | Tests | Statements | Branches | Functions | Lines |
 |---|---|---|---|---|---|
 | backend (`app.py`) | 28 | 98% | n/a | n/a | 98% |
+| mcp_server (`*.py`) | 357 | 95% | n/a | n/a | 95% |
 | ui (`src/**/*.tsx`) | 37 | 100% | 92% | 92% | 100% |
 
 The backend tests auto-skip if `_tmp/usl-ng-core-map/run_manifest.json` is

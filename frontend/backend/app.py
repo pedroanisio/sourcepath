@@ -465,6 +465,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Optionally expose the MCP server over streamable HTTP. Skipped unless
+# CBM_MCP_TOKEN is set — no anonymous remote access by default.
+if os.environ.get("CBM_MCP_TOKEN"):
+    try:
+        from frontend.mcp_server.http_transport import mount_mcp  # noqa: E402
+        mount_mcp(app)
+    except Exception:  # pragma: no cover — mount must never break the REST app
+        import logging
+        logging.getLogger("cbm").exception("failed to mount MCP HTTP transport")
+
 
 @app.get("/api/bundles", response_model=BundleListResp)
 def bundles() -> BundleListResp:
