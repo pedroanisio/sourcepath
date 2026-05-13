@@ -19,6 +19,7 @@ from __future__ import annotations
 from .aggregator import XrefAggregator, XREF_INDEX_KEY
 from .artifact import XrefsArtifact, SIDECAR_FILENAME
 from .graph_writer import XrefGraphWriter, XrefShapes, chunk_iri, edge_iri
+from .python_resolver import resolve_python_intra_file
 
 
 __all__ = [
@@ -30,14 +31,17 @@ __all__ = [
     "SIDECAR_FILENAME",
     "chunk_iri",
     "edge_iri",
+    "resolve_python_intra_file",
     "register_all",
 ]
 
 
-# Per-language resolvers. Phase 1 ships empty; later phases populate.
-# Each entry: language string (matches FileRecord.language) -> callable
+# Per-language resolvers. Phase N adds one entry. Each entry:
+# language string (matches FileRecord.language) -> callable
 # (record, ctx) -> (list[SymbolXrefEdge], list[UnresolvedSymbolRef]).
-_RESOLVERS: dict = {}
+_RESOLVERS: dict = {
+    "python": resolve_python_intra_file,
+}
 
 
 def register_all() -> None:

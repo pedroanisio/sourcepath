@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
-"""verify_xrefs.py — Phase 1 contract for the symbol-xref layer.
+"""verify_xrefs.py — contract suite for the symbol-xref layer.
 
-Phase 1 ships only the schema + vocab + empty plumbing. Tests:
-
-  1. Empty contract: no resolvers registered → manifest fragment reports
-     zero edges/unresolved, xrefs.jsonl exists and is empty.
-  2. Vocabulary bound: ``cbmxr:`` appears in inventory.ttl;
-     ``cbmxr:EdgeShape`` appears in shapes.shacl.ttl.
-  3. SHACL conforms with no edges (trivial well-formedness).
-  4. Determinism: two consecutive runs produce a byte-identical sidecar
-     and inventory.
+Phase 1 — schema, vocab, empty plumbing (no L2 registered, no resolvers fire):
+  1. Empty contract: manifest fragment reports zero edges/unresolved,
+     xrefs.jsonl exists and is empty.
+  2. Vocabulary bound: ``cbmxr:EdgeShape`` in shapes.shacl.ttl; the
+     ``cbmxr:`` prefix round-trips when an edge is mutated in.
+  3. SHACL conforms with no edges.
+  4. Determinism: two consecutive runs are byte-identical.
   5. Aggregator unit: ``XrefAggregator(resolvers={}).run(ctx)`` returns
      the documented empty shape.
-  6. SHACL positive: a well-formed ``cbmxr:Edge`` referencing a real
-     ``cbml2:Chunk`` validates.
-  7. SHACL negative — missing src: an edge without ``cbmxr:src`` fails.
-  8. SHACL negative — bad kind: an edge whose ``cbmxr:kind`` is outside
-     the enum fails.
-  9. SHACL negative — bad resolution: an edge whose ``cbmxr:resolution``
-     is outside the enum fails.
+  6-9. SHACL mutation suite: a well-formed edge validates; missing
+     src / bad kind / bad resolution are flagged.
+
+Phase 2 — Python intra-file ``calls`` resolver (L2 + symbol_xrefs registered):
+  10. The expected (src_symbol, dst_symbol, kind, resolution) triples land
+      in xrefs.jsonl. Negative cases (Attribute calls, builtins,
+      module-level calls, nested-function calls) do not.
+  11. Each emitted edge's src/dst chunk_id corresponds to a real
+      ``cbml2:Chunk`` in inventory.ttl (reference integrity).
+  12. SHACL conforms with real edges + real chunks.
+  13. xrefs.jsonl round-trips: each line parses to a dict matching the
+      in-graph triples; lines are sorted (deterministic).
+  14. Determinism with L2 + resolver: two runs byte-identical.
+  15. Pure resolver unit: ``resolve_python_intra_file`` called directly
+      on a record + chunks index returns the same edge set.
 
 Exit code: 0 if all pass, 1 otherwise.
 """
@@ -40,8 +46,13 @@ from rdflib.namespace import RDF
 from codebase_mapper import emit, map_codebase, reset_registries
 from codebase_mapper.constants import CBMI_NS, CBMXR, CBMXR_NS
 from codebase_mapper.extensions import PipelineCtx
-from plugins import symbol_xrefs
+from codebase_mapper.models import FileRecord
+from plugins import chunks_embeddings, symbol_xrefs
 from plugins.symbol_xrefs.aggregator import XREF_INDEX_KEY, XrefAggregator
+from plugins.symbol_xrefs.python_resolver import (
+    RESOLVER_NAME as PYTHON_INTRA_FILE,
+    resolve_python_intra_file,
+)
 
 
 CBML2 = Namespace("https://codebase-mapper.example.org/cbml2#")
@@ -63,21 +74,72 @@ def check(name: str, ok: bool, detail: str = "") -> None:
         FAIL += 1
 
 
-def build_fixture(target: Path) -> None:
-    """One Python file is enough; xrefs Phase 1 doesn't depend on chunks."""
+def build_minimal_fixture(target: Path) -> None:
+    """Phase 1 fixture: enough to exercise the empty contract."""
+    _init_git(target)
+    (target / "hello.py").write_text('def hi():\n    return "hi"\n')
+    _commit(target)
+
+
+# Phase 2 fixture — every call pattern Phase 2 must handle (positive + negative).
+# Line numbers are not asserted; the test matches edges by symbol name only.
+PHASE2_SRC = '''\
+def helper():
+    return 1
+
+
+def main():
+    helper()  # → edge: main → helper
+    helper()  # dedup; same edge
+
+
+def recursive(n):
+    if n > 0:
+        recursive(n - 1)  # → edge: recursive → recursive (self-call)
+
+
+class User:
+    def greet(self):
+        helper()  # → edge: User.greet → helper
+
+    def chained(self):
+        self.greet()  # Attribute call; Phase 2 skips
+
+
+def top_call():
+    print("hi")  # builtin / not in this file; skipped
+
+
+top_call()  # module-level call; no enclosing chunk; skipped
+'''
+
+
+def build_phase2_fixture(target: Path) -> None:
+    _init_git(target)
+    (target / "app.py").write_text(PHASE2_SRC)
+    _commit(target)
+
+
+def _init_git(target: Path) -> None:
     target.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=target, check=True)
     subprocess.run(["git", "-C", str(target), "config", "user.email", "t@t"], check=True)
     subprocess.run(["git", "-C", str(target), "config", "user.name", "t"], check=True)
-    (target / "hello.py").write_text('def hi():\n    return "hi"\n')
+
+
+def _commit(target: Path) -> None:
     subprocess.run(["git", "-C", str(target), "add", "-A"], check=True)
     subprocess.run(
         ["git", "-C", str(target), "commit", "-q", "-m", "init"], check=True,
     )
 
 
-def run_pipeline(fixture: Path, out_dir: Path) -> dict:
+def run_pipeline(fixture: Path, out_dir: Path, *, with_l2: bool = False) -> dict:
     reset_registries()
+    if with_l2:
+        chunks_embeddings.register_all(
+            chunks_embeddings.DeterministicHashBackend(dimension=64),
+        )
     symbol_xrefs.register_all()
     mapped = map_codebase(fixture.resolve(), "HEAD")
     return emit(fixture.name, mapped, out_dir.resolve(), emit_blobs_flag=False)
@@ -90,6 +152,17 @@ def _add_chunk(g: Graph, chunk_id: str = "demo#hello.py#hi") -> URIRef:
     ciri = URIRef(f"{CBMI_NS}chunk/{safe}")
     g.add((ciri, RDF.type, CBML2.Chunk))
     return ciri
+
+
+def _symbol_from_chunk_id(chunk_id: str) -> str:
+    """Parse the L2 chunk_id ``path#kind:symbol:L<a>-L<b>`` → ``symbol``.
+
+    Method chunks encode the parent as ``parent.symbol``; returned as-is.
+    """
+    _path, _hash, rest = chunk_id.partition("#")
+    _kind, _colon, rest = rest.partition(":")
+    symbol, _colon, _lines = rest.rpartition(":")
+    return symbol
 
 
 def _add_edge(g: Graph, *, src: URIRef, dst: URIRef,
@@ -120,8 +193,11 @@ def main(argv: list[str] | None = None) -> int:
 
     work = Path(tempfile.mkdtemp(prefix="verify_xrefs_"))
     try:
+        # =====================================================
+        # Phase 1: empty plumbing (no L2 registered)
+        # =====================================================
         fixture = work / "fixture"
-        build_fixture(fixture)
+        build_minimal_fixture(fixture)
 
         out1 = work / "out1"
         out2 = work / "out2"
@@ -272,6 +348,153 @@ def main(argv: list[str] | None = None) -> int:
         check("SHACL rejects edge with resolution outside enum",
               not mutated(case_bad_resolution),
               "should fail")
+
+        # =====================================================
+        # Phase 2: Python intra-file `calls` resolver
+        # =====================================================
+        p2_fixture = work / "p2_fixture"
+        build_phase2_fixture(p2_fixture)
+        p2_out1 = work / "p2_out1"
+        p2_out2 = work / "p2_out2"
+        p2_manifest = run_pipeline(p2_fixture, p2_out1, with_l2=True)
+        run_pipeline(p2_fixture, p2_out2, with_l2=True)
+
+        # --- 10. Edges match the expected (src, dst, kind, resolution) set ---
+        sidecar_lines = (p2_out1 / "xrefs.jsonl").read_text().splitlines()
+        emitted = [json.loads(line) for line in sidecar_lines]
+        actual_triples = {
+            (
+                _symbol_from_chunk_id(e["src_chunk_id"]),
+                _symbol_from_chunk_id(e["dst_chunk_id"]),
+                e["kind"],
+                e["resolution"],
+            )
+            for e in emitted
+        }
+        expected_triples = {
+            ("main", "helper", "calls", "exact"),
+            ("recursive", "recursive", "calls", "exact"),
+            ("User.greet", "helper", "calls", "exact"),
+        }
+        check(
+            "Phase 2: emitted call edges match expected (src, dst, kind, resolution)",
+            actual_triples == expected_triples,
+            f"expected={sorted(expected_triples)}\nactual={sorted(actual_triples)}",
+        )
+        check(
+            "Phase 2: every edge resolver is python_intra_file",
+            all(e["resolver"] == PYTHON_INTRA_FILE for e in emitted),
+            f"resolvers={set(e['resolver'] for e in emitted)}",
+        )
+        check(
+            "Phase 2: manifest fragment counts agree with sidecar",
+            (
+                p2_manifest["extensions"]["l3_50_xrefs_artifact"]["n_edges"]
+                == len(expected_triples)
+                and p2_manifest["extensions"]["l3_50_xrefs_artifact"]["by_kind"]
+                == {"calls": len(expected_triples)}
+                and p2_manifest["extensions"]["l3_50_xrefs_artifact"]["by_resolution"]
+                == {"exact": len(expected_triples)}
+            ),
+            json.dumps(p2_manifest["extensions"]["l3_50_xrefs_artifact"], indent=2),
+        )
+        check(
+            "Phase 2: manifest by_language reports python resolved count",
+            p2_manifest["extensions"]["l3_50_xrefs_artifact"]["by_language"].get("python", {}).get("resolved")
+            == len(expected_triples)
+            and p2_manifest["extensions"]["l3_50_xrefs_artifact"]["by_language"].get("python", {}).get("unresolved") == 0,
+            str(p2_manifest["extensions"]["l3_50_xrefs_artifact"].get("by_language")),
+        )
+
+        # --- 11. Reference integrity: every edge's src/dst exists as cbml2:Chunk ---
+        g_p2 = Graph()
+        g_p2.parse(str(p2_out1 / "inventory.ttl"), format="turtle")
+        chunk_subjects = set(g_p2.subjects(RDF.type, CBML2.Chunk))
+        edge_subjects = list(g_p2.subjects(RDF.type, CBMXR.Edge))
+        check(
+            "Phase 2: cbmxr:Edge count in inventory.ttl matches sidecar",
+            len(edge_subjects) == len(emitted),
+            f"ttl_edges={len(edge_subjects)} sidecar_edges={len(emitted)}",
+        )
+        bad_refs = []
+        for e_iri in edge_subjects:
+            for pred in (CBMXR.src, CBMXR.dst):
+                tgt = next(iter(g_p2.objects(e_iri, pred)), None)
+                if tgt is None or tgt not in chunk_subjects:
+                    bad_refs.append((str(e_iri), str(pred), str(tgt)))
+        check(
+            "Phase 2: every cbmxr:src/dst resolves to a real cbml2:Chunk",
+            not bad_refs,
+            f"bad={bad_refs[:3]}",
+        )
+
+        # --- 12. SHACL conforms with real edges ---
+        check(
+            "Phase 2: SHACL conforms with real edges + chunks",
+            p2_manifest["shacl_self_check"]["conforms"],
+            p2_manifest["shacl_self_check"].get("report_excerpt", ""),
+        )
+
+        # --- 13. Sidecar lines are ordered by edge tuple (deterministic) ---
+        # The contract is "edges sorted by (src, dst, kind, resolution, resolver)",
+        # not "lines sorted lexicographically as strings" (the JSON keys are
+        # alphabetical, so dst_chunk_id leads each line — sorting by string
+        # would shuffle the intended edge order).
+        edge_tuples = [
+            (e["src_chunk_id"], e["dst_chunk_id"], e["kind"], e["resolution"], e["resolver"])
+            for e in emitted
+        ]
+        check(
+            "Phase 2: xrefs.jsonl edges sorted by (src, dst, kind, resolution, resolver)",
+            edge_tuples == sorted(edge_tuples),
+            f"first divergence at line {next((i for i, (a, b) in enumerate(zip(edge_tuples, sorted(edge_tuples))) if a != b), -1)}",
+        )
+
+        # --- 14. Determinism under L2 + resolver ---
+        for fname in ("inventory.ttl", "shapes.shacl.ttl", "xrefs.jsonl"):
+            a = (p2_out1 / fname).read_bytes()
+            b = (p2_out2 / fname).read_bytes()
+            check(
+                f"Phase 2 determinism: {fname} byte-identical",
+                a == b,
+                f"len {len(a)} vs {len(b)}",
+            )
+
+        # --- 15. Pure resolver unit: same edges from direct call ---
+        # Rebuild the pipeline state in-process and call the resolver directly
+        # to prove it doesn't depend on emit / graph_writer.
+        reset_registries()
+        chunks_embeddings.register_all(
+            chunks_embeddings.DeterministicHashBackend(dimension=64),
+        )
+        symbol_xrefs.register_all()
+        from codebase_mapper.pipeline import map_codebase as _map
+        mapped = _map(p2_fixture.resolve(), "HEAD")
+        unit_ctx = mapped["ctx"]
+        py_records = [r for r in mapped["records"] if r.language == "python"]
+        unit_edges = []
+        for rec in py_records:
+            e, u = resolve_python_intra_file(rec, unit_ctx)
+            unit_edges.extend(e)
+            check(
+                f"Phase 2: resolver returned empty unresolved for {rec.path}",
+                u == [],
+                f"got {u}",
+            )
+        unit_triples = {
+            (
+                _symbol_from_chunk_id(e.src_chunk_id),
+                _symbol_from_chunk_id(e.dst_chunk_id),
+                e.kind,
+                e.resolution,
+            )
+            for e in unit_edges
+        }
+        check(
+            "Phase 2: pure resolver unit produces the same edge set",
+            unit_triples == expected_triples,
+            f"unit={sorted(unit_triples)}\nexpected={sorted(expected_triples)}",
+        )
 
         print()
         print(f"passed: {PASS}   failed: {FAIL}")
