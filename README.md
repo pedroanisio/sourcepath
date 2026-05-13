@@ -22,7 +22,8 @@ plugins/
 └── symbol_xrefs/       symbol-level xref edges (cbmxr:Edge) — Phase 1 scaffold
 scripts/
 ├── run_l2.py           host + chunks_embeddings registered
-└── run_l3.py           host + chunks_embeddings + concept_graph (--no-l2 skips L2)
+├── run_l3.py           host + chunks_embeddings + concept_graph (--no-l2 skips L2)
+└── run_xrefs.py        host + chunks_embeddings + symbol_xrefs (+ --concepts opt-in)
 frontend/
 ├── backend/            FastAPI service that reads an output bundle and serves
 │                       summary/graph/chunk/concept JSON to the UI

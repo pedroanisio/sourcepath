@@ -26,12 +26,24 @@ Phase 2 — Python intra-file ``calls`` resolver (L2 + symbol_xrefs registered):
   15. Pure resolver unit: ``resolve_python_intra_file`` called directly
       on a record + chunks index returns the same edge set.
 
+Phase 3 — persistence contract (TTL + JSON-LD + sidecar + CLI):
+  16. Sidecar lines reconstruct as ``SymbolXrefEdge`` dataclasses and
+      equal the aggregator's in-memory edge set (the actual downstream
+      consumer contract).
+  17. JSON-LD round-trip: ``inventory.jsonld`` survives the host's
+      canonicalization step and still contains every ``cbmxr:Edge``
+      and its src/dst/kind/resolution/resolver predicates.
+  18. CLI parity: ``scripts/run_xrefs.py`` over the same fixture
+      produces a byte-identical ``xrefs.jsonl`` and the same edge count
+      as in-process registration.
+
 Exit code: 0 if all pass, 1 otherwise.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -495,6 +507,89 @@ def main(argv: list[str] | None = None) -> int:
             unit_triples == expected_triples,
             f"unit={sorted(unit_triples)}\nexpected={sorted(expected_triples)}",
         )
+
+        # =====================================================
+        # Phase 3: persistence contract
+        # =====================================================
+        from codebase_mapper.models import SymbolXrefEdge
+
+        # --- 16. Sidecar → SymbolXrefEdge round-trip ---
+        unit_edge_set = set(unit_edges)
+        reconstructed = {
+            SymbolXrefEdge(**json.loads(line)) for line in sidecar_lines
+        }
+        check(
+            "Phase 3: xrefs.jsonl reconstructs as SymbolXrefEdge dataclasses "
+            "equal to the resolver's in-memory edge set",
+            reconstructed == unit_edge_set,
+            f"sidecar={len(reconstructed)} unit={len(unit_edge_set)} "
+            f"diff_sidecar_only={list(reconstructed - unit_edge_set)[:2]} "
+            f"diff_unit_only={list(unit_edge_set - reconstructed)[:2]}",
+        )
+
+        # --- 17. JSON-LD round-trip ---
+        jsonld_path = p2_out1 / "inventory.jsonld"
+        jsonld_text = jsonld_path.read_text()
+        # The custom canonicalization in emit_bundle.py expands/compacts —
+        # the cleanest check is to re-parse as RDF and confirm the same
+        # edge/predicate counts as inventory.ttl.
+        g_jsonld = Graph()
+        g_jsonld.parse(str(jsonld_path), format="json-ld")
+        jsonld_edges = list(g_jsonld.subjects(RDF.type, CBMXR.Edge))
+        check(
+            "Phase 3: inventory.jsonld carries the same cbmxr:Edge count "
+            "as inventory.ttl",
+            len(jsonld_edges) == len(edge_subjects),
+            f"jsonld={len(jsonld_edges)} ttl={len(edge_subjects)}",
+        )
+        # And every required predicate is reachable from each edge.
+        missing_preds = []
+        for e_iri in jsonld_edges:
+            for pred in (CBMXR.src, CBMXR.dst, CBMXR.kind,
+                         CBMXR.resolution, CBMXR.resolver):
+                if not list(g_jsonld.objects(e_iri, pred)):
+                    missing_preds.append((str(e_iri), str(pred)))
+        check(
+            "Phase 3: every cbmxr:Edge in JSON-LD has src/dst/kind/resolution/resolver",
+            not missing_preds,
+            f"missing={missing_preds[:3]}",
+        )
+
+        # --- 18. CLI parity: scripts/run_xrefs.py matches in-process bundle ---
+        cli_out = work / "p2_cli"
+        repo_root = Path(__file__).resolve().parent.parent
+        env = {**os.environ, "PYTHONPATH": str(repo_root)}
+        cli = subprocess.run(
+            [
+                sys.executable, "scripts/run_xrefs.py",
+                "--repo", str(p2_fixture),
+                "--out", str(cli_out),
+                "--backend", "hash",
+                "--hash-dim", "64",
+                "--no-emit-blobs",
+            ],
+            env=env, cwd=str(repo_root), capture_output=True, text=True,
+        )
+        check(
+            "Phase 3: scripts/run_xrefs.py exits 0",
+            cli.returncode == 0,
+            f"stderr_tail={cli.stderr[-600:]}",
+        )
+        if cli.returncode == 0:
+            check(
+                "Phase 3: CLI xrefs.jsonl is byte-identical to in-process bundle",
+                (cli_out / "xrefs.jsonl").read_bytes()
+                == (p2_out1 / "xrefs.jsonl").read_bytes(),
+                "byte mismatch",
+            )
+            cli_manifest = json.loads((cli_out / "run_manifest.json").read_text())
+            check(
+                "Phase 3: CLI manifest n_edges matches in-process",
+                cli_manifest["extensions"]["l3_50_xrefs_artifact"]["n_edges"]
+                == p2_manifest["extensions"]["l3_50_xrefs_artifact"]["n_edges"],
+                f"cli={cli_manifest['extensions']['l3_50_xrefs_artifact']['n_edges']} "
+                f"inproc={p2_manifest['extensions']['l3_50_xrefs_artifact']['n_edges']}",
+            )
 
         print()
         print(f"passed: {PASS}   failed: {FAIL}")
