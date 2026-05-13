@@ -39,8 +39,14 @@ class SentenceTransformerBackend:
         from sentence_transformers import SentenceTransformer
         self.name = model_name
         self._model = SentenceTransformer(model_name)
-        # MiniLM dim is 384; query the model to be sure.
-        self.dimension = int(self._model.get_sentence_embedding_dimension() or 0)
+        # MiniLM dim is 384; query the model to be sure. Newer sentence-
+        # transformers (>=3.0) renamed the method; keep the fallback for older
+        # releases.
+        get_dim = getattr(
+            self._model, "get_embedding_dimension",
+            self._model.get_sentence_embedding_dimension,
+        )
+        self.dimension = int(get_dim() or 0)
         self.normalized = True
         self.batch_size = batch_size
 

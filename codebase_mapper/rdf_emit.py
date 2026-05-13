@@ -1,6 +1,7 @@
 """codebase_mapper.rdf_emit."""
 from __future__ import annotations
 
+import datetime as _dt
 import hashlib
 import json
 import re
@@ -13,6 +14,19 @@ from rdflib.namespace import OWL
 from rdflib.namespace import RDF
 from rdflib.namespace import RDFS
 from rdflib.namespace import XSD
+
+
+def _iso_utc(ts: float) -> str:
+    """Format a Unix timestamp as a UTC xsd:dateTime literal.
+
+    Preserves microsecond precision when the source has any; trims the
+    trailing zeros otherwise so equal seconds serialize identically
+    regardless of how the value was constructed.
+    """
+    d = _dt.datetime.fromtimestamp(ts, tz=_dt.timezone.utc)
+    s = d.isoformat(timespec="microseconds").replace("+00:00", "Z")
+    # "2026-05-12T10:00:00.000000Z" -> "2026-05-12T10:00:00Z" when sub-second is 0
+    return s.replace(".000000Z", "Z")
 
 from .constants import CBM, CBMI, CBMI_NS, CBMP, CBMP_NS, CBMT, CBMT_NS, CBM_NS, PHASE_VOCABULARY, SH, SPDX_CORE_NS, SPDX_SOFTWARE_NS, TYPE_VOCABULARY
 from .models import DeclaresDependencyEdge, FileRecord, ImportEdge, ImportExternalEdge, PinsDependencyEdge, TestsEdge
@@ -72,6 +86,15 @@ def build_inventory_graph(
             g.add((f, CBM.astSummary, _plain(json.dumps(r.ast_summary, sort_keys=True))))
         for err in r.extraction_errors:
             g.add((f, CBM.extractionError, _plain(err)))
+        if r.atime is not None:
+            g.add((f, CBM.atime, Literal(_iso_utc(r.atime), datatype=XSD.dateTime)))
+        if r.mtime is not None:
+            g.add((f, CBM.mtime, Literal(_iso_utc(r.mtime), datatype=XSD.dateTime)))
+        if r.ctime is not None:
+            g.add((f, CBM.ctime, Literal(_iso_utc(r.ctime), datatype=XSD.dateTime)))
+        if r.git_commit_time is not None:
+            g.add((f, CBM.gitCommitTime,
+                   Literal(_iso_utc(r.git_commit_time), datatype=XSD.dateTime)))
 
     for e in import_edges:
         g.add((file_iri(e.src_path), CBM.imports, file_iri(e.dst_path)))
@@ -143,6 +166,11 @@ def build_shacl_graph() -> Graph:
              datatype=XSD.integer, minInclusive=Literal(0))
     add_prop(file_shape, path=CBM.language,
              maxCount=Literal(1), datatype=XSD.string)
+    # Filesystem + git commit times are optional (None on a non-HEAD map);
+    # when present, they're single xsd:dateTime literals.
+    for pred in (CBM.atime, CBM.mtime, CBM.ctime, CBM.gitCommitTime):
+        add_prop(file_shape, path=pred,
+                 maxCount=Literal(1), datatype=XSD.dateTime)
 
     from rdflib.collection import Collection
     type_list = URIRef(f"{CBM_NS}_typeList")

@@ -40,3 +40,35 @@ def list_tree(repo: Path, commit: str) -> list[tuple[str, str, str]]:
 
 def read_blob(repo: Path, blob_sha: str) -> bytes:
     return git_bytes(repo, "cat-file", "blob", blob_sha)
+
+
+def list_commit_times(repo: Path, commit: str) -> dict[str, int]:
+    """Map each path to the Unix timestamp of its most-recent commit.
+
+    Single ``git log`` invocation that walks all ancestors of ``commit``
+    newest-first; the first time we see a path is its last-modified time.
+    Cost is O(commits + total touched paths). Renames are not followed —
+    a renamed file's recorded time is the time of the rename, which is
+    the same "last touched at this path" semantics that callers want.
+    """
+    sentinel = "__cbm_commit__"
+    out = git(
+        repo, "log", commit,
+        f"--format={sentinel}%at", "--name-only", "--no-merges",
+    )
+    last: dict[str, int] = {}
+    current_ts: int | None = None
+    for line in out.splitlines():
+        if not line:
+            continue
+        if line.startswith(sentinel):
+            try:
+                current_ts = int(line[len(sentinel):])
+            except ValueError:
+                current_ts = None
+            continue
+        if current_ts is None:
+            continue
+        if line not in last:
+            last[line] = current_ts
+    return last

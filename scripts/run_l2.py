@@ -28,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--hash-dim", type=int, default=256)
     p.add_argument("--sbert-model", default="sentence-transformers/all-MiniLM-L6-v2")
     p.add_argument("--no-emit-blobs", action="store_true")
+    p.add_argument("--exclude", action="append", default=[],
+                   help="POSIX-glob pattern; files matching are dropped. "
+                        "Repeatable. Merged with patterns from <repo>/.cbmignore.")
     args = p.parse_args(argv)
 
     # Start from a clean slate: a previous process may have registered
@@ -41,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     chunks_embeddings.register_all(backend)
 
     repo_name = args.name or args.repo.resolve().name
-    mapped = map_codebase(args.repo.resolve(), args.state)
+    mapped = map_codebase(args.repo.resolve(), args.state, exclude_patterns=args.exclude)
     manifest = emit(repo_name, mapped, args.out.resolve(),
                     emit_blobs_flag=not args.no_emit_blobs)
     print(json.dumps(manifest, indent=2, sort_keys=True))

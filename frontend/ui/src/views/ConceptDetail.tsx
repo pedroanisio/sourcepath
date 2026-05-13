@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ConceptDetail as CCD } from "../api";
+import { useBundleVersion } from "../bundle-context";
 
 function fileLink(path: string) {
   return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
@@ -10,13 +11,13 @@ export default function ConceptDetail() {
   const { name } = useParams();
   const [d, setD] = useState<CCD | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const bundleVersion = useBundleVersion();
 
   useEffect(() => {
-    setD(null);
     setErr(null);
     if (!name) return;
     api.concept(name).then(setD).catch((e) => setErr(String(e)));
-  }, [name]);
+  }, [name, bundleVersion]);
 
   if (err) return <div className="error">{err}</div>;
   if (!d) return <div className="empty">Loading…</div>;

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, GraphResp } from "../api";
 import CytoscapeGraph from "../components/CytoscapeGraph";
+import { useBundleVersion } from "../bundle-context";
 
 export default function FileGraph() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export default function FileGraph() {
   const [data, setData] = useState<GraphResp | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const bundleVersion = useBundleVersion();
 
   const reload = () => {
     setLoading(true);
@@ -23,7 +25,7 @@ export default function FileGraph() {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [bundleVersion]);
 
   return (
     <>

@@ -4,7 +4,7 @@ from __future__ import annotations
 import fnmatch
 import re
 
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from .constants import ASSET_EXT, DATA_EXT, LANG_BY_EXT, MAN_PAGE_EXTS
 from .models import FileRecord
@@ -299,10 +299,47 @@ def refine_phases(record: FileRecord) -> list[str]:
 def path_excluded(path: str, patterns: list[str]) -> bool:
     if not patterns:
         return False
-    for pat in patterns:
+    for raw in patterns:
+        # Trailing slash is a gitignore-style directory marker. Strip it —
+        # paths from `git ls-tree` never end in "/", so the trailing slash
+        # would otherwise prevent any match. ".repo/" => ".repo".
+        pat = raw.rstrip("/")
+        if not pat:
+            continue
         if fnmatch.fnmatchcase(path, pat):
             return True
-        # Also try prefix-style matching for directory patterns ending with /
+        # Explicit "dir/**" form: match the directory itself + every descendant.
         if pat.endswith("/**") and (path == pat[:-3] or path.startswith(pat[:-2])):
             return True
+        # Convenience: a bare path with no wildcards (e.g. ".repo" or
+        # "vendor/cache") also excludes everything under it. Lets users write
+        # ".repo" instead of ".repo" + ".repo/**".
+        if not any(ch in pat for ch in ("*", "?", "[")):
+            if path == pat or path.startswith(pat + "/"):
+                return True
     return False
+
+
+def read_repo_ignore(repo: Path | str) -> list[str]:
+    """Read per-repo ignore patterns from ``<repo>/.cbmignore``.
+
+    One pattern per line; ``#`` comments and blank lines are skipped.
+    Patterns use the same syntax as ``--exclude`` (fnmatch globs;
+    bare paths exclude descendants too; gitignore-style trailing
+    slashes are accepted). Returns ``[]`` if the file is absent
+    or unreadable.
+    """
+    ignore_path = Path(repo) / ".cbmignore"
+    if not ignore_path.is_file():
+        return []
+    try:
+        text = ignore_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    out: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        out.append(line)
+    return out

@@ -53,6 +53,23 @@ python scripts/run_l3.py --repo /path/to/repo --out /tmp/out --backend sbert
 `--backend sbert` uses `sentence-transformers/all-MiniLM-L6-v2`; `--backend hash`
 uses a deterministic SHA-256 fake (no semantics, useful for contract tests).
 
+### Excluding files
+
+Per-invocation: `--exclude PATTERN` (repeatable; POSIX-glob; bare names like
+`.repo` also exclude descendants). Available on the host CLI and on
+`scripts/run_l2.py` / `scripts/run_l3.py`.
+
+Per-repo: drop a `.cbmignore` at the repo root. One pattern per line, `#`
+comments, blank lines OK. Patterns merge with `--exclude` and appear in
+`run_manifest.json`'s `exclude_patterns`.
+
+```
+# .cbmignore
+.repo
+vendor/**
+docs/_build/**
+```
+
 ## Visualize
 
 `frontend/backend` is a FastAPI service that reads an output bundle and exposes
@@ -152,9 +169,29 @@ them after a clear.
 ```bash
 python tests/verify_roundtrip.py            # blob-based byte-perfect roundtrip
 python tests/verify_regenerate.py           # TTL+AST regenerate (Python semantic + TS/JS byte)
+python tests/verify_excludes.py             # --exclude flag + .cbmignore behavior
+python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
 python tests/verify_l3.py                   # concept_graph contract + cross-layer
 ```
 
-All four verifiers resolve `repo_root` from their own `__file__`, so they
+All six verifiers resolve `repo_root` from their own `__file__`, so they
 run correctly regardless of the caller's cwd.
+
+### File timestamps
+
+Every `cbm:File` carries four optional `xsd:dateTime` predicates:
+
+| Predicate | Source | Notes |
+|---|---|---|
+| `cbm:atime` | `os.lstat(repo/path).st_atime` | last access |
+| `cbm:mtime` | `os.lstat(repo/path).st_mtime` | last content change |
+| `cbm:ctime` | `os.lstat(repo/path).st_ctime` | inode change (Linux) / creation (Win) |
+| `cbm:gitCommitTime` | author timestamp of the last commit that touched the path | deterministic per commit; renames are not followed |
+
+Captured on every run. `os.lstat` doesn't bump atime, so two consecutive
+runs over an untouched working tree still produce byte-identical
+`inventory.ttl` (the existing determinism guarantee). For non-HEAD
+mappings the working tree may not match the mapped commit; in that case
+the filesystem times reflect whatever's on disk and `cbm:gitCommitTime`
+remains correct for the mapped commit.

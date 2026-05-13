@@ -16,14 +16,19 @@ BACKEND_DIR = REPO_ROOT / "frontend" / "backend"
 DEFAULT_BUNDLE = REPO_ROOT / "_tmp" / "usl-ng-core-map"
 
 
+LIVE_BUNDLE_FIXTURES = {"client", "summary", "bundle_dir"}
+
+
 def pytest_collection_modifyitems(config, items):
     bundle = Path(os.environ.get("CBM_OUTPUT_DIR", DEFAULT_BUNDLE))
-    if not (bundle / "run_manifest.json").exists():
-        skip = pytest.mark.skip(
-            reason=f"bundle not found at {bundle}; "
-            "generate one with scripts/run_l3.py or set CBM_OUTPUT_DIR"
-        )
-        for item in items:
+    if (bundle / "run_manifest.json").exists():
+        return
+    skip = pytest.mark.skip(
+        reason=f"live bundle not found at {bundle}; "
+        "generate one with scripts/run_l3.py or set CBM_OUTPUT_DIR"
+    )
+    for item in items:
+        if LIVE_BUNDLE_FIXTURES.intersection(set(item.fixturenames)):
             item.add_marker(skip)
 
 

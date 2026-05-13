@@ -5,6 +5,7 @@ import type {
   FileDetail,
   ChunkDetail,
   ConceptDetail,
+  BundleListResp,
 } from "../api";
 
 export const summaryFixture: Summary = {
@@ -135,16 +136,42 @@ export const conceptDetailFixture: ConceptDetail = {
   chunk_count_total: 1,
 };
 
-/** Wires `globalThis.fetch` to return the right fixture per URL prefix. */
+export const bundlesFixture: BundleListResp = {
+  bundles: [
+    {
+      name: "alpha",
+      path: "/tmp/alpha",
+      repo_name: "repo-a",
+      generated_at: "2026-05-12T00:00:00Z",
+      files: 100,
+    },
+    {
+      name: "beta",
+      path: "/tmp/beta",
+      repo_name: "repo-b",
+      generated_at: "2026-05-12T01:00:00Z",
+      files: 250,
+    },
+  ],
+  selected: "alpha",
+  bundles_root: "/tmp",
+};
+
+/** Wires `globalThis.fetch` to return the right fixture per URL prefix.
+ *  Matches the path component only — `?bundle=` query params are accepted
+ *  and ignored, so each test can assert that URLs are formed correctly
+ *  without the mock fighting it.
+ */
 export function installFetchMock() {
   const handlers: Array<[RegExp, () => unknown]> = [
-    [/^\/api\/summary$/, () => summaryFixture],
+    [/^\/api\/bundles(\?|$)/, () => bundlesFixture],
+    [/^\/api\/summary(\?|$)/, () => summaryFixture],
     [/^\/api\/file-graph/, () => fileGraphFixture],
     [/^\/api\/concept-graph/, () => conceptGraphFixture],
     [/^\/api\/chunks(\?|$)/, () => chunkListFixture],
-    [/^\/api\/chunks\/search$/, () => chunkListFixture],
+    [/^\/api\/chunks\/search(\?|$)/, () => chunkListFixture],
     [/^\/api\/file\//, () => fileDetailFixture],
-    [/^\/api\/chunk\/\d+$/, () => chunkDetailFixture],
+    [/^\/api\/chunk\/\d+(\?|$)/, () => chunkDetailFixture],
     [/^\/api\/concept\//, () => conceptDetailFixture],
   ];
   (globalThis as any).fetch = async (input: RequestInfo | URL) => {

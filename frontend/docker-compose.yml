@@ -7,9 +7,16 @@ services:
     image: cbm-backend:${TAG:-latest}
     container_name: cbm-backend
     environment:
+      # /data can be EITHER a single bundle directory (legacy single-bundle
+      # mode, used when CBM_BUNDLE points at e.g. ../_tmp/usl-ng-core-map)
+      # OR the parent directory containing multiple bundles (when CBM_BUNDLE
+      # points at e.g. ../_tmp). The backend tries CBM_OUTPUT_DIR first and
+      # falls through to enumerating CBM_BUNDLES_ROOT — setting both to
+      # /data makes both layouts work.
       CBM_OUTPUT_DIR: /data
+      CBM_BUNDLES_ROOT: /data
     volumes:
-      - "${CBM_BUNDLE:-../_tmp/usl-ng-core-map}:/data:ro"
+      - "${CBM_BUNDLE:-../_tmp}:/data:ro"
     expose:
       - "8765"
     restart: unless-stopped

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ChunkDetail as CD } from "../api";
+import { useBundleVersion } from "../bundle-context";
 
 function fileLink(path: string) {
   return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
@@ -11,16 +12,16 @@ export default function ChunkDetail() {
   const idxNum = Number(idx);
   const [d, setD] = useState<CD | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const bundleVersion = useBundleVersion();
 
   useEffect(() => {
-    setD(null);
-    setErr(null);
     if (!Number.isFinite(idxNum)) {
       setErr("invalid chunk idx");
       return;
     }
+    setErr(null);
     api.chunk(idxNum).then(setD).catch((e) => setErr(String(e)));
-  }, [idxNum]);
+  }, [idxNum, bundleVersion]);
 
   if (err) return <div className="error">{err}</div>;
   if (!d) return <div className="empty">Loading…</div>;

@@ -16,6 +16,14 @@ class FileRecord:
     phases: list[str]
     ast_summary: dict | None = None
     extraction_errors: list[str] = field(default_factory=list)
+    # Filesystem times via os.lstat() on the working tree. None when the
+    # file isn't materialized on disk (e.g. mapping a non-HEAD commit).
+    atime: float | None = None
+    mtime: float | None = None
+    ctime: float | None = None
+    # Unix timestamp of the most-recent commit that touched this path
+    # (resolved via `git log --name-only`). Deterministic per commit.
+    git_commit_time: int | None = None
 
 @dataclass(frozen=True)
 class ImportEdge:

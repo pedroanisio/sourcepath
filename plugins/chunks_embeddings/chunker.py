@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import warnings
 from typing import cast
 
 from codebase_mapper.extensions import PipelineCtx
@@ -89,7 +90,11 @@ def _chunk_python(content: bytes, path: str) -> list[dict]:
     except UnicodeDecodeError:
         return []
     try:
-        tree = ast.parse(text, filename=path)
+        # Silence SyntaxWarning (invalid escape sequences etc.) — that's a
+        # diagnostic about the mapped source, not about us.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tree = ast.parse(text, filename=path)
     except SyntaxError:
         # Fall back to whole-file chunk so the file still gets some L2 coverage.
         return _whole_file_chunk(content, path)

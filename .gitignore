@@ -28,3 +28,7 @@ frontend/ui/coverage/
 .DS_Store
 _tmp/
 frontend/ui/node_modules/
+
+# Local env config (the committed convention is .env.example)
+.env
+*.env.local

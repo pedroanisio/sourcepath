@@ -1,10 +1,15 @@
-"""FastAPI backend for visualizing a codebase-mapper output bundle.
+"""FastAPI backend for visualizing codebase-mapper output bundles.
+
+Bundle resolution (in order of precedence):
+  - ``?bundle=NAME`` query param on any endpoint — picks ``CBM_BUNDLES_ROOT/NAME``
+    (falls back to CBM_OUTPUT_DIR when its basename matches).
+  - ``CBM_OUTPUT_DIR`` env var — single-bundle default for back-compat.
+  - First bundle found under ``CBM_BUNDLES_ROOT`` (default ``_tmp``).
 
 Run:
-    uvicorn frontend.backend.app:app --reload --port 8000 \
-        --factory  # if using make_app(output_dir=...)
-or simpler:
     CBM_OUTPUT_DIR=_tmp/usl-ng-core-map uvicorn frontend.backend.app:app --port 8000
+or, with multiple bundles available:
+    CBM_BUNDLES_ROOT=_tmp uvicorn frontend.backend.app:app --port 8000
 """
 from __future__ import annotations
 
@@ -62,8 +67,15 @@ def load_bundle(output_dir: Path) -> Bundle:
         raise FileNotFoundError(f"output dir not found: {output_dir}")
 
     manifest = json.loads((output_dir / "run_manifest.json").read_text())
-    concepts = json.loads((output_dir / "concepts.json").read_text())
-    embeddings_meta = json.loads((output_dir / "embeddings_meta.json").read_text())
+    # concepts.json and embeddings_meta.json come from the L3 / L2 plugins
+    # respectively; a host-only bundle (e.g. produced by `python -m
+    # codebase_mapper`) won't have them. Treat them as optional.
+    concepts_path = output_dir / "concepts.json"
+    concepts = json.loads(concepts_path.read_text()) if concepts_path.exists() else {}
+    emb_meta_path = output_dir / "embeddings_meta.json"
+    embeddings_meta = (
+        json.loads(emb_meta_path.read_text()) if emb_meta_path.exists() else {}
+    )
 
     chunk_npz_path = output_dir / "embeddings.npz"
     chunk_vectors = None
@@ -213,10 +225,130 @@ def _concept_name_from_uri(uri: str) -> str | None:
     return None
 
 
-@lru_cache(maxsize=1)
-def get_bundle() -> Bundle:
-    out = os.environ.get("CBM_OUTPUT_DIR", "_tmp/usl-ng-core-map")
-    return load_bundle(Path(out).resolve())
+def _bundles_root() -> Path:
+    return Path(os.environ.get("CBM_BUNDLES_ROOT", "_tmp")).resolve()
+
+
+def _validate_bundle_name(name: str) -> None:
+    if not name or "/" in name or "\\" in name or ".." in name or name.startswith("."):
+        raise HTTPException(status_code=400, detail=f"invalid bundle name: {name!r}")
+
+
+def _bundle_info(path: Path) -> dict[str, Any] | None:
+    """Return summary metadata if the dir contains a valid run_manifest.json."""
+    manifest_path = path / "run_manifest.json"
+    if not manifest_path.exists():
+        return None
+    try:
+        m = json.loads(manifest_path.read_text())
+    except Exception:
+        return None
+    return {
+        "name": path.name,
+        "path": str(path),
+        "repo_name": m.get("repo_name"),
+        "commit_sha": m.get("commit_sha"),
+        "generated_at": m.get("generated_at"),
+        "tool_version": m.get("tool_version"),
+        "files": (m.get("counts") or {}).get("files"),
+    }
+
+
+def list_bundles() -> list[dict[str, Any]]:
+    """List discoverable bundles: anything under CBM_BUNDLES_ROOT with a
+    run_manifest.json, plus the CBM_OUTPUT_DIR override if it lives outside
+    the root.
+    """
+    seen: set[Path] = set()
+    out: list[dict[str, Any]] = []
+
+    env_out = os.environ.get("CBM_OUTPUT_DIR")
+    if env_out:
+        p = Path(env_out).resolve()
+        info = _bundle_info(p)
+        if info:
+            out.append(info)
+            seen.add(p)
+
+    root = _bundles_root()
+    if root.exists():
+        for child in sorted(root.iterdir()):
+            if not child.is_dir():
+                continue
+            cp = child.resolve()
+            if cp in seen:
+                continue
+            info = _bundle_info(child)
+            if info:
+                out.append(info)
+                seen.add(cp)
+    return out
+
+
+def _default_bundle_name() -> str | None:
+    env_out = os.environ.get("CBM_OUTPUT_DIR")
+    if env_out:
+        p = Path(env_out).resolve()
+        # Only honor CBM_OUTPUT_DIR if it's actually a bundle. Otherwise the
+        # basename leaks into the picker and the frontend later asks for it.
+        if _bundle_info(p) is not None:
+            return p.name
+    items = list_bundles()
+    return items[0]["name"] if items else None
+
+
+def _resolve_bundle_path(name: str | None) -> Path:
+    """Resolve a bundle name to an on-disk directory path.
+
+    Raises HTTPException(404) when the requested bundle isn't found OR
+    when the requested path lacks a run_manifest.json (i.e. isn't a valid
+    bundle — guards against CBM_OUTPUT_DIR misconfigured to a parent dir).
+    """
+    if name:
+        _validate_bundle_name(name)
+        env_out = os.environ.get("CBM_OUTPUT_DIR")
+        if env_out:
+            p = Path(env_out).resolve()
+            if p.name == name and _bundle_info(p) is not None:
+                return p
+        p = (_bundles_root() / name).resolve()
+        if not p.is_dir() or _bundle_info(p) is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"bundle '{name}' not found or missing run_manifest.json",
+            )
+        return p
+
+    env_out = os.environ.get("CBM_OUTPUT_DIR")
+    if env_out:
+        p = Path(env_out).resolve()
+        if _bundle_info(p) is not None:
+            return p
+    items = list_bundles()
+    if not items:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no bundles found in {_bundles_root()}; set CBM_OUTPUT_DIR "
+                   "or place bundles under CBM_BUNDLES_ROOT",
+        )
+    return Path(items[0]["path"]).resolve()
+
+
+@lru_cache(maxsize=4)
+def _load_bundle_cached(path_str: str) -> Bundle:
+    return load_bundle(Path(path_str))
+
+
+def get_bundle(name: str | None = None) -> Bundle:
+    path = _resolve_bundle_path(name)
+    return _load_bundle_cached(str(path))
+
+
+def _clear_bundle_cache() -> None:
+    _load_bundle_cached.cache_clear()
+
+
+get_bundle.cache_clear = _clear_bundle_cache  # type: ignore[attr-defined]
 
 
 # -- Pydantic response models -------------------------------------------------
@@ -276,6 +408,22 @@ class ChunkListResp(BaseModel):
     mode: str  # "semantic" | "lexical"
 
 
+class BundleInfo(BaseModel):
+    name: str
+    path: str
+    repo_name: str | None = None
+    commit_sha: str | None = None
+    generated_at: str | None = None
+    tool_version: str | None = None
+    files: int | None = None
+
+
+class BundleListResp(BaseModel):
+    bundles: list[BundleInfo]
+    selected: str | None = None
+    bundles_root: str
+
+
 # -- FastAPI app --------------------------------------------------------------
 
 app = FastAPI(title="codebase-mapper visualizer", version="0.1.0")
@@ -287,9 +435,19 @@ app.add_middleware(
 )
 
 
+@app.get("/api/bundles", response_model=BundleListResp)
+def bundles() -> BundleListResp:
+    items = list_bundles()
+    return BundleListResp(
+        bundles=[BundleInfo(**it) for it in items],
+        selected=_default_bundle_name(),
+        bundles_root=str(_bundles_root()),
+    )
+
+
 @app.get("/api/summary", response_model=SummaryResp)
-def summary() -> SummaryResp:
-    b = get_bundle()
+def summary(bundle: str | None = Query(default=None)) -> SummaryResp:
+    b = get_bundle(bundle)
     m = b.manifest
     return SummaryResp(
         repo_name=m.get("repo_name"),
@@ -309,8 +467,11 @@ def summary() -> SummaryResp:
 
 
 @app.get("/api/file-graph", response_model=GraphResp)
-def file_graph(limit: int = Query(default=400, ge=1, le=5000)) -> GraphResp:
-    b = get_bundle()
+def file_graph(
+    limit: int = Query(default=400, ge=1, le=5000),
+    bundle: str | None = Query(default=None),
+) -> GraphResp:
+    b = get_bundle(bundle)
     # rank files by degree (in + out import edges) so the limit picks the most-connected core
     deg: dict[str, int] = {}
     for a, b_ in b.imports:
@@ -346,8 +507,9 @@ def file_graph(limit: int = Query(default=400, ge=1, le=5000)) -> GraphResp:
 def concept_graph(
     limit: int = Query(default=150, ge=1, le=2000),
     min_edge: int = Query(default=3, ge=1, le=1000),
+    bundle: str | None = Query(default=None),
 ) -> GraphResp:
-    b = get_bundle()
+    b = get_bundle(bundle)
     concepts = b.concepts.get("concepts", {})
     # top-N by frequency
     ranked = sorted(concepts.items(), key=lambda kv: kv[1].get("frequency", 0), reverse=True)
@@ -389,8 +551,9 @@ def chunks(
     q: str | None = None,
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    bundle: str | None = Query(default=None),
 ) -> ChunkListResp:
-    b = get_bundle()
+    b = get_bundle(bundle)
     rows = b.chunks
     if q:
         ql = q.lower()
@@ -412,8 +575,11 @@ class SearchReq(BaseModel):
 
 
 @app.post("/api/chunks/search", response_model=ChunkListResp)
-def chunk_search(req: SearchReq) -> ChunkListResp:
-    b = get_bundle()
+def chunk_search(
+    req: SearchReq,
+    bundle: str | None = Query(default=None),
+) -> ChunkListResp:
+    b = get_bundle(bundle)
     backend_name = (b.embeddings_meta.get("backend") or {}).get("name") or ""
     is_sbert = "sentence-transformer" in backend_name.lower() or "sbert" in backend_name.lower() or "minilm" in backend_name.lower()
     if not is_sbert or b.chunk_vectors is None:
@@ -467,8 +633,11 @@ def _get_model(name: str):
 
 
 @app.get("/api/chunk-blob/{sha}")
-def chunk_blob(sha: str) -> dict[str, str]:
-    b = get_bundle()
+def chunk_blob(
+    sha: str,
+    bundle: str | None = Query(default=None),
+) -> dict[str, str]:
+    b = get_bundle(bundle)
     if not all(c in "0123456789abcdef" for c in sha) or len(sha) != 64:
         raise HTTPException(status_code=400, detail="invalid sha")
     p = b.output_dir / "blobs" / sha
@@ -487,8 +656,9 @@ def concept_detail(
     cooccur_k: int = Query(default=30, ge=1, le=500),
     chunk_k: int = Query(default=50, ge=1, le=500),
     file_k: int = Query(default=100, ge=1, le=1000),
+    bundle: str | None = Query(default=None),
 ) -> dict[str, Any]:
-    b = get_bundle()
+    b = get_bundle(bundle)
     c = b.concepts.get("concepts", {}).get(name)
     if not c:
         raise HTTPException(status_code=404, detail="concept not found")
@@ -518,8 +688,11 @@ def concept_detail(
 
 
 @app.get("/api/file/{path:path}")
-def file_detail(path: str) -> dict[str, Any]:
-    b = get_bundle()
+def file_detail(
+    path: str,
+    bundle: str | None = Query(default=None),
+) -> dict[str, Any]:
+    b = get_bundle(bundle)
     rec = b.file_by_path.get(path)
     if not rec:
         raise HTTPException(status_code=404, detail="file not found")
@@ -539,8 +712,11 @@ def file_detail(path: str) -> dict[str, Any]:
 
 
 @app.get("/api/chunk/{idx}")
-def chunk_detail(idx: int) -> dict[str, Any]:
-    b = get_bundle()
+def chunk_detail(
+    idx: int,
+    bundle: str | None = Query(default=None),
+) -> dict[str, Any]:
+    b = get_bundle(bundle)
     if idx < 0 or idx >= len(b.chunks):
         raise HTTPException(status_code=404, detail="chunk idx out of range")
     rec = b.chunks[idx]

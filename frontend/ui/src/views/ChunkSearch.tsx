@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ChunkListResp } from "../api";
+import { useBundleVersion } from "../bundle-context";
 
 export default function ChunkSearch() {
   const [q, setQ] = useState("");
@@ -8,14 +9,15 @@ export default function ChunkSearch() {
   const [data, setData] = useState<ChunkListResp | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const bundleVersion = useBundleVersion();
 
-  // Show first page of chunks on load
+  // Show first page of chunks on load (and again when the bundle changes).
   useEffect(() => {
     api
       .chunks("", 25, 0)
       .then(setData)
       .catch((e) => setErr(String(e)));
-  }, []);
+  }, [bundleVersion]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

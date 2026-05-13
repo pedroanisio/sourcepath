@@ -6,7 +6,7 @@ The splitter regenerates this file; do not edit by hand.
 from __future__ import annotations
 
 from .blobs import emit_blobs
-from .classify import classify, language_of, path_excluded, refine_phases
+from .classify import classify, language_of, path_excluded, read_repo_ignore, refine_phases
 from .cli import main
 from .constants import ASSET_EXT, CBM, CBMI, CBMI_NS, CBMP, CBMP_NS, CBMT, CBMT_NS, CBM_NS, DATA_EXT, DEFAULT_PHASES, LANG_BY_EXT, MAN_PAGE_EXTS, PHASE_VOCABULARY, SH, SPDX_CORE_NS, SPDX_SOFTWARE_NS, TOOL_VERSION, TYPE_VOCABULARY, VOCABULARY_VERSION
 from .emit_bundle import emit
@@ -129,6 +129,7 @@ __all__ = [
     'parse_setup_cfg',
     'parse_uv_lock',
     'path_excluded',
+    'read_repo_ignore',
     'phase_iri',
     'pinned_dependencies',
     'read_blob',

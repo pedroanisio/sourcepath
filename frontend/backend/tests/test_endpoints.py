@@ -230,3 +230,32 @@ def test_chunk_blob_invalid_sha(client):
 def test_chunk_blob_not_found(client):
     r = client.get("/api/chunk-blob/" + "a" * 64)
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------- ?bundle= wiring
+def test_bundle_query_param_loads_named_bundle(client, bundle_dir, summary):
+    """Explicit ?bundle=NAME must reach the same bundle as the default."""
+    name = bundle_dir.name
+    r = client.get(f"/api/summary?bundle={name}")
+    assert r.status_code == 200
+    assert r.json()["repo_name"] == summary["repo_name"]
+    assert r.json()["counts"]["files"] == summary["counts"]["files"]
+
+
+def test_bundle_query_param_threads_through_graph_endpoint(client, bundle_dir):
+    name = bundle_dir.name
+    a = client.get("/api/file-graph?limit=5").json()
+    b = client.get(f"/api/file-graph?limit=5&bundle={name}").json()
+    assert [n["id"] for n in a["nodes"]] == [n["id"] for n in b["nodes"]]
+
+
+def test_bundle_query_param_unknown_bundle_404(client):
+    r = client.get("/api/summary?bundle=__nope__")
+    assert r.status_code == 404
+
+
+def test_bundle_listing_includes_live_bundle(client, bundle_dir):
+    r = client.get("/api/bundles")
+    assert r.status_code == 200
+    names = [b["name"] for b in r.json()["bundles"]]
+    assert bundle_dir.name in names

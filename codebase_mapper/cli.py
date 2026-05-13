@@ -20,7 +20,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path)
     p.add_argument("--name", default=None)
     p.add_argument("--exclude", action="append", default=[],
-                   help="POSIX-glob pattern; files matching are dropped. Repeatable.")
+                   help="POSIX-glob pattern; files matching are dropped. "
+                        "Repeatable. A bare name without wildcards (e.g. '.repo') "
+                        "also excludes everything under it. Merged with patterns "
+                        "from <repo>/.cbmignore.")
     p.add_argument("--no-emit-blobs", action="store_true",
                    help="Skip writing blobs/ dir (no roundtrip support).")
     p.add_argument("--self-test", action="store_true")

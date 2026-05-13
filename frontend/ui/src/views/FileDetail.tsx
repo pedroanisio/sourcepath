@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, FileDetail as FD } from "../api";
+import { useBundleVersion } from "../bundle-context";
 
 function fileLink(path: string) {
   return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
@@ -11,12 +12,14 @@ export default function FileDetail() {
   const path = params["*"] || "";
   const [d, setD] = useState<FD | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const bundleVersion = useBundleVersion();
 
   useEffect(() => {
-    setD(null);
-    setErr(null);
+    // No reset on dep change — keep the previous file's data visible until
+    // the new response arrives. Avoids unmounting elements that
+    // asynchronous tests are observing.
     api.file(path).then(setD).catch((e) => setErr(String(e)));
-  }, [path]);
+  }, [path, bundleVersion]);
 
   if (err) return <div className="error">{err}</div>;
   if (!d) return <div className="empty">Loading…</div>;

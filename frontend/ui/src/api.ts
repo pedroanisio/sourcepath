@@ -114,23 +114,60 @@ export interface ChunkListResp {
   mode: "semantic" | "lexical";
 }
 
+export interface BundleInfo {
+  name: string;
+  path: string;
+  repo_name?: string | null;
+  commit_sha?: string | null;
+  generated_at?: string | null;
+  tool_version?: string | null;
+  files?: number | null;
+}
+
+export interface BundleListResp {
+  bundles: BundleInfo[];
+  selected: string | null;
+  bundles_root: string;
+}
+
+// Module-level current bundle. The picker in App.tsx updates this; every
+// helper below appends `?bundle=<name>` to its URL when it's set.
+let _currentBundle: string | null = null;
+
+export function setBundle(name: string | null): void {
+  _currentBundle = name;
+}
+
+export function getCurrentBundle(): string | null {
+  return _currentBundle;
+}
+
+function withBundle(url: string): string {
+  if (_currentBundle === null) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}bundle=${encodeURIComponent(_currentBundle)}`;
+}
+
 async function get<T>(path: string): Promise<T> {
-  const r = await fetch(path);
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText} on ${path}`);
+  const url = withBundle(path);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText} on ${url}`);
   return r.json();
 }
 
 async function post<T>(path: string, body: any): Promise<T> {
-  const r = await fetch(path, {
+  const url = withBundle(path);
+  const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`${r.status} ${r.statusText} on ${path}`);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText} on ${url}`);
   return r.json();
 }
 
 export const api = {
+  bundles: () => get<BundleListResp>("/api/bundles"),
   summary: () => get<Summary>("/api/summary"),
   fileGraph: (limit = 400) => get<GraphResp>(`/api/file-graph?limit=${limit}`),
   conceptGraph: (limit = 150, min_edge = 3) =>

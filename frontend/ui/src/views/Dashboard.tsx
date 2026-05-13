@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, Summary } from "../api";
+import { useBundleVersion } from "../bundle-context";
 
 function Bars({ data }: { data: Record<string, number> }) {
   const items = Object.entries(data).sort((a, b) => b[1] - a[1]);
@@ -22,10 +23,14 @@ function Bars({ data }: { data: Record<string, number> }) {
 export default function Dashboard() {
   const [s, setS] = useState<Summary | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const bundleVersion = useBundleVersion();
 
   useEffect(() => {
+    // Don't reset state here — on bundle change we want the old data to
+    // stay visible until the new fetch returns, both for smoother UX and
+    // to avoid unmounting elements that asynchronous tests are observing.
     api.summary().then(setS).catch((e) => setErr(String(e)));
-  }, []);
+  }, [bundleVersion]);
 
   if (err) return <div className="error">{err}</div>;
   if (!s) return <div className="empty">Loading…</div>;

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, GraphResp } from "../api";
 import CytoscapeGraph from "../components/CytoscapeGraph";
+import { useBundleVersion } from "../bundle-context";
 
 export default function ConceptGraph() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function ConceptGraph() {
   const [data, setData] = useState<GraphResp | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const bundleVersion = useBundleVersion();
 
   const reload = () => {
     setLoading(true);
@@ -24,7 +26,7 @@ export default function ConceptGraph() {
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [bundleVersion]);
 
   return (
     <>

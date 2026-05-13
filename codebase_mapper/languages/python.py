@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import base64
 import math
+import warnings
 
 from collections import defaultdict
 from pathlib import PurePosixPath
@@ -108,7 +109,12 @@ def extract_python_ast_summary(content: bytes, path: str) -> tuple[dict | None, 
     except UnicodeDecodeError as e:
         return None, [f"decode_error: {e}"]
     try:
-        tree = ast.parse(text, filename=path)
+        # Python's parser emits SyntaxWarning for things like invalid escape
+        # sequences in string literals (e.g. `"\d"` instead of `r"\d"`).
+        # That's the mapped source's problem, not ours — silence it.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tree = ast.parse(text, filename=path)
     except SyntaxError as e:
         return None, [f"syntax_error: line {e.lineno}: {e.msg}"]
 

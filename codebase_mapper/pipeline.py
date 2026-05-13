@@ -2,17 +2,18 @@
 from __future__ import annotations
 
 import hashlib
+import os
 
 from pathlib import Path
 
 
-from .classify import classify, language_of, path_excluded, refine_phases
+from .classify import classify, language_of, path_excluded, read_repo_ignore, refine_phases
 from .constants import DEFAULT_PHASES
 from .extensions import (
     PipelineCtx, iter_aggregators, iter_import_resolvers,
     iter_language_analyzers, iter_record_enrichers,
 )
-from .git_plumbing import list_tree, read_blob, resolve_commit
+from .git_plumbing import list_commit_times, list_tree, read_blob, resolve_commit
 from .languages.dart import detect_dart_package_name
 from .languages.go import detect_go_module
 from .languages.kotlin import build_kotlin_fqn_index
@@ -29,11 +30,17 @@ from .tests_edges import infer_tests_edges
 def map_codebase(
     repo: Path, state: str, exclude_patterns: list[str] | None = None
 ) -> dict:
-    exclude_patterns = exclude_patterns or []
+    # Merge CLI-supplied patterns with any `.cbmignore` at the repo root so
+    # the per-repo config is honored automatically. The merged list ends up
+    # in run_manifest.json's exclude_patterns for full traceability.
+    exclude_patterns = [*(exclude_patterns or []), *read_repo_ignore(repo)]
     commit = resolve_commit(repo, state)
     blobs = list_tree(repo, commit)
     blob_by_path = {p: sha for p, sha, _mode in blobs}
     mode_by_path = {p: mode for p, _sha, mode in blobs}
+    # Last-touched commit time per path. One `git log` walk; safe to call
+    # once up-front since the commit graph doesn't change during a run.
+    commit_times = list_commit_times(repo, commit)
 
     records: list[FileRecord] = []
     # Build a stub PipelineCtx now so LanguageAnalyzers receive a ctx with
@@ -66,11 +73,24 @@ def map_codebase(
         else:
             type_ = classify(path, head)
             lang = language_of(path)
+        # Filesystem times from the working tree. lstat (not stat) so a
+        # symlink's own metadata is captured instead of its target's, and
+        # so a dangling symlink doesn't raise. stat() doesn't bump atime,
+        # so this is determinism-safe across consecutive runs.
+        atime = mtime = ctime = None
+        try:
+            st = os.lstat(repo / path)
+            atime, mtime, ctime = st.st_atime, st.st_mtime, st.st_ctime
+        except (OSError, ValueError):
+            pass
+
         rec = FileRecord(
             path=path, git_blob_sha=blob_sha,
             content_sha256=hashlib.sha256(content).hexdigest(),
             size_bytes=len(content), language=lang, type_=type_,
             phases=list(DEFAULT_PHASES[type_]) or ["runtime"],
+            atime=atime, mtime=mtime, ctime=ctime,
+            git_commit_time=commit_times.get(path),
         )
         # AST extraction via LanguageAnalyzer registry (first-match-wins).
         # Builtin analyzers are auto-registered at package import; their
