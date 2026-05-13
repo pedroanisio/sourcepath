@@ -37,6 +37,24 @@ Phase 3 — persistence contract (TTL + JSON-LD + sidecar + CLI):
       produces a byte-identical ``xrefs.jsonl`` and the same edge count
       as in-process registration.
 
+Phase 4 — Python inter-file `calls` resolution (`from X import Y`):
+  19. Cross-file resolution: ``from lib import foo; foo()`` produces
+      an inter-file edge whose resolver is ``python_inter_file``.
+  20. Alias support: ``from lib import foo as bar; bar()`` resolves to
+      the chunk for ``foo``.
+  21. Relative imports: ``from .sibling import foo; foo()`` resolves
+      against the source file's package.
+  22. ``module_not_in_repo``: ``from external_pkg import x; x()``
+      → entry in ``unresolved`` with the correct reason; no edge.
+  23. ``symbol_not_exported``: ``from lib import nonexistent;
+      nonexistent()`` (lib in repo but symbol missing) → entry in
+      ``unresolved`` with the correct reason; no edge.
+  24. Intra-file still wins when both bindings exist (shadowing rule
+      documented in python_resolver.py).
+  25. Cross-file ``cbml2:Chunk`` reference integrity: src/dst IRIs
+      resolve to existing chunks in inventory.ttl, including the
+      ones in other files.
+
 Exit code: 0 if all pass, 1 otherwise.
 """
 from __future__ import annotations
@@ -129,6 +147,94 @@ top_call()  # module-level call; no enclosing chunk; skipped
 def build_phase2_fixture(target: Path) -> None:
     _init_git(target)
     (target / "app.py").write_text(PHASE2_SRC)
+    _commit(target)
+
+
+# Phase 4 fixture — exercises every cross-file case Phase 4 must handle.
+# Layout:
+#   pkg/__init__.py    (empty package marker)
+#   pkg/lib.py         (target module: defines `foo`, `Helper`)
+#   pkg/sibling.py     (defines `sib` — exercised via relative import)
+#   pkg/app.py         (caller: from-import + alias + relative + bad cases)
+#
+# Expected outcome:
+#   inter-file edges:
+#     app.main         -> pkg.lib.foo           (from-import)
+#     app.main         -> pkg.lib.foo           (aliased; dedup with above)
+#     app.use_sibling  -> pkg.sibling.sib       (relative import)
+#     app.use_class    -> pkg.lib.Helper        (class as call target)
+#   unresolved:
+#     app.use_external  -> module_not_in_repo   (from external_pkg ...)
+#     app.use_missing   -> symbol_not_exported  (from .lib import nope)
+#   intra-file (shadowing) wins over import:
+#     app.use_shadow   -> app.shadow            (local shadow takes precedence)
+
+PHASE4_LIB_SRC = '''\
+def foo():
+    return 1
+
+
+def shadow():
+    return "imported shadow"
+
+
+class Helper:
+    def hello(self):
+        return "hi"
+'''
+
+PHASE4_SIBLING_SRC = '''\
+def sib():
+    return 2
+'''
+
+PHASE4_APP_SRC = '''\
+from pkg.lib import foo, Helper, shadow
+from pkg.lib import foo as foo_alias
+from .sibling import sib
+from external_pkg import gone
+from .lib import nope
+
+
+def shadow():
+    """Locally shadows the import above; later binding wins in Python."""
+    return "local shadow"
+
+
+def main():
+    foo()              # inter-file: app.main -> pkg.lib.foo
+    foo_alias()        # inter-file via alias; dedups with the above edge
+
+
+def use_sibling():
+    sib()              # inter-file via relative import
+
+
+def use_class():
+    Helper()           # class as call target
+
+
+def use_external():
+    gone()             # unresolved: module_not_in_repo
+
+
+def use_missing():
+    nope()             # unresolved: symbol_not_exported
+
+
+def use_shadow():
+    shadow()           # intra-file beats import: edge to local app.shadow
+'''
+
+
+def build_phase4_fixture(target: Path) -> None:
+    _init_git(target)
+    pkg = target / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "lib.py").write_text(PHASE4_LIB_SRC)
+    (pkg / "sibling.py").write_text(PHASE4_SIBLING_SRC)
+    (pkg / "app.py").write_text(PHASE4_APP_SRC)
     _commit(target)
 
 
@@ -590,6 +696,122 @@ def main(argv: list[str] | None = None) -> int:
                 f"cli={cli_manifest['extensions']['l3_50_xrefs_artifact']['n_edges']} "
                 f"inproc={p2_manifest['extensions']['l3_50_xrefs_artifact']['n_edges']}",
             )
+
+        # =====================================================
+        # Phase 4: Python inter-file `calls` resolution
+        # =====================================================
+        p4_fixture = work / "p4_fixture"
+        build_phase4_fixture(p4_fixture)
+        p4_out = work / "p4_out"
+        p4_manifest = run_pipeline(p4_fixture, p4_out, with_l2=True)
+
+        p4_lines = (p4_out / "xrefs.jsonl").read_text().splitlines()
+        p4_edges = [json.loads(line) for line in p4_lines]
+        edge_tuples = {
+            (
+                e["src_chunk_id"].split("#")[0],
+                _symbol_from_chunk_id(e["src_chunk_id"]),
+                e["dst_chunk_id"].split("#")[0],
+                _symbol_from_chunk_id(e["dst_chunk_id"]),
+                e["resolver"],
+            )
+            for e in p4_edges
+        }
+        expected_edges = {
+            # (src_path, src_sym, dst_path, dst_sym, resolver)
+            ("pkg/app.py", "main", "pkg/lib.py", "foo", "python_inter_file"),
+            ("pkg/app.py", "use_sibling", "pkg/sibling.py", "sib", "python_inter_file"),
+            ("pkg/app.py", "use_class", "pkg/lib.py", "Helper", "python_inter_file"),
+            ("pkg/app.py", "use_shadow", "pkg/app.py", "shadow", "python_intra_file"),
+        }
+        check(
+            "Phase 4: cross-file + alias + relative + class-target + shadow edges match",
+            edge_tuples == expected_edges,
+            f"expected={sorted(expected_edges)}\nactual={sorted(edge_tuples)}",
+        )
+
+        # Alias dedup: only one main→foo edge despite two call sites (foo() and foo_alias()).
+        main_to_foo = [
+            e for e in p4_edges
+            if _symbol_from_chunk_id(e["src_chunk_id"]) == "main"
+            and _symbol_from_chunk_id(e["dst_chunk_id"]) == "foo"
+        ]
+        check(
+            "Phase 4: alias and original target produce a single deduped edge",
+            len(main_to_foo) == 1,
+            f"got {len(main_to_foo)} edges",
+        )
+
+        # Manifest fragment: 4 edges total; 1 intra-file (shadow win) + 3 inter-file;
+        # 2 unresolved (external + missing-symbol).
+        p4_frag = p4_manifest["extensions"]["l3_50_xrefs_artifact"]
+        check(
+            "Phase 4: manifest counts 4 edges, 2 unresolved",
+            p4_frag["n_edges"] == 4 and p4_frag["n_unresolved"] == 2,
+            json.dumps(p4_frag, indent=2),
+        )
+        check(
+            "Phase 4: by_language python = {resolved: 4, unresolved: 2}",
+            p4_frag["by_language"].get("python") == {"resolved": 4, "unresolved": 2},
+            str(p4_frag.get("by_language")),
+        )
+
+        # Reach into the in-memory unresolved list via a fresh resolver invocation,
+        # since the manifest only carries counts. The aggregator's edges + unresolved
+        # are deterministic from the same inputs, so re-running is safe.
+        reset_registries()
+        chunks_embeddings.register_all(
+            chunks_embeddings.DeterministicHashBackend(dimension=64),
+        )
+        symbol_xrefs.register_all()
+        from codebase_mapper.pipeline import map_codebase as _map4
+        p4_mapped = _map4(p4_fixture.resolve(), "HEAD")
+        p4_ctx = p4_mapped["ctx"]
+        p4_app_record = next(
+            r for r in p4_mapped["records"] if r.path == "pkg/app.py"
+        )
+        _, p4_unresolved = resolve_python_intra_file(p4_app_record, p4_ctx)
+
+        reasons_by_target = {
+            (u.src_chunk_id.split("#")[0], _symbol_from_chunk_id(u.src_chunk_id), u.reason)
+            for u in p4_unresolved
+        }
+        check(
+            "Phase 4: unresolved has module_not_in_repo for use_external",
+            ("pkg/app.py", "use_external", "module_not_in_repo") in reasons_by_target,
+            str(reasons_by_target),
+        )
+        check(
+            "Phase 4: unresolved has symbol_not_exported for use_missing",
+            ("pkg/app.py", "use_missing", "symbol_not_exported") in reasons_by_target,
+            str(reasons_by_target),
+        )
+        check(
+            "Phase 4: unresolved resolver is python_inter_file for both entries",
+            all(u.resolver == "python_inter_file" for u in p4_unresolved),
+            f"resolvers={set(u.resolver for u in p4_unresolved)}",
+        )
+        check(
+            "Phase 4: unresolved raw_target includes the import statement",
+            all("from " in u.raw_target and "import " in u.raw_target for u in p4_unresolved),
+            f"raw_targets={[u.raw_target for u in p4_unresolved]}",
+        )
+
+        # Reference integrity across files.
+        g_p4 = Graph()
+        g_p4.parse(str(p4_out / "inventory.ttl"), format="turtle")
+        chunk_subjects = set(g_p4.subjects(RDF.type, CBML2.Chunk))
+        bad_p4 = []
+        for e_iri in g_p4.subjects(RDF.type, CBMXR.Edge):
+            for pred in (CBMXR.src, CBMXR.dst):
+                tgt = next(iter(g_p4.objects(e_iri, pred)), None)
+                if tgt is None or tgt not in chunk_subjects:
+                    bad_p4.append((str(e_iri), str(pred), str(tgt)))
+        check(
+            "Phase 4: every cbmxr:src/dst (including cross-file) resolves to cbml2:Chunk",
+            not bad_p4,
+            f"bad={bad_p4[:3]}",
+        )
 
         print()
         print(f"passed: {PASS}   failed: {FAIL}")
