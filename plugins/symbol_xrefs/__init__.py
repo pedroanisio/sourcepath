@@ -20,6 +20,7 @@ from .aggregator import XrefAggregator, XREF_INDEX_KEY
 from .artifact import XrefsArtifact, SIDECAR_FILENAME
 from .graph_writer import XrefGraphWriter, XrefShapes, chunk_iri, edge_iri
 from .python_resolver import resolve_python_intra_file
+from .tsjs_resolver import resolve_tsjs_calls
 
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "chunk_iri",
     "edge_iri",
     "resolve_python_intra_file",
+    "resolve_tsjs_calls",
     "register_all",
 ]
 
@@ -41,6 +43,8 @@ __all__ = [
 # (record, ctx) -> (list[SymbolXrefEdge], list[UnresolvedSymbolRef]).
 _RESOLVERS: dict = {
     "python": resolve_python_intra_file,
+    "typescript": resolve_tsjs_calls,
+    "javascript": resolve_tsjs_calls,
 }
 
 

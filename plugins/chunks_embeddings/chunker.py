@@ -5,6 +5,11 @@ Strategy:
     AsyncFunctionDef / ClassDef, and one chunk per method inside classes
     (one nesting level). Bytes ranges come from `ast.get_source_segment`-
     equivalent line-based slicing.
+  - TypeScript / JavaScript: re-parse with tree-sitter, emit one chunk per
+    top-level ``function_declaration`` / ``class_declaration`` /
+    ``lexical_declaration`` containing an arrow or function expression, and
+    one chunk per ``method_definition`` inside a class body. Symbol-level
+    coverage matches Python so the symbol-xref layer can attach edges.
   - Other text source files: emit a single "file" chunk covering the whole
     content.
   - Binary, symlinks, generated, asset: skip.
@@ -54,6 +59,8 @@ class ChunkExtractor:
         chunks: list[dict] = []
         if record.language == "python":
             chunks = _chunk_python(content, record.path)
+        elif record.language in ("typescript", "javascript"):
+            chunks = _chunk_tsjs(content, record.path)
         elif record.language is not None or record.type_ in {"documentation", "configuration", "test_code", "source_code"}:
             # whole-file chunk for any text file we recognize
             chunks = _whole_file_chunk(content, record.path)
@@ -146,6 +153,160 @@ def _chunk_from_node(node: ast.AST, kind: str, parent: str | None,
     # byte_start + len(chunk_bytes) which is exact given the slicing above.
     byte_end = byte_start + len(chunk_bytes)
     name = getattr(node, "name", "<unknown>")
+    return {
+        "kind": kind,
+        "symbol": name,
+        "parent_symbol": parent,
+        "byte_start": byte_start,
+        "byte_end": byte_end,
+        "line_start": line_start,
+        "line_end": line_end,
+        "text": text,
+        "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# TypeScript / JavaScript chunker (tree-sitter)
+# ---------------------------------------------------------------------------
+
+
+def _chunk_tsjs(content: bytes, path: str) -> list[dict]:
+    """Symbol-level chunks for TS/JS.
+
+    Re-parses with tree-sitter (cheap; the LanguageAnalyzer parses too but
+    its tree isn't kept on the record). Emits:
+      - one chunk per top-level ``function_declaration``
+      - one chunk per top-level ``class_declaration`` + one per
+        ``method_definition`` inside its ``class_body``
+      - one chunk per top-level ``lexical_declaration`` /
+        ``variable_declaration`` whose RHS is an arrow or function
+        expression (``const foo = () => ...`` / ``const foo = function() ...``)
+
+    Falls back to a whole-file chunk if tree-sitter is unavailable or no
+    chunkable decls are found.
+    """
+    from codebase_mapper.ts_setup import TS_AVAILABLE, _ts_setup, _TS_LANGS, ts
+    from codebase_mapper.ts_setup import _ts_grammar_for
+
+    if not TS_AVAILABLE:
+        return _whole_file_chunk(content, path)
+    grammar = _ts_grammar_for(path)
+    if grammar not in ("typescript", "javascript", "tsx"):
+        return _whole_file_chunk(content, path)
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+
+    _ts_setup()
+    parser = ts.Parser(_TS_LANGS[grammar])
+    tree = parser.parse(content)
+    src_lines = text.splitlines(keepends=True)
+    line_byte_starts = _line_byte_starts(content)
+
+    chunks: list[dict] = []
+    for node in tree.root_node.children:
+        # Unwrap `export ...` / `export default ...` so the inner decl is
+        # what we chunk; the chunk's byte range still covers the export
+        # keyword via `target` below.
+        inner = _tsjs_unwrap_export(node)
+        if inner.type == "function_declaration":
+            name = _tsjs_named_child_text(inner, "identifier", content)
+            if name:
+                chunks.append(_chunk_from_ts_node(node, "function", None, name,
+                                                  src_lines, line_byte_starts))
+        elif inner.type == "class_declaration":
+            name = _tsjs_class_name(inner, content)
+            if not name:
+                continue
+            chunks.append(_chunk_from_ts_node(node, "class", None, name,
+                                              src_lines, line_byte_starts))
+            for method in _tsjs_iter_methods(inner):
+                m_name = _tsjs_named_child_text(method, "property_identifier", content)
+                if m_name:
+                    chunks.append(_chunk_from_ts_node(method, "method", name, m_name,
+                                                      src_lines, line_byte_starts))
+        elif inner.type in ("lexical_declaration", "variable_declaration"):
+            for name in _tsjs_decl_function_bindings(inner, content):
+                chunks.append(_chunk_from_ts_node(node, "function", None, name,
+                                                  src_lines, line_byte_starts))
+
+    if not chunks:
+        return _whole_file_chunk(content, path)
+    return chunks
+
+
+def _tsjs_unwrap_export(node):
+    """If ``node`` is ``export ...`` return the wrapped declaration node."""
+    if node.type != "export_statement":
+        return node
+    for c in node.children:
+        if c.is_named and c.type in (
+            "function_declaration", "class_declaration",
+            "lexical_declaration", "variable_declaration",
+        ):
+            return c
+    return node
+
+
+def _tsjs_named_child_text(node, child_type: str, content: bytes) -> str | None:
+    for c in node.children:
+        if c.type == child_type:
+            return content[c.start_byte:c.end_byte].decode("utf-8", "replace")
+    return None
+
+
+def _tsjs_class_name(class_node, content: bytes) -> str | None:
+    # TypeScript uses type_identifier; JavaScript uses identifier.
+    return (
+        _tsjs_named_child_text(class_node, "type_identifier", content)
+        or _tsjs_named_child_text(class_node, "identifier", content)
+    )
+
+
+def _tsjs_iter_methods(class_node):
+    """Yield method_definition nodes inside a class_declaration's body."""
+    body = next((c for c in class_node.children if c.type == "class_body"), None)
+    if body is None:
+        return
+    for c in body.children:
+        if c.type == "method_definition":
+            yield c
+
+
+def _tsjs_decl_function_bindings(decl_node, content: bytes) -> list[str]:
+    """For ``const foo = () => ...`` / ``const foo = function() ...``
+    declarations, yield the bound name(s). Skips declarators whose RHS isn't
+    a function/arrow (we only chunk callable bindings)."""
+    out: list[str] = []
+    for c in decl_node.children:
+        if c.type != "variable_declarator":
+            continue
+        # variable_declarator: name = value
+        # children include an identifier (name) and the value node.
+        name_node = next((n for n in c.children if n.type == "identifier"), None)
+        if name_node is None:
+            continue
+        # The value is the last named child after the `=`. Tree-sitter
+        # exposes it cleanly via the `value` field; use that when available.
+        value = c.child_by_field_name("value")
+        if value is None:
+            continue
+        if value.type in ("arrow_function", "function_expression"):
+            out.append(content[name_node.start_byte:name_node.end_byte].decode("utf-8", "replace"))
+    return out
+
+
+def _chunk_from_ts_node(node, kind: str, parent: str | None, name: str,
+                        src_lines: list[str], line_byte_starts: list[int]) -> dict:
+    # Tree-sitter's points are zero-indexed; chunks expose 1-indexed lines.
+    line_start = node.start_point[0] + 1
+    line_end = node.end_point[0] + 1
+    text = "".join(src_lines[line_start - 1: line_end])
+    chunk_bytes = text.encode("utf-8")
+    byte_start = line_byte_starts[line_start] if line_start < len(line_byte_starts) else 0
+    byte_end = byte_start + len(chunk_bytes)
     return {
         "kind": kind,
         "symbol": name,

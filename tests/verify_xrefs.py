@@ -55,6 +55,27 @@ Phase 4 — Python inter-file `calls` resolution (`from X import Y`):
       resolve to existing chunks in inventory.ttl, including the
       ones in other files.
 
+Phase 8 — TypeScript / JavaScript ``calls`` resolver:
+  26. L2 chunker emits symbol-level chunks for TS/JS (function /
+      class / method / arrow-const-binding).
+  27. TS intra-file: ``function caller() { localTarget() }`` → edge
+      with resolver ``tsjs_intra_file``.
+  28. TS inter-file via named import: ``import { foo } from "./lib";
+      caller() { foo() }`` → edge to lib.foo with resolver
+      ``tsjs_inter_file``.
+  29. TS alias: ``import { foo as bar } from "./lib"; bar()`` →
+      edge to lib.foo (dedup with the un-aliased call).
+  30. TS ``module_not_in_repo``: ``import { x } from "external-pkg";
+      x()`` → ``unresolved`` entry.
+  31. TS ``symbol_not_exported``: ``import { missing } from "./lib";
+      missing()`` (lib exists but symbol absent) → ``unresolved`` entry.
+  32. TS ``import type {...}`` and ``import * as ns from ...`` do
+      NOT bind: a call using such a name produces neither an edge
+      nor an unresolved entry.
+  33. JS intra-file edge works the same way.
+  34. Reference integrity: every TS/JS edge endpoint resolves to a
+      real ``cbml2:Chunk`` in inventory.ttl.
+
 Exit code: 0 if all pass, 1 otherwise.
 """
 from __future__ import annotations
@@ -235,6 +256,68 @@ def build_phase4_fixture(target: Path) -> None:
     (pkg / "lib.py").write_text(PHASE4_LIB_SRC)
     (pkg / "sibling.py").write_text(PHASE4_SIBLING_SRC)
     (pkg / "app.py").write_text(PHASE4_APP_SRC)
+    _commit(target)
+
+
+# Phase 8 fixtures: TS/JS chunker + resolver coverage.
+#
+# Layout:
+#   src/lib.ts     — exports foo (function) and Helper (class)
+#   src/app.ts     — covers intra-file, inter-file, alias, type-only,
+#                    namespace, symbol-not-exported, module-not-in-repo
+#   src/legacy.js  — JS intra-file edge
+PHASE8_LIB_TS = '''\
+export function foo(x: number): number {
+    return x + 1;
+}
+
+export class Helper {
+    run(): number { return 42; }
+}
+'''
+
+PHASE8_APP_TS = '''\
+import { foo } from "./lib";
+import { foo as renamed } from "./lib";
+import { missing } from "./lib";
+import { external } from "external-pkg";
+import type { Helper } from "./lib";
+import * as ns from "./lib";
+
+function localTarget(): void {}
+
+function caller(): void {
+    foo(1);          // inter-file: caller → lib.foo
+    renamed(2);      // inter-file (alias): caller → lib.foo (dedup)
+    localTarget();   // intra-file: caller → localTarget
+    missing();       // unresolved: symbol_not_exported
+    external();      // unresolved: module_not_in_repo
+}
+
+class App {
+    method(): void {
+        foo(3);      // inter-file: App.method → lib.foo
+        ns.foo(4);   // Attribute call (namespace import); skipped silently
+    }
+}
+'''
+
+PHASE8_LEGACY_JS = '''\
+function add(a, b) { return a + b; }
+
+function caller() {
+    add(1, 2);  // intra-file: caller → add
+}
+'''
+
+
+def build_phase8_fixture(target: Path) -> None:
+    _init_git(target)
+    src = target / "src"
+    src.mkdir()
+    (src / "lib.ts").write_text(PHASE8_LIB_TS)
+    (src / "app.ts").write_text(PHASE8_APP_TS)
+    (src / "legacy.js").write_text(PHASE8_LEGACY_JS)
     _commit(target)
 
 
@@ -811,6 +894,155 @@ def main(argv: list[str] | None = None) -> int:
             "Phase 4: every cbmxr:src/dst (including cross-file) resolves to cbml2:Chunk",
             not bad_p4,
             f"bad={bad_p4[:3]}",
+        )
+
+        # =====================================================
+        # Phase 8: TypeScript / JavaScript resolver
+        # =====================================================
+        p8_fixture = work / "p8_fixture"
+        build_phase8_fixture(p8_fixture)
+        p8_out = work / "p8_out"
+        p8_manifest = run_pipeline(p8_fixture, p8_out, with_l2=True)
+
+        # --- 26. L2 chunker emits symbol-level chunks for TS/JS. ---
+        reset_registries()
+        chunks_embeddings.register_all(
+            chunks_embeddings.DeterministicHashBackend(dimension=64),
+        )
+        symbol_xrefs.register_all()
+        from codebase_mapper.pipeline import map_codebase as _map8
+        p8_mapped = _map8(p8_fixture.resolve(), "HEAD")
+        p8_ctx = p8_mapped["ctx"]
+        all_chunks = p8_ctx.indices["l2_10_chunks"]
+
+        def _chunks_by_path(path):
+            return [c for c in all_chunks if c.get("path") == path]
+
+        tsjs_lib_chunks = _chunks_by_path("src/lib.ts")
+        tsjs_app_chunks = _chunks_by_path("src/app.ts")
+        js_chunks = _chunks_by_path("src/legacy.js")
+        lib_symbols = {(c["symbol"], c.get("parent_symbol")) for c in tsjs_lib_chunks}
+        app_symbols = {(c["symbol"], c.get("parent_symbol")) for c in tsjs_app_chunks}
+        js_symbols = {(c["symbol"], c.get("parent_symbol")) for c in js_chunks}
+        check(
+            "Phase 8: TS chunker emits {foo, Helper, Helper.run} for lib.ts",
+            {("foo", None), ("Helper", None), ("run", "Helper")}.issubset(lib_symbols),
+            str(lib_symbols),
+        )
+        check(
+            "Phase 8: TS chunker emits {caller, localTarget, App, App.method} for app.ts",
+            {("caller", None), ("localTarget", None), ("App", None),
+             ("method", "App")}.issubset(app_symbols),
+            str(app_symbols),
+        )
+        check(
+            "Phase 8: JS chunker emits {add, caller} for legacy.js",
+            {("add", None), ("caller", None)}.issubset(js_symbols),
+            str(js_symbols),
+        )
+
+        # --- 27-33. Resolver edges + unresolved entries ---
+        p8_lines = (p8_out / "xrefs.jsonl").read_text().splitlines()
+        p8_edges = [json.loads(line) for line in p8_lines]
+        p8_tuples = {
+            (
+                e["src_chunk_id"].split("#")[0],
+                _symbol_from_chunk_id(e["src_chunk_id"]),
+                e["dst_chunk_id"].split("#")[0],
+                _symbol_from_chunk_id(e["dst_chunk_id"]),
+                e["resolver"],
+            )
+            for e in p8_edges
+        }
+        expected_tsjs_edges = {
+            # (src_path, src_sym, dst_path, dst_sym, resolver)
+            ("src/app.ts", "caller", "src/app.ts", "localTarget", "tsjs_intra_file"),
+            ("src/app.ts", "caller", "src/lib.ts", "foo", "tsjs_inter_file"),
+            ("src/app.ts", "App.method", "src/lib.ts", "foo", "tsjs_inter_file"),
+            ("src/legacy.js", "caller", "src/legacy.js", "add", "tsjs_intra_file"),
+        }
+        check(
+            "Phase 8: TS/JS edges match expected set (intra + inter + alias dedup)",
+            p8_tuples == expected_tsjs_edges,
+            f"expected={sorted(expected_tsjs_edges)}\nactual={sorted(p8_tuples)}",
+        )
+
+        # Alias dedup: only one caller→foo edge despite two call sites.
+        caller_to_foo = [
+            e for e in p8_edges
+            if _symbol_from_chunk_id(e["src_chunk_id"]) == "caller"
+            and _symbol_from_chunk_id(e["dst_chunk_id"]) == "foo"
+            and e["resolver"] == "tsjs_inter_file"
+        ]
+        check(
+            "Phase 8: aliased and original imports dedup to one edge",
+            len(caller_to_foo) == 1,
+            f"got {len(caller_to_foo)} edges",
+        )
+
+        # Unresolved buckets — fetch the in-memory list via the pure resolver.
+        from plugins.symbol_xrefs.tsjs_resolver import resolve_tsjs_calls
+        app_record = next(
+            r for r in p8_mapped["records"] if r.path == "src/app.ts"
+        )
+        _, p8_unresolved = resolve_tsjs_calls(app_record, p8_ctx)
+        reasons = {(u.reason, u.resolver) for u in p8_unresolved}
+        check(
+            "Phase 8: unresolved has module_not_in_repo from tsjs_inter_file",
+            ("module_not_in_repo", "tsjs_inter_file") in reasons,
+            str(reasons),
+        )
+        check(
+            "Phase 8: unresolved has symbol_not_exported from tsjs_inter_file",
+            ("symbol_not_exported", "tsjs_inter_file") in reasons,
+            str(reasons),
+        )
+
+        # Type-only and namespace imports must NOT contribute edges or
+        # unresolved entries (they never bind a callable identifier).
+        helper_calls = [
+            t for t in p8_tuples
+            if t[3] == "Helper"
+        ]
+        check(
+            "Phase 8: type-only import `Helper` does not produce an edge",
+            helper_calls == [],
+            str(helper_calls),
+        )
+        # The namespace `ns` is used only as `ns.foo(...)` (Attribute call);
+        # the resolver shouldn't add `ns` to unresolved either.
+        ns_unresolved = [
+            u for u in p8_unresolved if "ns" in u.raw_target or u.raw_target == "ns"
+        ]
+        check(
+            "Phase 8: namespace import `ns` does not contribute to unresolved",
+            ns_unresolved == [],
+            str([u.raw_target for u in p8_unresolved]),
+        )
+
+        # --- 34. Reference integrity for TS/JS edges. ---
+        g_p8 = Graph()
+        g_p8.parse(str(p8_out / "inventory.ttl"), format="turtle")
+        chunk_subjects_p8 = set(g_p8.subjects(RDF.type, CBML2.Chunk))
+        bad_p8 = []
+        for e_iri in g_p8.subjects(RDF.type, CBMXR.Edge):
+            for pred in (CBMXR.src, CBMXR.dst):
+                tgt = next(iter(g_p8.objects(e_iri, pred)), None)
+                if tgt is None or tgt not in chunk_subjects_p8:
+                    bad_p8.append((str(e_iri), str(pred), str(tgt)))
+        check(
+            "Phase 8: every TS/JS cbmxr:src/dst resolves to cbml2:Chunk",
+            not bad_p8,
+            f"bad={bad_p8[:3]}",
+        )
+
+        # Manifest fragment reflects the new languages.
+        p8_frag = p8_manifest["extensions"]["l3_50_xrefs_artifact"]
+        check(
+            "Phase 8: by_language reports typescript + javascript buckets",
+            "typescript" in p8_frag["by_language"]
+            and "javascript" in p8_frag["by_language"],
+            str(p8_frag.get("by_language")),
         )
 
         print()
