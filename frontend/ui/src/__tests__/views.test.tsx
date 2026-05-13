@@ -98,6 +98,53 @@ describe("FileDetail route", () => {
       "/file/tests/test_a.py"
     );
   });
+
+  it("renders the xrefs columns with click-through and resolution badges", async () => {
+    renderAt("/file/a.py");
+    // Both panels render with their row counts.
+    expect(await screen.findByText("Calls out (2)")).toBeInTheDocument();
+    expect(screen.getByText("Called from (1)")).toBeInTheDocument();
+    // Symbol links jump to /chunk/{idx}.
+    expect(screen.getByRole("link", { name: "load_users" })).toHaveAttribute(
+      "href",
+      "/chunk/7"
+    );
+    expect(screen.getByRole("link", { name: "guess_owner" })).toHaveAttribute(
+      "href",
+      "/chunk/9"
+    );
+    expect(screen.getByRole("link", { name: "main" })).toHaveAttribute(
+      "href",
+      "/chunk/3"
+    );
+    // Resolution badges carry the provenance through the title attribute.
+    const heuristic = screen.getByText("heuristic");
+    expect(heuristic).toHaveClass("muted");
+    expect(heuristic).toHaveAttribute("title", "resolver: python_inter_file");
+    const exactBadges = screen.getAllByText("exact");
+    expect(exactBadges[0]).not.toHaveClass("muted");
+  });
+
+  it("renders empty xrefs panels when the bundle has no edges", async () => {
+    // Patch fetch to return a FileDetail without xrefs_out / xrefs_in.
+    const originalFetch = (globalThis as any).fetch;
+    (globalThis as any).fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/file/")) {
+        const stripped = {
+          ...((await (await originalFetch(input)).json()) as any),
+        };
+        delete stripped.xrefs_out;
+        delete stripped.xrefs_in;
+        return new Response(JSON.stringify(stripped), { status: 200 });
+      }
+      return originalFetch(input);
+    };
+    renderAt("/file/a.py");
+    expect(await screen.findByText("Calls out (0)")).toBeInTheDocument();
+    expect(screen.getByText("Called from (0)")).toBeInTheDocument();
+    expect(screen.getByText(/no tracked calls leave this file/)).toBeInTheDocument();
+  });
 });
 
 describe("ChunkDetail route", () => {
@@ -105,11 +152,52 @@ describe("ChunkDetail route", () => {
     renderAt("/chunk/0");
     expect(await screen.findByRole("heading", { name: /chunk #0/ })).toBeInTheDocument();
     expect(screen.getByText("def hello():", { exact: false })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "a.py" })).toHaveAttribute("href", "/file/a.py");
+    expect(screen.getAllByRole("link", { name: "a.py" })[0]).toHaveAttribute("href", "/file/a.py");
     expect(screen.getByRole("link", { name: "schema" })).toHaveAttribute(
       "href",
       "/concept/schema"
     );
+  });
+
+  it("renders Callers and Callees with click-through links to the peer chunks", async () => {
+    renderAt("/chunk/0");
+    expect(await screen.findByText("Callers (1)")).toBeInTheDocument();
+    expect(screen.getByText("Callees (1)")).toBeInTheDocument();
+    // Caller row links to /chunk/11; callee row links to /chunk/12.
+    expect(screen.getByRole("link", { name: "main" })).toHaveAttribute(
+      "href",
+      "/chunk/11"
+    );
+    expect(screen.getByRole("link", { name: "load_users" })).toHaveAttribute(
+      "href",
+      "/chunk/12"
+    );
+    // The heuristic callee renders dimmed; the exact caller does not.
+    const heuristicBadge = screen.getByTitle(/resolver: python_inter_file/);
+    expect(heuristicBadge).toHaveTextContent("heuristic");
+    expect(heuristicBadge).toHaveClass("muted");
+    const exactBadge = screen.getByTitle(/resolver: python_intra_file/);
+    expect(exactBadge).toHaveTextContent("exact");
+    expect(exactBadge).not.toHaveClass("muted");
+  });
+
+  it("renders the empty state when a chunk has no xrefs", async () => {
+    // Patch fetch to drop callers/callees from the chunk response.
+    const originalFetch = (globalThis as any).fetch;
+    (globalThis as any).fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (/^\/api\/chunk\/\d+/.test(url)) {
+        const body = (await (await originalFetch(input)).json()) as any;
+        delete body.callers;
+        delete body.callees;
+        return new Response(JSON.stringify(body), { status: 200 });
+      }
+      return originalFetch(input);
+    };
+    renderAt("/chunk/0");
+    expect(await screen.findByText("Callers (0)")).toBeInTheDocument();
+    expect(screen.getByText("Callees (0)")).toBeInTheDocument();
+    expect(screen.getByText(/not called by any chunk/)).toBeInTheDocument();
   });
 });
 

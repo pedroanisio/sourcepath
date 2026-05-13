@@ -42,8 +42,14 @@ export interface ChunkRow {
   file: string | null;
   beginLine: number | null;
   endLine: number | null;
-  embeddingRow: number | null;
+  embeddingRow?: number | null;
   score?: number | null;
+  // Present only on rows produced by an xref lookup (callers/callees on
+  // ChunkDetail; xrefs_out/xrefs_in on FileDetail). The same shape carries
+  // edge provenance through to the UI so we don't need a parallel type.
+  xref_kind?: string;
+  resolution?: string;
+  resolver?: string;
 }
 
 export interface FileDetail {
@@ -65,6 +71,11 @@ export interface FileDetail {
     embeddingRow: number | null;
   }>;
   concepts: string[];
+  // Symbol-level xrefs aggregated across every chunk in this file. Each
+  // row is deduped per peer chunk by the backend; the first edge's
+  // provenance (xref_kind/resolution/resolver) wins.
+  xrefs_out?: ChunkRow[];
+  xrefs_in?: ChunkRow[];
 }
 
 export interface FileImpact {
@@ -95,6 +106,11 @@ export interface ChunkDetail {
   };
   concepts: string[];
   blob_preview: string | null;
+  // Symbol-level xrefs. `callers` are chunks that call into this chunk;
+  // `callees` are chunks this chunk calls out to. Optional because older
+  // bundles (no symbol_xrefs sidecar) won't return these keys.
+  callers?: ChunkRow[];
+  callees?: ChunkRow[];
 }
 
 export interface ConceptDetail {

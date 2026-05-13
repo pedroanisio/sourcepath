@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, ChunkDetail as CD } from "../api";
+import { api, ChunkDetail as CD, ChunkRow } from "../api";
 import { useBundleVersion } from "../bundle-context";
 
 function fileLink(path: string) {
@@ -26,6 +26,8 @@ export default function ChunkDetail() {
   if (err) return <div className="error">{err}</div>;
   if (!d) return <div className="empty">Loading…</div>;
   const c = d.chunk;
+  const callers = d.callers ?? [];
+  const callees = d.callees ?? [];
 
   return (
     <>
@@ -49,6 +51,11 @@ export default function ChunkDetail() {
           <dt>contentSha256</dt>
           <dd style={{ wordBreak: "break-all" }}>{c.contentSha256 ?? "—"}</dd>
         </dl>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <XrefList title="Callers" rows={callers} emptyLabel="not called by any chunk" />
+        <XrefList title="Callees" rows={callees} emptyLabel="this chunk calls nothing tracked" />
       </div>
 
       <div className="card">
@@ -89,5 +96,79 @@ export default function ChunkDetail() {
         )}
       </div>
     </>
+  );
+}
+
+function XrefList({
+  title,
+  rows,
+  emptyLabel,
+}: {
+  title: string;
+  rows: ChunkRow[];
+  emptyLabel: string;
+}) {
+  return (
+    <div className="card" style={{ padding: 0 }}>
+      <h3 style={{ padding: "16px 16px 0" }}>
+        {title} ({rows.length})
+      </h3>
+      {rows.length === 0 ? (
+        <div className="empty" style={{ padding: 16 }}>
+          {emptyLabel}
+        </div>
+      ) : (
+        <table className="rows">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>file</th>
+              <th>lines</th>
+              <th>via</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.idx}-${r.resolver ?? ""}`}>
+                <td>
+                  {r.idx != null ? (
+                    <Link to={`/chunk/${r.idx}`}>{r.symbol ?? "—"}</Link>
+                  ) : (
+                    r.symbol ?? "—"
+                  )}
+                </td>
+                <td>
+                  {r.file ? <Link to={fileLink(r.file)}>{r.file}</Link> : "—"}
+                </td>
+                <td>
+                  {r.beginLine ?? "—"}–{r.endLine ?? "—"}
+                </td>
+                <td>
+                  <ResolutionBadge resolution={r.resolution} resolver={r.resolver} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function ResolutionBadge({
+  resolution,
+  resolver,
+}: {
+  resolution?: string;
+  resolver?: string;
+}) {
+  if (!resolution) return <>—</>;
+  // `exact` is the default — render plain; non-exact gets the muted tone so
+  // reviewers can spot heuristics at a glance.
+  const cls = resolution === "exact" ? "tag" : "tag muted";
+  return (
+    <span className={cls} title={resolver ? `resolver: ${resolver}` : undefined}>
+      {resolution}
+    </span>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, FileDetail as FD, FileImpact } from "../api";
+import { api, ChunkRow, FileDetail as FD, FileImpact } from "../api";
 import { useBundleVersion } from "../bundle-context";
 
 function fileLink(path: string) {
@@ -80,6 +80,19 @@ export default function FileDetail() {
         </div>
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <FileXrefList
+          title="Calls out"
+          rows={d.xrefs_out ?? []}
+          emptyLabel="no tracked calls leave this file"
+        />
+        <FileXrefList
+          title="Called from"
+          rows={d.xrefs_in ?? []}
+          emptyLabel="no tracked calls enter this file"
+        />
+      </div>
+
       {impact && (
         <div className="card">
           <h3>Change impact</h3>
@@ -156,6 +169,72 @@ export default function FileDetail() {
     </>
   );
 }
+
+function FileXrefList({
+  title,
+  rows,
+  emptyLabel,
+}: {
+  title: string;
+  rows: ChunkRow[];
+  emptyLabel: string;
+}) {
+  return (
+    <div className="card" style={{ padding: 0 }}>
+      <h3 style={{ padding: "16px 16px 0" }}>
+        {title} ({rows.length})
+      </h3>
+      {rows.length === 0 ? (
+        <div className="empty" style={{ padding: 16 }}>
+          {emptyLabel}
+        </div>
+      ) : (
+        <table className="rows">
+          <thead>
+            <tr>
+              <th>symbol</th>
+              <th>file</th>
+              <th>lines</th>
+              <th>via</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.idx}-${r.resolver ?? ""}`}>
+                <td>
+                  {r.idx != null ? (
+                    <Link to={`/chunk/${r.idx}`}>{r.symbol ?? "—"}</Link>
+                  ) : (
+                    r.symbol ?? "—"
+                  )}
+                </td>
+                <td>
+                  {r.file ? <Link to={fileLink(r.file)}>{r.file}</Link> : "—"}
+                </td>
+                <td>
+                  {r.beginLine ?? "—"}–{r.endLine ?? "—"}
+                </td>
+                <td>
+                  {r.resolution ? (
+                    <span
+                      className={r.resolution === "exact" ? "tag" : "tag muted"}
+                      title={r.resolver ? `resolver: ${r.resolver}` : undefined}
+                    >
+                      {r.resolution}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 
 function ImpactList({ title, items }: { title: string; items: string[] }) {
   return (

@@ -93,6 +93,43 @@ export const fileDetailFixture: FileDetail = {
     },
   ],
   concepts: ["schema", "auth"],
+  xrefs_out: [
+    {
+      idx: 7,
+      symbol: "load_users",
+      kind: "function",
+      file: "b.py",
+      beginLine: 12,
+      endLine: 16,
+      xref_kind: "calls",
+      resolution: "exact",
+      resolver: "python_inter_file",
+    },
+    {
+      idx: 9,
+      symbol: "guess_owner",
+      kind: "function",
+      file: "c.py",
+      beginLine: 30,
+      endLine: 33,
+      xref_kind: "calls",
+      resolution: "heuristic",
+      resolver: "python_inter_file",
+    },
+  ],
+  xrefs_in: [
+    {
+      idx: 3,
+      symbol: "main",
+      kind: "function",
+      file: "c.py",
+      beginLine: 5,
+      endLine: 8,
+      xref_kind: "calls",
+      resolution: "exact",
+      resolver: "python_intra_file",
+    },
+  ],
 };
 
 export const fileImpactFixture: FileImpact = {
@@ -133,6 +170,32 @@ export const chunkDetailFixture: ChunkDetail = {
   },
   concepts: ["schema"],
   blob_preview: "def hello():\n    return 'hi'\n",
+  callers: [
+    {
+      idx: 11,
+      symbol: "main",
+      kind: "function",
+      file: "c.py",
+      beginLine: 4,
+      endLine: 6,
+      xref_kind: "calls",
+      resolution: "exact",
+      resolver: "python_intra_file",
+    },
+  ],
+  callees: [
+    {
+      idx: 12,
+      symbol: "load_users",
+      kind: "function",
+      file: "b.py",
+      beginLine: 12,
+      endLine: 16,
+      xref_kind: "calls",
+      resolution: "heuristic",
+      resolver: "python_inter_file",
+    },
+  ],
 };
 
 export const conceptDetailFixture: ConceptDetail = {

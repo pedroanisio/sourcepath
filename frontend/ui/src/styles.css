@@ -365,3 +365,8 @@ table.rows tbody tr:hover {
   border-color: var(--good);
   color: var(--good);
 }
+
+.tag.muted {
+  color: var(--fg-dim);
+  border-style: dashed;
+}
