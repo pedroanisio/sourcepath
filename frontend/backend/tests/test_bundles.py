@@ -342,6 +342,24 @@ def test_endpoints_serve_a_host_only_bundle(host_only_bundle):
         assert cg["edges"] == []
 
 
+def test_impact_endpoint_reports_import_radius_for_host_only_bundle(host_only_bundle):
+    with TestClient(app_module.app) as c:
+        r = c.get("/api/impact/a.py")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["file"] == "a.py"
+    assert body["direct_dependencies"] == ["b.py"]
+    assert body["direct_dependents"] == []
+    assert body["transitive_dependencies"] == ["b.py"]
+    assert body["related_tests"] == []
+
+
+def test_impact_endpoint_404s_for_unknown_file(host_only_bundle):
+    with TestClient(app_module.app) as c:
+        r = c.get("/api/impact/missing.py")
+    assert r.status_code == 404
+
+
 # ---------------------------------------------------------------- cache TTL
 def test_bundle_cache_clear_drops_entries(fake_bundles_root: Path, monkeypatch):
     """cache_clear() forces a re-read of bundle metadata."""

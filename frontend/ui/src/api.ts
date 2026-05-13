@@ -67,6 +67,20 @@ export interface FileDetail {
   concepts: string[];
 }
 
+export interface FileImpact {
+  file: string;
+  depth: number;
+  direct_dependencies: string[];
+  direct_dependents: string[];
+  transitive_dependencies: string[];
+  transitive_dependents: string[];
+  related_tests: string[];
+  tested_subjects: string[];
+  concepts: string[];
+  chunks: ChunkRow[];
+  truncated: boolean;
+}
+
 export interface ChunkDetail {
   chunk: {
     idx: number;
@@ -183,6 +197,10 @@ export const api = {
   file: (path: string) =>
     get<FileDetail>(
       "/api/file/" + path.split("/").map(encodeURIComponent).join("/")
+    ),
+  impact: (path: string, depth = 2) =>
+    get<FileImpact>(
+      `/api/impact/${path.split("/").map(encodeURIComponent).join("/")}?depth=${depth}`
     ),
   chunk: (idx: number) => get<ChunkDetail>(`/api/chunk/${idx}`),
 };

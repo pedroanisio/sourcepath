@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, FileDetail as FD } from "../api";
+import { api, FileDetail as FD, FileImpact } from "../api";
 import { useBundleVersion } from "../bundle-context";
 
 function fileLink(path: string) {
@@ -11,6 +11,7 @@ export default function FileDetail() {
   const params = useParams();
   const path = params["*"] || "";
   const [d, setD] = useState<FD | null>(null);
+  const [impact, setImpact] = useState<FileImpact | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const bundleVersion = useBundleVersion();
 
@@ -18,7 +19,10 @@ export default function FileDetail() {
     // No reset on dep change — keep the previous file's data visible until
     // the new response arrives. Avoids unmounting elements that
     // asynchronous tests are observing.
+    setErr(null);
+    setImpact(null);
     api.file(path).then(setD).catch((e) => setErr(String(e)));
+    api.impact(path).then(setImpact).catch(() => setImpact(null));
   }, [path, bundleVersion]);
 
   if (err) return <div className="error">{err}</div>;
@@ -76,6 +80,33 @@ export default function FileDetail() {
         </div>
       </div>
 
+      {impact && (
+        <div className="card">
+          <h3>Change impact</h3>
+          <div className="impact-grid">
+            <ImpactList
+              title={`Dependencies (${impact.direct_dependencies.length})`}
+              items={impact.direct_dependencies}
+            />
+            <ImpactList
+              title={`Dependents (${impact.direct_dependents.length})`}
+              items={impact.direct_dependents}
+            />
+            <ImpactList
+              title={`Transitive dependents, depth ${impact.depth} (${impact.transitive_dependents.length})`}
+              items={impact.transitive_dependents}
+            />
+            <ImpactList
+              title={`Related tests (${impact.related_tests.length})`}
+              items={impact.related_tests}
+            />
+          </div>
+          {impact.truncated && (
+            <div className="impact-note">Results truncated by backend limit.</div>
+          )}
+        </div>
+      )}
+
       <div className="card" style={{ padding: 0 }}>
         <h3 style={{ padding: "16px 16px 0" }}>Chunks ({d.chunks.length})</h3>
         {d.chunks.length === 0 ? (
@@ -123,5 +154,27 @@ export default function FileDetail() {
         )}
       </div>
     </>
+  );
+}
+
+function ImpactList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section className="impact-list">
+      <h4>{title}</h4>
+      {items.length === 0 ? (
+        <div className="empty compact">none</div>
+      ) : (
+        <ul>
+          {items.slice(0, 12).map((p) => (
+            <li key={p}>
+              <Link to={fileLink(p)}>{p}</Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {items.length > 12 && (
+        <div className="impact-note">+{items.length - 12} more</div>
+      )}
+    </section>
   );
 }

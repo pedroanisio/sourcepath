@@ -3,6 +3,7 @@ import type {
   GraphResp,
   ChunkListResp,
   FileDetail,
+  FileImpact,
   ChunkDetail,
   ConceptDetail,
   BundleListResp,
@@ -94,6 +95,30 @@ export const fileDetailFixture: FileDetail = {
   concepts: ["schema", "auth"],
 };
 
+export const fileImpactFixture: FileImpact = {
+  file: "a.py",
+  depth: 2,
+  direct_dependencies: ["b.py"],
+  direct_dependents: ["c.py", "d.py"],
+  transitive_dependencies: ["b.py"],
+  transitive_dependents: ["c.py", "d.py", "e.py"],
+  related_tests: ["tests/test_a.py"],
+  tested_subjects: [],
+  concepts: ["schema", "auth"],
+  chunks: [
+    {
+      idx: 0,
+      symbol: "<file>",
+      kind: "file",
+      file: "a.py",
+      beginLine: 1,
+      endLine: 10,
+      embeddingRow: 0,
+    },
+  ],
+  truncated: false,
+};
+
 export const chunkDetailFixture: ChunkDetail = {
   chunk: {
     idx: 0,
@@ -170,6 +195,7 @@ export function installFetchMock() {
     [/^\/api\/concept-graph/, () => conceptGraphFixture],
     [/^\/api\/chunks(\?|$)/, () => chunkListFixture],
     [/^\/api\/chunks\/search(\?|$)/, () => chunkListFixture],
+    [/^\/api\/impact\//, () => fileImpactFixture],
     [/^\/api\/file\//, () => fileDetailFixture],
     [/^\/api\/chunk\/\d+(\?|$)/, () => chunkDetailFixture],
     [/^\/api\/concept\//, () => conceptDetailFixture],

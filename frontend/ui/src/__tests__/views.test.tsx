@@ -86,10 +86,16 @@ describe("FileDetail route", () => {
     expect(await screen.findByRole("heading", { name: /a\.py/ })).toBeInTheDocument();
     expect(screen.getByText(/Imports out/)).toBeInTheDocument();
     expect(screen.getByText(/Imported by/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "b.py" })).toHaveAttribute("href", "/file/b.py");
+    expect(screen.getAllByRole("link", { name: "b.py" })[0]).toHaveAttribute("href", "/file/b.py");
     expect(screen.getByRole("link", { name: "schema" })).toHaveAttribute(
       "href",
       "/concept/schema"
+    );
+    expect(screen.getByText("Change impact")).toBeInTheDocument();
+    expect(screen.getByText(/Transitive dependents/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "tests/test_a.py" })).toHaveAttribute(
+      "href",
+      "/file/tests/test_a.py"
     );
   });
 });

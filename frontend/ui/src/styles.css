@@ -308,6 +308,44 @@ table.rows tbody tr:hover {
   text-align: center;
 }
 
+.empty.compact {
+  padding: 8px 0;
+  text-align: left;
+}
+
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.impact-list {
+  min-width: 0;
+}
+
+.impact-list h4 {
+  margin: 0 0 8px;
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.impact-list ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.impact-list li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.impact-note {
+  color: var(--fg-dim);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
 .tag {
   display: inline-block;
   padding: 1px 6px;

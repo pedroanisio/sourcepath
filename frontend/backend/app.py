@@ -48,6 +48,9 @@ class Bundle:
     imports: list[tuple[str, str]]  # (src_path, dst_path)
     imports_out: dict[str, list[str]]
     imports_in: dict[str, list[str]]
+    tests: list[tuple[str, str]]  # (test_path, subject_path)
+    tests_for_subject: dict[str, list[str]]
+    subjects_for_test: dict[str, list[str]]
     chunks: list[dict[str, Any]]  # adds: idx
     chunks_by_uri: dict[str, int]  # uri -> idx
     chunks_by_file: dict[str, list[int]]  # file path -> [idx,...]
@@ -139,6 +142,17 @@ def load_bundle(output_dir: Path) -> Bundle:
             imports_out.setdefault(s_path, []).append(o_path)
             imports_in.setdefault(o_path, []).append(s_path)
 
+    tests: list[tuple[str, str]] = []
+    tests_for_subject: dict[str, list[str]] = {}
+    subjects_for_test: dict[str, list[str]] = {}
+    for s, o in g.subject_objects(CBM.tests):
+        test_path = file_by_uri.get(str(s), {}).get("path")
+        subject_path = file_by_uri.get(str(o), {}).get("path")
+        if test_path and subject_path:
+            tests.append((test_path, subject_path))
+            tests_for_subject.setdefault(subject_path, []).append(test_path)
+            subjects_for_test.setdefault(test_path, []).append(subject_path)
+
     chunks: list[dict[str, Any]] = []
     chunk_uri_to_idx: dict[str, int] = {}
     for c in g.subjects(RDF.type, CBML2.Chunk):
@@ -207,6 +221,9 @@ def load_bundle(output_dir: Path) -> Bundle:
         imports=imports,
         imports_out=imports_out,
         imports_in=imports_in,
+        tests=tests,
+        tests_for_subject=tests_for_subject,
+        subjects_for_test=subjects_for_test,
         chunks=chunks,
         chunks_by_uri=chunk_uri_to_idx,
         chunks_by_file=chunks_by_file,
@@ -422,6 +439,20 @@ class BundleListResp(BaseModel):
     bundles: list[BundleInfo]
     selected: str | None = None
     bundles_root: str
+
+
+class ImpactResp(BaseModel):
+    file: str
+    depth: int
+    direct_dependencies: list[str]
+    direct_dependents: list[str]
+    transitive_dependencies: list[str]
+    transitive_dependents: list[str]
+    related_tests: list[str]
+    tested_subjects: list[str]
+    concepts: list[str]
+    chunks: list[ChunkResp]
+    truncated: bool = False
 
 
 # -- FastAPI app --------------------------------------------------------------
@@ -709,6 +740,76 @@ def file_detail(
         "chunks": chunks,
         "concepts": concepts,
     }
+
+
+def _walk_paths(
+    start: str,
+    adjacency: dict[str, list[str]],
+    depth: int,
+    limit: int,
+) -> tuple[list[str], bool]:
+    """Breadth-first walk from a file path through a path adjacency index."""
+    seen = {start}
+    frontier = [start]
+    out: list[str] = []
+    truncated = False
+    for _ in range(depth):
+        next_frontier: list[str] = []
+        for src in frontier:
+            for dst in sorted(adjacency.get(src, [])):
+                if dst in seen:
+                    continue
+                seen.add(dst)
+                out.append(dst)
+                next_frontier.append(dst)
+                if len(out) >= limit:
+                    return out, True
+        frontier = next_frontier
+        if not frontier:
+            break
+    return out, truncated
+
+
+@app.get("/api/impact/{path:path}", response_model=ImpactResp)
+def impact(
+    path: str,
+    depth: int = Query(default=2, ge=1, le=5),
+    limit: int = Query(default=100, ge=1, le=1000),
+    bundle: str | None = Query(default=None),
+) -> ImpactResp:
+    b = get_bundle(bundle)
+    if path not in b.file_by_path:
+        raise HTTPException(status_code=404, detail="file not found")
+
+    dependencies, dep_truncated = _walk_paths(path, b.imports_out, depth, limit)
+    dependents, rev_truncated = _walk_paths(path, b.imports_in, depth, limit)
+    chunk_idxs = b.chunks_by_file.get(path, [])[:25]
+    chunks = [
+        ChunkResp(**{
+            k: b.chunks[i].get(k)
+            for k in ("idx", "symbol", "kind", "file", "beginLine", "endLine", "embeddingRow")
+        })
+        for i in chunk_idxs
+    ]
+
+    related_tests = set(b.tests_for_subject.get(path, []))
+    tested_subjects = set(b.subjects_for_test.get(path, []))
+    for impacted in dependents:
+        related_tests.update(b.tests_for_subject.get(impacted, []))
+
+    return ImpactResp(
+        file=path,
+        depth=depth,
+        direct_dependencies=sorted(b.imports_out.get(path, [])),
+        direct_dependents=sorted(b.imports_in.get(path, [])),
+        transitive_dependencies=dependencies,
+        transitive_dependents=dependents,
+        related_tests=sorted(related_tests),
+        tested_subjects=sorted(tested_subjects),
+        concepts=list((b.concepts.get("per_path_concepts") or {}).get(path, [])),
+        chunks=chunks,
+        truncated=dep_truncated or rev_truncated,
+    )
 
 
 @app.get("/api/chunk/{idx}")
