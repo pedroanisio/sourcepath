@@ -144,6 +144,13 @@ short retrofit is to move the full-body literals to a sidecar
 `ast_summaries.jsonl` keyed by `cbm:contentSha256` and reference them
 from `inventory.ttl` as URIs.
 
+### Adding a new language
+
+See [docs/regenerate.md](docs/regenerate.md) for the full contract:
+the `ast_summary` shape, the `regenerate_<lang>_source(summary) -> str`
+signature, registration in `_REGENERATORS`, and the
+`verify_regenerate.py` test cases a new language must satisfy.
+
 ## Extension model
 
 `codebase_mapper.extensions` exposes seven protocols:
