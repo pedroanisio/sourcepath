@@ -16,6 +16,8 @@ CBMP_NS = "https://codebase-mapper.example.org/cbm/phase#"
 
 CBMI_NS = "https://codebase-mapper.example.org/cbm/instance#"
 
+CBMXR_NS = "https://codebase-mapper.example.org/cbmxr#"
+
 SPDX_SOFTWARE_NS = "https://spdx.org/rdf/3.0.1/terms/Software/"
 
 SPDX_CORE_NS = "https://spdx.org/rdf/3.0.1/terms/Core/"
@@ -28,7 +30,21 @@ CBMP = Namespace(CBMP_NS)
 
 CBMI = Namespace(CBMI_NS)
 
+CBMXR = Namespace(CBMXR_NS)
+
 SH = Namespace("http://www.w3.org/ns/shacl#")
+
+XREF_KINDS = ("calls", "subclassOf", "overrides", "references")
+
+XREF_RESOLUTIONS = ("exact", "heuristic", "ambiguous")
+
+XREF_UNRESOLVED_REASONS = (
+    "module_not_in_repo",
+    "symbol_not_exported",
+    "ambiguous",
+    "dynamic_dispatch",
+    "language_unsupported",
+)
 
 TYPE_VOCABULARY = (
     "source_code", "test_code", "configuration", "documentation",

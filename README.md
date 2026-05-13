@@ -18,7 +18,8 @@ codebase_mapper/        host package
 └── ...
 plugins/
 ├── chunks_embeddings/  source chunks + sentence-transformer/hash embeddings
-└── concept_graph/      identifier splitting + canonical concept set + SKOS
+├── concept_graph/      identifier splitting + canonical concept set + SKOS
+└── symbol_xrefs/       symbol-level xref edges (cbmxr:Edge) — Phase 1 scaffold
 scripts/
 ├── run_l2.py           host + chunks_embeddings registered
 └── run_l3.py           host + chunks_embeddings + concept_graph (--no-l2 skips L2)
@@ -28,7 +29,8 @@ frontend/
 └── ui/                 React UI (scaffold, in progress)
 tests/
 ├── verify_l2.py        chunks_embeddings contract suite
-└── verify_l3.py        concept_graph contract + cross-layer (with/without L2)
+├── verify_l3.py        concept_graph contract + cross-layer (with/without L2)
+└── verify_xrefs.py     symbol_xrefs schema/vocab/sidecar (Phase 1)
 ```
 
 ## Install
@@ -180,9 +182,10 @@ python tests/verify_excludes.py             # --exclude flag + .cbmignore behavi
 python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
 python tests/verify_l3.py                   # concept_graph contract + cross-layer
+python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 ```
 
-All six verifiers resolve `repo_root` from their own `__file__`, so they
+All seven verifiers resolve `repo_root` from their own `__file__`, so they
 run correctly regardless of the caller's cwd.
 
 ### File timestamps

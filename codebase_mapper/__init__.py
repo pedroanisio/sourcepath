@@ -8,7 +8,7 @@ from __future__ import annotations
 from .blobs import emit_blobs
 from .classify import classify, language_of, path_excluded, read_repo_ignore, refine_phases
 from .cli import main
-from .constants import ASSET_EXT, CBM, CBMI, CBMI_NS, CBMP, CBMP_NS, CBMT, CBMT_NS, CBM_NS, DATA_EXT, DEFAULT_PHASES, LANG_BY_EXT, MAN_PAGE_EXTS, PHASE_VOCABULARY, SH, SPDX_CORE_NS, SPDX_SOFTWARE_NS, TOOL_VERSION, TYPE_VOCABULARY, VOCABULARY_VERSION
+from .constants import ASSET_EXT, CBM, CBMI, CBMI_NS, CBMP, CBMP_NS, CBMT, CBMT_NS, CBMXR, CBMXR_NS, CBM_NS, DATA_EXT, DEFAULT_PHASES, LANG_BY_EXT, MAN_PAGE_EXTS, PHASE_VOCABULARY, SH, SPDX_CORE_NS, SPDX_SOFTWARE_NS, TOOL_VERSION, TYPE_VOCABULARY, VOCABULARY_VERSION, XREF_KINDS, XREF_RESOLUTIONS, XREF_UNRESOLVED_REASONS
 from .emit_bundle import emit
 from .extensions import (
     Aggregator, ArtifactEmitter, GraphContributor, ImportResolver,
@@ -34,7 +34,7 @@ from .languages.swift import detect_swift_modules, extract_swift_ast_summary, re
 from .languages.tsjs import TSJS_EXT_CANDIDATES, TSJS_INDEX_CANDIDATES, extract_tsjs_ast_summary, find_governing_tsconfig, load_tsconfigs, resolve_tsjs_import, tsjs_bare_package_root
 from .lockfiles import parse_cargo_lock, parse_gemfile_lock, parse_go_sum, parse_gradle_lockfile, parse_package_lock_json, parse_package_resolved, parse_pnpm_lock_yaml, parse_pubspec_lock, parse_uv_lock, pinned_dependencies
 from .manifests import REQ_LINE, declared_dependencies, parse_build_gradle, parse_cargo_toml, parse_gemfile, parse_gemspec, parse_go_mod, parse_package_json, parse_package_swift, parse_pubspec_yaml, parse_pyproject_toml, parse_requirements_txt, parse_setup_cfg
-from .models import DeclaresDependencyEdge, FileRecord, ImportEdge, ImportExternalEdge, PinsDependencyEdge, TestsEdge
+from .models import DeclaresDependencyEdge, FileRecord, ImportEdge, ImportExternalEdge, PinsDependencyEdge, SymbolXrefEdge, TestsEdge, UnresolvedSymbolRef
 from .pipeline import map_codebase
 from .rdf_emit import build_inventory_graph, build_ontology_mapping_graph, build_shacl_graph, file_iri, package_iri, phase_iri, release_iri, type_iri
 from .reconstruct import reconstruct, verify_reconstructed, verify_roundtrip
@@ -51,6 +51,8 @@ __all__ = [
     'CBMP_NS',
     'CBMT',
     'CBMT_NS',
+    'CBMXR',
+    'CBMXR_NS',
     'CBM_NS',
     'DATA_EXT',
     'DEFAULT_PHASES',
@@ -66,12 +68,17 @@ __all__ = [
     'SH',
     'SPDX_CORE_NS',
     'SPDX_SOFTWARE_NS',
+    'SymbolXrefEdge',
     'TOOL_VERSION',
     'TSJS_EXT_CANDIDATES',
     'TSJS_INDEX_CANDIDATES',
     'TYPE_VOCABULARY',
     'TestsEdge',
+    'UnresolvedSymbolRef',
     'VOCABULARY_VERSION',
+    'XREF_KINDS',
+    'XREF_RESOLUTIONS',
+    'XREF_UNRESOLVED_REASONS',
     'build_inventory_graph',
     'build_kotlin_fqn_index',
     'build_ontology_mapping_graph',
