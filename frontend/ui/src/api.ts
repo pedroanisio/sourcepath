@@ -200,6 +200,8 @@ export const api = {
   bundles: () => get<BundleListResp>("/api/bundles"),
   summary: () => get<Summary>("/api/summary"),
   fileGraph: (limit = 400) => get<GraphResp>(`/api/file-graph?limit=${limit}`),
+  symbolGraph: (limit = 400, kind: "calls" | "all" = "calls") =>
+    get<GraphResp>(`/api/symbol-graph?limit=${limit}&kind=${kind}`),
   conceptGraph: (limit = 150, min_edge = 3) =>
     get<GraphResp>(`/api/concept-graph?limit=${limit}&min_edge=${min_edge}`),
   chunks: (q = "", limit = 50, offset = 0) =>

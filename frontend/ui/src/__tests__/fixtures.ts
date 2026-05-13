@@ -45,6 +45,38 @@ export const conceptGraphFixture: GraphResp = {
   total_nodes_available: 2,
 };
 
+export const symbolGraphFixture: GraphResp = {
+  nodes: [
+    {
+      id: "1",
+      label: "main",
+      group: "function",
+      weight: 2,
+      meta: { idx: 1, file: "app.py", kind: "function", beginLine: 4, endLine: 8 },
+    },
+    {
+      id: "2",
+      label: "helper",
+      group: "function",
+      weight: 3,
+      meta: { idx: 2, file: "app.py", kind: "function", beginLine: 1, endLine: 2 },
+    },
+    {
+      id: "3",
+      label: "greet",
+      group: "method",
+      weight: 1,
+      meta: { idx: 3, file: "app.py", kind: "method", beginLine: 14, endLine: 16 },
+    },
+  ],
+  edges: [
+    { source: "1", target: "2" },
+    { source: "3", target: "2" },
+  ],
+  truncated: false,
+  total_nodes_available: 3,
+};
+
 export const chunkListFixture: ChunkListResp = {
   chunks: [
     {
@@ -255,6 +287,7 @@ export function installFetchMock() {
     [/^\/api\/bundles(\?|$)/, () => bundlesFixture],
     [/^\/api\/summary(\?|$)/, () => summaryFixture],
     [/^\/api\/file-graph/, () => fileGraphFixture],
+    [/^\/api\/symbol-graph/, () => symbolGraphFixture],
     [/^\/api\/concept-graph/, () => conceptGraphFixture],
     [/^\/api\/chunks(\?|$)/, () => chunkListFixture],
     [/^\/api\/chunks\/search(\?|$)/, () => chunkListFixture],

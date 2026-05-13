@@ -628,6 +628,66 @@ def file_graph(
     )
 
 
+@app.get("/api/symbol-graph", response_model=GraphResp)
+def symbol_graph(
+    limit: int = Query(default=400, ge=1, le=5000),
+    kind: str = Query(default="calls",
+                       description="Edge kind filter. 'all' includes every kind."),
+    bundle: str | None = Query(default=None),
+) -> GraphResp:
+    """Symbol-level call graph — nodes are chunks, edges are cbmxr:Edge.
+
+    Same shape as /api/file-graph so the frontend reuses CytoscapeGraph
+    unchanged. Nodes are ranked by call-degree (in + out edges of the
+    chosen kind) so the limit picks the most-connected core.
+
+    Node ``id`` is the chunk idx as a string — the frontend's
+    onNodeClick navigates to /chunk/{id}.
+    """
+    b = get_bundle(bundle)
+
+    selected_edges = [
+        e for e in b.xrefs if kind == "all" or e["kind"] == kind
+    ]
+    deg: dict[int, int] = {}
+    for e in selected_edges:
+        deg[e["src_idx"]] = deg.get(e["src_idx"], 0) + 1
+        deg[e["dst_idx"]] = deg.get(e["dst_idx"], 0) + 1
+
+    # Stable order: degree desc, idx asc — keeps two runs reproducible.
+    ranked_idxs = sorted(deg.keys(), key=lambda i: (-deg[i], i))
+    selected_idxs = ranked_idxs[:limit]
+    selected_set = set(selected_idxs)
+
+    nodes = [
+        GraphNode(
+            id=str(i),
+            label=b.chunks[i].get("symbol") or "—",
+            group=b.chunks[i].get("kind") or "unknown",
+            weight=float(deg.get(i, 0)),
+            meta={
+                "idx": i,
+                "file": b.chunks[i].get("file"),
+                "kind": b.chunks[i].get("kind"),
+                "beginLine": b.chunks[i].get("beginLine"),
+                "endLine": b.chunks[i].get("endLine"),
+            },
+        )
+        for i in selected_idxs
+    ]
+    edges = [
+        GraphEdge(source=str(e["src_idx"]), target=str(e["dst_idx"]))
+        for e in selected_edges
+        if e["src_idx"] in selected_set and e["dst_idx"] in selected_set
+    ]
+    return GraphResp(
+        nodes=nodes,
+        edges=edges,
+        truncated=len(deg) > len(selected_idxs),
+        total_nodes_available=len(deg),
+    )
+
+
 @app.get("/api/concept-graph", response_model=GraphResp)
 def concept_graph(
     limit: int = Query(default=150, ge=1, le=2000),

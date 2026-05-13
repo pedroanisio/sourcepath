@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./views/Dashboard";
 import FileGraph from "./views/FileGraph";
+import SymbolGraph from "./views/SymbolGraph";
 import ConceptGraph from "./views/ConceptGraph";
 import ChunkSearch from "./views/ChunkSearch";
 import FileDetail from "./views/FileDetail";
@@ -82,6 +83,7 @@ export default function App() {
           <nav>
             <NavLink to="/dashboard">Dashboard</NavLink>
             <NavLink to="/files">File graph</NavLink>
+            <NavLink to="/symbols">Symbol graph</NavLink>
             <NavLink to="/concepts">Concept graph</NavLink>
             <NavLink to="/chunks">Chunk search</NavLink>
           </nav>
@@ -91,6 +93,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/files" element={<FileGraph />} />
+            <Route path="/symbols" element={<SymbolGraph />} />
             <Route path="/concepts" element={<ConceptGraph />} />
             <Route path="/chunks" element={<ChunkSearch />} />
             <Route path="/file/*" element={<FileDetail />} />

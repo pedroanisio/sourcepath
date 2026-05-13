@@ -199,6 +199,112 @@ def test_file_xrefs_carry_provenance(xref_client: TestClient):
         assert "resolver" in r and r["resolver"]
 
 
+# --------------------------------------------------------- /api/symbol-graph
+def test_symbol_graph_shape(xref_client: TestClient):
+    """Default endpoint returns nodes + edges + truncated flag."""
+    r = xref_client.get("/api/symbol-graph")
+    assert r.status_code == 200
+    body = r.json()
+    assert "nodes" in body and "edges" in body
+    assert "truncated" in body and "total_nodes_available" in body
+    # Every edge's endpoints are present as nodes.
+    node_ids = {n["id"] for n in body["nodes"]}
+    for e in body["edges"]:
+        assert e["source"] in node_ids
+        assert e["target"] in node_ids
+
+
+def test_symbol_graph_node_carries_chunk_meta(xref_client: TestClient):
+    """Each node has the fields the UI needs to render: idx, file, kind, lines."""
+    body = xref_client.get("/api/symbol-graph").json()
+    assert body["nodes"], "fixture must produce at least one xref node"
+    for n in body["nodes"]:
+        # id is the chunk idx stringified; meta carries the unwrapped idx.
+        assert n["id"].isdigit()
+        meta = n.get("meta") or {}
+        assert meta.get("idx") == int(n["id"])
+        assert "file" in meta and meta["file"]
+        assert "kind" in meta
+        assert n.get("weight") is not None and n["weight"] >= 0
+
+
+def test_symbol_graph_degree_ranking(xref_client: TestClient):
+    """When the limit is tight, the top-degree node is the most-connected one.
+
+    In the fixture, `helper` is called by main + User.greet → degree 2 (in-degree).
+    With limit=1 the single returned node should be helper.
+    """
+    body = xref_client.get("/api/symbol-graph?limit=1").json()
+    assert len(body["nodes"]) == 1
+    only = body["nodes"][0]
+    # weight is degree; for helper it must be at least 2 (called from two chunks).
+    assert only["label"] == "helper"
+    assert only["weight"] >= 2
+    assert body["truncated"] is True
+    assert body["total_nodes_available"] > 1
+
+
+def test_symbol_graph_kind_filter(xref_client: TestClient):
+    """`kind=all` is a superset of `kind=calls` (and equal in this fixture)."""
+    a = xref_client.get("/api/symbol-graph?kind=calls").json()
+    b = xref_client.get("/api/symbol-graph?kind=all").json()
+    a_edge_endpoints = {(e["source"], e["target"]) for e in a["edges"]}
+    b_edge_endpoints = {(e["source"], e["target"]) for e in b["edges"]}
+    assert a_edge_endpoints.issubset(b_edge_endpoints)
+
+
+def test_symbol_graph_limit_clamping(xref_client: TestClient):
+    """ge=1, le=5000 are enforced by FastAPI."""
+    assert xref_client.get("/api/symbol-graph?limit=0").status_code == 422
+    assert xref_client.get("/api/symbol-graph?limit=99999").status_code == 422
+
+
+def test_symbol_graph_stability(xref_client: TestClient):
+    """Two identical requests return identical responses (deterministic order)."""
+    a = xref_client.get("/api/symbol-graph?limit=10").json()
+    b = xref_client.get("/api/symbol-graph?limit=10").json()
+    assert a == b
+
+
+def test_symbol_graph_empty_bundle(tmp_path: Path):
+    """A bundle with no xrefs.jsonl returns empty nodes + edges, not 500."""
+    # Build a bundle, then remove the sidecar.
+    fixture = tmp_path / "fixture"
+    fixture.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=fixture, check=True)
+    subprocess.run(
+        ["git", "-C", str(fixture), "config", "user.email", "t@t"], check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(fixture), "config", "user.name", "t"], check=True,
+    )
+    (fixture / "app.py").write_text(FIXTURE_SRC)
+    subprocess.run(["git", "-C", str(fixture), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(fixture), "commit", "-q", "-m", "init"], check=True,
+    )
+    bundle = tmp_path / "bundle"
+    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
+    subprocess.run(
+        [
+            sys.executable, "scripts/run_xrefs.py",
+            "--repo", str(fixture), "--out", str(bundle),
+            "--backend", "hash", "--hash-dim", "64", "--no-emit-blobs",
+        ],
+        env=env, cwd=str(REPO_ROOT), check=True, capture_output=True,
+    )
+    (bundle / "xrefs.jsonl").unlink()
+
+    os.environ["CBM_OUTPUT_DIR"] = str(bundle)
+    import app as app_module  # type: ignore
+    app_module.get_bundle.cache_clear()
+    with TestClient(app_module.app) as c:
+        body = c.get("/api/symbol-graph").json()
+        assert body["nodes"] == []
+        assert body["edges"] == []
+        assert body["total_nodes_available"] == 0
+
+
 # ---------------------------------------------------------------- backward compat
 def test_backend_serves_bundle_without_xrefs_jsonl(tmp_path: Path):
     """A bundle missing xrefs.jsonl should still load and serve empty

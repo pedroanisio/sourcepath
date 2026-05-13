@@ -59,6 +59,35 @@ describe("ConceptGraph route", () => {
   });
 });
 
+describe("SymbolGraph route", () => {
+  it("renders toolbar + stubbed cytoscape with one node per fixture chunk", async () => {
+    renderAt("/symbols");
+    expect(await screen.findByText(/top-N by call degree/i)).toBeInTheDocument();
+    expect(await screen.findByTestId("cy-stub")).toHaveTextContent("cy:3n/2e");
+    // Kind selector defaults to `calls` and is selectable
+    const kindSelect = screen.getAllByRole("combobox").find(
+      (el) => (el as HTMLSelectElement).value === "calls"
+    ) as HTMLSelectElement;
+    expect(kindSelect).toBeDefined();
+  });
+
+  it("renders the empty state when the bundle has no symbol edges", async () => {
+    const originalFetch = (globalThis as any).fetch;
+    (globalThis as any).fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/symbol-graph")) {
+        return new Response(
+          JSON.stringify({ nodes: [], edges: [], truncated: false, total_nodes_available: 0 }),
+          { status: 200 },
+        );
+      }
+      return originalFetch(input);
+    };
+    renderAt("/symbols");
+    expect(await screen.findByText(/no symbol-level edges/i)).toBeInTheDocument();
+  });
+});
+
 describe("ChunkSearch route", () => {
   it("loads initial list and submits a search", async () => {
     renderAt("/chunks");
