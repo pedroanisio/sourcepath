@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+import urllib.parse
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ CBM = Namespace("https://codebase-mapper.example.org/cbm#")
 CBML2 = Namespace("https://codebase-mapper.example.org/cbml2#")
 CBML3 = Namespace("https://codebase-mapper.example.org/cbml3#")
 SKOS = Namespace("http://www.w3.org/2004/02/skos/core#")
+CBMI_NS = "https://codebase-mapper.example.org/cbm/instance#"
 
 
 @dataclass
@@ -57,6 +59,12 @@ class Bundle:
     chunk_concepts: dict[int, list[str]]  # idx -> [concept_name,...]
     concept_chunks: dict[str, list[int]]  # concept_name -> [idx,...]
     cooccur: dict[str, list[tuple[str, int]]]  # concept -> [(neighbor, weight), ...] sorted desc
+    # Symbol-level xrefs (L3 symbol_xrefs plugin). When the bundle was
+    # produced without symbol_xrefs registered, xrefs is empty and the
+    # *_by_* indices are empty dicts — endpoints just return empty lists.
+    xrefs: list[dict[str, Any]] = field(default_factory=list)
+    xrefs_by_src_idx: dict[int, list[int]] = field(default_factory=dict)
+    xrefs_by_dst_idx: dict[int, list[int]] = field(default_factory=dict)
 
 
 def _resolve_file_type_uri(uri: str) -> str:
@@ -207,6 +215,10 @@ def load_bundle(output_dir: Path) -> Bundle:
 
     file_by_path = {r["path"]: r for r in files}
 
+    xrefs, xrefs_by_src_idx, xrefs_by_dst_idx = _load_xrefs(
+        output_dir / "xrefs.jsonl", chunk_uri_to_idx,
+    )
+
     return Bundle(
         output_dir=output_dir,
         manifest=manifest,
@@ -230,7 +242,79 @@ def load_bundle(output_dir: Path) -> Bundle:
         chunk_concepts=chunk_concepts,
         concept_chunks=concept_chunks,
         cooccur=cooccur,
+        xrefs=xrefs,
+        xrefs_by_src_idx=xrefs_by_src_idx,
+        xrefs_by_dst_idx=xrefs_by_dst_idx,
     )
+
+
+def _chunk_id_to_uri(chunk_id: str) -> str:
+    """Mirror plugins.symbol_xrefs.graph_writer.chunk_iri.
+
+    The xrefs sidecar uses raw chunk_id strings; the inventory keys
+    chunks by their URI. We re-quote the chunk_id and look up via
+    chunks_by_uri so the backend doesn't need to keep two parallel maps.
+    """
+    return f"{CBMI_NS}chunk/{urllib.parse.quote(chunk_id, safe='')}"
+
+
+def _load_xrefs(
+    sidecar_path: Path, chunks_by_uri: dict[str, int],
+) -> tuple[list[dict[str, Any]], dict[int, list[int]], dict[int, list[int]]]:
+    """Parse xrefs.jsonl into idx-keyed indices.
+
+    Each loaded edge is:
+        {"src_idx": int, "dst_idx": int,
+         "kind": str, "resolution": str, "resolver": str}
+    Edges whose endpoints don't resolve to a chunk in the inventory are
+    silently dropped — the inventory is the source of truth; if the
+    sidecar and inventory drift the user shouldn't see ghost edges.
+    """
+    xrefs: list[dict[str, Any]] = []
+    by_src: dict[int, list[int]] = {}
+    by_dst: dict[int, list[int]] = {}
+    if not sidecar_path.exists():
+        return xrefs, by_src, by_dst
+    for line in sidecar_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        raw = json.loads(line)
+        src_idx = chunks_by_uri.get(_chunk_id_to_uri(raw["src_chunk_id"]))
+        dst_idx = chunks_by_uri.get(_chunk_id_to_uri(raw["dst_chunk_id"]))
+        if src_idx is None or dst_idx is None:
+            continue
+        edge_idx = len(xrefs)
+        xrefs.append({
+            "src_idx": src_idx,
+            "dst_idx": dst_idx,
+            "kind": raw["kind"],
+            "resolution": raw["resolution"],
+            "resolver": raw["resolver"],
+        })
+        by_src.setdefault(src_idx, []).append(edge_idx)
+        by_dst.setdefault(dst_idx, []).append(edge_idx)
+    return xrefs, by_src, by_dst
+
+
+def _xref_row(b: "Bundle", peer_idx: int, edge: dict[str, Any]) -> dict[str, Any]:
+    """Render one xref endpoint as a row for /api/chunk and /api/file responses.
+
+    ``peer_idx`` is the chunk at the *other end* of the edge (the dst for
+    callers, the src for callees). Edge provenance (kind/resolution/resolver)
+    is carried verbatim so the UI can dim heuristic results.
+    """
+    c = b.chunks[peer_idx]
+    return {
+        "idx": peer_idx,
+        "symbol": c.get("symbol"),
+        "kind": c.get("kind"),
+        "file": c.get("file"),
+        "beginLine": c.get("beginLine"),
+        "endLine": c.get("endLine"),
+        "xref_kind": edge["kind"],
+        "resolution": edge["resolution"],
+        "resolver": edge["resolver"],
+    }
 
 
 def _concept_name_from_uri(uri: str) -> str | None:
@@ -743,12 +827,38 @@ def file_detail(
         for i in chunk_idxs
     ]
     concepts = list((b.concepts.get("per_path_concepts") or {}).get(path, []))
+
+    # Symbol-level xrefs aggregated over every chunk in the file. Dedup
+    # by peer-chunk idx — if two chunks in this file both call X, the
+    # user sees one row for X (the first edge's provenance wins).
+    xrefs_out: list[dict[str, Any]] = []
+    xrefs_in: list[dict[str, Any]] = []
+    seen_out: set[int] = set()
+    seen_in: set[int] = set()
+    for ci in chunk_idxs:
+        for e_idx in b.xrefs_by_src_idx.get(ci, []):
+            edge = b.xrefs[e_idx]
+            if edge["dst_idx"] in seen_out:
+                continue
+            seen_out.add(edge["dst_idx"])
+            xrefs_out.append(_xref_row(b, edge["dst_idx"], edge))
+        for e_idx in b.xrefs_by_dst_idx.get(ci, []):
+            edge = b.xrefs[e_idx]
+            if edge["src_idx"] in seen_in:
+                continue
+            seen_in.add(edge["src_idx"])
+            xrefs_in.append(_xref_row(b, edge["src_idx"], edge))
+    xrefs_out.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0, r["symbol"] or ""))
+    xrefs_in.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0, r["symbol"] or ""))
+
     return {
         "file": rec,
         "imports_out": sorted(b.imports_out.get(path, [])),
         "imports_in": sorted(b.imports_in.get(path, [])),
         "chunks": chunks,
         "concepts": concepts,
+        "xrefs_out": xrefs_out,
+        "xrefs_in": xrefs_in,
     }
 
 
@@ -841,10 +951,26 @@ def chunk_detail(
                 blob_preview = p.read_text(errors="replace")[:8000]
             except Exception:
                 blob_preview = None
+
+    # Symbol-level xrefs: callers = edges where this chunk is the dst;
+    # callees = edges where this chunk is the src.
+    callers = [
+        _xref_row(b, b.xrefs[e]["src_idx"], b.xrefs[e])
+        for e in b.xrefs_by_dst_idx.get(idx, [])
+    ]
+    callees = [
+        _xref_row(b, b.xrefs[e]["dst_idx"], b.xrefs[e])
+        for e in b.xrefs_by_src_idx.get(idx, [])
+    ]
+    callers.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0, r["symbol"] or ""))
+    callees.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0, r["symbol"] or ""))
+
     return {
         "chunk": rec,
         "concepts": concepts,
         "blob_preview": blob_preview,
+        "callers": callers,
+        "callees": callees,
     }
 
 
