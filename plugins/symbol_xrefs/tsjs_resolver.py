@@ -1,13 +1,22 @@
-"""TypeScript / JavaScript ``calls`` resolver — intra-file + inter-file.
+"""TypeScript / JavaScript xref resolver — calls (Phase 8) + subclassOf /
+overrides (Phase 10).
 
-Two sub-resolvers share one entry point; the resolver name on each edge
-tells you which path produced it:
+One entry point covers multiple edge kinds. The resolver name on each
+edge tells you which path produced it:
 
-  - ``tsjs_intra_file`` — call binds to a top-level function/class or a
+  - ``tsjs_intra_file`` — target is a top-level function/class or a
     method in the same module.
-  - ``tsjs_inter_file`` — call binds to a named ES6 import whose module
+  - ``tsjs_inter_file`` — target is a named ES6 import whose module
     resolves to an in-repo file and whose target is a top-level
     function/class chunk in that file.
+
+Edge kinds:
+
+  - ``calls`` (Phase 8) — bare ``Identifier()`` call expressions.
+  - ``subclassOf`` (Phase 10) — ``class Sub extends Base`` where
+    ``Base`` is a same-file class or a named import.
+  - ``overrides`` (Phase 10) — a method whose name matches a method
+    defined on the resolved base.
 
 The resolver re-parses with tree-sitter (cheap — same parser the L2
 analyzer + L2 chunker use). The CST already lives in
@@ -59,6 +68,7 @@ RESOLVER_INTRA = "tsjs_intra_file"
 RESOLVER_INTER = "tsjs_inter_file"
 
 _GLOBAL_TARGETS_CACHE_KEY = "_xrefs_tsjs_global_targets"
+_GLOBAL_METHODS_CACHE_KEY = "_xrefs_tsjs_global_methods"
 
 
 @dataclass(frozen=True)
@@ -93,16 +103,18 @@ def resolve_tsjs_calls(
     src_lookup = _source_chunk_lookup(chunks_in_file)
     imports = _collect_imports(tree.root_node, content)
     global_targets = _global_targets_cache(ctx)
+    global_methods = _global_methods_cache(ctx)
     tsconfigs = cast(dict, ctx.indices.get("host:tsconfigs", {}))
     paths_set = ctx.paths_set
 
     edges: list[SymbolXrefEdge] = []
     unresolved: list[UnresolvedSymbolRef] = []
     _walk_calls(
-        tree.root_node, content, scope=[],
+        tree.root_node, content, scope=[], class_bases=[],
         edges=edges, unresolved=unresolved,
         targets=targets, src_lookup=src_lookup,
         imports=imports, global_targets=global_targets,
+        global_methods=global_methods,
         tsconfigs=tsconfigs, paths_set=paths_set,
         src_path=record.path,
     )
@@ -166,6 +178,33 @@ def _global_targets_cache(ctx: PipelineCtx) -> dict[tuple[str, str], str]:
             out[key] = c["chunk_id"]
             by_key_line[key] = line
     ctx.scratch[_GLOBAL_TARGETS_CACHE_KEY] = out
+    return out
+
+
+def _global_methods_cache(ctx: PipelineCtx) -> dict[tuple[str, str, str], str]:
+    """(path, class_name, method_name) → chunk_id across the codebase.
+
+    Powers Phase 10's override lookup. Mirrors the Python resolver's
+    cache but keyed separately on ctx.scratch (the two resolvers don't
+    share indices — they may end up with subtly different tie-breaks).
+    """
+    cached = ctx.scratch.get(_GLOBAL_METHODS_CACHE_KEY)
+    if cached is not None:
+        return cast(dict, cached)
+    out: dict[tuple[str, str, str], str] = {}
+    by_key_line: dict[tuple[str, str, str], int] = {}
+    for c in cast(list, ctx.indices.get("l2_10_chunks", [])):
+        if c.get("kind") != "method":
+            continue
+        parent = c.get("parent_symbol")
+        if parent is None:
+            continue
+        key = (c["path"], parent, c["symbol"])
+        line = c.get("line_start", 0)
+        if key not in by_key_line or line > by_key_line[key]:
+            out[key] = c["chunk_id"]
+            by_key_line[key] = line
+    ctx.scratch[_GLOBAL_METHODS_CACHE_KEY] = out
     return out
 
 
@@ -245,17 +284,45 @@ def _walk_calls(
     node, content: bytes,
     *,
     scope: list[tuple[str, str]],
+    class_bases: list[list[tuple[str, str, str]]],
     edges: list[SymbolXrefEdge],
     unresolved: list[UnresolvedSymbolRef],
     targets: dict[str, str],
     src_lookup: dict[tuple[str, str | None], str],
     imports: dict[str, _ImportBinding],
     global_targets: dict[tuple[str, str], str],
+    global_methods: dict[tuple[str, str, str], str],
     tsconfigs: dict,
     paths_set: set[str],
     src_path: str,
 ) -> None:
-    pushed = _push_scope(node, scope, content)
+    pushed_scope = _push_scope(node, scope, content)
+    pushed_bases = False
+
+    if node.type == "class_declaration":
+        resolved = _emit_subclass_of(
+            node, content, edges, unresolved,
+            src_path=src_path,
+            targets=targets, src_lookup=src_lookup,
+            imports=imports, global_targets=global_targets,
+            tsconfigs=tsconfigs, paths_set=paths_set,
+        )
+        class_bases.append(resolved)
+        pushed_bases = True
+
+    if (
+        node.type == "method_definition"
+        and pushed_scope
+        and scope[-1][0] == "method"
+        and class_bases
+    ):
+        _emit_overrides(
+            node, content, scope, edges,
+            resolved_bases=class_bases[-1],
+            src_lookup=src_lookup,
+            global_methods=global_methods,
+        )
+
     if node.type == "call_expression":
         _emit_call(
             node, content, scope, edges, unresolved,
@@ -269,13 +336,17 @@ def _walk_calls(
             continue
         _walk_calls(
             child, content,
-            scope=scope, edges=edges, unresolved=unresolved,
+            scope=scope, class_bases=class_bases,
+            edges=edges, unresolved=unresolved,
             targets=targets, src_lookup=src_lookup,
             imports=imports, global_targets=global_targets,
+            global_methods=global_methods,
             tsconfigs=tsconfigs, paths_set=paths_set,
             src_path=src_path,
         )
-    if pushed:
+    if pushed_bases:
+        class_bases.pop()
+    if pushed_scope:
         scope.pop()
 
 
@@ -427,3 +498,142 @@ def _src_chunk_id(
     if kind in {"function", "class"}:
         return src_lookup.get((symbol, None))
     return None
+
+
+# ---------------------------------------------------------------------------
+# Phase 10: subclassOf + overrides
+# ---------------------------------------------------------------------------
+
+
+def _emit_subclass_of(
+    class_node, content: bytes,
+    edges: list[SymbolXrefEdge],
+    unresolved: list[UnresolvedSymbolRef],
+    *,
+    src_path: str,
+    targets: dict[str, str],
+    src_lookup: dict[tuple[str, str | None], str],
+    imports: dict[str, _ImportBinding],
+    global_targets: dict[tuple[str, str], str],
+    tsconfigs: dict,
+    paths_set: set[str],
+) -> list[tuple[str, str, str]]:
+    """Walk ``class Sub extends Base``, emit subclassOf edges, return the
+    resolved bases as ``(base_path, base_class_name, resolver_name)``.
+
+    JS/TS support single inheritance, so the result list has at most one
+    element. We still return a list to keep the override pass uniform
+    with the Python resolver (where multiple bases are possible).
+
+    Only bare-Identifier extends targets are attempted; ``extends
+    Generic<T>`` is supported because the heritage clause's first
+    identifier IS the base name; ``extends ns.Base`` (member access)
+    falls through silently.
+    """
+    sub_name = _class_decl_name(class_node, content)
+    if sub_name is None:
+        return []
+    sub_chunk_id = src_lookup.get((sub_name, None))
+    if sub_chunk_id is None:
+        return []
+
+    base_name = _extends_base_name(class_node, content)
+    if base_name is None:
+        return []
+
+    # 1) Same-file class wins.
+    if base_name in targets:
+        edges.append(SymbolXrefEdge(
+            src_chunk_id=sub_chunk_id, dst_chunk_id=targets[base_name],
+            kind="subclassOf", resolution="exact",
+            resolver=RESOLVER_INTRA,
+        ))
+        return [(src_path, base_name, RESOLVER_INTRA)]
+
+    # 2) Imported base via named import.
+    binding = imports.get(base_name)
+    if binding is None:
+        return []  # unknown base — silent
+
+    dst_path = resolve_tsjs_import(src_path, binding.spec, paths_set, tsconfigs)
+    raw_target = f'import {{ {binding.target_name} }} from "{binding.spec}"'
+    if dst_path is None:
+        unresolved.append(UnresolvedSymbolRef(
+            src_chunk_id=sub_chunk_id, raw_target=raw_target,
+            kind="subclassOf", reason="module_not_in_repo",
+            resolver=RESOLVER_INTER,
+        ))
+        return []
+    dst_id = global_targets.get((dst_path, binding.target_name))
+    if dst_id is None:
+        unresolved.append(UnresolvedSymbolRef(
+            src_chunk_id=sub_chunk_id, raw_target=raw_target,
+            kind="subclassOf", reason="symbol_not_exported",
+            resolver=RESOLVER_INTER,
+        ))
+        return []
+
+    edges.append(SymbolXrefEdge(
+        src_chunk_id=sub_chunk_id, dst_chunk_id=dst_id,
+        kind="subclassOf", resolution="exact",
+        resolver=RESOLVER_INTER,
+    ))
+    return [(dst_path, binding.target_name, RESOLVER_INTER)]
+
+
+def _extends_base_name(class_node, content: bytes) -> str | None:
+    """Find the first identifier under the class's ``class_heritage`` (if any).
+
+    Works for both TS (`class_heritage > extends_clause > identifier`) and
+    JS (`class_heritage > identifier`). Type-only ``implements`` clauses
+    use `type_identifier` and are correctly skipped.
+    """
+    heritage = next(
+        (c for c in class_node.children if c.type == "class_heritage"), None,
+    )
+    if heritage is None:
+        return None
+    # TS wraps the base in an extends_clause; JS attaches the identifier
+    # directly. Walk children once and accept the first identifier.
+    for c in heritage.children:
+        if c.type == "extends_clause":
+            for e in c.children:
+                if e.type == "identifier":
+                    return _text(e, content)
+            return None  # extends_clause with only type args — defer
+        if c.type == "identifier":
+            return _text(c, content)
+    return None
+
+
+def _emit_overrides(
+    method_node, content: bytes,
+    scope: list[tuple[str, str]],
+    edges: list[SymbolXrefEdge],
+    *,
+    resolved_bases: list[tuple[str, str, str]],
+    src_lookup: dict[tuple[str, str | None], str],
+    global_methods: dict[tuple[str, str, str], str],
+) -> None:
+    """Emit override edges when the method shadows a same-named method
+    on any resolved base class. Mirrors the Python resolver's logic."""
+    if len(scope) < 2 or scope[-2][0] != "class":
+        return
+    sub_class = scope[-2][1]
+    method_name = _named_child_text(method_node, "property_identifier", content)
+    if method_name is None:
+        return
+    method_chunk_id = src_lookup.get((method_name, sub_class))
+    if method_chunk_id is None:
+        return
+
+    for base_path, base_class, resolver_name in resolved_bases:
+        base_method_id = global_methods.get((base_path, base_class, method_name))
+        if base_method_id is None:
+            continue
+        edges.append(SymbolXrefEdge(
+            src_chunk_id=method_chunk_id,
+            dst_chunk_id=base_method_id,
+            kind="overrides", resolution="exact",
+            resolver=resolver_name,
+        ))

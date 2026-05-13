@@ -55,6 +55,26 @@ Phase 4 — Python inter-file `calls` resolution (`from X import Y`):
       resolve to existing chunks in inventory.ttl, including the
       ones in other files.
 
+Phase 10 — subclassOf + overrides edges:
+  35. Python intra-file subclassOf: `class Sub(Base):` where Base is in
+      the same module → edge Sub → Base with kind="subclassOf" and
+      resolver="python_intra_file".
+  36. Python inter-file subclassOf: `class Sub(Base):` where Base is
+      imported via `from .base import Base` → edge with
+      resolver="python_inter_file".
+  37. Python overrides: `class Sub(Base):` whose method `m` has the
+      same name as `Base.m` → edge Sub.m → Base.m with
+      kind="overrides".
+  38. Python silent skip: `class Sub(object):` (builtin base) produces
+      no subclassOf edge.
+  39. Python silent skip: `class Sub(pkg.Base):` (Attribute base) is
+      deferred — produces no edge.
+  40. TS intra-file subclassOf + overrides via `class Sub extends Base`.
+  41. TS inter-file subclassOf via named import.
+  42. JS subclassOf + overrides over a same-file base.
+  43. Reference integrity: every subclassOf / overrides cbmxr:src/dst
+      resolves to a real cbml2:Chunk in inventory.ttl.
+
 Phase 8 — TypeScript / JavaScript ``calls`` resolver:
   26. L2 chunker emits symbol-level chunks for TS/JS (function /
       class / method / arrow-const-binding).
@@ -318,6 +338,97 @@ def build_phase8_fixture(target: Path) -> None:
     (src / "lib.ts").write_text(PHASE8_LIB_TS)
     (src / "app.ts").write_text(PHASE8_APP_TS)
     (src / "legacy.js").write_text(PHASE8_LEGACY_JS)
+    _commit(target)
+
+
+# Phase 10 fixtures: subclassOf + overrides for Python and TS/JS.
+PHASE10_PY_BASE = '''\
+class Animal:
+    def speak(self):
+        return "generic"
+
+    def belly(self):
+        return "soft"
+
+
+class _Mixin:
+    def shared(self):
+        return 1
+'''
+
+PHASE10_PY_APP = '''\
+from base import Animal as _Animal
+
+
+class Local(_Animal):
+    """Same-file class with no subclass relation locally — anchors the
+    inter-file subclassOf to an imported base."""
+    def speak(self):
+        return "local"  # overrides Animal.speak
+
+    def unique(self):
+        return "no-override"
+
+
+class Wraps(Local):
+    """Intra-file subclassOf: Wraps → Local."""
+    def speak(self):
+        return "wrapped"  # overrides Local.speak (intra-file)
+
+
+class Builtin(object):
+    """Base is a builtin; no subclassOf edge."""
+    pass
+
+
+class Qualified(pkg.Base):  # noqa: F821 — Attribute base, deferred
+    pass
+'''
+
+
+PHASE10_TS_BASE = '''\
+export class Animal {
+    speak(): string { return "generic"; }
+    belly(): string { return "soft"; }
+}
+'''
+
+PHASE10_TS_APP = '''\
+import { Animal } from "./base";
+
+export class Dog extends Animal {
+    speak(): string { return "woof"; }
+}
+
+class Local {
+    greet(): string { return "hi"; }
+}
+
+class LocalSub extends Local {
+    greet(): string { return "hi2"; }
+}
+'''
+
+PHASE10_JS_APP = '''\
+class A {
+    greet() { return "a"; }
+}
+
+class B extends A {
+    greet() { return "b"; }
+}
+'''
+
+
+def build_phase10_fixture(target: Path) -> None:
+    _init_git(target)
+    (target / "base.py").write_text(PHASE10_PY_BASE)
+    (target / "app.py").write_text(PHASE10_PY_APP)
+    src = target / "src"
+    src.mkdir()
+    (src / "base.ts").write_text(PHASE10_TS_BASE)
+    (src / "app.ts").write_text(PHASE10_TS_APP)
+    (src / "legacy.js").write_text(PHASE10_JS_APP)
     _commit(target)
 
 
@@ -1043,6 +1154,150 @@ def main(argv: list[str] | None = None) -> int:
             "typescript" in p8_frag["by_language"]
             and "javascript" in p8_frag["by_language"],
             str(p8_frag.get("by_language")),
+        )
+
+        # =====================================================
+        # Phase 10: subclassOf + overrides
+        # =====================================================
+        p10_fixture = work / "p10_fixture"
+        build_phase10_fixture(p10_fixture)
+        p10_out = work / "p10_out"
+        run_pipeline(p10_fixture, p10_out, with_l2=True)
+
+        p10_lines = (p10_out / "xrefs.jsonl").read_text().splitlines()
+        p10_edges = [json.loads(line) for line in p10_lines]
+
+        def _tuple_of(edge: dict) -> tuple:
+            return (
+                edge["src_chunk_id"].split("#")[0],
+                _symbol_from_chunk_id(edge["src_chunk_id"]),
+                edge["dst_chunk_id"].split("#")[0],
+                _symbol_from_chunk_id(edge["dst_chunk_id"]),
+                edge["kind"],
+                edge["resolver"],
+            )
+
+        all_tuples = {_tuple_of(e) for e in p10_edges}
+
+        # --- 35. Python intra-file subclassOf: Wraps → Local in app.py ---
+        check(
+            "Phase 10: Python intra-file subclassOf (Wraps → Local)",
+            ("app.py", "Wraps", "app.py", "Local", "subclassOf",
+             "python_intra_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'subclassOf')}",
+        )
+
+        # --- 36. Python inter-file subclassOf: Local → Animal (imported from base.py) ---
+        check(
+            "Phase 10: Python inter-file subclassOf (Local → Animal)",
+            ("app.py", "Local", "base.py", "Animal", "subclassOf",
+             "python_inter_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'subclassOf')}",
+        )
+
+        # --- 37. Python overrides: Local.speak → Animal.speak (inter-file)
+        # AND Wraps.speak → Local.speak (intra-file)
+        check(
+            "Phase 10: Python override Local.speak → Animal.speak (inter-file)",
+            ("app.py", "Local.speak", "base.py", "Animal.speak", "overrides",
+             "python_inter_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'overrides')}",
+        )
+        check(
+            "Phase 10: Python override Wraps.speak → Local.speak (intra-file)",
+            ("app.py", "Wraps.speak", "app.py", "Local.speak", "overrides",
+             "python_intra_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'overrides')}",
+        )
+
+        # --- 37b. Local.unique does not override anything ---
+        unique_overrides = [
+            t for t in all_tuples
+            if t[4] == "overrides" and t[1] == "Local.unique"
+        ]
+        check(
+            "Phase 10: Local.unique produces no override edge",
+            unique_overrides == [],
+            f"unexpected={unique_overrides}",
+        )
+
+        # --- 38. Builtin base (`class Builtin(object):`) produces no edge ---
+        builtin_subclass = [
+            t for t in all_tuples
+            if t[4] == "subclassOf" and t[1] == "Builtin"
+        ]
+        check(
+            "Phase 10: builtin base `object` produces no subclassOf edge",
+            builtin_subclass == [],
+            f"unexpected={builtin_subclass}",
+        )
+
+        # --- 39. Attribute base (`pkg.Base`) is deferred — no edge ---
+        attr_subclass = [
+            t for t in all_tuples
+            if t[4] == "subclassOf" and t[1] == "Qualified"
+        ]
+        check(
+            "Phase 10: Attribute base produces no subclassOf edge (deferred)",
+            attr_subclass == [],
+            f"unexpected={attr_subclass}",
+        )
+
+        # --- 40. TS intra-file subclassOf + overrides (LocalSub extends Local) ---
+        check(
+            "Phase 10: TS intra-file subclassOf (LocalSub → Local)",
+            ("src/app.ts", "LocalSub", "src/app.ts", "Local", "subclassOf",
+             "tsjs_intra_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'subclassOf')}",
+        )
+        check(
+            "Phase 10: TS intra-file override (LocalSub.greet → Local.greet)",
+            ("src/app.ts", "LocalSub.greet", "src/app.ts", "Local.greet",
+             "overrides", "tsjs_intra_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'overrides')}",
+        )
+
+        # --- 41. TS inter-file subclassOf (Dog extends imported Animal) ---
+        check(
+            "Phase 10: TS inter-file subclassOf (Dog → Animal in src/base.ts)",
+            ("src/app.ts", "Dog", "src/base.ts", "Animal", "subclassOf",
+             "tsjs_inter_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'subclassOf')}",
+        )
+        check(
+            "Phase 10: TS inter-file override (Dog.speak → Animal.speak)",
+            ("src/app.ts", "Dog.speak", "src/base.ts", "Animal.speak",
+             "overrides", "tsjs_inter_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] == 'overrides')}",
+        )
+
+        # --- 42. JS subclassOf + overrides intra-file (B extends A) ---
+        check(
+            "Phase 10: JS intra-file subclassOf (B → A) + override",
+            ("src/legacy.js", "B", "src/legacy.js", "A", "subclassOf",
+             "tsjs_intra_file") in all_tuples
+            and ("src/legacy.js", "B.greet", "src/legacy.js", "A.greet",
+                 "overrides", "tsjs_intra_file") in all_tuples,
+            f"present={sorted(t for t in all_tuples if t[4] in ('subclassOf', 'overrides'))}",
+        )
+
+        # --- 43. Reference integrity for subclassOf / overrides edges ---
+        g_p10 = Graph()
+        g_p10.parse(str(p10_out / "inventory.ttl"), format="turtle")
+        chunk_subjects_p10 = set(g_p10.subjects(RDF.type, CBML2.Chunk))
+        bad_p10 = []
+        for e_iri in g_p10.subjects(RDF.type, CBMXR.Edge):
+            kind_lit = next(iter(g_p10.objects(e_iri, CBMXR.kind)), None)
+            if kind_lit is None or str(kind_lit) not in ("subclassOf", "overrides"):
+                continue
+            for pred in (CBMXR.src, CBMXR.dst):
+                tgt = next(iter(g_p10.objects(e_iri, pred)), None)
+                if tgt is None or tgt not in chunk_subjects_p10:
+                    bad_p10.append((str(e_iri), str(pred), str(tgt)))
+        check(
+            "Phase 10: every subclassOf/overrides src+dst resolves to cbml2:Chunk",
+            not bad_p10,
+            f"bad={bad_p10[:3]}",
         )
 
         print()
