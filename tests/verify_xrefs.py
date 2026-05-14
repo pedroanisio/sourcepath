@@ -115,9 +115,14 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF
 
 from codebase_mapper import emit, map_codebase, reset_registries
-from codebase_mapper.constants import CBMI_NS, CBMXR, CBMXR_NS
+from codebase_mapper.constants import (
+    CBMI_NS, CBMXR, CBMXR_NS,
+    XREF_KINDS, XREF_RESOLUTIONS, XREF_UNRESOLVED_REASONS,
+)
 from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.models import FileRecord
+from codebase_mapper.models import (
+    FileRecord, XrefKind, XrefResolution, XrefUnresolvedReason,
+)
 from plugins import chunks_embeddings, symbol_xrefs
 from plugins.symbol_xrefs.aggregator import XREF_INDEX_KEY, XrefAggregator
 from plugins.symbol_xrefs.python_resolver import (
@@ -660,6 +665,66 @@ def main(argv: list[str] | None = None) -> int:
         check("SHACL rejects edge with resolution outside enum",
               not mutated(case_bad_resolution),
               "should fail")
+
+        # --- 9b. Vocab/SHACL drift guard ---
+        # Assert the SHACL `sh:in` lists in shapes.shacl.ttl are exactly
+        # the tuples declared in codebase_mapper.constants. Catches drift
+        # in either direction: a new kind in constants that
+        # XrefShapes.contribute forgot to expose, OR a value in the shapes
+        # graph that constants no longer authorizes.
+        from rdflib.collection import Collection
+        shape_kinds = {
+            str(item) for item in Collection(
+                shapes_graph, URIRef(f"{CBMXR_NS}_kindList"),
+            )
+        }
+        shape_resolutions = {
+            str(item) for item in Collection(
+                shapes_graph, URIRef(f"{CBMXR_NS}_resolutionList"),
+            )
+        }
+        check(
+            "shapes.shacl.ttl cbmxr:_kindList equals constants.XREF_KINDS",
+            shape_kinds == set(XREF_KINDS),
+            f"constants={sorted(XREF_KINDS)}\nshapes={sorted(shape_kinds)}\n"
+            f"missing_in_shapes={sorted(set(XREF_KINDS) - shape_kinds)}\n"
+            f"extra_in_shapes={sorted(shape_kinds - set(XREF_KINDS))}",
+        )
+        check(
+            "shapes.shacl.ttl cbmxr:_resolutionList equals "
+            "constants.XREF_RESOLUTIONS",
+            shape_resolutions == set(XREF_RESOLUTIONS),
+            f"constants={sorted(XREF_RESOLUTIONS)}\n"
+            f"shapes={sorted(shape_resolutions)}",
+        )
+
+        # --- 9c. Runtime-tuple vs type-Literal drift guard (drift-risk
+        # findings #1-#3). The runtime tuples in `constants` and the
+        # type-level `Literal[...]` aliases in `models` MUST stay in
+        # sync; this test closes the dual-declaration gap.
+        from typing import get_args
+        check(
+            "models.XrefKind Literal matches constants.XREF_KINDS",
+            set(get_args(XrefKind)) == set(XREF_KINDS),
+            f"literal={sorted(set(get_args(XrefKind)))}\n"
+            f"constants={sorted(XREF_KINDS)}\n"
+            f"missing_in_literal={sorted(set(XREF_KINDS) - set(get_args(XrefKind)))}\n"
+            f"extra_in_literal={sorted(set(get_args(XrefKind)) - set(XREF_KINDS))}",
+        )
+        check(
+            "models.XrefResolution Literal matches constants.XREF_RESOLUTIONS",
+            set(get_args(XrefResolution)) == set(XREF_RESOLUTIONS),
+            f"literal={sorted(set(get_args(XrefResolution)))}\n"
+            f"constants={sorted(XREF_RESOLUTIONS)}",
+        )
+        check(
+            "models.XrefUnresolvedReason Literal matches "
+            "constants.XREF_UNRESOLVED_REASONS",
+            set(get_args(XrefUnresolvedReason))
+            == set(XREF_UNRESOLVED_REASONS),
+            f"literal={sorted(set(get_args(XrefUnresolvedReason)))}\n"
+            f"constants={sorted(XREF_UNRESOLVED_REASONS)}",
+        )
 
         # =====================================================
         # Phase 2: Python intra-file `calls` resolver

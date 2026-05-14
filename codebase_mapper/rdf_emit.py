@@ -166,6 +166,22 @@ def build_shacl_graph() -> Graph:
              datatype=XSD.integer, minInclusive=Literal(0))
     add_prop(file_shape, path=CBM.language,
              maxCount=Literal(1), datatype=XSD.string)
+    # ast_summary is optional (only emitted when the analyzer produces one)
+    # and serialized as a canonical JSON literal. Length is not bounded — some
+    # analyzers emit large AST blobs.
+    add_prop(file_shape, path=CBM.astSummary,
+             maxCount=Literal(1), datatype=XSD.string)
+    # extraction_errors is a list, recorded as one literal per error. No count
+    # bound; xsd:string covers the analyzer-emitted message format.
+    add_prop(file_shape, path=CBM.extractionError, datatype=XSD.string)
+    # Dependency-manifest files declare external packages; lockfile records
+    # pin them to specific releases. Both predicates are optional on
+    # cbm:File (most files are neither manifest nor lockfile) but when
+    # present the object class is constrained.
+    add_prop(file_shape, path=CBM.declaresDependency,
+             **{"class": CBM.ExternalPackage})
+    add_prop(file_shape, path=CBM.pinsDependency,
+             **{"class": CBM.PackageRelease})
     # Filesystem + git commit times are optional (None on a non-HEAD map);
     # when present, they're single xsd:dateTime literals.
     for pred in (CBM.atime, CBM.mtime, CBM.ctime, CBM.gitCommitTime):
@@ -214,6 +230,20 @@ def build_shacl_graph() -> Graph:
     add_prop(repo_shape, path=CBM.atCommit,
              minCount=Literal(1), maxCount=Literal(1),
              **{"class": CBM.Commit})
+    # Repository → File edges. min_count=0 (an empty repo emits no files but
+    # the Repository node is still valid); object class fixed to cbm:File.
+    add_prop(repo_shape, path=CBM.hasFile,
+             **{"class": CBM.File})
+
+    # The Commit node carries its own SHA. Single value, hexBinary-shaped
+    # (40 chars for SHA-1; the emitter currently writes the plain hex
+    # string so we keep xsd:string and constrain the pattern).
+    commit_shape = URIRef(f"{CBM_NS}CommitShape")
+    g.add((commit_shape, RDF.type, SH.NodeShape))
+    g.add((commit_shape, SH.targetClass, CBM.Commit))
+    add_prop(commit_shape, path=CBM.commitSha,
+             minCount=Literal(1), maxCount=Literal(1),
+             datatype=XSD.string, pattern=Literal("^[0-9a-f]+$"))
 
     rel_shape = URIRef(f"{CBM_NS}PackageReleaseShape")
     g.add((rel_shape, RDF.type, SH.NodeShape))

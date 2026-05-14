@@ -239,6 +239,11 @@ class ConceptShapes:
                   klass=SKOS.Concept)
         _add_prop(shapes, concept_shape, CBML3.embeddingRow,
                   datatype=XSD.integer, min_inclusive=0, max_count=1)
+        # `cbml3:embeddingArtifact` is the filename of the matrix the
+        # `embeddingRow` indexes into. Optional (only present when an
+        # embedding row was computed), single free-form string literal.
+        _add_prop(shapes, concept_shape, CBML3.embeddingArtifact,
+                  datatype=XSD.string, max_count=1)
 
         # Stage 3: curated-vocab typing. Both predicates are optional
         # (max_count=1, no min) — concepts not in the bundled vocab are
@@ -263,6 +268,18 @@ class ConceptShapes:
                   in_values=CONCEPT_KIND_LITERALS)
         _add_prop(shapes, collection_shape, SKOS.member,
                   klass=SKOS.Concept, min_count=1)
+
+        # `cbml3:lexicalizes` connects cbm:File AND cbml2:Chunk subjects to
+        # skos:Concept objects. We don't own either subject's NodeShape
+        # (cbm:File lives in the host, cbml2:Chunk in the L2 plugin), so
+        # target via sh:targetSubjectsOf — every node that has *any*
+        # `cbml3:lexicalizes` edge must point to a skos:Concept. This
+        # closes the gap without cross-plugin shape ownership.
+        lex_shape = URIRef(f"{CBML3_NS}LexicalizesShape")
+        shapes.add((lex_shape, RDF.type, SH.NodeShape))
+        shapes.add((lex_shape, URIRef(SH_NS + "targetSubjectsOf"),
+                    CBML3.lexicalizes))
+        _add_prop(shapes, lex_shape, CBML3.lexicalizes, klass=SKOS.Concept)
 
 
 def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,

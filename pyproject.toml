@@ -4,7 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codebase-mapper"
-version = "0.1.0"
+# Source of truth: codebase_mapper.constants.TOOL_VERSION. The contract
+# test `pyproject_version_matches_tool_version` in tests/verify_drift_p1.py
+# asserts these stay in lockstep. When bumping, update BOTH in the same commit.
+version = "0.5.0"
 description = "Map source code repositories into RDF graphs with a pluggable extension surface (chunks/embeddings, concept graph)."
 readme = "README.md"
 requires-python = ">=3.10"

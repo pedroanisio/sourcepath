@@ -359,6 +359,10 @@ python tests/verify_rust_attribute_query.py # Rust attribute queryable surface (
 python tests/verify_rust_super_self.py      # Rust self::/super:: use-path resolution (Stage 5)
 python tests/verify_rust_regenerate.py      # Rust byte-identical regenerate (Stage 6)
 python tests/verify_rust_ast_body_count.py  # Rust ast_full_bodies counter (Stage 7)
+python tests/verify_shape_coverage.py       # drift-risk #4/#5 — emitted RDF predicates ⊆ SHACL shapes
+python tests/verify_drift_p1.py             # drift-risk HIGH findings — port/env/response_model/concepts.json/version
+python tests/verify_drift_p2.py             # drift-risk MODERATE findings — README↔verifiers, CLI↔README, langs, plugin-names, MCP tools
+python tests/verify_drift_p3.py             # drift-risk LOW findings — meta-presence of cited guards + reinforcement
 ```
 
 All verifiers resolve `repo_root` from their own `__file__`, so they

@@ -24,7 +24,7 @@ from typing import Any
 import numpy as np
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF
 
@@ -643,9 +643,101 @@ class ImpactResp(BaseModel):
     truncated: bool = False
 
 
+# -- Detail endpoints: response models mirror frontend/ui/src/api.ts ---------
+
+# `extra="allow"` is deliberate: L4 enrichment plugins decorate these
+# responses by mutating the returned dict (e.g. adding `llm_summary`),
+# and forbidding unknown fields would lock cbm out of forward-compatible
+# enrichment. The model still validates *known* fields strictly, which
+# is the regression-relevant property.
+
+class _ConceptInfo(BaseModel):
+    """Inner `concept` block — mirrors api.ts::ConceptDetail.concept."""
+    model_config = ConfigDict(extra="allow")
+    label: str
+    alt_labels: list[str] = []
+    components: list[str] = []
+    frequency: int
+    file_count: int
+    embedding_row: int | None = None
+    # Curated-vocab fields. Present only on concepts that matched a term
+    # in the bundled vocabulary; pre-vocab bundles return them as absent.
+    kind: str | None = None
+    broader: str | None = None
+
+
+class _CooccurringConcept(BaseModel):
+    name: str
+    weight: int | float
+
+
+class _ConceptChunk(BaseModel):
+    """Lean chunk shape returned by /api/concept/{name}."""
+    model_config = ConfigDict(extra="allow")
+    idx: int | None = None
+    symbol: str | None = None
+    kind: str | None = None
+    file: str | None = None
+    beginLine: int | None = None
+    endLine: int | None = None
+
+
+class ConceptDetailResp(BaseModel):
+    """Mirrors api.ts::ConceptDetail. extra="allow" so L4 plugins may add
+    `llm_description` (and any future enrichment field) without breaking
+    serialization."""
+    model_config = ConfigDict(extra="allow")
+    concept: _ConceptInfo
+    files: list[str]
+    cooccurring: list[_CooccurringConcept]
+    chunks: list[_ConceptChunk]
+    components: list[str]
+    file_count_total: int
+    chunk_count_total: int
+
+
+class _FileBlock(BaseModel):
+    """Inner `file` block returned by /api/file/{path}. Mirrors
+    api.ts::FileDetail.file but admits the full FileRecord shape via
+    extra='allow' — the underlying record carries more fields than the
+    UI consumes (uri, contentSha256, etc.)."""
+    model_config = ConfigDict(extra="allow")
+    path: str
+    language: str | None = None
+    type: str | None = None
+    size: int | None = None
+    contentSha256: str | None = None
+
+
+class _FileChunk(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    idx: int
+    symbol: str | None = None
+    kind: str | None = None
+    beginLine: int | None = None
+    endLine: int | None = None
+    embeddingRow: int | None = None
+
+
+class FileDetailResp(BaseModel):
+    """Mirrors api.ts::FileDetail. extra="allow" for forward-compatible
+    L4 fields (`llm_summary`, `llm_schema_purpose`, …)."""
+    model_config = ConfigDict(extra="allow")
+    file: _FileBlock
+    imports_out: list[str]
+    imports_in: list[str]
+    chunks: list[_FileChunk]
+    concepts: list[str]
+    # ChunkResp shape suffices for xref rows — the backend reuses it via
+    # `_xref_row`. Optional because pre-Phase-9 bundles emit no xrefs.
+    xrefs_out: list[ChunkResp] = []
+    xrefs_in: list[ChunkResp] = []
+
+
 # -- FastAPI app --------------------------------------------------------------
 
-app = FastAPI(title="codebase-mapper visualizer", version="0.1.0")
+from codebase_mapper.constants import TOOL_VERSION as _CBM_TOOL_VERSION
+app = FastAPI(title="codebase-mapper visualizer", version=_CBM_TOOL_VERSION)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -939,7 +1031,7 @@ def chunk_blob(
     return {"sha256": sha, "text": text[:20000]}
 
 
-@app.get("/api/concept/{name}")
+@app.get("/api/concept/{name}", response_model=ConceptDetailResp)
 def concept_detail(
     name: str,
     cooccur_k: int = Query(default=30, ge=1, le=500),
@@ -976,7 +1068,7 @@ def concept_detail(
     }
 
 
-@app.get("/api/file/{path:path}")
+@app.get("/api/file/{path:path}", response_model=FileDetailResp)
 def file_detail(
     path: str,
     bundle: str | None = Query(default=None),

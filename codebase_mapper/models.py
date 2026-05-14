@@ -1,4 +1,11 @@
-"""codebase_mapper.models."""
+"""codebase_mapper.models.
+
+XrefKind / XrefResolution / XrefUnresolvedReason are type-level mirrors of the
+runtime tuples in ``codebase_mapper.constants``. They MUST stay in sync; the
+contract test ``test_runtime_tuples_match_type_literals`` in
+``tests/verify_xrefs.py`` enforces this. When you add a new value to one,
+add it to the other in the same commit.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
