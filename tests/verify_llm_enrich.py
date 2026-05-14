@@ -137,14 +137,20 @@ def run_pipeline(fixture: Path, out: Path, repo_root: Path, *,
 
 
 def manifest_modulo(text: str) -> dict:
-    """Return a manifest dict with the two known-divergent fields
-    stripped: ``generated_at`` and the L4 manifest fragment under
-    ``extensions``. Both must be allowed to differ between runs
+    """Return a manifest dict with the known-divergent fields stripped:
+      - ``generated_at`` (wall-clock at emit time)
+      - the L4 manifest fragment under ``extensions["l4_50_artifact"]``
+      - the ``artifacts["shapes.shacl.ttl"]`` entry (its SHA + size
+        legitimately differ when L4 adds its optional-cardinality
+        shape entries; the data-graph artifacts are still byte-identical)
+    All three must be allowed to differ between with/without-L4 runs
     *without* breaking back-compat."""
     m = json.loads(text)
     m.pop("generated_at", None)
     ext = m.get("extensions") or {}
     ext.pop("l4_50_artifact", None)
+    artifacts = m.get("artifacts") or {}
+    artifacts.pop("shapes.shacl.ttl", None)
     return m
 
 
@@ -174,7 +180,14 @@ def main(argv: list[str] | None = None) -> int:
                      with_l4=True, runner=runner)
 
         # --- 1. Every emitted artifact must be byte-identical ---
-        for fname in ("inventory.ttl", "shapes.shacl.ttl",
+        # shapes.shacl.ttl is handled separately: the L4 plugin
+        # always contributes its optional-cardinality shape (so a
+        # consumer SPARQLing the bundle knows what the L4 layer
+        # promises). The shape declares "fields are optional" — it
+        # validates an empty graph the same as a populated one. We
+        # assert the shapes graphs are equal modulo the L4 namespace
+        # entries.
+        for fname in ("inventory.ttl",
                       "ontology-mapping.ttl", "embeddings.npz",
                       "embeddings_meta.json", "concepts.json",
                       "concepts_embeddings.npz"):
@@ -182,6 +195,56 @@ def main(argv: list[str] | None = None) -> int:
             b = (out_with / fname).read_bytes()
             check(f"byte-identical: {fname}", a == b,
                   f"diverged by {abs(len(a) - len(b))} bytes")
+
+        # shapes.shacl.ttl modulo L4 entries: rdflib's blank-node IDs
+        # for sh:in RDF lists vary across runs (they're internal),
+        # so a plain set-equality comparison fails on cosmetic
+        # differences. Use rdflib.compare.isomorphic which canonicalizes
+        # blank nodes before comparing.
+        from rdflib import Graph, Namespace, URIRef
+        from rdflib.compare import isomorphic
+        from rdflib.namespace import RDF
+        SH_URI = "http://www.w3.org/ns/shacl#"
+        CBML4_URI = "https://codebase-mapper.example.org/cbml4#"
+
+        def shapes_without_l4(path: Path) -> Graph:
+            g = Graph()
+            g.parse(str(path), format="turtle")
+            # Remove every triple whose subject is in the cbml4
+            # namespace (the shape node + the property-shape nodes).
+            to_remove = [
+                (s, p, o) for s, p, o in g
+                if str(s).startswith(CBML4_URI)
+            ]
+            for t in to_remove:
+                g.remove(t)
+            return g
+
+        ga = shapes_without_l4(out_without / "shapes.shacl.ttl")
+        gb = shapes_without_l4(out_with / "shapes.shacl.ttl")
+        check(
+            "shapes.shacl.ttl isomorphic modulo L4 cbml4: entries",
+            isomorphic(ga, gb),
+            f"a={len(ga)} triples, b={len(gb)} triples",
+        )
+
+        # And the L4 shape entries that DO appear must be the
+        # expected optional-cardinality predicates — not silently
+        # broken into something else.
+        g_with = Graph()
+        g_with.parse(str(out_with / "shapes.shacl.ttl"), format="turtle")
+        CBML4 = Namespace(CBML4_URI)
+        # The LlmFileSummaryShape node must exist and target cbm:File.
+        shape_iri = URIRef(f"{CBML4_URI}LlmFileSummaryShape")
+        from codebase_mapper.constants import CBM
+        check(
+            "L4 shape declares LlmFileSummaryShape",
+            (shape_iri, RDF.type, URIRef(SH_URI + "NodeShape")) in g_with,
+        )
+        check(
+            "L4 shape targets cbm:File",
+            (shape_iri, URIRef(SH_URI + "targetClass"), CBM.File) in g_with,
+        )
 
         # --- 2. run_manifest.json modulo generated_at + l4 fragment ---
         a = manifest_modulo((out_without / "run_manifest.json").read_text())
