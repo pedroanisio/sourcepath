@@ -292,6 +292,7 @@ python tests/verify_rust_ast.py             # Rust deep-AST items + chunker (Sta
 python tests/verify_rust_xrefs.py           # Rust intra/inter-file call edges (Stage 2)
 python tests/verify_rust_tests_edges.py     # Rust tests-edges use-analysis + inline #[test] (Stage 3)
 python tests/verify_rust_attribute_query.py # Rust attribute queryable surface (Stage 4)
+python tests/verify_rust_super_self.py      # Rust self::/super:: use-path resolution (Stage 5)
 ```
 
 All verifiers resolve `repo_root` from their own `__file__`, so they

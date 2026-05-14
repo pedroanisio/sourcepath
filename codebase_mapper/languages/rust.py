@@ -182,6 +182,39 @@ def detect_rust_workspaces(records: list[FileRecord], read: Callable[[str], byte
             crates.append({"crate_dir": crate_dir, "name": name})
     return crates
 
+def _file_module_path(src_path: str, crate_dir: str) -> list[str]:
+    """Return the Rust module-path segments for a source file under a crate.
+
+    Maps filesystem position to Rust's module hierarchy::
+
+        <crate_dir>/src/lib.rs              → []                 (crate root)
+        <crate_dir>/src/main.rs             → []                 (crate root)
+        <crate_dir>/src/foo.rs              → ["foo"]
+        <crate_dir>/src/foo/mod.rs          → ["foo"]
+        <crate_dir>/src/foo/bar.rs          → ["foo", "bar"]
+        <crate_dir>/src/foo/bar/mod.rs      → ["foo", "bar"]
+
+    Used by ``resolve_rust_imports`` to interpret ``self::`` and
+    ``super::`` use-paths against the file's actual position in the
+    module tree. Returns ``[]`` defensively for files outside the
+    crate's ``src/`` (e.g. ``tests/foo.rs`` integration tests, which
+    don't have a stable in-source module path).
+    """
+    src_prefix = (crate_dir + "/src/") if crate_dir else "src/"
+    if not src_path.startswith(src_prefix):
+        return []
+    relative = src_path[len(src_prefix):]
+    if not relative.endswith(".rs"):
+        return []
+    stem = relative[:-3]  # strip ``.rs``
+    if stem in ("lib", "main"):
+        return []
+    parts = stem.split("/")
+    if parts[-1] == "mod":
+        parts = parts[:-1]
+    return parts
+
+
 def crate_for_file(file_path: str, crates: list[dict]) -> dict | None:
     """Return the crate (workspace member) whose directory is the longest prefix of file_path."""
     best, best_depth = None, -1
@@ -229,9 +262,28 @@ def resolve_rust_imports(
         in_repo_root: str | None = None
         if head == "crate":
             in_repo_root = src_prefix
-        elif head == "super" or head == "self":
-            # Relative inside the file's module. Heuristic: don't resolve in v0.3.
-            continue
+        elif head == "self":
+            # ``self::X::Y::…`` is resolved relative to THIS file's module.
+            # Rewrite to ``<file_module>::X::Y::…`` and resolve like ``crate::``.
+            file_mod = _file_module_path(src_path, crate_dir)
+            rest = file_mod + rest
+            in_repo_root = src_prefix
+        elif head == "super":
+            # ``super::…`` strips one segment off the file's module path
+            # per ``super`` keyword (``super::super::X`` strips two, etc.).
+            n_super = 1
+            while rest and rest[0] == "super":
+                n_super += 1
+                rest = rest[1:]
+            file_mod = _file_module_path(src_path, crate_dir)
+            if n_super > len(file_mod):
+                # Walked above the crate root — invalid Rust. Skip
+                # silently to match the v0.3 contract for malformed
+                # relative paths.
+                continue
+            cut = file_mod[:-n_super] if n_super < len(file_mod) else []
+            rest = cut + rest
+            in_repo_root = src_prefix
         elif head in name_to_crate:
             other_crate = name_to_crate[head]
             other_dir = other_crate["crate_dir"]

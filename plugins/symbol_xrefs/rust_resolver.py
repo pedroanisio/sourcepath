@@ -515,12 +515,32 @@ def _resolve_use_to_path(
 
     # Determine the in-repo source root for this use.
     src_root: str | None = None
+    crate_dir: str | None = None
     if head == "crate":
         crate_dir = _crate_dir_for(src_path, crates)
         src_root = (crate_dir + "/src/") if crate_dir else "src/"
-    elif head in ("super", "self"):
-        # v0.3 caveat: don't resolve. Surfaces as "module_not_in_repo".
-        return None
+    elif head == "self":
+        # ``self::X::Y::…`` resolves relative to the file's module path.
+        # Rewrite to ``<file_module>::X::Y::…`` against this file's crate.
+        from codebase_mapper.languages.rust import _file_module_path
+        crate_dir = _crate_dir_for(src_path, crates)
+        src_root = (crate_dir + "/src/") if crate_dir else "src/"
+        file_mod = _file_module_path(src_path, crate_dir)
+        rest = file_mod + rest
+    elif head == "super":
+        # ``super::…`` strips one module-path segment per ``super``.
+        from codebase_mapper.languages.rust import _file_module_path
+        n_super = 1
+        while rest and rest[0] == "super":
+            n_super += 1
+            rest = rest[1:]
+        crate_dir = _crate_dir_for(src_path, crates)
+        src_root = (crate_dir + "/src/") if crate_dir else "src/"
+        file_mod = _file_module_path(src_path, crate_dir)
+        if n_super > len(file_mod):
+            return None  # walked above the crate root
+        cut = file_mod[:-n_super] if n_super < len(file_mod) else []
+        rest = cut + rest
     else:
         # Try crate-name match (Cargo replaces hyphens with underscores
         # in lib names).
