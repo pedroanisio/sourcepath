@@ -1,0 +1,913 @@
+syntax = "proto3";
+
+package requirements.engineering.dsl.v2;
+
+import "google/protobuf/timestamp.proto";
+
+option java_package = "com.requirements.engineering.dsl.v2";
+option java_outer_classname = "RequirementsTypesProto";
+option go_package = "github.com/your-org/your-repo/dsl/v2;dslv2";
+
+// =====================================================
+// Core Types and Enums
+// =====================================================
+
+// Consistent versioning across all document elements
+message DocumentVersion {
+  string schema_version = 1;        // e.g., "dsl/v2.1"
+  int32 document_version = 2;       // Document version number
+  string semantic_version = 3;      // e.g., "2.1.0" following semantic versioning
+  google.protobuf.Timestamp created = 4;
+  google.protobuf.Timestamp last_modified = 5;
+  string created_by = 6;
+  string last_modified_by = 7;
+}
+
+// General project information.
+message ProjectInfo {
+  string system_name = 1;
+  string version = 2;
+  string description = 3;
+  repeated string key_objectives = 4;        // High-level business objectives
+  repeated string success_criteria = 5;      // How success will be measured
+  ProjectScope scope = 6;
+}
+
+message ProjectScope {
+  repeated string included_functions = 1;    // What's in scope
+  repeated string excluded_functions = 2;    // What's explicitly out of scope
+  repeated string assumptions = 3;           // Assumptions made
+  repeated string constraints = 4;           // External constraints
+}
+
+// Enhanced requirement status enum (used in state machine)
+enum RequirementStatus {
+  REQUIREMENT_STATUS_UNSPECIFIED = 0;
+  DRAFT = 1;                                  // Initial creation
+  UNDER_REVIEW = 2;                           // Being reviewed
+  REVIEW_FEEDBACK = 3;                        // Feedback provided, needs updates
+  APPROVED = 4;                               // Approved for implementation
+  IN_DEVELOPMENT = 5;                         // Being implemented
+  IMPLEMENTED = 6;                            // Implementation complete
+  TESTING = 7;                                // Under test
+  VERIFIED = 8;                               // Tests passed
+  VALIDATED = 9;                              // Stakeholder acceptance
+  REJECTED = 10;                              // Rejected during review
+  CANCELLED = 11;                             // Cancelled/no longer needed
+  ON_HOLD = 12;                               // Temporarily suspended
+  ARCHIVED = 13;                              // Archived for historical reference
+}
+
+// =====================================================
+// Basic Definitions
+// =====================================================
+
+// A single entry in the glossary.
+message GlossaryItem {
+  string term = 1;
+  string definition = 2;
+  repeated string synonyms = 3;              // Alternative terms
+  repeated string related_terms = 4;         // Related glossary terms
+}
+
+// A person or role involved in the project.
+message Stakeholder {
+  string id = 1;        // e.g., "STAKE-001"
+  string role = 2;      // e.g., "Project Manager", "End User"
+  string description = 3;
+  string name = 4;                           // Actual person name (optional)
+  string contact_info = 5;                   // Email, phone, etc.
+  enum Influence {
+    INFLUENCE_UNSPECIFIED = 0;
+    INFLUENCE_LOW = 1;
+    INFLUENCE_MEDIUM = 2;
+    INFLUENCE_HIGH = 3;
+  }
+  Influence influence_level = 6;             // Stakeholder influence on project
+  enum Interest {
+    INTEREST_UNSPECIFIED = 0;
+    INTEREST_LOW = 1;
+    INTEREST_MEDIUM = 2;
+    INTEREST_HIGH = 3;
+  }
+  Interest interest_level = 7;               // Stakeholder interest in project
+  repeated string responsibilities = 8;       // What they're responsible for
+}
+
+// The central Requirement message, capturing all details.
+message Requirement {
+  // --- Core Identification ---
+  string id = 1;          // e.g., "FR-001"
+  int32 version = 2;      // Version number for this requirement
+  
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    FUNCTIONAL = 1;
+    NON_FUNCTIONAL = 2;
+    DOMAIN = 3;
+  }
+  Type type = 3;
+  
+  // --- Content ---
+  string statement = 4;
+  string rationale = 5;
+  
+  // --- Specification Method ---
+  enum SpecificationMethod {
+    SPECIFICATION_METHOD_UNSPECIFIED = 0;
+    NATURAL_LANGUAGE = 1;
+    STRUCTURED_LANGUAGE = 2;
+    GRAPHICAL = 3;
+    MATHEMATICAL = 4;
+    TABULAR = 5;
+  }
+  SpecificationMethod specification_method = 6;
+  
+  // --- Metadata & Management ---
+  string source = 7;              // Can be a stakeholder ID or a document name
+  
+  enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    PRIORITY_LOW = 1;
+    PRIORITY_MEDIUM = 2;
+    PRIORITY_HIGH = 3;
+    PRIORITY_CRITICAL = 4;
+  }
+  Priority priority = 8;
+  
+  // Use the enhanced RequirementStatus enum
+  RequirementStatus status = 9;
+
+  // --- Business Value and Complexity ---
+  enum BusinessValue {
+    BUSINESS_VALUE_UNSPECIFIED = 0;
+    VALUE_LOW = 1;
+    VALUE_MEDIUM = 2;
+    VALUE_HIGH = 3;
+    VALUE_CRITICAL = 4;
+  }
+  BusinessValue business_value = 10;
+
+  enum ImplementationComplexity {
+    COMPLEXITY_UNSPECIFIED = 0;
+    COMPLEXITY_LOW = 1;
+    COMPLEXITY_MEDIUM = 2;
+    COMPLEXITY_HIGH = 3;
+    COMPLEXITY_VERY_HIGH = 4;
+  }
+  ImplementationComplexity complexity = 11;
+  
+  double estimated_effort = 12;      // Person-hours or story points
+  double estimated_cost = 13;        // Cost estimate
+
+  // --- Details for NFRs ---
+  NFRDetails nfr_details = 14;
+  
+  // --- Traceability & Relationships ---
+  repeated Relationship relationships = 15;
+
+  // --- Verification ---
+  Verification verification = 16;
+  
+  // --- Elicitation ---
+  Elicitation elicitation = 17;
+
+  // --- Change Management ---
+  repeated ChangeLogEntry history = 18;
+  
+  // --- Structured Specification Details ---
+  StructuredSpecification structured_spec = 19;
+
+  // --- Compliance Information ---
+  ComplianceInfo compliance = 20;
+
+  // --- Risk Information ---
+  repeated RequirementRisk risks = 21;
+}
+
+// Simplified requirement for basic use cases
+message SimpleRequirement {
+  string id = 1;                   // Must follow pattern
+  string statement = 2;            // What the system shall do
+  enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    SIMPLE_PRIORITY_LOW = 1;
+    SIMPLE_PRIORITY_MEDIUM = 2;
+    SIMPLE_PRIORITY_HIGH = 3;
+    SIMPLE_PRIORITY_CRITICAL = 4;
+  }
+  Priority priority = 3;
+  // Use the enhanced RequirementStatus enum
+  RequirementStatus status = 4;
+  string assignee = 5;             // Who's responsible
+  google.protobuf.Timestamp due_date = 6;
+  
+  // Optional link to full requirement if needed
+  string full_requirement_id = 7;
+}
+
+// =====================================================
+// Supporting Types (kept for reference - could be moved to separate files)
+// =====================================================
+
+// Enhanced structured specification template
+message StructuredSpecification {
+  string function_name = 1;         // For functional requirements
+  repeated string inputs = 2;       // Input parameters/data
+  repeated string input_sources = 3; // Where inputs come from
+  repeated string outputs = 4;      // Output parameters/data
+  repeated string output_destinations = 5; // Where outputs go
+  string action_description = 6;    // Detailed action to be taken
+  repeated string preconditions = 7; // What must be true before
+  repeated string postconditions = 8; // What must be true after
+  repeated string side_effects = 9;  // Any side effects
+  repeated string error_conditions = 10; // Error handling
+}
+
+// Specific details for Non-Functional Requirements.
+message NFRDetails {
+  enum Category {
+    CATEGORY_UNSPECIFIED = 0;
+    PRODUCT = 1;
+    ORGANIZATIONAL = 2;
+    EXTERNAL = 3;
+  }
+  Category category = 1;
+  
+  enum Subcategory {
+    SUBCATEGORY_UNSPECIFIED = 0;
+    // Product subcategories
+    PERFORMANCE = 1;
+    RELIABILITY = 2;
+    USABILITY = 3;
+    EFFICIENCY = 4;
+    MAINTAINABILITY = 5;
+    PORTABILITY = 6;
+    SECURITY = 7;
+    // Organizational subcategories  
+    OPERATIONAL = 8;
+    DEVELOPMENT = 9;
+    ENVIRONMENTAL = 10;
+    // External subcategories
+    REGULATORY = 11;
+    LEGISLATIVE = 12;
+    ETHICAL = 13;
+    SAFETY = 14;
+  }
+  Subcategory subcategory = 2;
+  
+  Metric metric = 3;
+  repeated PerformanceBenchmark benchmarks = 4;  // For performance requirements
+}
+
+// Enhanced metrics with specific types
+message Metric {
+  string property = 1;    // e.g., "Response Time", "Mean Time To Failure"  
+  string measure = 2;     // e.g., "The system shall respond to user input"
+  string target = 3;      // e.g., "in less than 500ms for 99% of requests"
+  
+  enum MetricType {
+    METRIC_TYPE_UNSPECIFIED = 0;
+    SPEED = 1;             // transactions/second, response time
+    SIZE = 2;              // Mbytes, number of components
+    EASE_OF_USE = 3;       // training time, error rate
+    RELIABILITY = 4;       // MTBF, availability
+    ROBUSTNESS = 5;        // restart time, failure handling
+    PORTABILITY = 6;       // platform independence
+    SECURITY = 7;          // encryption strength, access control
+    CAPACITY = 8;          // max users, max transactions
+  }
+  MetricType type = 4;
+  string measurement_method = 5;  // How the metric will be measured
+  MeasurementUnit measurement_unit = 6;  // Structured measurement with tolerance
+}
+
+message PerformanceBenchmark {
+  string scenario = 1;            // Test scenario
+  string expected_result = 2;     // Expected performance
+  string measurement_criteria = 3; // How to measure
+}
+
+// Defines a relationship between two requirements.
+message Relationship {
+  enum Type {
+    RELATIONSHIP_UNSPECIFIED = 0;
+    DEPENDS_ON = 1;     // This requirement cannot be met unless the target is met.
+    CONFLICTS_WITH = 2; // This requirement cannot be met if the target is met.
+    CONSTRAINS = 3;     // This requirement places a constraint on the target.
+    PARENT_OF = 4;      // This requirement is a parent of the target (decomposition).
+    RELATES_TO = 5;     // A general, non-specific relationship.
+    REFINES = 6;        // This requirement refines the target requirement
+    IMPLEMENTS = 7;     // This requirement implements the target requirement
+    TESTS = 8;          // This requirement tests the target requirement
+  }
+  Type type = 1;
+  string target_id = 2;   // ID of the other requirement
+  string description = 3; // Optional description of the relationship
+}
+
+// Additional supporting messages would continue here...
+// (Verification, Elicitation, ChangeLogEntry, etc.)
+
+message Verification {
+  enum Method {
+    METHOD_UNSPECIFIED = 0;
+    TEST = 1;
+    ANALYSIS = 2;
+    INSPECTION = 3;
+    DEMONSTRATION = 4;
+  }
+  Method method = 1;
+  repeated AcceptanceCriterion criteria = 2;
+  repeated VerificationResult results = 3;
+  string test_plan = 4;
+}
+
+message AcceptanceCriterion {
+  string id = 1;
+  string description = 2;
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    FUNCTIONAL_TEST = 1;
+    PERFORMANCE_TEST = 2;
+    USABILITY_TEST = 3;
+    SECURITY_TEST = 4;
+    INTEGRATION_TEST = 5;
+  }
+  Type type = 3;
+  enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    MUST_HAVE = 1;
+    SHOULD_HAVE = 2;
+    COULD_HAVE = 3;
+  }
+  Priority priority = 4;
+}
+
+message VerificationResult {
+  string criterion_id = 1;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PASSED = 1;
+    FAILED = 2;
+    BLOCKED = 3;
+    NOT_TESTED = 4;
+  }
+  Status status = 2;
+  google.protobuf.Timestamp verified_date = 3;
+  string verified_by = 4;
+  string notes = 5;
+  repeated string evidence = 6;
+}
+
+message Elicitation {
+  enum Technique {
+    TECHNIQUE_UNSPECIFIED = 0;
+    INTERVIEW = 1;
+    ETHNOGRAPHY = 2;
+    SCENARIO = 3;
+    WORKSHOP = 4;
+    SURVEY = 5;
+    OBSERVATION = 6;
+    PROTOTYPING = 7;
+    BRAINSTORMING = 8;
+    FOCUS_GROUP = 9;
+  }
+  Technique technique = 1;
+  string source_details = 2;
+  repeated string participants = 3;
+  repeated string artifacts = 4;
+  EthnographicContext ethnographic_context = 5;
+}
+
+message EthnographicContext {
+  string work_environment = 1;
+  repeated WorkPractice practices = 2;
+  repeated SocialFactor social_factors = 3;
+  string observer_notes = 4;
+}
+
+message WorkPractice {
+  string description = 1;
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    FORMAL_PROCESS = 1;
+    INFORMAL_PRACTICE = 2;
+    WORKAROUND = 3;
+    COLLABORATION = 4;
+  }
+  Type type = 2;
+  repeated string stakeholders_involved = 3;
+  string frequency = 4;
+  string context = 5;
+}
+
+message SocialFactor {
+  string description = 1;
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    POWER_RELATIONSHIP = 1;
+    COMMUNICATION_PATTERN = 2;
+    ORGANIZATIONAL_CULTURE = 3;
+    INFORMAL_NETWORK = 4;
+  }
+  Type type = 2;
+  string impact = 3;
+}
+
+message ChangeLogEntry {
+  int32 version = 1;
+  google.protobuf.Timestamp date = 2;
+  string author = 3;
+  string change_reason = 4;
+  enum ChangeType {
+    CHANGE_TYPE_UNSPECIFIED = 0;
+    CREATED = 1;
+    MODIFIED = 2;
+    DELETED = 3;
+    STATUS_CHANGED = 4;
+    PRIORITY_CHANGED = 5;
+  }
+  ChangeType change_type = 5;
+  string change_description = 6;
+  repeated string affected_elements = 7;
+}
+
+// Compliance and standards information
+message ComplianceInfo {
+  repeated string standards = 1;
+  repeated string regulations = 2;
+  string compliance_notes = 3;
+  repeated ComplianceRequirement compliance_requirements = 4;
+}
+
+message ComplianceRequirement {
+  string standard_id = 1;
+  string description = 2;
+  enum ComplianceStatus {
+    COMPLIANCE_STATUS_UNSPECIFIED = 0;
+    COMPLIANT = 1;
+    NON_COMPLIANT = 2;
+    PARTIALLY_COMPLIANT = 3;
+    NOT_APPLICABLE = 4;
+  }
+  ComplianceStatus status = 3;
+  string evidence = 4;
+}
+
+// Risk tracking for requirements
+message RequirementRisk {
+  string id = 1;
+  string description = 2;
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    SEVERITY_LOW = 1;
+    SEVERITY_MEDIUM = 2;
+    SEVERITY_HIGH = 3;
+    SEVERITY_CRITICAL = 4;
+  }
+  Severity severity = 3;
+  enum Probability {
+    PROBABILITY_UNSPECIFIED = 0;
+    PROBABILITY_LOW = 1;
+    PROBABILITY_MEDIUM = 2;
+    PROBABILITY_HIGH = 3;
+  }
+  Probability probability = 4;
+  string mitigation_strategy = 5;
+  string risk_owner = 6;
+  enum RiskStatus {
+    RISK_STATUS_UNSPECIFIED = 0;
+    OPEN = 1;
+    MITIGATED = 2;
+    ACCEPTED = 3;
+    CLOSED = 4;
+  }
+  RiskStatus status = 7;
+}
+
+// Enhanced Measurement System
+message MeasurementUnit {
+  enum UnitType {
+    UNIT_TYPE_UNSPECIFIED = 0;
+    // Time units
+    MILLISECONDS = 1;
+    SECONDS = 2;
+    MINUTES = 3;
+    HOURS = 4;
+    // Performance units
+    TRANSACTIONS_PER_SECOND = 10;
+    REQUESTS_PER_MINUTE = 11;
+    OPERATIONS_PER_HOUR = 12;
+    // Data units
+    BYTES = 20;
+    KILOBYTES = 21;
+    MEGABYTES = 22;
+    GIGABYTES = 23;
+    TERABYTES = 24;
+    // Percentage and counts
+    PERCENTAGE = 30;
+    COUNT = 31;
+    RATIO = 32;
+    // Availability units
+    UPTIME_PERCENTAGE = 40;
+    DOWNTIME_MINUTES_PER_MONTH = 41;
+    // User experience units
+    CLICKS_TO_COMPLETE = 50;
+    SCREENS_TO_NAVIGATE = 51;
+    TRAINING_HOURS = 52;
+  }
+  UnitType unit = 1;
+  double value = 2;
+  double tolerance = 3;
+  double minimum_acceptable = 4;
+  double target_value = 5;
+  double maximum_acceptable = 6;
+}
+
+// =====================================================
+// Additional Core Messages
+// =====================================================
+
+message UseCase {
+  message Step {
+    int32 step_number = 1;
+    string action = 2;
+    string actor = 3;
+    repeated string preconditions = 4;
+    repeated string postconditions = 5;
+  }
+  message Exception {
+    string condition = 1;
+    string handler = 2;
+    repeated Step alternative_steps = 3;
+  }
+
+  string id = 1;
+  string title = 2;
+  repeated string actors = 3;
+  string summary = 4;
+  repeated string preconditions = 5;
+  repeated Step steps = 6;
+  repeated Exception exceptions = 7;
+  repeated string postconditions = 8;
+  
+  enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    UC_PRIORITY_LOW = 1;
+    UC_PRIORITY_MEDIUM = 2;
+    UC_PRIORITY_HIGH = 3;
+    UC_PRIORITY_CRITICAL = 4;
+  }
+  Priority priority = 9;
+  enum Complexity {
+    COMPLEXITY_UNSPECIFIED = 0;
+    UC_COMPLEXITY_SIMPLE = 1;
+    UC_COMPLEXITY_MEDIUM = 2;
+    UC_COMPLEXITY_COMPLEX = 3;
+  }
+  Complexity complexity = 10;
+  repeated string related_requirements = 11;
+  repeated string business_processes = 12;
+}
+
+// Business process context and modeling
+message BusinessProcess {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string stakeholders = 4;
+  repeated ProcessStep steps = 5;
+  repeated string inputs = 6;
+  repeated string outputs = 7;
+  repeated string related_requirements = 8;
+  repeated BusinessRule business_rules = 9;
+  enum ProcessType {
+    PROCESS_TYPE_UNSPECIFIED = 0;
+    CORE_BUSINESS = 1;
+    SUPPORTING = 2;
+    MANAGEMENT = 3;
+  }
+  ProcessType type = 10;
+}
+
+message ProcessStep {
+  int32 step_number = 1;
+  string description = 2;
+  string actor = 3;
+  repeated string inputs = 4;
+  repeated string outputs = 5;
+  repeated string systems_used = 6;
+}
+
+message BusinessRule {
+  string id = 1;
+  string description = 2;
+  enum RuleType {
+    RULE_TYPE_UNSPECIFIED = 0;
+    CONSTRAINT = 1;
+    GUIDELINE = 2;
+    POLICY = 3;
+  }
+  RuleType type = 3;
+  repeated string affected_processes = 4;
+}
+
+// System models
+message SystemModel {
+  string id = 1;
+  
+  enum Type {
+    MODEL_TYPE_UNSPECIFIED = 0;
+    CONTEXT = 1;
+    INTERACTION = 2;
+    STRUCTURAL = 3;
+    BEHAVIORAL = 4;
+    DATA = 5;
+    PROCESS = 6;
+  }
+  Type type = 2;
+  
+  enum Format {
+    FORMAT_UNSPECIFIED = 0;
+    UML_ACTIVITY = 1;
+    UML_SEQUENCE = 2;
+    UML_STATE = 3;
+    UML_CLASS = 4;
+    UML_USE_CASE = 5;
+    DATA_FLOW_DIAGRAM = 6;
+    ENTITY_RELATIONSHIP = 7;
+    BPMN = 8;
+    OTHER = 9;
+  }
+  Format format = 3;
+
+  string description = 4;
+  string location = 5;
+  repeated string related_requirements = 6;
+  repeated string related_use_cases = 7;
+  ModelMetadata metadata = 8;
+}
+
+message ModelMetadata {
+  string created_by = 1;
+  google.protobuf.Timestamp created_date = 2;
+  string last_modified_by = 3;
+  google.protobuf.Timestamp last_modified_date = 4;
+  string tool_used = 5;
+  DocumentVersion version = 6;
+}
+
+// Process tracking and management
+message ProcessInfo {
+  enum Phase {
+    PHASE_UNSPECIFIED = 0;
+    FEASIBILITY = 1;
+    ELICITATION = 2;
+    SPECIFICATION = 3;
+    VALIDATION = 4;
+    MANAGEMENT = 5;
+  }
+  Phase current_phase = 1;
+  repeated ValidationCheck validation_results = 2;
+  repeated ProcessActivity activities = 3;
+  string process_owner = 4;
+  google.protobuf.Timestamp last_updated = 5;
+}
+
+message ValidationCheck {
+  enum CheckType {
+    CHECK_TYPE_UNSPECIFIED = 0;
+    VALIDITY = 1;
+    CONSISTENCY = 2;
+    COMPLETENESS = 3;
+    REALISM = 4;
+    VERIFIABILITY = 5;
+  }
+  CheckType type = 1;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PASSED = 1;
+    FAILED = 2;
+    PENDING = 3;
+    NOT_APPLICABLE = 4;
+  }
+  Status status = 2;
+  string description = 3;
+  string checker = 4;
+  google.protobuf.Timestamp checked_date = 5;
+  repeated string affected_requirements = 6;
+}
+
+message ProcessActivity {
+  string id = 1;
+  string name = 2;
+  enum ActivityType {
+    ACTIVITY_TYPE_UNSPECIFIED = 0;
+    ELICITATION = 1;
+    ANALYSIS = 2;
+    SPECIFICATION = 3;
+    VALIDATION = 4;
+    MANAGEMENT = 5;
+  }
+  ActivityType type = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+  repeated string participants = 6;
+  string outcome = 7;
+  repeated string artifacts_created = 8;
+}
+
+// Document structure
+message DocumentStructure {
+  repeated DocumentSection sections = 1;
+  repeated CrossReference cross_references = 2;
+  repeated DocumentIndex indexes = 3;
+  string template_used = 4;
+}
+
+message DocumentSection {
+  string id = 1;
+  string title = 2;
+  enum SectionType {
+    SECTION_TYPE_UNSPECIFIED = 0;
+    PREFACE = 1;
+    INTRODUCTION = 2;
+    GLOSSARY = 3;
+    USER_REQUIREMENTS = 4;
+    SYSTEM_REQUIREMENTS = 5;
+    SYSTEM_ARCHITECTURE = 6;
+    SYSTEM_MODELS = 7;
+    SYSTEM_EVOLUTION = 8;
+    APPENDIX = 9;
+  }
+  SectionType type = 3;
+  repeated string content_ids = 4;
+  repeated DocumentSection subsections = 5;
+}
+
+message CrossReference {
+  string source_id = 1;
+  string target_id = 2;
+  enum ReferenceType {
+    REFERENCE_TYPE_UNSPECIFIED = 0;
+    SATISFIES = 1;
+    DERIVED_FROM = 2;
+    IMPLEMENTS = 3;
+    TESTS = 4;
+    DOCUMENTS = 5;
+  }
+  ReferenceType type = 3;
+}
+
+message DocumentIndex {
+  enum IndexType {
+    INDEX_TYPE_UNSPECIFIED = 0;
+    ALPHABETIC = 1;
+    FUNCTIONAL = 2;
+    DIAGRAMS = 3;
+    TABLES = 4;
+  }
+  IndexType type = 1;
+  repeated IndexEntry entries = 2;
+}
+
+message IndexEntry {
+  string term = 1;
+  repeated string references = 2;
+}
+
+// Feasibility studies
+message FeasibilityStudy {
+  enum OverallResult {
+    RESULT_UNSPECIFIED = 0;
+    FEASIBLE = 1;
+    NOT_FEASIBLE = 2;
+    FEASIBLE_WITH_CONDITIONS = 3;
+  }
+  OverallResult overall_result = 1;
+  TechnicalFeasibility technical = 2;
+  EconomicFeasibility economic = 3;
+  OperationalFeasibility operational = 4;
+  string summary = 5;
+  google.protobuf.Timestamp study_date = 6;
+  string conducted_by = 7;
+}
+
+message TechnicalFeasibility {
+  enum Assessment {
+    ASSESSMENT_UNSPECIFIED = 0;
+    FEASIBLE = 1;
+    NOT_FEASIBLE = 2;
+    REQUIRES_RESEARCH = 3;
+  }
+  Assessment assessment = 1;
+  string technology_stack = 2;
+  repeated string constraints = 3;
+  repeated string risks = 4;
+}
+
+message EconomicFeasibility {
+  enum Assessment {
+    ASSESSMENT_UNSPECIFIED = 0;
+    FEASIBLE = 1;
+    NOT_FEASIBLE = 2;
+    REQUIRES_ADDITIONAL_FUNDING = 3;
+  }
+  Assessment assessment = 1;
+  double estimated_cost = 2;
+  double available_budget = 3;
+  string cost_benefit_analysis = 4;
+}
+
+message OperationalFeasibility {
+  enum Assessment {
+    ASSESSMENT_UNSPECIFIED = 0;
+    FEASIBLE = 1;
+    NOT_FEASIBLE = 2;
+    REQUIRES_ORGANIZATIONAL_CHANGES = 3;
+  }
+  Assessment assessment = 1;
+  repeated string organizational_impacts = 2;
+  repeated string user_acceptance_factors = 3;
+}
+
+// Configuration profiles
+message ConfigurationProfile {
+  string name = 1;
+  string description = 2;
+  repeated string required_fields = 3;
+  repeated string optional_fields = 4;
+  repeated string hidden_fields = 5;
+  repeated ValidationRule validation_rules = 6;
+  enum ProfileType {
+    PROFILE_TYPE_UNSPECIFIED = 0;
+    SIMPLE = 1;
+    STANDARD = 2;
+    COMPREHENSIVE = 3;
+    REGULATORY = 4;
+    AGILE = 5;
+  }
+  ProfileType type = 7;
+}
+
+message ValidationRule {
+  string field_name = 1;
+  enum RuleType {
+    RULE_TYPE_UNSPECIFIED = 0;
+    REQUIRED = 1;
+    CONDITIONAL_REQUIRED = 2;
+    PATTERN_MATCH = 3;
+    VALUE_RANGE = 4;
+    MUTUAL_EXCLUSION = 5;
+  }
+  RuleType type = 2;
+  string condition = 3;
+  string error_message = 4;
+}
+
+// Requirement patterns
+message RequirementPattern {
+  string id = 1;
+  string name = 2;
+  string category = 3;
+  string template = 4;
+  repeated TemplateParameter parameters = 5;
+  repeated string example_requirements = 6;
+  string description = 7;
+  repeated string tags = 8;
+}
+
+message TemplateParameter {
+  string name = 1;
+  string description = 2;
+  enum ParameterType {
+    PARAMETER_TYPE_UNSPECIFIED = 0;
+    TEXT = 1;
+    NUMBER = 2;
+    SELECTION = 3;
+    BOOLEAN = 4;
+    DATE = 5;
+  }
+  ParameterType type = 3;
+  repeated string allowed_values = 4;
+  string default_value = 5;
+  bool required = 6;
+}
+
+// ID management
+message RequirementId {
+  string value = 1;
+  enum IdType {
+    ID_TYPE_UNSPECIFIED = 0;
+    FUNCTIONAL_REQ = 1;
+    NON_FUNCTIONAL_REQ = 2;
+    BUSINESS_REQ = 3;
+    DOMAIN_REQ = 4;
+    USER_REQ = 5;
+    SYSTEM_REQ = 6;
+  }
+  IdType type = 2;
+  int32 sequence_number = 3;
+  string prefix = 4;
+} 

@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package requirements.engineering.dsl.v2;
+
+import "requirements_types.proto";
+
+option java_package = "com.requirements.engineering.dsl.v2";
+option java_outer_classname = "RequirementsTestingProto";
+option go_package = "github.com/your-org/your-repo/dsl/v2;dslv2";
+
+// =====================================================
+// Enhanced Test Integration
+// =====================================================
+
+message TestSpecification {
+  string id = 1;
+  string requirement_id = 2;       // Links to Requirement.id
+  string title = 3;
+  string description = 4;
+  repeated TestCase test_cases = 5;
+  TestStrategy strategy = 6;
+  string test_plan_reference = 7;  // Reference to external test plan
+  enum TestLevel {
+    TEST_LEVEL_UNSPECIFIED = 0;
+    UNIT = 1;
+    INTEGRATION = 2;
+    SYSTEM = 3;
+    ACCEPTANCE = 4;
+  }
+  TestLevel level = 8;
+  repeated string prerequisites = 9;
+}
+
+message TestCase {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  repeated TestStep steps = 4;
+  repeated TestData test_data = 5;
+  ExpectedResult expected = 6;
+  repeated string acceptance_criteria_ids = 7;  // Links to AcceptanceCriterion.id
+  enum TestType {
+    TEST_TYPE_UNSPECIFIED = 0;
+    FUNCTIONAL = 1;
+    PERFORMANCE = 2;
+    SECURITY = 3;
+    USABILITY = 4;
+    COMPATIBILITY = 5;
+    RELIABILITY = 6;
+  }
+  TestType type = 8;
+  enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    LOW = 1;
+    MEDIUM = 2;
+    HIGH = 3;
+    CRITICAL = 4;
+  }
+  Priority priority = 9;
+}
+
+message TestStep {
+  int32 step_number = 1;
+  string action = 2;               // What to do
+  string expected_result = 3;      // What should happen
+  repeated string test_data_refs = 4;  // References to test data
+}
+
+message TestData {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  enum DataType {
+    DATA_TYPE_UNSPECIFIED = 0;
+    INPUT_DATA = 1;
+    EXPECTED_OUTPUT = 2;
+    CONFIGURATION = 3;
+    ENVIRONMENT_SETUP = 4;
+  }
+  DataType type = 4;
+  string data_source = 5;          // File, database, generated, etc.
+  string format = 6;               // JSON, XML, CSV, etc.
+}
+
+message ExpectedResult {
+  string description = 1;
+  repeated string success_criteria = 2;
+  repeated string failure_criteria = 3;
+  MeasurementUnit performance_target = 4;  // For performance tests
+}
+
+message TestStrategy {
+  string approach = 1;             // Overall testing approach
+  repeated string tools = 2;       // Testing tools to be used
+  repeated string environments = 3; // Test environments needed
+  string automation_level = 4;     // Manual, semi-automated, fully automated
+  repeated string risks = 5;       // Testing risks
+} 

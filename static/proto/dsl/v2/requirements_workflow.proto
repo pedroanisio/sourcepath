@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package requirements.engineering.dsl.v2;
+
+import "requirements_types.proto";
+
+option java_package = "com.requirements.engineering.dsl.v2";
+option java_outer_classname = "RequirementsWorkflowProto";
+option go_package = "github.com/your-org/your-repo/dsl/v2;dslv2";
+
+// =====================================================
+// Requirement State Machine & Workflow Management
+// =====================================================
+
+// Defines the state machine for requirement lifecycle management
+message RequirementStateMachine {
+  string id = 1;                              // State machine identifier
+  string name = 2;                            // e.g., "Standard Workflow", "Regulatory Workflow"
+  string description = 3;
+  repeated StateTransition transitions = 4;    // Allowed transitions
+  map<string, StateConfiguration> state_configs = 5;  // State-specific configurations
+  repeated WorkflowRole roles = 6;            // Roles that can perform transitions
+  bool is_default = 7;                        // Whether this is the default state machine
+}
+
+// Defines a single state transition
+message StateTransition {
+  string id = 1;                              // Transition identifier
+  RequirementStatus from_state = 2;           // Source status
+  RequirementStatus to_state = 3;             // Target status
+  repeated string required_fields = 4;        // Fields that must be populated before transition
+  repeated string optional_fields = 5;        // Fields that should be populated
+  string guard_condition = 6;                 // Boolean expression that must be true
+  repeated string required_roles = 7;         // Roles authorized to perform this transition
+  repeated TransitionAction actions = 8;      // Actions to perform on transition
+  string transition_name = 9;                 // Human-readable name, e.g., "Submit for Review"
+  bool requires_approval = 10;                // Whether transition needs approval
+  repeated string approval_roles = 11;        // Roles that can approve the transition
+}
+
+// Configuration for a specific requirement status/state
+message StateConfiguration {
+  RequirementStatus status = 1;
+  repeated string editable_fields = 2;        // Fields that can be edited in this state
+  repeated string readonly_fields = 3;        // Fields that are read-only in this state
+  repeated string required_fields = 4;        // Fields required to be in this state
+  repeated string hidden_fields = 5;          // Fields to hide in UI for this state
+  bool allows_deletion = 6;                   // Whether requirement can be deleted in this state
+  repeated string notification_roles = 7;     // Roles to notify when entering this state
+}
+
+// Actions to perform when transitioning
+message TransitionAction {
+  enum ActionType {
+    ACTION_TYPE_UNSPECIFIED = 0;
+    NOTIFY_STAKEHOLDER = 1;                   // Send notification
+    SET_FIELD_VALUE = 2;                      // Set a field to a specific value  
+    CLEAR_FIELD_VALUE = 3;                    // Clear a field
+    VALIDATE_REQUIREMENT = 4;                 // Run validation checks
+    CREATE_AUDIT_LOG = 5;                     // Create audit trail entry
+    ASSIGN_REVIEWER = 6;                      // Assign someone to review
+    UPDATE_RELATIONSHIPS = 7;                 // Update dependent requirements
+  }
+  ActionType type = 1;
+  string target = 2;                          // Target of the action (field name, stakeholder ID, etc.)
+  string value = 3;                           // Value to set (for SET_FIELD_VALUE)
+  map<string, string> parameters = 4;        // Additional parameters for the action
+}
+
+// Workflow roles and permissions
+message WorkflowRole {
+  string id = 1;                              // e.g., "ANALYST", "REVIEWER", "APPROVER"
+  string name = 2;                            // Human-readable name
+  string description = 3;
+  repeated string permissions = 4;            // e.g., "CREATE", "EDIT", "APPROVE", "DELETE"
+  repeated string stakeholder_ids = 5;        // Stakeholders assigned to this role
+} 

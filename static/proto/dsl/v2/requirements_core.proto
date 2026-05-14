@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package requirements.engineering.dsl.v2;
+
+import "requirements_types.proto";
+import "requirements_workflow.proto";
+import "requirements_analysis.proto";
+import "requirements_testing.proto";
+
+option java_package = "com.requirements.engineering.dsl.v2";
+option java_outer_classname = "RequirementsCoreProto";
+option go_package = "github.com/your-org/your-repo/dsl/v2;dslv2";
+
+// =====================================================
+// Top-level Document Structure
+// =====================================================
+
+// The complete requirements document, serving as the root object.
+message RequirementsDocument {
+  DocumentVersion version = 1;               // Consistent versioning approach
+  ProjectInfo project_info = 2;
+  repeated GlossaryItem glossary = 3;
+  repeated Stakeholder stakeholders = 4;
+  repeated Requirement requirements = 5;
+  repeated UseCase use_cases = 6;
+  repeated SystemModel models = 7;
+  ProcessInfo process_info = 8;              // Process tracking information
+  repeated BusinessProcess business_processes = 9;  // Business context
+  DocumentStructure document_structure = 10;  // Document organization
+  FeasibilityStudy feasibility_study = 11;   // Feasibility analysis results
+  
+  // New enhanced features
+  ConfigurationProfile configuration = 12;   // Project configuration and field requirements
+  repeated SimpleRequirement simple_requirements = 13;  // Lightweight requirements
+  repeated RequirementPattern patterns = 14;  // Requirement templates and patterns
+  repeated TestSpecification test_specifications = 15;  // Test integration
+  repeated RequirementId id_registry = 16;   // ID management and validation
+  
+  // Enhanced workflow and dependency management
+  RequirementStateMachine state_machine = 17;  // Workflow state transitions
+  DependencyGraph dependency_graph = 18;       // Requirement dependency tracking
+  DependencyAnalysis dependency_analysis = 19; // Dependency analysis results
+}
+
+// Note: DocumentVersion, ProjectInfo, and ProjectScope moved to requirements_types.proto 

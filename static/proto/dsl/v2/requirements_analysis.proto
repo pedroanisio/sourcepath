@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package requirements.engineering.dsl.v2;
+
+import "google/protobuf/timestamp.proto";
+import "requirements_types.proto";
+
+option java_package = "com.requirements.engineering.dsl.v2";
+option java_outer_classname = "RequirementsAnalysisProto";
+option go_package = "github.com/your-org/your-repo/dsl/v2;dslv2";
+
+// =====================================================
+// Dependency Analysis & Requirement Relationships  
+// =====================================================
+
+// Complete dependency graph for all requirements
+message DependencyGraph {
+  repeated DependencyNode nodes = 1;          // All requirements as nodes
+  repeated DependencyEdge edges = 2;          // Dependencies as edges
+  google.protobuf.Timestamp last_updated = 3;
+  string updated_by = 4;
+  int32 graph_version = 5;                    // Version of the dependency graph
+}
+
+// A single requirement node in the dependency graph
+message DependencyNode {
+  string requirement_id = 1;                  // References Requirement.id
+  RequirementStatus current_status = 2;       // Current status of this requirement
+  int32 dependency_level = 3;                 // Depth from root requirements (0 = no dependencies)
+  repeated string incoming_dependencies = 4;   // Requirements this depends on
+  repeated string outgoing_dependencies = 5;   // Requirements that depend on this
+  bool is_critical_path = 6;                  // Whether this requirement is on critical path
+  DependencyMetrics metrics = 7;              // Calculated metrics for this node
+}
+
+// A dependency relationship between two requirements
+message DependencyEdge {
+  string source_requirement_id = 1;           // Requirement that has the dependency
+  string target_requirement_id = 2;           // Requirement being depended upon
+  DependencyType dependency_type = 3;         // Type of dependency
+  string description = 4;                     // Optional description of the dependency
+  bool is_mandatory = 5;                      // Whether this dependency is mandatory
+  double dependency_strength = 6;             // Strength of dependency (0.0-1.0)
+  google.protobuf.Timestamp created_date = 7;
+  string created_by = 8;                      // Who created this dependency
+}
+
+// Types of dependencies between requirements
+enum DependencyType {
+  DEPENDENCY_TYPE_UNSPECIFIED = 0;
+  REQUIRES = 1;                               // Source requires target to be completed first
+  ENABLES = 2;                                // Source enables target (target can start after source)
+  CONFLICTS_WITH = 3;                         // Source conflicts with target (mutual exclusion)
+  RELATED_TO = 4;                             // General relationship
+  IMPLEMENTS = 5;                             // Source implements target (refinement)
+  DERIVES_FROM = 6;                           // Source is derived from target
+  VALIDATES = 7;                              // Source validates target
+  SUPERSEDES = 8;                             // Source replaces target
+  INFLUENCES = 9;                             // Source influences target (weak dependency)
+}
+
+// Comprehensive analysis of the dependency graph
+message DependencyAnalysis {
+  google.protobuf.Timestamp analysis_date = 1;
+  string analyzed_by = 2;
+  DependencyStatistics statistics = 3;        // Overall graph statistics
+  repeated CircularDependency circular_dependencies = 4;  // Circular dependency violations
+  repeated OrphanedRequirement orphaned_requirements = 5; // Requirements with no relationships
+  repeated CriticalPathAnalysis critical_paths = 6;       // Critical paths through the graph
+  repeated DependencyCluster clusters = 7;                // Clustered requirements
+  repeated DependencyViolation violations = 8;            // Policy violations
+  DependencyHealthScore health_score = 9;                 // Overall health of dependencies
+}
+
+// Statistical analysis of the dependency graph
+message DependencyStatistics {
+  int32 total_requirements = 1;
+  int32 total_dependencies = 2;
+  int32 orphaned_count = 3;                   // Requirements with no dependencies
+  int32 leaf_requirements = 4;                // Requirements nothing depends on
+  int32 root_requirements = 5;                // Requirements that depend on nothing
+  double average_dependencies_per_requirement = 6;
+  int32 max_dependency_depth = 7;             // Maximum depth in graph
+  double graph_density = 8;                   // Density of connections (0.0-1.0)
+  int32 strongly_connected_components = 9;     // Number of strongly connected components
+}
+
+// Circular dependency detection and analysis  
+message CircularDependency {
+  string id = 1;                              // Unique identifier for this cycle
+  repeated string requirement_cycle = 2;       // Requirements in the circular dependency
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    LOW = 1;           // Soft circular dependency, can be worked around
+    MEDIUM = 2;        // Problematic, should be resolved
+    HIGH = 3;          // Blocking, must be resolved
+    CRITICAL = 4;      // System cannot progress with this cycle
+  }
+  Severity severity = 3;
+  string description = 4;
+  repeated string suggested_resolutions = 5;   // Suggested ways to break the cycle
+  bool is_resolved = 6;
+  string resolution_notes = 7;
+}
+
+// Requirements with no incoming or outgoing dependencies
+message OrphanedRequirement {
+  string requirement_id = 1;
+  enum OrphanType {
+    ORPHAN_TYPE_UNSPECIFIED = 0;
+    NO_DEPENDENCIES = 1;        // Requirement has no dependencies at all
+    NO_INCOMING = 2;            // Nothing depends on this requirement
+    NO_OUTGOING = 3;            // This requirement doesn't depend on anything
+  }
+  OrphanType type = 2;
+  string reason = 3;                          // Why this is orphaned
+  bool is_intentional = 4;                    // Whether this is by design
+  repeated string suggested_relationships = 5; // Suggested requirements to link to
+}
+
+// Critical path analysis through requirements
+message CriticalPathAnalysis {
+  string path_id = 1;
+  repeated string requirement_sequence = 2;    // Requirements in order along this path
+  double total_estimated_effort = 3;          // Total effort for this path
+  double total_estimated_duration = 4;        // Total time for this path
+  bool is_longest_path = 5;                   // Whether this is the critical path
+  repeated BottleneckRequirement bottlenecks = 6; // Requirements that could delay this path
+}
+
+// Requirements that could become bottlenecks
+message BottleneckRequirement {
+  string requirement_id = 1;
+  int32 dependent_count = 2;                  // How many requirements depend on this
+  double risk_factor = 3;                     // Risk of this becoming a bottleneck (0.0-1.0)
+  string risk_reason = 4;                     // Why this might be a bottleneck
+}
+
+// Clusters of highly related requirements
+message DependencyCluster {
+  string cluster_id = 1;
+  repeated string requirement_ids = 2;        // Requirements in this cluster
+  string cluster_description = 3;             // What this cluster represents
+  double cohesion_score = 4;                  // How tightly coupled this cluster is (0.0-1.0)
+  repeated string external_dependencies = 5;  // Dependencies outside this cluster
+  ClusterType type = 6;
+}
+
+enum ClusterType {
+  CLUSTER_TYPE_UNSPECIFIED = 0;
+  FUNCTIONAL_MODULE = 1;                      // Related by functionality
+  STAKEHOLDER_GROUP = 2;                      // Related by stakeholder interest
+  IMPLEMENTATION_PHASE = 3;                   // Related by implementation timing
+  BUSINESS_PROCESS = 4;                       // Related by business process
+  COMPLIANCE_GROUP = 5;                       // Related by compliance requirements
+}
+
+// Dependency policy violations
+message DependencyViolation {
+  string violation_id = 1;
+  enum ViolationType {
+    VIOLATION_TYPE_UNSPECIFIED = 0;
+    CIRCULAR_DEPENDENCY = 1;
+    EXCESSIVE_COUPLING = 2;      // Too many dependencies
+    MISSING_DEPENDENCY = 3;      // Expected dependency missing
+    INVALID_DEPENDENCY = 4;      // Dependency not allowed by policy
+    DEPENDENCY_DEPTH_EXCEEDED = 5; // Dependency chain too deep
+  }
+  ViolationType type = 2;
+  repeated string affected_requirements = 3;
+  string description = 4;
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    INFO = 1;
+    WARNING = 2;
+    ERROR = 3;
+    CRITICAL = 4;
+  }
+  Severity severity = 5;
+  repeated string suggested_fixes = 6;
+}
+
+// Overall health assessment of the dependency graph
+message DependencyHealthScore {
+  double overall_score = 1;                   // Overall health (0.0-1.0, higher is better)
+  double complexity_score = 2;                // Complexity assessment
+  double maintainability_score = 3;           // How maintainable the dependencies are
+  double consistency_score = 4;               // How consistent the dependencies are  
+  repeated string improvement_suggestions = 5; // Suggestions for improvement
+  enum HealthLevel {
+    HEALTH_LEVEL_UNSPECIFIED = 0;
+    EXCELLENT = 1;      // 0.9-1.0
+    GOOD = 2;          // 0.7-0.89
+    FAIR = 3;          // 0.5-0.69
+    POOR = 4;          // 0.3-0.49
+    CRITICAL = 5;      // 0.0-0.29
+  }
+  HealthLevel level = 6;
+}
+
+// Metrics calculated for each requirement node
+message DependencyMetrics {
+  int32 incoming_count = 1;                   // Number of requirements this depends on
+  int32 outgoing_count = 2;                   // Number of requirements depending on this
+  double centrality_score = 3;                // How central this requirement is (0.0-1.0)
+  double betweenness_centrality = 4;          // How often this requirement appears in paths
+  int32 shortest_path_to_root = 5;            // Shortest path to a root requirement
+  bool is_articulation_point = 6;            // Whether removing this would disconnect the graph
+  double pagerank_score = 7;                  // PageRank-style importance score
+} 
