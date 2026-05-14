@@ -19,11 +19,13 @@ codebase_mapper/        host package
 plugins/
 ├── chunks_embeddings/  source chunks + sentence-transformer/hash embeddings
 ├── concept_graph/      identifier splitting + canonical concept set + SKOS
-└── symbol_xrefs/       symbol-level xref edges (cbmxr:Edge) — Phase 1 scaffold
+├── symbol_xrefs/       symbol-level xref edges (cbmxr:Edge) — Phase 1 scaffold
+└── llm_enrich/         L4 LLM-authored annotations (cbml4:* triples) — opt-in
 scripts/
 ├── run_l2.py           host + chunks_embeddings registered
 ├── run_l3.py           host + chunks_embeddings + concept_graph (--no-l2 skips L2)
-└── run_xrefs.py        host + chunks_embeddings + symbol_xrefs (+ --concepts opt-in)
+├── run_xrefs.py        host + chunks_embeddings + symbol_xrefs (+ --concepts opt-in)
+└── run_l4.py           host + L2 + L3 + L4 llm_enrich (Ollama-backed; full L1+L2+L3+L4)
 frontend/
 ├── backend/            FastAPI service that reads an output bundle and serves
 │                       summary/graph/chunk/concept JSON to the UI
@@ -32,6 +34,9 @@ tests/
 ├── verify_l2.py        chunks_embeddings contract suite
 ├── verify_l3.py        concept_graph contract + cross-layer (with/without L2)
 ├── verify_xrefs.py     symbol_xrefs schema/vocab/sidecar (Phase 1)
+├── verify_llm_enrich*.py  L4 llm_enrich contract suite (9 verifiers: basic,
+│                       cache, prompts, file_summary, RDF, aggregator,
+│                       determinism, offline, CLI, CI-determinism)
 └── verify_xsd_fixture.py  static/schemas/ classifier coverage
 static/
 ├── schemas/            vendored industry-standard XSDs (IEEE 12207/29148,
@@ -65,6 +70,10 @@ python scripts/run_l3.py --repo /path/to/repo --out /tmp/out --backend sbert
 
 # Host + chunks/embeddings + concept graph + symbol xrefs
 python scripts/run_xrefs.py --repo /path/to/repo --out /tmp/out --backend hash --concepts
+
+# Full L1+L2+L3+L4 (opt-in LLM enrichment via Ollama; see the "LLM enrichment"
+# section below for caveats and PALS's-Law framing).
+python scripts/run_l4.py --repo /path/to/repo --out /tmp/out
 ```
 
 `--backend sbert` uses `sentence-transformers/all-MiniLM-L6-v2`; `--backend hash`

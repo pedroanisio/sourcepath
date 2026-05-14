@@ -95,9 +95,42 @@ def test_orient_bundle_includes_cheatsheet_and_suggested_calls(live_bundle, bund
     assert p["bundle"]["name"] == bundle_name
     assert "cbm" in p["schema_hint"]["namespaces"]
     assert "skos" in p["schema_hint"]["namespaces"]
-    assert {l["name"] for l in p["schema_hint"]["layers"]} >= {"L1 host", "L2 chunks_embeddings", "L3 concept_graph"}
+    layer_names = {l["name"] for l in p["schema_hint"]["layers"]}
+    # All four layers MUST be declared by orient_bundle so MCP clients learn
+    # the L4 contract even on bundles built without --llm-enrich.
+    assert layer_names >= {"L1 host", "L2 chunks_embeddings", "L3 concept_graph", "L4 llm_enrich"}
+    # Namespaces must include cbml4 for the same reason.
+    assert "cbml4" in p["schema_hint"]["namespaces"]
+    # L4 must be flagged optional so clients know it can be empty/absent.
+    l4 = next(l for l in p["schema_hint"]["layers"] if l["name"] == "L4 llm_enrich")
+    assert l4.get("optional") is True
     tools_named = {c["tool"] for c in p["suggested_first_calls"]}
     assert tools_named.issubset(set(HANDLERS))
+    # Every namespace the producer can emit MUST be declared by orient_bundle.
+    # Regression guard: when a future L5+ layer ships, this assertion forces
+    # the new namespace to be added here before the producer can ship it.
+    # Without this guard, the L4 second-class defect (cbml4 emitted as data
+    # but never declared by orient_bundle) can re-occur for any future layer.
+    declared_ns = set(p["schema_hint"]["namespaces"])
+    required_ns = {"cbm", "cbml2", "cbml3", "cbml4", "skos", "nif"}
+    missing = required_ns - declared_ns
+    assert not missing, (
+        f"orient_bundle.namespaces omits {missing}; every namespace the "
+        f"producer can emit (cbml2/3/4) MUST be declared so MCP clients can "
+        f"interpret cbml*: triples. See docs/cbm-l4-second-class-impact.md."
+    )
+    # Every layer entry must reference a namespace via its key_predicates.
+    # This couples the layer table to the namespace map: dropping a layer's
+    # namespace would silently strand its predicates.
+    declared_prefixes = {ns + ":" for ns in declared_ns}
+    for layer in p["schema_hint"]["layers"]:
+        preds = layer.get("key_predicates", [])
+        if not preds:
+            continue
+        assert any(pred.startswith(tuple(declared_prefixes)) for pred in preds), (
+            f"layer {layer['name']!r} declares predicates {preds} but none "
+            f"match a declared namespace prefix in {sorted(declared_ns)}"
+        )
 
 
 def test_bundle_summary_counts(live_bundle, bundle_name):

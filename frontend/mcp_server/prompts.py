@@ -65,9 +65,11 @@ def _build_orient(args: dict[str, str] | None) -> GetPromptResult:
     )
     text = (
         "You are exploring a codebase that has been pre-mapped into an RDF "
-        "knowledge graph with three layers: L1 host (files + imports), "
-        "L2 chunks (per-function/class chunks with embeddings), and L3 "
-        "concept_graph (SKOS concepts from identifier splitting).\n\n"
+        "knowledge graph with four layers: L1 host (files + imports), "
+        "L2 chunks (per-function/class chunks with embeddings), L3 "
+        "concept_graph (SKOS concepts from identifier splitting), and "
+        "L4 llm_enrich (optional, advisory LLM-authored annotations with "
+        "model/prompt provenance — present only on --llm-enrich bundles).\n\n"
         f"Start by orienting yourself{bundle_clause}:\n"
         "  1. Call `orient_bundle` for namespace + layer cheat sheet.\n"
         "  2. Call `bundle_summary` for repo counts and language histogram.\n"

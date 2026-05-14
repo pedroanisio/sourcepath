@@ -515,6 +515,10 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
                                     "type": "array",
                                     "items": {"type": "string"},
                                 },
+                                # True when the layer is opt-in (e.g. L4
+                                # llm_enrich) and may be absent on bundles
+                                # built without the corresponding plugin.
+                                "optional": {"type": "boolean"},
                             },
                         },
                     },
@@ -1001,7 +1005,7 @@ RESOURCE_URI_TEMPLATES: dict[str, dict[str, Any]] = {
     "bundle_ontology": {
         "uri": "cbm://bundle/{bundle}/ontology-mapping.ttl",
         "name": "Bundle ontology mapping",
-        "description": "Namespace aliases (cbm, cbml2, cbml3, skos, nif…). Read first if you don't know the ontology.",
+        "description": "Namespace aliases (cbm, cbml2, cbml3, cbml4, skos, nif…). Read first if you don't know the ontology.",
         "mimeType": "text/turtle",
     },
     "file": {

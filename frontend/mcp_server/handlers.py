@@ -187,6 +187,7 @@ def _orient_bundle(args: dict[str, Any], default: str | None) -> dict[str, Any]:
         "cbm":   "https://codebase-mapper.example.org/cbm#",
         "cbml2": "https://codebase-mapper.example.org/cbml2#",
         "cbml3": "https://codebase-mapper.example.org/cbml3#",
+        "cbml4": "https://codebase-mapper.example.org/cbml4#",
         "skos":  "http://www.w3.org/2004/02/skos/core#",
         "nif":   "http://persistence.uni-leipzig.org/nlp2rdf/ontologies/nif-core#",
     }
@@ -205,6 +206,28 @@ def _orient_bundle(args: dict[str, Any], default: str | None) -> dict[str, Any]:
             "name": "L3 concept_graph",
             "purpose": "SKOS concepts from identifier splitting; cooccurrence as skos:related.",
             "key_predicates": ["cbml3:lexicalizes", "cbml3:composedOf", "skos:related", "skos:prefLabel"],
+        },
+        {
+            "name": "L4 llm_enrich",
+            # PALS's Law: L4 is the only layer whose triples are LLM-derived.
+            # Surface it explicitly so MCP clients know the data is advisory
+            # and content-addressed, and that the layer may be absent on
+            # bundles built without --llm-enrich.
+            "purpose": (
+                "Optional LLM-authored annotations (file summaries, concept "
+                "descriptions, schema purposes) with model/prompt/timestamp "
+                "provenance. Present only when the bundle was built with "
+                "--llm-enrich; absent or empty otherwise. Treat as advisory."
+            ),
+            "key_predicates": [
+                "cbml4:fileSummary",
+                "cbml4:conceptDescription",
+                "cbml4:schemaPurpose",
+                "cbml4:fileSummaryModel",
+                "cbml4:fileSummaryPromptSha",
+                "cbml4:fileSummaryGeneratedAt",
+            ],
+            "optional": True,
         },
     ]
     suggested = [
