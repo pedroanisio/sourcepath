@@ -591,6 +591,12 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
                     "source_files": _INT_GE_0,
                     "ratio": {"type": ["number", "null"]},
                     "tests_edges": _INT_GE_0,
+                    # Source files containing inline #[test] functions
+                    # (the Rust #[cfg(test)] mod tests pattern). Omitted
+                    # when not present in the bundle (pre-Stage-3 bundles).
+                    "rust_files_with_inline_tests": {
+                        "type": ["integer", "null"], "minimum": 0,
+                    },
                 },
             },
         },

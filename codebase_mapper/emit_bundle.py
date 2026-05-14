@@ -16,6 +16,7 @@ from .extensions import (
     iter_artifact_emitters, iter_graph_contributors, iter_shape_contributors,
 )
 from .rdf_emit import build_inventory_graph, build_ontology_mapping_graph, build_shacl_graph
+from .tests_edges import count_rust_inline_test_files
 
 
 def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = True) -> dict:
@@ -131,6 +132,12 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
             "ast_full_bodies_python": ast_full_bodies_python,
             "ast_full_bodies_tsjs": ast_full_bodies_tsjs,
             "ast_summary_total_bytes": ast_summary_total_bytes,
+            # Rust-specific: source files containing inline #[test]
+            # functions (the #[cfg(test)] mod tests pattern). Surfaces
+            # tests the path classifier can't see.
+            "rust_files_with_inline_tests": count_rust_inline_test_files(
+                mapped["records"],
+            ),
         },
         "files_by_type": dict(sorted(
             Counter(r.type_ for r in mapped["records"]).items(),

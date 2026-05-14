@@ -201,7 +201,12 @@ def map_codebase(
         "import_ext_edges": sorted(import_ext_edges, key=lambda e: (e.src_path, e.package_name)),
         "dep_edges": sorted(dep_edges, key=lambda e: (e.manifest_path, e.package_name)),
         "pin_edges": sorted(pin_edges, key=lambda e: (e.lockfile_path, e.package_name, e.package_version)),
-        "tests_edges": infer_tests_edges(records),
+        # Pass rust_crates + paths_set so Rust integration tests under
+        # ``tests/*.rs`` can fall back to use-analysis when filename
+        # heuristics fail to match a subject by basename.
+        "tests_edges": infer_tests_edges(
+            records, rust_crates=rust_crates, paths_set=paths_set,
+        ),
         "python_source_roots": py_roots,
         "rust_crates": rust_crates,
         "tsconfig_count": len(tsconfigs),

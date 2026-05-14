@@ -376,6 +376,14 @@ def _repository_summary(args: dict[str, Any], default: str | None) -> dict[str, 
         "source_files": src_files,
         "ratio": (test_files / src_files) if src_files > 0 else None,
         "tests_edges": int(counts.get("tests_edges", 0)),
+        # Stage-3 addition. Older bundles omit the key; we surface it
+        # as `null` so consumers can distinguish "no inline tests" (0)
+        # from "this bundle doesn't carry the count" (null).
+        "rust_files_with_inline_tests": (
+            int(counts["rust_files_with_inline_tests"])
+            if "rust_files_with_inline_tests" in counts
+            else None
+        ),
     }
 
     return {
