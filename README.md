@@ -280,6 +280,50 @@ The MCP server surfaces typing through `concept_detail` (returns
 For the schema, SHACL shapes, extension/stability rules, and the file
 map, see [docs/vocabulary.md](docs/vocabulary.md).
 
+## LLM enrichment
+
+L4 is the optional LLM enrichment layer. It calls a local Ollama
+server to attach LLM-authored annotations in a new `cbml4:` namespace.
+Three enrichment kinds:
+
+- `cbml4:fileSummary` — one sentence per source-code `cbm:File`.
+- `cbml4:conceptDescription` — one paragraph per curated `skos:Concept`.
+- `cbml4:schemaPurpose` — one paragraph per file under `static/schemas/`.
+
+Every triple carries provenance (`cbml4:*Model`, `cbml4:*PromptSha`,
+`cbml4:*GeneratedAt`) and every output is content-addressed in
+`~/.cache/cbm-llm/` — re-emits over an unchanged repo are byte-identical
+(warm-cache determinism). Ollama unreachable → the bundle degrades
+cleanly to L1+L2+L3, SHACL stays green.
+
+Default off; opt in via flag. Default model `qwen2.5-coder:7b` (the
+benchmark winner from [docs/llm-baseline-results.md](docs/llm-baseline-results.md)):
+
+```bash
+# Install Ollama and pull the default model.
+ollama pull qwen2.5-coder:7b
+
+# Full L1+L2+L3+L4 entry point with all knobs surfaced.
+python scripts/run_l4.py --repo /path/to/repo --out /tmp/out
+
+# Or short-form opt-in on top of run_l3/run_xrefs.
+python scripts/run_l3.py --repo … --out … --llm-enrich
+python scripts/run_xrefs.py --repo … --out … --llm-enrich   # implies --concepts
+
+# Narrow the enrichment kinds (default is all three).
+python scripts/run_l4.py --repo … --out … --llm-scope files
+python scripts/run_l4.py --repo … --out … --llm-scope files,concepts
+```
+
+The MCP server surfaces enrichments on `file_detail.llm_summary`,
+`file_detail.llm_schema_purpose`, `concept_detail.llm_description`,
+plus short-form text on `repository_summary.central_files[*].llm_summary`
+and `repository_summary.key_concepts[*].llm_description`. The React UI
+renders an "AI-enriched" card with collapsible provenance. For the
+RDF schema, SHACL shapes, cache layout, prompt-versioning rules,
+extension procedure, and file map, see
+[docs/llm-enrich.md](docs/llm-enrich.md).
+
 ## Verify
 
 ```bash
@@ -294,6 +338,15 @@ python tests/verify_vocab.py                # controlled-vocab loader
 python tests/verify_vocab_emission.py       # controlled-vocab RDF + SHACL
 python tests/verify_vocab_wiring.py         # controlled-vocab aggregator wiring
 python tests/verify_vocab_pipeline.py       # controlled-vocab end-to-end pipeline
+python tests/verify_llm_enrich.py           # L4 back-compat anchor (no-L4 vs L4-registered byte-identity)
+python tests/verify_llm_enrich_cache.py     # L4 cache + OllamaClient
+python tests/verify_llm_enrich_prompts.py   # L4 prompt-file SHA integrity
+python tests/verify_llm_enrich_file_summary.py     # L4 file_summary enricher (requires Ollama)
+python tests/verify_llm_enrich_rdf.py       # L4 RDF emission + SHACL + sidecar (requires Ollama)
+python tests/verify_llm_enrich_aggregator.py       # L4 concept_description + schema_purpose (requires Ollama)
+python tests/verify_llm_enrich_determinism.py      # L4 warm-cache determinism (requires Ollama)
+python tests/verify_llm_enrich_offline.py   # L4 graceful degradation when Ollama is unreachable
+python tests/verify_llm_enrich_cli.py       # L4 CLI surface (scripts/run_l4 + --llm-enrich flags)
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 python tests/verify_xsd_fixture.py          # static/schemas/ classifier coverage
 python tests/verify_proto_fixture.py        # static/proto/ classifier + import coverage
@@ -338,6 +391,16 @@ In-flight design work lives under [docs/](docs/):
   bundle inspection workflow.
 - [docs/vocabulary.md](docs/vocabulary.md) — L3 controlled vocabulary:
   schema, kinds, RDF predicates, SHACL, extension rules, file map.
+- [docs/llm-enrich.md](docs/llm-enrich.md) — L4 LLM enrichment layer:
+  RDF predicates, SHACL shapes, cache layout, prompt versioning,
+  extension procedure, file map.
+- [docs/llm-enrich-plan.md](docs/llm-enrich-plan.md) — the 10-step
+  implementation plan for L4 (now shipped; kept as the architectural-
+  commitment record).
+- [docs/llm-enrich-poc.md](docs/llm-enrich-poc.md) — the 1-day
+  proof-of-concept doc (run before committing to the plan).
+- [docs/llm-baseline-results.md](docs/llm-baseline-results.md) — the
+  5-model benchmark that selected qwen2.5-coder:7b as the default.
 - [docs/symbol-xrefs-plan.md](docs/symbol-xrefs-plan.md) — proposed
   symbol-level xref edge layer (SCIP / Stack Graphs analogue), broken
   into 10 shippable steps. Design only; no code yet.
