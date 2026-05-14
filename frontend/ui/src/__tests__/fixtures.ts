@@ -258,6 +258,29 @@ export const chunkDetailFixture: ChunkDetail = {
   ],
 };
 
+// Variant used by Stage-5 tests: a concept that carries curated-vocab
+// typing. The default `conceptDetailFixture` deliberately omits these
+// fields so we can also assert the badge stays *hidden* for uncurated
+// concepts.
+export const typedConceptDetailFixture: ConceptDetail = {
+  concept: {
+    label: "behavior",
+    alt_labels: ["Behavior", "behaviors"],
+    components: [],
+    frequency: 42,
+    file_count: 12,
+    embedding_row: 7,
+    kind: "domain-primitive",
+    broader: "intent_first_ontology",
+  },
+  files: ["a.py", "b.py"],
+  cooccurring: [{ name: "intent", weight: 5 }],
+  chunks: [],
+  components: [],
+  file_count_total: 12,
+  chunk_count_total: 0,
+};
+
 export const conceptDetailFixture: ConceptDetail = {
   concept: {
     label: "schema",

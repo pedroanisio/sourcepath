@@ -1,0 +1,119 @@
+# codebase_mapper — bundled L3 controlled vocabulary.
+#
+# Curated from the intent-first ontology. Terms are canonical
+# snake_case names; aliases collapse common variants to canonical at
+# split time. `broader` groups terms by kind into a skos:Collection.
+#
+# Editing rules:
+#   - Adding a term: append under its `kinds` bucket; aliases optional.
+#   - Removing a term: breaking change for any consumer SPARQL — avoid.
+#   - Renaming a term: add the old name as an alias to the new canonical.
+
+version: 1
+
+kinds:
+
+  # Intent-first ontology: concepts that describe what code *means*,
+  # not what shape it has. These come from the code-mapper authoring
+  # work and form cbm's strongest typed-query surface.
+  domain-primitive:
+    - intent
+    - behavior
+    - contract
+    - effect
+    - expression
+    - operation
+    - operation_graph
+    - decorator
+    - mapping
+    - generated_artifact
+    - generation_target
+    - embedded_contract
+
+  # Universal code structure: nouns that nearly every programming
+  # language surfaces in some form. Curated so cross-language queries
+  # ("show me every concept that lexicalizes a parameter") work.
+  structural-primitive:
+    - application
+    - module
+    - class
+    - method
+    - function
+    - field
+    - parameter
+    - constant
+    - variant
+    - import_item
+    - import_statement
+    - entry_point
+    - block
+    - impl_block
+    - receiver
+    - operator
+    - type_parameter
+    - type_constraint
+    - lifetime_parameter
+    - literal_value
+
+  # Relations between structural/domain concepts. Edge-shaped terms
+  # live here so consumers can filter "is this a node or a link?"
+  relational-primitive:
+    - edge
+    - block_edge
+    - data_flow_edge
+    - operation_edge
+    - operation_target
+    - mapping_level
+    - class_nesting
+
+aliases:
+
+  # domain-primitive
+  behavior:            [behaviour, behaviors, behaviours]
+  contract:            [contracts]
+  intent:              [intents]
+  effect:              [effects, side_effect, side_effects]
+  expression:          [expressions, expr]
+  operation:           [operations]
+  operation_graph:     [operation_graphs]
+  decorator:           [decorators, decorated]
+  mapping:             [mappings]
+  generated_artifact:  [generated_artifacts, artifact, artifacts]
+  generation_target:   [generation_targets]
+  embedded_contract:   [embedded_contracts]
+
+  # structural-primitive
+  application:         [applications, app]
+  module:              [modules]
+  class:               [classes]
+  method:              [methods]
+  function:            [functions, func, funcs]
+  field:               [fields, struct_field, class_field]
+  parameter:           [parameters, param, params, method_parameter]
+  constant:            [constants]
+  variant:             [variants, enum_variant, enum_variants]
+  import_item:         [import_items]
+  import_statement:    [import_statements, import]
+  entry_point:         [entry_points, entrypoint, entrypoints]
+  block:               [blocks]
+  impl_block:          [impl_blocks]
+  receiver:            [receivers]
+  operator:            [operators]
+  type_parameter:      [type_parameters]
+  type_constraint:     [type_constraints]
+  lifetime_parameter:  [lifetime_parameters]
+  literal_value:       [literal_values, literal, literals]
+
+  # relational-primitive
+  edge:                [edges, edge_kind, edge_type]
+  block_edge:          [block_edges]
+  data_flow_edge:      [data_flow_edges, dataflow_edge, dataflow_edges]
+  operation_edge:      [operation_edges]
+  operation_target:    [operation_targets]
+  mapping_level:       [mapping_levels]
+  class_nesting:       [class_nestings]
+
+broader:
+  domain-primitive:     intent_first_ontology
+  structural-primitive: code_structure
+  relational-primitive: code_relations

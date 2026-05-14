@@ -31,17 +31,15 @@ class ConceptsArtifact:
         cemb_ids = idx.get("concept_embedding_ids")
 
         # ---- concepts.json ----
+        # `kind` and `broader` are only present for concepts that
+        # matched the curated vocab; absent for compound terms and for
+        # any atomic term not in the YAML. We emit them only when
+        # present so untyped runs produce JSON identical to pre-vocab
+        # bundles (back-compat for any consumer reading concepts.json).
         json_path = out_dir / "concepts.json"
         payload = {
             "concepts": {
-                k: {
-                    "label": v["label"],
-                    "alt_labels": v["alt_labels"],
-                    "components": v["components"],
-                    "frequency": v["frequency"],
-                    "file_count": v["file_count"],
-                    "embedding_row": v.get("embedding_row"),
-                }
+                k: _concept_payload(v)
                 for k, v in sorted(concepts.items())
             },
             "per_path_concepts": {
@@ -84,3 +82,24 @@ class ConceptsArtifact:
             "concept_centroids_available": cembs is not None,
             "files": out_files,
         }
+
+
+def _concept_payload(v: dict) -> dict:
+    """Project a concept record onto its on-disk JSON shape.
+
+    Required keys are always emitted; `kind` / `broader` are emitted
+    iff the aggregator attached them (curated-vocab match).
+    """
+    out: dict = {
+        "label": v["label"],
+        "alt_labels": v["alt_labels"],
+        "components": v["components"],
+        "frequency": v["frequency"],
+        "file_count": v["file_count"],
+        "embedding_row": v.get("embedding_row"),
+    }
+    if "kind" in v:
+        out["kind"] = v["kind"]
+    if "broader" in v:
+        out["broader"] = v["broader"]
+    return out

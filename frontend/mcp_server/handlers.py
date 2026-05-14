@@ -537,15 +537,22 @@ def _concept_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]
     ]
     chunk_idxs = b.concept_chunks.get(concept_name, [])[:chunk_k]
     chunks = [_chunk_row(b.chunks[i]) for i in chunk_idxs]
+    concept_payload: dict[str, Any] = {
+        "label": c.get("label", concept_name),
+        "alt_labels": list(c.get("alt_labels", [])),
+        "components": list(c.get("components", [])),
+        "frequency": int(c.get("frequency", 0)),
+        "file_count": int(c.get("file_count", 0)),
+        "embedding_row": c.get("embedding_row"),
+    }
+    # Stage 5: surface curated-vocab typing when the bundle carries it.
+    # Pre-vocab bundles simply lack these keys; older clients ignore them.
+    if "kind" in c:
+        concept_payload["kind"] = c["kind"]
+    if "broader" in c:
+        concept_payload["broader"] = c["broader"]
     return {
-        "concept": {
-            "label": c.get("label", concept_name),
-            "alt_labels": list(c.get("alt_labels", [])),
-            "components": list(c.get("components", [])),
-            "frequency": int(c.get("frequency", 0)),
-            "file_count": int(c.get("file_count", 0)),
-            "embedding_row": c.get("embedding_row"),
-        },
+        "concept": concept_payload,
         "files": files,
         "cooccurring": cooc,
         "chunks": chunks,
@@ -570,8 +577,14 @@ def _concept_neighborhood(args: dict[str, Any], default: str | None) -> dict[str
     depth = int(args.get("depth", 1))
     limit = int(args.get("limit", 20))
     min_weight = int(args.get("min_weight", 2))
+    # Stage 5: optional curated-vocab filter. When provided, only
+    # neighbors whose concept record carries this `kind` are returned.
+    # Traversal still walks every cooccurrence edge so a kinded
+    # neighbor at depth 2 isn't hidden behind an unkinded depth-1 node.
+    kind_filter = args.get("kind")
     b = _get_bundle(name)
-    if concept_name not in b.concepts.get("concepts", {}):
+    all_concepts = b.concepts.get("concepts", {})
+    if concept_name not in all_concepts:
         raise ToolError(NOT_FOUND, f"concept not found: {concept_name}")
 
     visited = {concept_name}
@@ -588,13 +601,28 @@ def _concept_neighborhood(args: dict[str, Any], default: str | None) -> dict[str
                 if n in visited or int(w) < min_weight:
                     continue
                 visited.add(n)
-                neighbors.append({
+                n_meta = all_concepts.get(n, {})
+                n_kind = n_meta.get("kind")
+                # Surface kind/broader on each neighbor (when known)
+                # whether or not a filter is in play — same shape either
+                # way is friendlier for client renderers.
+                row: dict[str, Any] = {
                     "name": n,
                     "weight": int(w),
                     "depth": cur_depth + 1,
                     "via": via + [cur] if via else ([cur] if cur != concept_name else []),
-                })
+                }
+                if n_kind is not None:
+                    row["kind"] = n_kind
+                if "broader" in n_meta:
+                    row["broader"] = n_meta["broader"]
+                # Always extend the frontier so deeper kinded neighbors
+                # remain reachable. Apply the filter only when deciding
+                # to emit the current row.
                 next_frontier.append((n, cur_depth + 1, via + [cur] if cur != concept_name else [cur]))
+                if kind_filter is not None and n_kind != kind_filter:
+                    continue
+                neighbors.append(row)
                 if len(neighbors) >= limit:
                     truncated = True
                     break
@@ -602,8 +630,11 @@ def _concept_neighborhood(args: dict[str, Any], default: str | None) -> dict[str
                 break
         frontier = next_frontier
 
-    return {
+    out: dict[str, Any] = {
         "root": concept_name,
         "neighbors": neighbors,
         "truncated": truncated,
     }
+    if kind_filter is not None:
+        out["kind_filter"] = kind_filter
+    return out

@@ -26,6 +26,7 @@ import {
   fileDetailFixture,
   chunkDetailFixture,
   conceptDetailFixture,
+  typedConceptDetailFixture,
   chunkListFixture,
 } from "./fixtures";
 
@@ -503,6 +504,69 @@ describe("Toolbar interactions — selects + node-click", () => {
     const user = userEvent.setup();
     await user.click(btn);
     expect(await screen.findByRole("heading", { name: /a\.py/ })).toBeInTheDocument();
+  });
+});
+
+// ----- Stage 5: curated-vocab badge + metadata --------------------------
+//
+// Notes on targeting:
+//   - The chunks table has a <th>kind</th> column header that always
+//     renders, so we can't assert plain text absence of "kind".
+//   - The badge text equals the kind literal, which also appears in
+//     <dd> when present, so we target the badge via data-testid.
+
+describe("ConceptDetail — curated-vocab typing", () => {
+  it("shows the kind badge and broader collection when the concept is typed", async () => {
+    mockFetch([[/^\/api\/concept\//, typedConceptDetailFixture]]);
+    renderAt("/concept/behavior");
+
+    expect(
+      await screen.findByRole("heading", { name: /behavior/ })
+    ).toBeInTheDocument();
+
+    const badge = await screen.findByTestId("concept-kind-badge");
+    expect(badge).toHaveTextContent("domain-primitive");
+    expect(badge.getAttribute("data-kind")).toBe("domain-primitive");
+
+    // Metadata row exposes the broader collection name.
+    expect(screen.getByText("intent_first_ontology")).toBeInTheDocument();
+  });
+
+  it("hides the kind badge entirely for uncurated concepts", async () => {
+    // The default fixture has no `kind` / `broader`. The badge must
+    // not appear; the chunks-table <th>kind</th> still does, which is
+    // unrelated.
+    mockFetch([[/^\/api\/concept\//, conceptDetailFixture]]);
+    renderAt("/concept/schema");
+
+    expect(
+      await screen.findByRole("heading", { name: /schema/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("concept-kind-badge")).not.toBeInTheDocument();
+    // The broader-collection literal must not leak in.
+    expect(
+      screen.queryByText("intent_first_ontology")
+    ).not.toBeInTheDocument();
+  });
+
+  it("colors each kind distinctly via inline style", async () => {
+    mockFetch([
+      [
+        /^\/api\/concept\//,
+        {
+          ...typedConceptDetailFixture,
+          concept: {
+            ...typedConceptDetailFixture.concept,
+            kind: "structural-primitive",
+            broader: "code_structure",
+          },
+        },
+      ],
+    ]);
+    renderAt("/concept/module");
+    const badge = await screen.findByTestId("concept-kind-badge");
+    expect(badge.getAttribute("data-kind")).toBe("structural-primitive");
+    expect(badge.getAttribute("style") || "").toMatch(/background/);
   });
 });
 

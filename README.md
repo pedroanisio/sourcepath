@@ -227,6 +227,38 @@ supported languages (C, Dart, Go, Kotlin, Python, Ruby, Rust, Swift,
 TS/JS) auto-register at host import; `reset_registries()` re-registers
 them after a clear.
 
+## Controlled vocabulary
+
+L3's concept graph ships with a curated set of ~40 atomic terms covering
+intent-first domain primitives (`intent`, `behavior`, `contract`,
+`effect`, …), universal code structure (`module`, `class`, `method`,
+`function`, …), and edge/relation primitives (`edge`, `block_edge`,
+`data_flow_edge`, …). Concepts matching a curated term get tagged with
+`cbml3:conceptKind` (one of `domain-primitive` / `structural-primitive`
+/ `relational-primitive`) plus a `cbml3:broaderCollection` link to a
+per-kind `skos:Collection`. Aliases collapse common variants at
+canonicalization time (`behaviour` → `behavior`, `func` → `function`,
+`params` → `parameter`, …).
+
+The vocabulary is loaded automatically; opt out or override via:
+
+```bash
+# Default — bundled software_primitives.yaml is live.
+python scripts/run_l3.py --repo /path/to/repo --out /tmp/out
+
+# Override with a custom YAML.
+python scripts/run_l3.py --repo … --out … --concept-vocab my_vocab.yaml
+
+# Disable curated tagging entirely (bundles look like pre-v1 L3).
+python scripts/run_l3.py --repo … --out … --no-builtin-vocab
+```
+
+The MCP server surfaces typing through `concept_detail` (returns
+`kind`/`broader` on curated concepts) and `concept_neighborhood`
+(accepts an optional `kind` filter and attaches per-neighbor typing).
+For the schema, SHACL shapes, extension/stability rules, and the file
+map, see [docs/vocabulary.md](docs/vocabulary.md).
+
 ## Verify
 
 ```bash
@@ -237,10 +269,14 @@ python tests/verify_repo_source.py          # local path + Git URL --repo handli
 python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
 python tests/verify_l3.py                   # concept_graph contract + cross-layer
+python tests/verify_vocab.py                # controlled-vocab loader
+python tests/verify_vocab_emission.py       # controlled-vocab RDF + SHACL
+python tests/verify_vocab_wiring.py         # controlled-vocab aggregator wiring
+python tests/verify_vocab_pipeline.py       # controlled-vocab end-to-end pipeline
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 ```
 
-All eight verifiers resolve `repo_root` from their own `__file__`, so they
+All verifiers resolve `repo_root` from their own `__file__`, so they
 run correctly regardless of the caller's cwd.
 
 ### File timestamps
@@ -269,6 +305,8 @@ In-flight design work lives under [docs/](docs/):
   adding a new language to `_REGENERATORS`.
 - [docs/analyze.md](docs/analyze.md) — local path, GitHub URL, Docker, and
   bundle inspection workflow.
+- [docs/vocabulary.md](docs/vocabulary.md) — L3 controlled vocabulary:
+  schema, kinds, RDF predicates, SHACL, extension rules, file map.
 - [docs/symbol-xrefs-plan.md](docs/symbol-xrefs-plan.md) — proposed
   symbol-level xref edge layer (SCIP / Stack Graphs analogue), broken
   into 10 shippable steps. Design only; no code yet.

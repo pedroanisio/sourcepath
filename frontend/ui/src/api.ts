@@ -118,6 +118,14 @@ export interface ChunkDetail {
   callees?: ChunkRow[];
 }
 
+// Curated-vocab kind values. Concepts that match a term in the bundled
+// vocabulary carry one of these on `concept.kind`; pre-vocab bundles
+// and uncurated concepts have neither `kind` nor `broader`.
+export type ConceptKind =
+  | "domain-primitive"
+  | "structural-primitive"
+  | "relational-primitive";
+
 export interface ConceptDetail {
   concept: {
     label: string;
@@ -126,6 +134,8 @@ export interface ConceptDetail {
     frequency: number;
     file_count: number;
     embedding_row: number | null;
+    kind?: ConceptKind;
+    broader?: string;
   };
   files: string[];
   cooccurring: Array<{ name: string; weight: number }>;

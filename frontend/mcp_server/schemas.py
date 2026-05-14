@@ -193,11 +193,19 @@ DESCRIPTIONS: dict[str, str] = {
     ),
     "concept_detail": (
         "Inspect a SKOS concept: frequency, alt-labels, components, top-k "
-        "cooccurring concepts, files and chunks that lexicalize it."
+        "cooccurring concepts, files and chunks that lexicalize it. "
+        "Concepts from the curated vocabulary also report ``kind`` "
+        "(``domain-primitive`` | ``structural-primitive`` | "
+        "``relational-primitive``) and the ``broader`` collection name."
     ),
     "concept_neighborhood": (
         "k-hop cooccurrence expansion from a concept. Use to explore the "
-        "domain vocabulary around a concept; bounded ``depth`` ≤ 3."
+        "domain vocabulary around a concept; bounded ``depth`` ≤ 3. "
+        "Pass ``kind`` to restrict the returned neighbors to a single "
+        "curated-vocab category (e.g. \"show me every domain-primitive "
+        "cooccurring with `behavior`\"). Bundles built without the "
+        "controlled vocabulary contain no kinds, so this filter "
+        "matches nothing on those bundles."
     ),
     "sparql": (
         "ADVANCED. Run a read-only SPARQL query (SELECT or ASK) against the "
@@ -336,6 +344,23 @@ INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             "depth": {"type": "integer", "minimum": 1, "maximum": 3, "default": 1},
             "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20},
             "min_weight": {"type": "integer", "minimum": 1, "default": 2},
+            "kind": {
+                "type": "string",
+                "enum": [
+                    "domain-primitive",
+                    "structural-primitive",
+                    "relational-primitive",
+                ],
+                "description": (
+                    "Optional curated-vocab filter. Only neighbors whose "
+                    "concept record carries this `kind` are returned. "
+                    "Traversal still walks every cooccurrence edge so "
+                    "kinded neighbors past an unkinded hop remain "
+                    "reachable. Bundles built without the controlled "
+                    "vocabulary contain no kinds, so this filter "
+                    "matches nothing on those bundles."
+                ),
+            },
         },
     },
     "sparql": {
@@ -584,6 +609,17 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
                     "frequency": {"type": "integer", "minimum": 0},
                     "file_count": {"type": "integer", "minimum": 0},
                     "embedding_row": {"type": ["integer", "null"]},
+                    # Stage 5: curated-vocab typing. Present only when the
+                    # concept matched a term in the bundled vocabulary.
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "domain-primitive",
+                            "structural-primitive",
+                            "relational-primitive",
+                        ],
+                    },
+                    "broader": {"type": "string"},
                 },
             },
             "files": {"type": "array", "items": {"type": "string"}},
@@ -622,10 +658,33 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
                         "weight": {"type": "integer", "minimum": 1},
                         "depth": {"type": "integer", "minimum": 1},
                         "via": {"type": "array", "items": {"type": "string"}},
+                        # Stage 5: curated-vocab typing; present per
+                        # neighbor when the underlying concept matched
+                        # a term in the bundled vocabulary.
+                        "kind": {
+                            "type": "string",
+                            "enum": [
+                                "domain-primitive",
+                                "structural-primitive",
+                                "relational-primitive",
+                            ],
+                        },
+                        "broader": {"type": "string"},
                     },
                 },
             },
             "truncated": {"type": "boolean"},
+            # Echo of the input `kind` filter when one was supplied, so
+            # clients can confirm the filter took effect. Absent when no
+            # filter was requested.
+            "kind_filter": {
+                "type": "string",
+                "enum": [
+                    "domain-primitive",
+                    "structural-primitive",
+                    "relational-primitive",
+                ],
+            },
         },
     },
     "sparql": {

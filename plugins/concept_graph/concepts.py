@@ -48,6 +48,7 @@ from typing import cast
 import numpy as np
 
 from codebase_mapper.extensions import PipelineCtx
+from codebase_mapper.vocab import Vocabulary, builtin_vocabulary
 
 
 # Programming-context stopwords. Conservative: anything in this set is
@@ -71,17 +72,37 @@ MIN_COOCCURRENCE = 2     # drop singletons; tune for noisier codebases
 MIN_FREQUENCY = 1        # keep all concepts that appear at least once
 
 
-def canonicalize(token: str) -> str | None:
-    """Lower-case + trailing-'s' plural strip. Returns None to drop.
+class _UseBuiltin:
+    """Sentinel type for the constructor's USE_BUILTIN flag."""
+    __slots__ = ()
+    def __repr__(self) -> str:  # pragma: no cover - cosmetic
+        return "<USE_BUILTIN>"
+
+USE_BUILTIN = _UseBuiltin()
+
+
+def canonicalize(token: str, vocab: Vocabulary | None = None) -> str | None:
+    """Lower-case + trailing-'s' plural strip + optional vocab override.
 
     Deliberately minimal. Real lemmatization (Porter stemmer, spaCy,
     NLTK WordNet) belongs in a future iteration; the previous naive
     stripper over-stripped ('mapper' -> 'mapp', 'languages' -> 'languag').
     Under-stemming is the lesser evil for a concept graph.
+
+    Vocab pass: when a `vocab` is given, the lowercased token (and its
+    plural-stripped form) is consulted against the alias table first.
+    A hit returns the canonical name directly, which means curated terms
+    survive even when they'd otherwise be dropped (e.g. "func" is a
+    stopword by default but maps to "function" under the vocab).
     """
     if not token:
         return None
     t = token.lower()
+    # Vocab takes precedence over both stopwords and plural-stripping.
+    if vocab is not None:
+        hit = vocab.by_alias.get(t)
+        if hit is not None:
+            return hit
     if len(t) < MIN_TOKEN_LEN:
         return None
     if t in STOPWORDS:
@@ -92,15 +113,66 @@ def canonicalize(token: str) -> str | None:
     # shorter than MIN_TOKEN_LEN+1 (avoids 'us' -> 'u') and skip 'ss'
     # endings ('class' should not become 'clas').
     if len(t) >= MIN_TOKEN_LEN + 2 and t.endswith("s") and not t.endswith("ss"):
-        return t[:-1]
+        stem = t[:-1]
+        # Give the vocab one more shot on the stripped form — handles
+        # ("behaviors" -> "behavior") when "behaviors" wasn't an alias.
+        if vocab is not None:
+            hit = vocab.by_alias.get(stem)
+            if hit is not None:
+                return hit
+        return stem
     return t
 
 
 class ConceptAggregator:
     name = "l3_20_concepts"
 
+    # Cached default. Shared across instances because the YAML doesn't
+    # change between calls in a single process.
+    _cached_builtin_vocab: Vocabulary | None = None
+
+    def __init__(self, vocab: Vocabulary | None | _UseBuiltin = None) -> None:
+        """Construct with a specific vocabulary, or with the sentinel
+        `USE_BUILTIN` to defer-load the bundled one, or with `None` to
+        disable typed concepts entirely.
+
+        Default (`vocab=None`) preserves the pre-vocab behavior so the
+        aggregator stays drop-in compatible. `register_all(vocab=...)`
+        is the entry point that opts into the bundled vocab by default.
+        """
+        self._configured_vocab: Vocabulary | None | _UseBuiltin = vocab
+
+    @classmethod
+    def _builtin(cls) -> Vocabulary:
+        if cls._cached_builtin_vocab is None:
+            cls._cached_builtin_vocab = builtin_vocabulary()
+        return cls._cached_builtin_vocab
+
+    def _resolve_vocab(self, ctx: PipelineCtx) -> Vocabulary | None:
+        """Returns the vocabulary to use, or None if disabled.
+
+        Resolution order:
+          1. ctx.scratch["host:concept_vocab_disabled"] == True  -> None
+          2. ctx.indices["host:concept_vocab"] (Vocabulary)       -> override
+          3. constructor-supplied vocab or USE_BUILTIN sentinel
+          4. None (pre-vocab default, full back-compat)
+        """
+        if ctx.scratch.get("host:concept_vocab_disabled"):
+            return None
+        override = ctx.indices.get("host:concept_vocab")
+        if isinstance(override, Vocabulary):
+            return override
+        if self._configured_vocab is USE_BUILTIN:
+            return self._builtin()
+        return cast("Vocabulary | None", self._configured_vocab)
+
     def run(self, ctx: PipelineCtx) -> dict:
         raw_map = cast(dict, ctx.scratch.get("raw_terms", {}))
+        vocab = self._resolve_vocab(ctx)
+        # Stash the resolved vocab so downstream contributors
+        # (notably ConceptGraphWriter's L2 chunk-anchoring) agree on
+        # alias collapses. Aggregators always run before writers.
+        ctx.scratch["l3:resolved_vocab"] = vocab
 
         # Augment raw_terms with method-level identifiers from L2 chunks if
         # present. L2's chunker exposes 'symbol' and 'parent_symbol' for
@@ -140,7 +212,8 @@ class ConceptAggregator:
             for entry in raw_map[path]:
                 tokens = entry["tokens"]
                 raw = entry["raw"]
-                canon = [c for c in (canonicalize(t) for t in tokens) if c is not None]
+                canon = [c for c in (canonicalize(t, vocab) for t in tokens)
+                         if c is not None]
                 if not canon:
                     continue
                 # Atomic concepts: each canonicalized token.
@@ -164,7 +237,7 @@ class ConceptAggregator:
         for c in sorted(atomic_freq):
             if atomic_freq[c] < MIN_FREQUENCY:
                 continue
-            concepts[c] = {
+            record: dict = {
                 "label": c,
                 "alt_labels": sorted(x for x in atomic_alt_labels[c] if x != c),
                 "components": [],
@@ -172,6 +245,18 @@ class ConceptAggregator:
                 "file_count": len(atomic_file_count[c]),
                 "embedding_row": None,
             }
+            # Vocab typing: if this canonical form is a curated term,
+            # attach `kind` and `broader` so the writer + sidecar can
+            # emit cbml3:conceptKind / cbml3:broaderCollection. Compound
+            # concepts (joined with '_') are intentionally not typed —
+            # the curated vocab only declares atomic primitives.
+            if vocab is not None:
+                term = vocab.terms.get(c)
+                if term is not None:
+                    record["kind"] = term.kind
+                    if term.broader is not None:
+                        record["broader"] = term.broader
+            concepts[c] = record
         # compound — synthesize canonical_form by joining with underscore
         for key in sorted(compound_freq, key=lambda k: ("_".join(k), k)):
             if compound_freq[key] < MIN_FREQUENCY:

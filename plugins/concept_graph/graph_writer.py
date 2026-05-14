@@ -10,7 +10,18 @@ Triple structure per concept:
         cbml3:fileCount 7 ;
         cbml3:composedOf cbmi:concept/user, cbmi:concept/service ;   # compound only
         cbml3:embeddingRow 4 ;
-        cbml3:embeddingArtifact "concepts_embeddings.npz" .          # if computed
+        cbml3:embeddingArtifact "concepts_embeddings.npz" ;          # if computed
+        # Curated-vocab-only (absent when concept is not in the bundled vocab):
+        cbml3:conceptKind "domain-primitive" ;
+        cbml3:broaderCollection cbmi:collection/intent_first_ontology .
+
+When at least one concept carries `kind`, the writer also emits one
+``skos:Collection`` per encountered kind:
+
+    cbmi:collection/intent_first_ontology a skos:Collection ;
+        skos:prefLabel "intent-first ontology"@en ;
+        cbml3:conceptKindBacking "domain-primitive" ;
+        skos:member cbmi:concept/behavior, cbmi:concept/intent, ... .
 
 Plus per-file :lexicalizes edges:
 
@@ -59,6 +70,28 @@ def chunk_iri_for(chunk_id: str) -> URIRef:
     return URIRef(f"{CBMI_NS}chunk/{safe}")
 
 
+def collection_iri(collection_tail: str) -> URIRef:
+    safe = urllib.parse.quote(collection_tail, safe="")
+    return URIRef(f"{CBMI_NS}collection/{safe}")
+
+
+# Closed set of legal `cbml3:conceptKind` values. SHACL enforces the same
+# set via `sh:in`. Keep in sync with codebase_mapper.vocab.loader.
+CONCEPT_KIND_LITERALS: tuple[str, ...] = (
+    "domain-primitive",
+    "structural-primitive",
+    "relational-primitive",
+)
+
+# Human-friendly labels for each kind's backing collection. The collection
+# tail itself is determined by the curated YAML's `broader:` block.
+_KIND_LABELS: dict[str, str] = {
+    "domain-primitive":     "intent-first ontology",
+    "structural-primitive": "code structure",
+    "relational-primitive": "code relations",
+}
+
+
 class ConceptGraphWriter:
     name = "l3_30_graph"
 
@@ -72,6 +105,11 @@ class ConceptGraphWriter:
         cooccurrence = idx.get("cooccurrence", [])
 
         # --- Concept nodes ---
+        # Tracks which curated kinds appeared, so we can emit a
+        # skos:Collection per kind after the per-concept loop. Maps
+        # collection_tail -> (kind_literal, [member concept iris]).
+        kind_collections: dict[str, tuple[str, list[URIRef]]] = {}
+
         for canon, meta in sorted(concepts.items()):
             ciri = concept_iri(canon)
             g.add((ciri, RDF.type, SKOS.Concept))
@@ -93,6 +131,44 @@ class ConceptGraphWriter:
                 g.add((ciri, CBML3.embeddingArtifact,
                        Literal("concepts_embeddings.npz")))
 
+            # Stage 3: curated-vocab-only typing. Both fields are optional —
+            # only concepts matched against the bundled vocab carry them.
+            # Stage 4 populates them; the writer is forward-compatible.
+            kind = meta.get("kind")
+            broader = meta.get("broader")
+            if kind is not None:
+                if kind not in CONCEPT_KIND_LITERALS:
+                    # Loader should have already rejected this; defend
+                    # in depth so a hand-edited bundle dict fails loudly.
+                    raise ValueError(
+                        f"concept {canon!r}: unknown conceptKind {kind!r}; "
+                        f"expected one of {CONCEPT_KIND_LITERALS}"
+                    )
+                g.add((ciri, CBML3.conceptKind, Literal(kind)))
+                if broader:
+                    coll_iri = collection_iri(broader)
+                    g.add((ciri, CBML3.broaderCollection, coll_iri))
+                    bucket = kind_collections.setdefault(
+                        broader, (kind, []),
+                    )
+                    # Same kind always for a given broader; guard anyway.
+                    if bucket[0] != kind:
+                        raise ValueError(
+                            f"broader collection {broader!r} reused under "
+                            f"conflicting kinds: {bucket[0]!r} vs {kind!r}"
+                        )
+                    bucket[1].append(ciri)
+
+        # --- Per-kind skos:Collection nodes (only when populated) ---
+        for tail, (kind, members) in sorted(kind_collections.items()):
+            coll_iri = collection_iri(tail)
+            g.add((coll_iri, RDF.type, SKOS.Collection))
+            g.add((coll_iri, SKOS.prefLabel,
+                   Literal(_KIND_LABELS.get(kind, tail), lang="en")))
+            g.add((coll_iri, CBML3.conceptKindBacking, Literal(kind)))
+            for m in members:
+                g.add((coll_iri, SKOS.member, m))
+
         # --- skos:related from co-occurrence (symmetric, but RDF is
         # directed; we emit both directions to be lookup-friendly) ---
         for a, b, _count in cooccurrence:
@@ -111,9 +187,13 @@ class ConceptGraphWriter:
         l2_chunks = cast(list, ctx.indices.get("l2_10_chunks") or [])
         if l2_chunks:
             # Compute concepts per chunk from its symbol(s) + parent_symbol,
-            # canonicalize, intersect with the global concept set.
+            # canonicalize, intersect with the global concept set. The
+            # vocab must match the aggregator's so chunk-anchoring agrees
+            # with file-anchoring on alias collapses; the aggregator
+            # stashes its resolved vocab on ctx.scratch.
             from .splitter import split_identifier
             from .concepts import canonicalize
+            vocab = ctx.scratch.get("l3:resolved_vocab")
             for c in l2_chunks:
                 symbols: list[str] = []
                 if c.get("symbol") and c["symbol"] != "<file>":
@@ -123,7 +203,7 @@ class ConceptGraphWriter:
                 concept_names: set[str] = set()
                 for sym in symbols:
                     for tok in split_identifier(sym):
-                        cn = canonicalize(tok)
+                        cn = canonicalize(tok, vocab)
                         if cn and cn in concepts:
                             concept_names.add(cn)
                 if not concept_names:
@@ -160,6 +240,30 @@ class ConceptShapes:
         _add_prop(shapes, concept_shape, CBML3.embeddingRow,
                   datatype=XSD.integer, min_inclusive=0, max_count=1)
 
+        # Stage 3: curated-vocab typing. Both predicates are optional
+        # (max_count=1, no min) — concepts not in the bundled vocab are
+        # still valid skos:Concept nodes.
+        _add_prop(shapes, concept_shape, CBML3.conceptKind,
+                  datatype=XSD.string, max_count=1,
+                  in_values=CONCEPT_KIND_LITERALS)
+        _add_prop(shapes, concept_shape, CBML3.broaderCollection,
+                  klass=SKOS.Collection, max_count=1)
+
+        # Stage 3: per-kind collection node shape. A collection is emitted
+        # only when at least one concept carries a `kind`; this shape
+        # validates its required predicates.
+        collection_shape = URIRef(f"{CBML3_NS}KindCollectionShape")
+        shapes.add((collection_shape, RDF.type, SH.NodeShape))
+        shapes.add((collection_shape, SH.targetClass, SKOS.Collection))
+
+        _add_prop(shapes, collection_shape, SKOS.prefLabel,
+                  min_count=1, max_count=1)
+        _add_prop(shapes, collection_shape, CBML3.conceptKindBacking,
+                  datatype=XSD.string, min_count=1, max_count=1,
+                  in_values=CONCEPT_KIND_LITERALS)
+        _add_prop(shapes, collection_shape, SKOS.member,
+                  klass=SKOS.Concept, min_count=1)
+
 
 def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,
               datatype: URIRef | None = None,
@@ -167,8 +271,10 @@ def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,
               min_count: int | None = None,
               max_count: int | None = None,
               min_inclusive: int | None = None,
-              pattern: str | None = None) -> None:
-    key = f"{parent}|{path}|{datatype}|{klass}|{min_count}|{max_count}|{min_inclusive}|{pattern}"
+              pattern: str | None = None,
+              in_values: tuple[str, ...] | None = None) -> None:
+    key = (f"{parent}|{path}|{datatype}|{klass}|{min_count}|{max_count}"
+           f"|{min_inclusive}|{pattern}|{in_values}")
     p_iri = URIRef(f"{CBML3_NS}_ps_{hashlib.sha1(key.encode()).hexdigest()[:16]}")
     g.add((parent, SH.property, p_iri))
     g.add((p_iri, SH.path, path))
@@ -184,3 +290,18 @@ def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,
         g.add((p_iri, SH.minInclusive, Literal(min_inclusive)))
     if pattern is not None:
         g.add((p_iri, SH.pattern, Literal(pattern)))
+    if in_values is not None:
+        # `sh:in` takes an RDF list. Build it as a fresh blank-list head.
+        from rdflib import BNode
+        from rdflib.namespace import RDF as _RDF
+        head: URIRef | BNode = BNode()
+        g.add((p_iri, SH["in"], head))
+        nodes: list[URIRef | BNode] = [head]
+        for _ in range(len(in_values) - 1):
+            nodes.append(BNode())
+        for i, val in enumerate(in_values):
+            g.add((nodes[i], _RDF.first, Literal(val)))
+            if i + 1 < len(in_values):
+                g.add((nodes[i], _RDF.rest, nodes[i + 1]))
+            else:
+                g.add((nodes[i], _RDF.rest, _RDF.nil))

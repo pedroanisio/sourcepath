@@ -1,10 +1,42 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, ConceptDetail as CCD } from "../api";
+import { api, ConceptDetail as CCD, ConceptKind } from "../api";
 import { useBundleVersion } from "../bundle-context";
 
 function fileLink(path: string) {
   return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+// Color the curated-vocab badge by kind so the three categories are
+// distinguishable at a glance. Uses CSS variables that the host theme
+// can override; falls back to inline color values otherwise.
+const KIND_COLORS: Record<ConceptKind, { bg: string; fg: string }> = {
+  "domain-primitive":     { bg: "#3a2645", fg: "#e6c7f0" },
+  "structural-primitive": { bg: "#24364a", fg: "#bcd6ec" },
+  "relational-primitive": { bg: "#2d3c2a", fg: "#cae0c0" },
+};
+
+function KindBadge({ kind, broader }: { kind: ConceptKind; broader?: string }) {
+  const c = KIND_COLORS[kind];
+  const title = broader
+    ? `Curated vocab: ${kind} (broader: ${broader})`
+    : `Curated vocab: ${kind}`;
+  return (
+    <span
+      className="tag"
+      title={title}
+      data-testid="concept-kind-badge"
+      data-kind={kind}
+      style={{
+        background: c.bg,
+        color: c.fg,
+        marginLeft: 8,
+        fontWeight: 600,
+      }}
+    >
+      {kind}
+    </span>
+  );
 }
 
 export default function ConceptDetail() {
@@ -27,6 +59,7 @@ export default function ConceptDetail() {
     <>
       <h2>
         <span className="tag">concept</span> {c.label}
+        {c.kind && <KindBadge kind={c.kind} broader={c.broader} />}
       </h2>
 
       <div className="card">
@@ -42,6 +75,18 @@ export default function ConceptDetail() {
           </dd>
           <dt>embedding row</dt>
           <dd>{c.embedding_row ?? "—"}</dd>
+          {c.kind && (
+            <>
+              <dt>kind</dt>
+              <dd>{c.kind}</dd>
+            </>
+          )}
+          {c.broader && (
+            <>
+              <dt>broader</dt>
+              <dd>{c.broader}</dd>
+            </>
+          )}
         </dl>
         {c.alt_labels.length > 0 && (
           <details style={{ marginTop: 10 }}>

@@ -33,7 +33,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--exclude", action="append", default=[],
                    help="POSIX-glob pattern; files matching are dropped. "
                         "Repeatable. Merged with patterns from <repo>/.cbmignore.")
+    p.add_argument("--concept-vocab", type=Path, default=None,
+                   help="Override the bundled L3 controlled vocabulary "
+                        "(YAML). When omitted, software_primitives.yaml is "
+                        "used. See codebase_mapper/vocab/loader.py.")
+    p.add_argument("--no-builtin-vocab", action="store_true",
+                   help="Disable typed concepts entirely. Emitted L3 graphs "
+                        "match pre-vocab bundles (no cbml3:conceptKind, no "
+                        "skos:Collection nodes).")
     args = p.parse_args(argv)
+
+    if args.concept_vocab and args.no_builtin_vocab:
+        p.error("--concept-vocab and --no-builtin-vocab are mutually exclusive")
 
     reset_registries()
 
@@ -44,7 +55,14 @@ def main(argv: list[str] | None = None) -> int:
             backend = chunks_embeddings.DeterministicHashBackend(args.hash_dim)
         chunks_embeddings.register_all(backend)
 
-    concept_graph.register_all()
+    if args.no_builtin_vocab:
+        l3_vocab = None
+    elif args.concept_vocab is not None:
+        from codebase_mapper.vocab import load_vocabulary
+        l3_vocab = load_vocabulary(args.concept_vocab.resolve())
+    else:
+        l3_vocab = concept_graph.USE_BUILTIN
+    concept_graph.register_all(vocab=l3_vocab)
 
     with resolve_repo_source(args.repo, args.state) as repo:
         repo_name = args.name or repo.name
