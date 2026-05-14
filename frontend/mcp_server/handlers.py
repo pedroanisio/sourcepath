@@ -386,7 +386,26 @@ def _repository_summary(args: dict[str, Any], default: str | None) -> dict[str, 
         ),
     }
 
-    return {
+    # Stage 4: top-N Rust attribute → count distribution. Computed
+    # from the sidecar payload loaded at bundle open. Pre-Stage-4
+    # bundles surface as None (no sidecar present); a Stage-4 bundle
+    # with no Rust code surfaces as an empty list.
+    rust_attr_dist: list[dict[str, Any]] | None
+    rust_items = getattr(b, "rust_items", None)
+    if rust_items is None:
+        rust_attr_dist = None
+    else:
+        attr_counter: dict[str, int] = {}
+        for item in rust_items:
+            for attr in item.get("attributes") or []:
+                attr_counter[attr] = attr_counter.get(attr, 0) + 1
+        ranked = sorted(
+            attr_counter.items(),
+            key=lambda kv: (-kv[1], kv[0]),
+        )[:20]
+        rust_attr_dist = [{"attribute": a, "count": c} for a, c in ranked]
+
+    payload: dict[str, Any] = {
         "bundle": bundle_info,
         "total_files": int(counts.get("files", 0)),
         "total_chunks": int(b.embeddings_meta.get("n_chunks", 0)),
@@ -400,6 +419,9 @@ def _repository_summary(args: dict[str, Any], default: str | None) -> dict[str, 
         "dependency_summary": dep_summary,
         "test_coverage_hint": test_hint,
     }
+    if rust_attr_dist is not None:
+        payload["rust_attribute_distribution"] = rust_attr_dist
+    return payload
 
 
 @tool("list_bundles")
@@ -807,3 +829,44 @@ def _concept_neighborhood(args: dict[str, Any], default: str | None) -> dict[str
     if kind_filter is not None:
         out["kind_filter"] = kind_filter
     return out
+
+
+@tool("items_by_attribute")
+def _items_by_attribute(args: dict[str, Any], default: str | None) -> dict[str, Any]:
+    """Stage 4: filter Rust items (from the rust_items.jsonl sidecar)
+    by attribute substring + optional kind. Returns at most ``limit``
+    items starting at ``offset``; the full filtered count is in
+    ``total``, with ``truncated`` flagging that more results exist."""
+    name = _pick_bundle_name(args, default)
+    pattern = args["pattern"]
+    kind = args.get("kind")
+    limit = int(args.get("limit", 50))
+    offset = int(args.get("offset", 0))
+    b = _get_bundle(name)
+
+    matches: list[dict[str, Any]] = []
+    for item in getattr(b, "rust_items", None) or []:
+        if kind is not None and item.get("kind") != kind:
+            continue
+        attrs = item.get("attributes") or []
+        if not any(pattern in a for a in attrs):
+            continue
+        matches.append({
+            "path": item["path"],
+            "kind": item["kind"],
+            "name": item["name"],
+            "parent": item.get("parent"),
+            "line_start": item.get("line_start"),
+            "line_end": item.get("line_end"),
+            "is_pub": bool(item.get("is_pub", False)),
+            "is_async": bool(item.get("is_async", False)),
+            "attributes": list(attrs),
+        })
+
+    total = len(matches)
+    page = matches[offset:offset + limit]
+    return {
+        "items": page,
+        "total": total,
+        "truncated": total > offset + len(page),
+    }

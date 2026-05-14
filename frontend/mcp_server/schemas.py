@@ -140,6 +140,16 @@ DESCRIPTIONS: dict[str, str] = {
         "Active bundle's run manifest: file counts, language/type histogram, "
         "embeddings backend, SHACL conformance. Cheap; safe to call any time."
     ),
+    "items_by_attribute": (
+        "ADVANCED. Filter Rust items (function/method/struct/enum/trait/impl/"
+        "mod/…) by attribute substring. Use to answer queries like \"every "
+        "#[test] function\", \"every #[derive(Debug, Clone)] struct\", "
+        "\"every #[tokio::test] async function\". The match is a case-"
+        "sensitive substring against the raw attribute text. Returns "
+        "pre-emitted facts from the bundle's rust_items.jsonl sidecar; "
+        "bundles built before Stage 4 (or with no attribute-bearing Rust "
+        "items) return an empty list."
+    ),
     "repository_summary": (
         "One-shot executive read of the active bundle: language/type histograms, "
         "the most-connected files by import degree, detected entry points, top "
@@ -405,6 +415,34 @@ INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "items_by_attribute": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["pattern"],
+        "properties": {
+            **_bundle_arg(),
+            "pattern": {
+                "type": "string", "minLength": 1, "maxLength": 200,
+                "description": (
+                    "Case-sensitive substring matched against the raw "
+                    "attribute text (e.g. ``#[test]``, ``#[derive(``, "
+                    "``tokio::test``)."
+                ),
+            },
+            "kind": {
+                "type": "string",
+                "enum": [
+                    "function", "method", "struct", "enum", "union",
+                    "trait", "impl", "mod", "type_alias", "const", "static",
+                ],
+                "description": (
+                    "Optional filter: only return items of this kind."
+                ),
+            },
+            "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+            "offset": {**_INT_GE_0, "default": 0},
+        },
+    },
 }
 
 
@@ -599,6 +637,55 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
                     },
                 },
             },
+            # Stage 4: top-N Rust attribute → count distribution. Omitted
+            # when not present (pre-Stage-4 bundles or bundles with no
+            # Rust code).
+            "rust_attribute_distribution": {
+                "type": ["array", "null"],
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["attribute", "count"],
+                    "properties": {
+                        "attribute": {"type": "string"},
+                        "count": _INT_GE_0,
+                    },
+                },
+            },
+        },
+    },
+    "items_by_attribute": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["items", "total"],
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "path", "kind", "name",
+                        "line_start", "line_end", "attributes",
+                    ],
+                    "properties": {
+                        "path": {"type": "string"},
+                        "kind": {"type": "string"},
+                        "name": {"type": "string"},
+                        "parent": {"type": ["string", "null"]},
+                        "line_start": {"type": ["integer", "null"]},
+                        "line_end": {"type": ["integer", "null"]},
+                        "is_pub": {"type": "boolean"},
+                        "is_async": {"type": "boolean"},
+                        "attributes": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                },
+            },
+            "total": _INT_GE_0,
+            "truncated": {"type": "boolean"},
         },
     },
     "select_bundle": {

@@ -65,6 +65,10 @@ class Bundle:
     xrefs: list[dict[str, Any]] = field(default_factory=list)
     xrefs_by_src_idx: dict[int, list[int]] = field(default_factory=dict)
     xrefs_by_dst_idx: dict[int, list[int]] = field(default_factory=dict)
+    # Stage 4: Rust items carrying at least one attribute. Pre-Stage-4
+    # bundles or bundles with no Rust code have empty defaults.
+    rust_items: list[dict[str, Any]] = field(default_factory=list)
+    rust_items_by_file: dict[str, list[int]] = field(default_factory=dict)
 
 
 def _resolve_file_type_uri(uri: str) -> str:
@@ -219,6 +223,10 @@ def load_bundle(output_dir: Path) -> Bundle:
         output_dir / "xrefs.jsonl", chunk_uri_to_idx,
     )
 
+    rust_items, rust_items_by_file = _load_rust_items(
+        output_dir / "rust_items.jsonl"
+    )
+
     return Bundle(
         output_dir=output_dir,
         manifest=manifest,
@@ -245,7 +253,39 @@ def load_bundle(output_dir: Path) -> Bundle:
         xrefs=xrefs,
         xrefs_by_src_idx=xrefs_by_src_idx,
         xrefs_by_dst_idx=xrefs_by_dst_idx,
+        rust_items=rust_items,
+        rust_items_by_file=rust_items_by_file,
     )
+
+
+def _load_rust_items(
+    sidecar_path: Path,
+) -> tuple[list[dict[str, Any]], dict[str, list[int]]]:
+    """Parse rust_items.jsonl into a flat list + per-file index.
+
+    Stage 4 sidecar. Each line is one Rust item with at least one
+    attribute, schema fixed by ``emit_bundle._emit_rust_items_sidecar``.
+    Returns ``([], {})`` when the sidecar is absent — pre-Stage-4
+    bundles have no rust_items.
+    """
+    items: list[dict[str, Any]] = []
+    by_file: dict[str, list[int]] = {}
+    if not sidecar_path.exists():
+        return items, by_file
+    for line in sidecar_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        path = row.get("path")
+        if not path:
+            continue
+        idx = len(items)
+        items.append(row)
+        by_file.setdefault(path, []).append(idx)
+    return items, by_file
 
 
 def _chunk_id_to_uri(chunk_id: str) -> str:

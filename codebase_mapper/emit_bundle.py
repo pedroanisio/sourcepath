@@ -84,6 +84,14 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
         for ae in iter_artifact_emitters():
             extension_fragments[ae.name] = ae.emit(out_dir, ctx)
 
+    # --- Stage 4: Rust items sidecar ---
+    # rust_items.jsonl: one line per Rust function/method/struct/enum/
+    # trait/impl/mod/etc. that carries at least one attribute. Lets the
+    # MCP layer answer "every #[test] function" / "every struct with
+    # #[derive(Debug, Clone)]" without re-parsing every ast_summary at
+    # query time. Always emitted (zero-byte file when no attributes).
+    rust_items_fragment = _emit_rust_items_sidecar(mapped["records"], out_dir)
+
     from pyshacl import validate
     conforms, _vg, report_text = validate(
         data_graph=inv, shacl_graph=shapes, inference="none",
@@ -162,6 +170,81 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
     }
     if extension_fragments:
         manifest["extensions"] = extension_fragments
+    if rust_items_fragment.get("n_items", 0) > 0:
+        # Surface sidecar stats in the manifest so consumers can detect
+        # its presence without listing the directory.
+        manifest["rust_items_sidecar"] = rust_items_fragment
     (out_dir / "run_manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return manifest
+
+
+# ---------------------------------------------------------------------------
+# Rust items sidecar (Stage 4)
+# ---------------------------------------------------------------------------
+
+
+_RUST_ITEMS_SIDECAR = "rust_items.jsonl"
+
+
+def _emit_rust_items_sidecar(records: list, out_dir: Path) -> dict:
+    """Write ``rust_items.jsonl`` listing every Rust item that carries
+    at least one attribute. Schema is one flat JSON object per line so
+    streaming readers don't need an indexer.
+
+    Returns a manifest fragment with counts. The file is always created
+    (zero-byte when no attributes) so the bundle contract is uniform.
+    """
+    sidecar = out_dir / _RUST_ITEMS_SIDECAR
+    rows: list[dict] = []
+    for r in records:
+        if getattr(r, "language", None) != "rust":
+            continue
+        if r.ast_summary is None:
+            continue
+        items = r.ast_summary.get("items") or []
+        for item in items:
+            attrs = item.get("attributes") or []
+            if not attrs:
+                continue
+            rows.append({
+                "path": r.path,
+                "kind": item.get("kind"),
+                "name": item.get("name"),
+                "parent": item.get("parent"),
+                "line_start": item.get("begin_line"),
+                "line_end": item.get("end_line"),
+                "byte_start": item.get("begin_byte"),
+                "byte_end": item.get("end_byte"),
+                "is_pub": bool(item.get("is_pub", False)),
+                "is_async": bool(item.get("is_async", False)),
+                "attributes": list(attrs),
+            })
+    # Deterministic sort: (path, line_start, name).
+    rows.sort(key=lambda r: (r["path"], r["line_start"] or 0, r["name"] or ""))
+
+    sidecar.write_text(
+        "".join(json.dumps(r, sort_keys=True, separators=(",", ":")) + "\n"
+                for r in rows)
+    )
+    sha = (hashlib.sha256(sidecar.read_bytes()).hexdigest()
+           if rows else hashlib.sha256(b"").hexdigest())
+
+    attr_counter: Counter = Counter()
+    for row in rows:
+        for attr in row["attributes"]:
+            attr_counter[attr] += 1
+
+    return {
+        "n_items": len(rows),
+        "n_files": len({r["path"] for r in rows}),
+        "by_kind": dict(Counter(r["kind"] for r in rows)),
+        "top_attributes": attr_counter.most_common(20),
+        "files": {
+            _RUST_ITEMS_SIDECAR: {
+                "path": _RUST_ITEMS_SIDECAR,
+                "sha256": sha,
+                "size_bytes": sidecar.stat().st_size,
+            },
+        },
+    }
