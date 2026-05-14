@@ -301,6 +301,7 @@ python tests/verify_rust_tests_edges.py     # Rust tests-edges use-analysis + in
 python tests/verify_rust_attribute_query.py # Rust attribute queryable surface (Stage 4)
 python tests/verify_rust_super_self.py      # Rust self::/super:: use-path resolution (Stage 5)
 python tests/verify_rust_regenerate.py      # Rust byte-identical regenerate (Stage 6)
+python tests/verify_rust_ast_body_count.py  # Rust ast_full_bodies counter (Stage 7)
 ```
 
 All verifiers resolve `repo_root` from their own `__file__`, so they
