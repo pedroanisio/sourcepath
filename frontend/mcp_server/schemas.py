@@ -140,6 +140,15 @@ DESCRIPTIONS: dict[str, str] = {
         "Active bundle's run manifest: file counts, language/type histogram, "
         "embeddings backend, SHACL conformance. Cheap; safe to call any time."
     ),
+    "repository_summary": (
+        "One-shot executive read of the active bundle: language/type histograms, "
+        "the most-connected files by import degree, detected entry points, top "
+        "concepts by frequency (with controlled-vocab kind when present), "
+        "dependency-edge counts, and a test-coverage hint. Use as the first "
+        "deep call after ``select_bundle`` when an agent wants the gist of the "
+        "repo in a single response — replaces a chain of ``bundle_summary`` + "
+        "``list_files`` + ``concept_detail`` calls."
+    ),
     "list_bundles": (
         "List every bundle available under the server's bundles root. Use to "
         "decide which bundle to ``select_bundle``."
@@ -232,6 +241,22 @@ INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
         "type": "object",
         "additionalProperties": False,
         "properties": _bundle_arg(),
+    },
+    "repository_summary": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            **_bundle_arg(),
+            "central_files_limit": {
+                "type": "integer", "minimum": 1, "maximum": 50, "default": 10,
+            },
+            "entry_points_limit": {
+                "type": "integer", "minimum": 1, "maximum": 50, "default": 10,
+            },
+            "key_concepts_limit": {
+                "type": "integer", "minimum": 1, "maximum": 100, "default": 20,
+            },
+        },
     },
     "list_bundles": {
         "type": "object",
@@ -476,6 +501,98 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             "bundles": {"type": "array", "items": _BUNDLE_INFO},
             "selected": {"type": ["string", "null"]},
             "bundles_root": {"type": "string"},
+        },
+    },
+    "repository_summary": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "bundle", "total_files", "total_chunks", "total_concepts",
+            "files_by_language", "files_by_type",
+            "central_files", "entry_points", "key_concepts",
+            "dependency_summary", "test_coverage_hint",
+        ],
+        "properties": {
+            "bundle": _BUNDLE_INFO,
+            "total_files": _INT_GE_0,
+            "total_chunks": _INT_GE_0,
+            "total_concepts": _INT_GE_0,
+            "shacl_conforms": {"type": ["boolean", "null"]},
+            "files_by_language": {
+                "type": "object",
+                "additionalProperties": {"type": "integer"},
+            },
+            "files_by_type": {
+                "type": "object",
+                "additionalProperties": {"type": "integer"},
+            },
+            "central_files": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["path", "import_degree"],
+                    "properties": {
+                        "path": {"type": "string"},
+                        "import_degree": _INT_GE_0,
+                        "imports_out": _INT_GE_0,
+                        "imports_in": _INT_GE_0,
+                        "language": {"type": ["string", "null"]},
+                        "type": {"type": ["string", "null"]},
+                        "size": {"type": ["integer", "null"]},
+                    },
+                },
+            },
+            "entry_points": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["path", "kind"],
+                    "properties": {
+                        "path": {"type": "string"},
+                        "kind": {"type": "string"},
+                        "language": {"type": ["string", "null"]},
+                    },
+                },
+            },
+            "key_concepts": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["name", "frequency"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "frequency": _INT_GE_0,
+                        "file_count": {"type": ["integer", "null"]},
+                        "kind": {"type": ["string", "null"]},
+                        "broader": {"type": ["string", "null"]},
+                    },
+                },
+            },
+            "dependency_summary": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["internal_imports", "external_imports"],
+                "properties": {
+                    "internal_imports": _INT_GE_0,
+                    "external_imports": _INT_GE_0,
+                    "declares_dependency": _INT_GE_0,
+                    "pins_dependency": _INT_GE_0,
+                },
+            },
+            "test_coverage_hint": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["test_files", "source_files"],
+                "properties": {
+                    "test_files": _INT_GE_0,
+                    "source_files": _INT_GE_0,
+                    "ratio": {"type": ["number", "null"]},
+                    "tests_edges": _INT_GE_0,
+                },
+            },
         },
     },
     "select_bundle": {

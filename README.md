@@ -282,6 +282,7 @@ python tests/verify_vocab_wiring.py         # controlled-vocab aggregator wiring
 python tests/verify_vocab_pipeline.py       # controlled-vocab end-to-end pipeline
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 python tests/verify_xsd_fixture.py          # static/schemas/ classifier coverage
+python tests/verify_repository_summary.py   # MCP repository_summary tool contract
 ```
 
 All verifiers resolve `repo_root` from their own `__file__`, so they

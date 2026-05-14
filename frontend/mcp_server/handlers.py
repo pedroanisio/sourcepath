@@ -233,6 +233,167 @@ def _bundle_summary(args: dict[str, Any], default: str | None) -> dict[str, Any]
     }
 
 
+_ENTRY_POINT_BASENAMES: dict[str, str] = {
+    "__main__.py": "python_main",
+    "main.py": "python_main",
+    "cli.py": "python_cli",
+    "app.py": "python_app",
+    "server.py": "python_app",
+    "main.rs": "rust_main",
+    "main.go": "go_main",
+    "index.js": "js_index",
+    "index.ts": "js_index",
+    "index.jsx": "js_index",
+    "index.tsx": "js_index",
+    "index.mjs": "js_index",
+}
+
+
+def _entry_point_kind(path: str, file_type: str | None) -> str | None:
+    """Heuristic classifier. Returns an entry-point kind tag or None.
+
+    Tags use the convention ``<language>_<role>``: ``python_main``,
+    ``python_cli``, ``python_app``, ``rust_main``, ``rust_bin``,
+    ``go_main``, ``js_index``.
+    """
+    from pathlib import PurePosixPath
+
+    p = PurePosixPath(path)
+    name = p.name
+    parts = p.parts
+
+    kind = _ENTRY_POINT_BASENAMES.get(name)
+    if kind is not None:
+        # Filter heuristic candidates that aren't source (e.g. test app.py)
+        if file_type == "source_code":
+            return kind
+        # __main__.py is reliably an entry point regardless of type
+        if name == "__main__.py":
+            return kind
+        return None
+
+    # Rust bin/ convention — files under .../bin/*.rs are alternative binaries.
+    if "bin" in parts and p.suffix == ".rs":
+        return "rust_bin"
+    # Generic bin/ entrypoint scripts (no suffix, in a bin/ dir).
+    if "bin" in parts and not p.suffix and file_type == "source_code":
+        return "shell_bin"
+    return None
+
+
+@tool("repository_summary")
+def _repository_summary(args: dict[str, Any], default: str | None) -> dict[str, Any]:
+    """One-shot executive read: combines bundle metadata + central files +
+    entry points + top concepts + dependency edge counts + test ratio.
+
+    Pure graph queries — no LLM, no extraction beyond what's already in the
+    emitted bundle. Deterministic for a given bundle state.
+    """
+    name = _pick_bundle_name(args, default)
+    b = _get_bundle(name)
+    m = b.manifest
+    counts = m.get("counts") or {}
+    files_by_type = m.get("files_by_type") or {}
+
+    central_limit = int(args.get("central_files_limit", 10))
+    entry_limit = int(args.get("entry_points_limit", 10))
+    concept_limit = int(args.get("key_concepts_limit", 20))
+
+    bundle_info = {
+        "name": b.output_dir.name,
+        "path": str(b.output_dir),
+        "repo_name": m.get("repo_name"),
+        "commit_sha": m.get("commit_sha"),
+        "generated_at": m.get("generated_at"),
+        "tool_version": m.get("tool_version"),
+        "files": counts.get("files"),
+    }
+
+    # Central files — ranked by combined in+out import degree.
+    central: list[dict[str, Any]] = []
+    for rec in b.files:
+        path = rec["path"]
+        out_deg = len(b.imports_out.get(path, []))
+        in_deg = len(b.imports_in.get(path, []))
+        deg = out_deg + in_deg
+        if deg == 0:
+            continue
+        central.append({
+            "path": path,
+            "import_degree": deg,
+            "imports_out": out_deg,
+            "imports_in": in_deg,
+            "language": rec.get("language"),
+            "type": rec.get("type"),
+            "size": rec.get("size"),
+        })
+    central.sort(key=lambda r: (-r["import_degree"], r["path"]))
+    central = central[:central_limit]
+
+    # Entry points — heuristic; ranked by path for stable output.
+    entry: list[dict[str, Any]] = []
+    for rec in b.files:
+        kind = _entry_point_kind(rec["path"], rec.get("type"))
+        if kind is None:
+            continue
+        entry.append({
+            "path": rec["path"],
+            "kind": kind,
+            "language": rec.get("language"),
+        })
+    entry.sort(key=lambda r: r["path"])
+    entry = entry[:entry_limit]
+
+    # Key concepts — ranked by frequency descending. Surface curated-vocab
+    # typing (kind, broader) when present.
+    concepts_dict = b.concepts.get("concepts", {}) or {}
+    ranked = sorted(
+        concepts_dict.items(),
+        key=lambda kv: (-int(kv[1].get("frequency", 0)), kv[0]),
+    )
+    key_concepts: list[dict[str, Any]] = []
+    for cname, crec in ranked[:concept_limit]:
+        item: dict[str, Any] = {
+            "name": cname,
+            "frequency": int(crec.get("frequency", 0)),
+            "file_count": crec.get("file_count"),
+            "kind": crec.get("kind"),
+            "broader": crec.get("broader"),
+        }
+        key_concepts.append(item)
+
+    dep_summary = {
+        "internal_imports": int(counts.get("import_edges", 0)),
+        "external_imports": int(counts.get("import_external_edges", 0)),
+        "declares_dependency": int(counts.get("declares_dependency_edges", 0)),
+        "pins_dependency": int(counts.get("pins_dependency_edges", 0)),
+    }
+
+    src_files = int(files_by_type.get("source_code", 0))
+    test_files = int(files_by_type.get("test_code", 0))
+    test_hint = {
+        "test_files": test_files,
+        "source_files": src_files,
+        "ratio": (test_files / src_files) if src_files > 0 else None,
+        "tests_edges": int(counts.get("tests_edges", 0)),
+    }
+
+    return {
+        "bundle": bundle_info,
+        "total_files": int(counts.get("files", 0)),
+        "total_chunks": int(b.embeddings_meta.get("n_chunks", 0)),
+        "total_concepts": len(concepts_dict),
+        "shacl_conforms": (m.get("shacl_self_check") or {}).get("conforms"),
+        "files_by_language": m.get("files_by_language", {}),
+        "files_by_type": files_by_type,
+        "central_files": central,
+        "entry_points": entry,
+        "key_concepts": key_concepts,
+        "dependency_summary": dep_summary,
+        "test_coverage_hint": test_hint,
+    }
+
+
 @tool("list_bundles")
 def _list_bundles(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     return {
