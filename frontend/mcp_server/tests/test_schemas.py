@@ -125,6 +125,7 @@ def test_output_objects_have_explicit_additional_properties_policy(tool):
 VALID_INPUTS: dict[str, dict] = {
     "orient_bundle": {},
     "bundle_summary": {},
+    "repository_summary": {"central_files_limit": 5},
     "list_bundles": {},
     "select_bundle": {"bundle": "alpha"},
     "list_files": {"language": "python", "limit": 10},
@@ -139,6 +140,7 @@ VALID_INPUTS: dict[str, dict] = {
     "concept_detail": {"name": "schema"},
     "concept_neighborhood": {"name": "schema", "depth": 2, "limit": 30},
     "sparql": {"query": "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 1"},
+    "items_by_attribute": {"pattern": "#[test]", "kind": "function"},
 }
 
 # (tool, bad_payload, expected error fragment)
@@ -196,6 +198,50 @@ VALID_OUTPUTS: dict[str, dict] = {
         "n_chunks": 200,
         "n_concepts": 50,
         "output_dir": "/data/alpha",
+    },
+    "repository_summary": {
+        "bundle": {"name": "alpha", "path": "/data/alpha"},
+        "total_files": 100,
+        "total_chunks": 200,
+        "total_concepts": 50,
+        "files_by_language": {"python": 60},
+        "files_by_type": {"source_code": 80},
+        "central_files": [{
+            "path": "src/app.py",
+            "import_degree": 7,
+            "imports_out": 3,
+            "imports_in": 4,
+            "language": "python",
+            "type": "source_code",
+            "size": 1024,
+            # Optional L4 field (Step 7).
+            "llm_summary": "Defines the application entry point.",
+        }],
+        "entry_points": [{
+            "path": "src/__main__.py",
+            "kind": "python_main",
+            "language": "python",
+        }],
+        "key_concepts": [{
+            "name": "schema",
+            "frequency": 5,
+            "file_count": 2,
+            "kind": "structural-primitive",
+            "broader": "code_structure",
+            "llm_description": "Schema concept describing entity contracts.",
+        }],
+        "dependency_summary": {
+            "internal_imports": 12,
+            "external_imports": 5,
+            "declares_dependency": 2,
+            "pins_dependency": 2,
+        },
+        "test_coverage_hint": {
+            "test_files": 20,
+            "source_files": 80,
+            "ratio": 0.25,
+            "tests_edges": 15,
+        },
     },
     "list_bundles": {
         "bundles": [{"name": "alpha", "path": "/data/alpha", "files": 10}],
@@ -255,6 +301,20 @@ VALID_OUTPUTS: dict[str, dict] = {
         "truncated": False,
         "query_form": "SELECT",
         "ask_result": None,
+    },
+    "items_by_attribute": {
+        "items": [{
+            "path": "src/lib.rs",
+            "kind": "function",
+            "name": "test_thing",
+            "parent": None,
+            "line_start": 10,
+            "line_end": 20,
+            "is_pub": False,
+            "is_async": False,
+            "attributes": ["#[test]"],
+        }],
+        "total": 1,
     },
 }
 

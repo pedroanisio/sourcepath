@@ -52,6 +52,20 @@ export interface ChunkRow {
   resolver?: string;
 }
 
+// L4 enrichment payload. Surfaced as an optional field on detail
+// endpoints when the bundle was emitted with `--llm-enrich` and the
+// relevant scope opted in. Provenance fields let consumers detect
+// drift across re-emits (different model, different prompt version).
+export interface LlmEnrichment {
+  text: string;
+  provenance: {
+    model: string;
+    prompt_sha: string;
+    target_sha: string;
+    generated_at: string;
+  };
+}
+
 export interface FileDetail {
   file: {
     path: string;
@@ -76,6 +90,11 @@ export interface FileDetail {
   // provenance (xref_kind/resolution/resolver) wins.
   xrefs_out?: ChunkRow[];
   xrefs_in?: ChunkRow[];
+  // L4 enrichments — both optional. `llm_summary` is the file-purpose
+  // sentence; `llm_schema_purpose` is the schema-file paragraph for
+  // files under static/schemas/. Absent on pre-L4 bundles.
+  llm_summary?: LlmEnrichment;
+  llm_schema_purpose?: LlmEnrichment;
 }
 
 export interface FileImpact {
@@ -150,6 +169,9 @@ export interface ConceptDetail {
   components: string[];
   file_count_total: number;
   chunk_count_total: number;
+  // L4 enrichment — present on curated-vocab (typed) concepts in
+  // bundles built with `--llm-enrich --llm-scope concepts`.
+  llm_description?: LlmEnrichment;
 }
 
 export interface ChunkListResp {

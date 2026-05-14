@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ConceptDetail as CCD, ConceptKind } from "../api";
 import { useBundleVersion } from "../bundle-context";
+import LlmEnrichmentCard from "../components/LlmEnrichmentCard";
 
 function fileLink(path: string) {
   return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
@@ -103,6 +104,11 @@ export default function ConceptDetail() {
           </details>
         )}
       </div>
+
+      <LlmEnrichmentCard
+        label="LLM description"
+        enrichment={d.llm_description}
+      />
 
       {d.components.length > 0 && (
         <div className="card">

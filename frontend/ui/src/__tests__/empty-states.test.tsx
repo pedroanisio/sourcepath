@@ -570,6 +570,96 @@ describe("ConceptDetail — curated-vocab typing", () => {
   });
 });
 
+// ----- Step 7: L4 enrichment cards on FileDetail / ConceptDetail -------
+
+describe("L4 enrichment surface — FileDetail llm_summary", () => {
+  // The fixture's contentSha256 is "a".repeat(64); pick different
+  // SHAs for our provenance so the assertions can target each
+  // element uniquely.
+  const promptSha = "e".repeat(64);
+  const targetSha = "f".repeat(64);
+  const enriched = {
+    ...fileDetailFixture,
+    llm_summary: {
+      text: "This file defines an authenticator class with token validation.",
+      provenance: {
+        model: "qwen2.5-coder:7b",
+        prompt_sha: promptSha,
+        target_sha: targetSha,
+        generated_at: "2026-05-14T10:00:00Z",
+      },
+    },
+  };
+
+  it("renders the LLM summary card with the AI-enriched badge", async () => {
+    mockFetch([[/^\/api\/file\//, enriched]]);
+    renderAt("/file/a.py");
+
+    const card = await screen.findByTestId("llm-enrichment-card");
+    expect(card).toHaveTextContent("This file defines an authenticator class");
+    expect(card.getAttribute("data-model")).toBe("qwen2.5-coder:7b");
+    // Badge text is "AI-enriched".
+    expect(screen.getByText("AI-enriched")).toBeInTheDocument();
+  });
+
+  it("hides the LLM card entirely when llm_summary is absent", async () => {
+    mockFetch([[/^\/api\/file\//, fileDetailFixture]]);
+    renderAt("/file/a.py");
+    // Wait for the heading to render so the data has loaded.
+    await screen.findByRole("heading", { name: /a\.py/ });
+    expect(
+      screen.queryByTestId("llm-enrichment-card"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("AI-enriched")).not.toBeInTheDocument();
+  });
+
+  it("exposes provenance under a collapsible details element", async () => {
+    mockFetch([[/^\/api\/file\//, enriched]]);
+    renderAt("/file/a.py");
+    await screen.findByTestId("llm-enrichment-card");
+    // The provenance fields live inside a <details> so they're hidden
+    // by default but present in the DOM.
+    expect(screen.getByText("qwen2.5-coder:7b")).toBeInTheDocument();
+    expect(screen.getByText(promptSha)).toBeInTheDocument();
+    expect(screen.getByText(targetSha)).toBeInTheDocument();
+  });
+});
+
+describe("L4 enrichment surface — ConceptDetail llm_description", () => {
+  it("renders the description card on a curated concept", async () => {
+    mockFetch([
+      [
+        /^\/api\/concept\//,
+        {
+          ...typedConceptDetailFixture,
+          llm_description: {
+            text: "In this codebase, 'behavior' captures the intent-first action pattern.",
+            provenance: {
+              model: "qwen2.5-coder:7b",
+              prompt_sha: "c".repeat(64),
+              target_sha: "d".repeat(64),
+              generated_at: "2026-05-14T10:01:00Z",
+            },
+          },
+        },
+      ],
+    ]);
+    renderAt("/concept/behavior");
+    const card = await screen.findByTestId("llm-enrichment-card");
+    expect(card).toHaveTextContent("intent-first action pattern");
+    expect(screen.getByText("AI-enriched")).toBeInTheDocument();
+  });
+
+  it("hides the description card on an untyped concept without llm_description", async () => {
+    mockFetch([[/^\/api\/concept\//, conceptDetailFixture]]);
+    renderAt("/concept/schema");
+    await screen.findByRole("heading", { name: /schema/ });
+    expect(
+      screen.queryByTestId("llm-enrichment-card"),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("ChunkSearch — submit guards", () => {
   it("ignores empty-query submission (no /api/chunks/search call)", async () => {
     const searchCalls: string[] = [];

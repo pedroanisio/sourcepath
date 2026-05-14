@@ -330,6 +330,16 @@ def _repository_summary(args: dict[str, Any], default: str | None) -> dict[str, 
     central.sort(key=lambda r: (-r["import_degree"], r["path"]))
     central = central[:central_limit]
 
+    # L4 enrichment surface (Step 7): attach an llm_summary string to
+    # each central file when the bundle carries one. We surface only
+    # the text, not the full provenance — repository_summary is an
+    # executive read, not a deep call. Clients wanting the
+    # model/prompt_sha can follow up with file_detail.
+    for entry_dict in central:
+        fs = b.enrichment_file_summary.get(entry_dict["path"])
+        if fs and fs.get("text"):
+            entry_dict["llm_summary"] = fs["text"]
+
     # Entry points — heuristic; ranked by path for stable output.
     entry: list[dict[str, Any]] = []
     for rec in b.files:
@@ -360,6 +370,12 @@ def _repository_summary(args: dict[str, Any], default: str | None) -> dict[str, 
             "kind": crec.get("kind"),
             "broader": crec.get("broader"),
         }
+        # L4 enrichment surface (Step 7): attach the concept's LLM
+        # description text when present. Same projection rule as for
+        # central files — text only, full provenance via concept_detail.
+        cd = b.enrichment_concept_description.get(cname)
+        if cd and cd.get("text"):
+            item["llm_description"] = cd["text"]
         key_concepts.append(item)
 
     dep_summary = {
@@ -495,7 +511,7 @@ def _file_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]:
         _chunk_row(b.chunks[i]) for i in chunk_idxs
     ]
     concepts = list((b.concepts.get("per_path_concepts") or {}).get(path, []))
-    return {
+    payload: dict[str, Any] = {
         "file": _file_record(rec),
         "imports_out": sorted(b.imports_out.get(path, [])),
         "imports_in": sorted(b.imports_in.get(path, [])),
@@ -503,6 +519,36 @@ def _file_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]:
         "tested_subjects": sorted(b.subjects_for_test.get(path, [])),
         "chunks": chunks,
         "concepts": concepts,
+    }
+    # L4 surfaces (Step 7). Two possible attributes per file: an LLM
+    # summary of the source file (file_summary kind), or — for schema
+    # files under static/schemas/ — a purpose statement
+    # (schema_purpose kind). Both are absent on pre-L4 bundles or
+    # files that weren't enriched.
+    fs = b.enrichment_file_summary.get(path)
+    if fs:
+        payload["llm_summary"] = _llm_payload(fs)
+    sp = b.enrichment_schema_purpose.get(path)
+    if sp:
+        payload["llm_schema_purpose"] = _llm_payload(sp)
+    return payload
+
+
+def _llm_payload(row: dict[str, Any]) -> dict[str, Any]:
+    """Project an enrichments.jsonl row to the MCP output shape.
+
+    Drops the sidecar's bookkeeping fields (``v``, ``kind``,
+    ``was_cache_hit``, raw ``target``) and keeps only the
+    consumer-facing pieces: text + provenance. Provenance is grouped
+    under a sub-dict so the top-level shape stays compact."""
+    return {
+        "text": row.get("text", ""),
+        "provenance": {
+            "model": row.get("model", ""),
+            "prompt_sha": row.get("prompt_sha", ""),
+            "target_sha": row.get("target_sha", ""),
+            "generated_at": row.get("generated_at", ""),
+        },
     }
 
 
@@ -742,7 +788,7 @@ def _concept_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]
         concept_payload["kind"] = c["kind"]
     if "broader" in c:
         concept_payload["broader"] = c["broader"]
-    return {
+    payload: dict[str, Any] = {
         "concept": concept_payload,
         "files": files,
         "cooccurring": cooc,
@@ -751,6 +797,13 @@ def _concept_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]
         "file_count_total": total_files,
         "chunk_count_total": len(b.concept_chunks.get(concept_name, [])),
     }
+    # L4 surface (Step 7): concept_description enrichments live on
+    # the concept's canonical name. Curated-vocab concepts (those with
+    # cbml3:conceptKind) are the only ones enriched today.
+    cd = b.enrichment_concept_description.get(concept_name)
+    if cd:
+        payload["llm_description"] = _llm_payload(cd)
+    return payload
 
 
 @tool("sparql")

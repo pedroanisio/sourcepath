@@ -69,6 +69,13 @@ class Bundle:
     # bundles or bundles with no Rust code have empty defaults.
     rust_items: list[dict[str, Any]] = field(default_factory=list)
     rust_items_by_file: dict[str, list[int]] = field(default_factory=dict)
+    # L4 enrichment layer (cbml4: predicates). Three buckets keyed by
+    # the enrichment target. Pre-L4 bundles and bundles emitted without
+    # the L4 scope opted in carry empty defaults — endpoints just
+    # return no llm_* fields.
+    enrichment_file_summary: dict[str, dict[str, Any]] = field(default_factory=dict)
+    enrichment_concept_description: dict[str, dict[str, Any]] = field(default_factory=dict)
+    enrichment_schema_purpose: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 def _resolve_file_type_uri(uri: str) -> str:
@@ -227,6 +234,10 @@ def load_bundle(output_dir: Path) -> Bundle:
         output_dir / "rust_items.jsonl"
     )
 
+    enrich_fs, enrich_cd, enrich_sp = _load_enrichments(
+        output_dir / "enrichments.jsonl"
+    )
+
     return Bundle(
         output_dir=output_dir,
         manifest=manifest,
@@ -255,6 +266,9 @@ def load_bundle(output_dir: Path) -> Bundle:
         xrefs_by_dst_idx=xrefs_by_dst_idx,
         rust_items=rust_items,
         rust_items_by_file=rust_items_by_file,
+        enrichment_file_summary=enrich_fs,
+        enrichment_concept_description=enrich_cd,
+        enrichment_schema_purpose=enrich_sp,
     )
 
 
@@ -296,6 +310,49 @@ def _chunk_id_to_uri(chunk_id: str) -> str:
     chunks_by_uri so the backend doesn't need to keep two parallel maps.
     """
     return f"{CBMI_NS}chunk/{urllib.parse.quote(chunk_id, safe='')}"
+
+
+def _load_enrichments(
+    sidecar_path: Path,
+) -> tuple[dict[str, dict[str, Any]],
+           dict[str, dict[str, Any]],
+           dict[str, dict[str, Any]]]:
+    """Partition enrichments.jsonl rows into per-kind dicts.
+
+    Returns ``(file_summary, concept_description, schema_purpose)``
+    where each is keyed by the row's ``target`` field. Missing file,
+    empty file, or malformed rows are tolerated — the backend's L4
+    surface is opt-in and silently absent on pre-L4 bundles.
+
+    Each value is the full sidecar row: ``{target, kind, text, model,
+    prompt_sha, target_sha, generated_at}``. The MCP handlers project
+    that to a friendlier client shape; the backend just preserves it.
+    """
+    fs: dict[str, dict[str, Any]] = {}
+    cd: dict[str, dict[str, Any]] = {}
+    sp: dict[str, dict[str, Any]] = {}
+    if not sidecar_path.exists():
+        return fs, cd, sp
+    for line in sidecar_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        kind = row.get("kind")
+        target = row.get("target")
+        if not kind or not target:
+            continue
+        if kind == "file_summary":
+            fs[target] = row
+        elif kind == "concept_description":
+            cd[target] = row
+        elif kind == "schema_purpose":
+            sp[target] = row
+        # Unknown kinds are silently dropped — forward-compat with
+        # future enrichment kinds the backend doesn't know about yet.
+    return fs, cd, sp
 
 
 def _load_xrefs(

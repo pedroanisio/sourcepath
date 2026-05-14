@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, ChunkRow, FileDetail as FD, FileImpact } from "../api";
 import { useBundleVersion } from "../bundle-context";
+import LlmEnrichmentCard from "../components/LlmEnrichmentCard";
 
 function fileLink(path: string) {
   return `/file/${path.split("/").map(encodeURIComponent).join("/")}`;
@@ -47,6 +48,12 @@ export default function FileDetail() {
           <dd style={{ wordBreak: "break-all" }}>{d.file.contentSha256 ?? "—"}</dd>
         </dl>
       </div>
+
+      <LlmEnrichmentCard label="LLM summary" enrichment={d.llm_summary} />
+      <LlmEnrichmentCard
+        label="LLM schema purpose"
+        enrichment={d.llm_schema_purpose}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div className="card">

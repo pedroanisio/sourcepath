@@ -95,6 +95,35 @@ _FILE_RECORD: dict[str, Any] = {
     },
 }
 
+# L4 enrichment payload (Step 7). Surfaced as optional fields on
+# file_detail (llm_summary, llm_schema_purpose) and concept_detail
+# (llm_description). The text field carries the model output; the
+# provenance sub-dict carries the model name + prompt-version + content
+# hashes + generation timestamp so consumers can detect drift across
+# re-emits.
+_LLM_ENRICHMENT: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["text", "provenance"],
+    "properties": {
+        "text": {"type": "string"},
+        "provenance": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "model", "prompt_sha", "target_sha", "generated_at",
+            ],
+            "properties": {
+                "model": {"type": "string"},
+                "prompt_sha": {"type": "string"},
+                "target_sha": {"type": "string"},
+                "generated_at": {"type": "string"},
+            },
+        },
+    },
+}
+
+
 _BUNDLE_INFO: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -175,7 +204,11 @@ DESCRIPTIONS: dict[str, str] = {
     "file_detail": (
         "Inspect a single file: metadata, imports (both directions), tests "
         "that exercise it, chunks, and concepts it lexicalizes. Use when you "
-        "have a known path and want everything about it."
+        "have a known path and want everything about it. Bundles built "
+        "with ``--llm-enrich --llm-scope files`` also carry an "
+        "``llm_summary`` (any source file) and/or ``llm_schema_purpose`` "
+        "(schemas under static/schemas/) — each an object with the LLM "
+        "text plus model/prompt provenance."
     ),
     "file_impact": (
         "Transitive dependency closure for a file up to ``depth``: every "
@@ -215,7 +248,10 @@ DESCRIPTIONS: dict[str, str] = {
         "cooccurring concepts, files and chunks that lexicalize it. "
         "Concepts from the curated vocabulary also report ``kind`` "
         "(``domain-primitive`` | ``structural-primitive`` | "
-        "``relational-primitive``) and the ``broader`` collection name."
+        "``relational-primitive``) and the ``broader`` collection name. "
+        "Bundles built with ``--llm-enrich --llm-scope concepts`` also "
+        "carry an ``llm_description`` object with an LLM-authored "
+        "paragraph plus model/prompt provenance."
     ),
     "concept_neighborhood": (
         "k-hop cooccurrence expansion from a concept. Use to explore the "
@@ -578,6 +614,9 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
                         "language": {"type": ["string", "null"]},
                         "type": {"type": ["string", "null"]},
                         "size": {"type": ["integer", "null"]},
+                        # L4 surface — short LLM summary text. Full
+                        # provenance available via file_detail.
+                        "llm_summary": {"type": "string"},
                     },
                 },
             },
@@ -606,6 +645,9 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
                         "file_count": {"type": ["integer", "null"]},
                         "kind": {"type": ["string", "null"]},
                         "broader": {"type": ["string", "null"]},
+                        # L4 surface — short LLM description text.
+                        # Full provenance available via concept_detail.
+                        "llm_description": {"type": "string"},
                     },
                 },
             },
@@ -716,6 +758,10 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             "tested_subjects": {"type": "array", "items": {"type": "string"}},
             "chunks": {"type": "array", "items": _CHUNK_ROW},
             "concepts": {"type": "array", "items": {"type": "string"}},
+            # L4 surfaces — both optional, present only when the
+            # bundle carries cbml4: enrichments for this path.
+            "llm_summary": _LLM_ENRICHMENT,
+            "llm_schema_purpose": _LLM_ENRICHMENT,
         },
     },
     "file_impact": {
@@ -849,6 +895,9 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             "components": {"type": "array", "items": {"type": "string"}},
             "file_count_total": {"type": "integer", "minimum": 0},
             "chunk_count_total": {"type": "integer", "minimum": 0},
+            # L4 surface — optional, present only when the bundle
+            # carries a cbml4:conceptDescription for this concept.
+            "llm_description": _LLM_ENRICHMENT,
         },
     },
     "concept_neighborhood": {
