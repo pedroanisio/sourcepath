@@ -32,3 +32,4 @@ frontend/ui/node_modules/
 # Local env config (the committed convention is .env.example)
 .env
 *.env.local
+.agent-tasks/
