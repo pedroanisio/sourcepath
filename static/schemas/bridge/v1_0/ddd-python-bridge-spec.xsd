@@ -1,0 +1,1020 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="https://schema.ddd-python.org/bridge/v1.0"
+           xmlns:bridge="https://schema.ddd-python.org/bridge/v1.0"
+           xmlns:ddd="https://schema.ddd-python.org/v3.0.0"
+           xmlns:py="http://schemas.python.org/metacode/v1.3"
+           elementFormDefault="qualified"
+           version="1.0.0">
+
+  <!-- ============================================== -->
+  <!-- Root Element                                   -->
+  <!-- ============================================== -->
+  
+  <xs:element name="ddd_python_bridge" type="bridge:BridgeSpecificationType"/>
+
+  <!-- ============================================== -->
+  <!-- Main Bridge Specification                      -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="BridgeSpecificationType">
+    <xs:sequence>
+      <xs:element name="metadata" type="bridge:MetadataType"/>
+      <xs:element name="mappings" type="bridge:MappingsType"/>
+      <xs:element name="transformations" type="bridge:TransformationsType"/>
+      <xs:element name="generators" type="bridge:GeneratorsType"/>
+      <xs:element name="validators" type="bridge:ValidatorsType"/>
+      <xs:element name="synchronization" type="bridge:SynchronizationType"/>
+    </xs:sequence>
+    <xs:attribute name="version" type="xs:string" use="required"/>
+    <xs:attribute name="strictMode" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- ============================================== -->
+  <!-- Metadata                                       -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="MetadataType">
+    <xs:sequence>
+      <xs:element name="dddSchemaVersion" type="xs:string"/>
+      <xs:element name="pythonMetacodeVersion" type="xs:string"/>
+      <xs:element name="projectName" type="xs:string"/>
+      <xs:element name="generatedAt" type="xs:dateTime" minOccurs="0"/>
+      <xs:element name="configuration" type="bridge:ConfigurationType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConfigurationType">
+    <xs:all>
+      <xs:element name="namingConvention" type="bridge:NamingConventionType" minOccurs="0"/>
+      <xs:element name="generationStrategy" type="bridge:GenerationStrategyType" minOccurs="0"/>
+      <xs:element name="validationLevel" type="bridge:ValidationLevelType" minOccurs="0"/>
+      <xs:element name="aiAssistance" type="bridge:AIAssistanceConfigType" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- ============================================== -->
+  <!-- Concept Mappings                               -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="MappingsType">
+    <xs:sequence>
+      <xs:element name="conceptMap" type="bridge:ConceptMapType" maxOccurs="unbounded"/>
+      <xs:element name="typeMap" type="bridge:TypeMapType" maxOccurs="unbounded"/>
+      <xs:element name="patternMap" type="bridge:PatternMapType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConceptMapType">
+    <xs:sequence>
+      <xs:element name="dddConcept" type="bridge:DDDConceptReferenceType"/>
+      <xs:element name="pythonImplementation" type="bridge:PythonImplementationType"/>
+      <xs:element name="transformationRules" type="bridge:TransformationRulesType" minOccurs="0"/>
+      <xs:element name="constraints" type="bridge:MappingConstraintsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="bidirectional" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <xs:complexType name="DDDConceptReferenceType">
+    <xs:sequence>
+      <xs:element name="conceptType" type="bridge:DDDConceptTypeEnum"/>
+      <xs:element name="schemaPath" type="xs:string"/>
+      <xs:element name="contextPath" type="xs:string" minOccurs="0"/>
+      <xs:element name="properties" type="bridge:PropertiesType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="PythonImplementationType">
+    <xs:sequence>
+      <xs:element name="targetType" type="bridge:PythonTargetTypeEnum"/>
+      <xs:element name="modulePath" type="xs:string"/>
+      <xs:element name="decorators" type="bridge:DecoratorMappingType" minOccurs="0"/>
+      <xs:element name="baseClasses" type="bridge:BaseClassMappingType" minOccurs="0"/>
+      <xs:element name="codeGenStrategy" type="bridge:CodeGenStrategyType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ============================================== -->
+  <!-- Transformation Rules                           -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="TransformationsType">
+    <xs:sequence>
+      <xs:element name="rule" type="bridge:TransformationRuleType" maxOccurs="unbounded"/>
+      <xs:element name="pipeline" type="bridge:TransformationPipelineType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TransformationRuleType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <cs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="source" type="bridge:TransformationSourceType"/>
+      <xs:element name="target" type="bridge:TransformationTargetType"/>
+      <xs:element name="mapping" type="bridge:MappingExpressionType"/>
+      <xs:element name="validation" type="bridge:ValidationExpressionType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="priority" type="xs:integer" default="0"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+  </xs:complexType>
+
+  <!-- ============================================== -->
+  <!-- Code Generators                                -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="GeneratorsType">
+    <xs:sequence>
+      <xs:element name="aggregateGenerator" type="bridge:AggregateGeneratorType"/>
+      <xs:element name="entityGenerator" type="bridge:EntityGeneratorType"/>
+      <xs:element name="valueObjectGenerator" type="bridge:ValueObjectGeneratorType"/>
+      <xs:element name="repositoryGenerator" type="bridge:RepositoryGeneratorType"/>
+      <xs:element name="serviceGenerator" type="bridge:ServiceGeneratorType"/>
+      <xs:element name="eventGenerator" type="bridge:EventGeneratorType"/>
+      <xs:element name="commandGenerator" type="bridge:CommandGeneratorType"/>
+      <xs:element name="queryGenerator" type="bridge:QueryGeneratorType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AggregateGeneratorType">
+    <xs:sequence>
+      <xs:element name="template" type="bridge:CodeTemplateType"/>
+      <xs:element name="invariantMapping" type="bridge:InvariantMappingType"/>
+      <xs:element name="lifecycleHooks" type="bridge:LifecycleHookMappingType" minOccurs="0"/>
+      <xs:element name="stateManagement" type="bridge:StateManagementType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CodeTemplateType">
+    <xs:sequence>
+      <xs:element name="imports" type="xs:string"/>
+      <xs:element name="classDefinition" type="xs:string"/>
+      <xs:element name="methodTemplates" type="bridge:MethodTemplatesType"/>
+      <xs:element name="contextInjection" type="bridge:ContextInjectionType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ============================================== -->
+  <!-- Validation                                     -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="ValidatorsType">
+    <xs:sequence>
+      <xs:element name="structuralValidator" type="bridge:StructuralValidatorType"/>
+      <xs:element name="semanticValidator" type="bridge:SemanticValidatorType"/>
+      <xs:element name="consistencyValidator" type="bridge:ConsistencyValidatorType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="StructuralValidatorType">
+    <xs:sequence>
+      <xs:element name="rule" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="dddPath" type="xs:string"/>
+            <xs:element name="pythonPath" type="xs:string"/>
+            <xs:element name="assertion" type="xs:string"/>
+            <xs:element name="errorMessage" type="xs:string"/>
+          </xs:sequence>
+          <xs:attribute name="severity" type="bridge:SeverityType" default="error"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ============================================== -->
+  <!-- Synchronization                                -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="SynchronizationType">
+    <xs:sequence>
+      <xs:element name="strategy" type="bridge:SyncStrategyType"/>
+      <xs:element name="conflictResolution" type="bridge:ConflictResolutionType"/>
+      <xs:element name="versionControl" type="bridge:VersionControlType" minOccurs="0"/>
+      <xs:element name="changeTracking" type="bridge:ChangeTrackingType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SyncStrategyType">
+    <xs:all>
+      <xs:element name="mode" type="bridge:SyncModeEnum"/>
+      <xs:element name="direction" type="bridge:SyncDirectionEnum"/>
+      <xs:element name="frequency" type="xs:string" minOccurs="0"/>
+      <xs:element name="triggers" type="bridge:SyncTriggersType" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- ============================================== -->
+  <!-- Enumerations                                   -->
+  <!-- ============================================== -->
+  
+  <xs:simpleType name="DDDConceptTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="bounded_context"/>
+      <xs:enumeration value="aggregate"/>
+      <xs:enumeration value="entity"/>
+      <xs:enumeration value="value_object"/>
+      <xs:enumeration value="domain_service"/>
+      <xs:enumeration value="domain_event"/>
+      <xs:enumeration value="repository"/>
+      <xs:enumeration value="specification"/>
+      <xs:enumeration value="policy"/>
+      <xs:enumeration value="factory"/>
+      <xs:enumeration value="command"/>
+      <xs:enumeration value="query"/>
+      <xs:enumeration value="saga"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PythonTargetTypeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="module"/>
+      <xs:enumeration value="class"/>
+      <xs:enumeration value="function"/>
+      <xs:enumeration value="protocol"/>
+      <xs:enumeration value="dataclass"/>
+      <xs:enumeration value="typed_dict"/>
+      <xs:enumeration value="enum"/>
+      <xs:enumeration value="decorator"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SyncModeEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="manual"/>
+      <xs:enumeration value="automatic"/>
+      <xs:enumeration value="semi-automatic"/>
+      <xs:enumeration value="on-demand"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SyncDirectionEnum">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ddd-to-python"/>
+      <xs:enumeration value="python-to-ddd"/>
+      <xs:enumeration value="bidirectional"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="SeverityType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="error"/>
+      <xs:enumeration value="warning"/>
+      <xs:enumeration value="info"/>
+      <xs:enumeration value="hint"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ValidationLevelType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="strict"/>
+      <xs:enumeration value="normal"/>
+      <xs:enumeration value="lenient"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="NamingConventionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="snake_case"/>
+      <xs:enumeration value="PascalCase"/>
+      <xs:enumeration value="camelCase"/>
+      <xs:enumeration value="preserve"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ============================================== -->
+  <!-- Supporting Complex Types                       -->
+  <!-- ============================================== -->
+  
+  <xs:complexType name="InvariantMappingType">
+    <xs:sequence>
+      <xs:element name="invariant" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dddExpression" type="xs:string"/>
+            <xs:element name="pythonMethod" type="xs:string"/>
+            <xs:element name="validationStrategy" type="xs:string"/>
+            <xs:element name="errorHandling" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AIAssistanceConfigType">
+    <xs:all>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="contextDepth" type="xs:integer" default="3"/>
+      <xs:element name="includeBusinessRules" type="xs:boolean" default="true"/>
+      <xs:element name="includeExamples" type="xs:boolean" default="true"/>
+      <xs:element name="generationPromptTemplate" type="xs:string" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- Additional Generator Types -->
+  
+  <xs:complexType name="EntityGeneratorType">
+    <xs:sequence>
+      <xs:element name="template" type="bridge:CodeTemplateType"/>
+      <xs:element name="identityMapping" type="bridge:IdentityMappingType"/>
+      <xs:element name="fieldMapping" type="bridge:FieldMappingType"/>
+      <xs:element name="relationshipMapping" type="bridge:RelationshipMappingType" minOccurs="0"/>
+      <xs:element name="auditableFields" type="bridge:AuditableFieldsType" minOccurs="0"/>
+      <xs:element name="softDelete" type="xs:boolean" default="false"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ValueObjectGeneratorType">
+    <xs:sequence>
+      <xs:element name="template" type="bridge:CodeTemplateType"/>
+      <xs:element name="immutabilityStrategy" type="bridge:ImmutabilityStrategyType"/>
+      <xs:element name="validationRules" type="bridge:ValidationRulesMappingType"/>
+      <xs:element name="equalityImplementation" type="bridge:EqualityImplementationType"/>
+      <xs:element name="hashImplementation" type="xs:boolean" default="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="RepositoryGeneratorType">
+    <xs:sequence>
+      <xs:element name="interfaceTemplate" type="bridge:CodeTemplateType"/>
+      <xs:element name="implementationTemplate" type="bridge:CodeTemplateType"/>
+      <xs:element name="persistenceMapping" type="bridge:PersistenceMappingType"/>
+      <xs:element name="queryMethods" type="bridge:QueryMethodsType"/>
+      <xs:element name="transactionSupport" type="xs:boolean" default="true"/>
+      <xs:element name="caching" type="bridge:CachingStrategyType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ServiceGeneratorType">
+    <xs:sequence>
+      <xs:element name="template" type="bridge:CodeTemplateType"/>
+      <xs:element name="serviceType" default="domain">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="domain"/>
+            <xs:enumeration value="application"/>
+            <xs:enumeration value="infrastructure"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="dependencyInjection" type="bridge:DependencyInjectionType"/>
+      <xs:element name="methodMapping" type="bridge:ServiceMethodMappingType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EventGeneratorType">
+    <xs:sequence>
+      <xs:element name="template" type="bridge:CodeTemplateType"/>
+      <xs:element name="eventType" default="domain">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="domain"/>
+            <xs:enumeration value="integration"/>
+            <xs:enumeration value="notification"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="fieldMapping" type="bridge:FieldMappingType"/>
+      <xs:element name="metadataFields" type="bridge:MetadataFieldsType" minOccurs="0"/>
+      <xs:element name="versionStrategy" type="bridge:VersionStrategyType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CommandGeneratorType">
+    <xs:sequence>
+      <xs:element name="template" type="bridge:CodeTemplateType"/>
+      <xs:element name="validationMapping" type="bridge:ValidationRulesMappingType"/>
+      <xs:element name="handlerGeneration" type="xs:boolean" default="true"/>
+      <xs:element name="idempotencySupport" type="bridge:IdempotencyType" minOccurs="0"/>
+      <xs:element name="authorizationMapping" type="bridge:AuthorizationMappingType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="QueryGeneratorType">
+    <xs:sequence>
+      <xs:element name="template" type="bridge:CodeTemplateType"/>
+      <xs:element name="resultMapping" type="bridge:ResultMappingType"/>
+      <xs:element name="paginationSupport" type="bridge:PaginationSupportType" minOccurs="0"/>
+      <xs:element name="sortingSupport" type="bridge:SortingSupportType" minOccurs="0"/>
+      <xs:element name="filteringSupport" type="bridge:FilteringSupportType" minOccurs="0"/>
+      <xs:element name="cacheable" type="xs:boolean" default="false"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Validator Types -->
+  
+  <xs:complexType name="SemanticValidatorType">
+    <xs:sequence>
+      <xs:element name="businessRuleValidation" type="bridge:BusinessRuleValidationType"/>
+      <xs:element name="domainConsistencyChecks" type="bridge:DomainConsistencyType"/>
+      <xs:element name="contextualValidation" type="bridge:ContextualValidationType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConsistencyValidatorType">
+    <xs:sequence>
+      <xs:element name="crossReferenceValidation" type="bridge:CrossReferenceValidationType"/>
+      <xs:element name="namingConsistency" type="bridge:NamingConsistencyType"/>
+      <xs:element name="typeConsistency" type="bridge:TypeConsistencyType"/>
+      <xs:element name="contractConsistency" type="bridge:ContractConsistencyType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Supporting Complex Types -->
+  
+  <xs:complexType name="PropertiesType">
+    <xs:sequence>
+      <xs:element name="property" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="key" type="xs:string" use="required"/>
+          <xs:attribute name="value" type="xs:string" use="required"/>
+          <xs:attribute name="type" type="xs:string"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DecoratorMappingType">
+    <xs:sequence>
+      <xs:element name="decorator" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dddAnnotation" type="xs:string"/>
+            <xs:element name="pythonDecorator" type="xs:string"/>
+            <xs:element name="arguments" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="BaseClassMappingType">
+    <xs:sequence>
+      <xs:element name="baseClass" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dddConcept" type="xs:string"/>
+            <xs:element name="pythonClass" type="xs:string"/>
+            <xs:element name="module" type="xs:string"/>
+            <xs:element name="typeParameters" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CodeGenStrategyType">
+    <xs:sequence>
+      <xs:element name="aiProvider" type="xs:string" minOccurs="0"/>
+      <xs:element name="templateEngine" type="xs:string" minOccurs="0"/>
+      <xs:element name="codeStyle" type="xs:string" default="pep8"/>
+      <xs:element name="testGeneration" type="xs:boolean" default="true"/>
+      <xs:element name="documentationGeneration" type="xs:boolean" default="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TransformationSourceType">
+    <xs:sequence>
+      <xs:element name="schemaType" default="ddd">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="ddd"/>
+            <xs:enumeration value="python"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="xpath" type="xs:string"/>
+      <xs:element name="namespace" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TransformationTargetType">
+    <xs:sequence>
+      <xs:element name="schemaType" default="python">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="ddd"/>
+            <xs:enumeration value="python"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="xpath" type="xs:string"/>
+      <xs:element name="namespace" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="MappingExpressionType">
+    <xs:sequence>
+      <xs:element name="expression" type="xs:string"/>
+      <xs:element name="language" default="xslt">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="xslt"/>
+            <xs:enumeration value="xpath"/>
+            <xs:enumeration value="python"/>
+            <xs:enumeration value="javascript"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="parameters" type="bridge:PropertiesType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ValidationExpressionType">
+    <xs:sequence>
+      <xs:element name="expression" type="xs:string"/>
+      <xs:element name="expectedResult" type="xs:string"/>
+      <xs:element name="errorMessage" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TransformationRulesType">
+    <xs:sequence>
+      <xs:element name="rule" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="pattern" type="xs:string"/>
+            <xs:element name="replacement" type="xs:string"/>
+            <xs:element name="condition" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="MappingConstraintsType">
+    <xs:sequence>
+      <xs:element name="constraint" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="type" type="xs:string"/>
+            <xs:element name="validation" type="xs:string"/>
+            <xs:element name="severity" type="bridge:SeverityType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TransformationPipelineType">
+    <xs:sequence>
+      <xs:element name="stage" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="transformations" type="xs:string"/>
+            <xs:element name="validation" type="xs:string" minOccurs="0"/>
+            <xs:element name="rollback" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+          <xs:attribute name="order" type="xs:integer" use="required"/>
+          <xs:attribute name="optional" type="xs:boolean" default="false"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="GenerationStrategyType">
+    <xs:sequence>
+      <xs:element name="approach" default="template">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="template"/>
+            <xs:enumeration value="ai"/>
+            <xs:enumeration value="hybrid"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="optimization" type="xs:string" minOccurs="0"/>
+      <xs:element name="parallelization" type="xs:boolean" default="false"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConflictResolutionType">
+    <xs:sequence>
+      <xs:element name="strategy" default="manual">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="manual"/>
+            <xs:enumeration value="ddd-wins"/>
+            <xs:enumeration value="python-wins"/>
+            <xs:enumeration value="merge"/>
+            <xs:enumeration value="timestamp"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="conflictHandlers" type="bridge:ConflictHandlersType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="VersionControlType">
+    <xs:sequence>
+      <xs:element name="trackingEnabled" type="xs:boolean" default="true"/>
+      <xs:element name="versioningStrategy" default="semantic">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="semantic"/>
+            <xs:enumeration value="timestamp"/>
+            <xs:enumeration value="hash"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="changeLog" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ChangeTrackingType">
+    <xs:sequence>
+      <xs:element name="trackingLevel" default="field">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="file"/>
+            <xs:enumeration value="class"/>
+            <xs:enumeration value="method"/>
+            <xs:enumeration value="field"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="changeHistory" type="xs:boolean" default="true"/>
+      <xs:element name="auditLog" type="xs:boolean" default="false"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SyncTriggersType">
+    <xs:sequence>
+      <xs:element name="trigger" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string"/>
+            <xs:element name="condition" type="xs:string" minOccurs="0"/>
+            <xs:element name="action" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="LifecycleHookMappingType">
+    <xs:sequence>
+      <xs:element name="hook" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dddEvent" type="xs:string"/>
+            <xs:element name="pythonMethod" type="xs:string"/>
+            <xs:element name="timing" default="after">
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:enumeration value="before"/>
+                  <xs:enumeration value="after"/>
+                  <xs:enumeration value="around"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="StateManagementType">
+    <xs:sequence>
+      <xs:element name="stateField" type="xs:string"/>
+      <xs:element name="stateEnum" type="xs:string"/>
+      <xs:element name="transitions" type="bridge:StateTransitionImplType"/>
+      <xs:element name="persistence" type="xs:boolean" default="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="MethodTemplatesType">
+    <xs:sequence>
+      <xs:element name="template" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="methodType" type="xs:string"/>
+            <xs:element name="signature" type="xs:string"/>
+            <xs:element name="bodyTemplate" type="xs:string"/>
+            <xs:element name="decorators" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ContextInjectionType">
+    <xs:sequence>
+      <xs:element name="domainContext" type="xs:boolean" default="true"/>
+      <xs:element name="securityContext" type="xs:boolean" default="false"/>
+      <xs:element name="performanceContext" type="xs:boolean" default="false"/>
+      <xs:element name="customContext" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Additional Supporting Types for Completeness -->
+  
+  <xs:complexType name="IdentityMappingType">
+    <xs:sequence>
+      <xs:element name="idField" type="xs:string"/>
+      <xs:element name="idType" type="xs:string"/>
+      <xs:element name="generationStrategy" default="uuid">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="uuid"/>
+            <xs:enumeration value="ulid"/>
+            <xs:enumeration value="sequence"/>
+            <xs:enumeration value="custom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="FieldMappingType">
+    <xs:sequence>
+      <xs:element name="mapping" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dddField" type="xs:string"/>
+            <xs:element name="pythonField" type="xs:string"/>
+            <xs:element name="typeMapping" type="xs:string"/>
+            <xs:element name="validation" type="xs:string" minOccurs="0"/>
+            <xs:element name="defaultValue" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="RelationshipMappingType">
+    <xs:sequence>
+      <xs:element name="relationship" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="type" type="xs:string"/>
+            <xs:element name="target" type="xs:string"/>
+            <xs:element name="cascade" type="xs:boolean" default="false"/>
+            <xs:element name="lazy" type="xs:boolean" default="true"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AuditableFieldsType">
+    <xs:sequence>
+      <xs:element name="createdAt" type="xs:string" default="created_at"/>
+      <xs:element name="updatedAt" type="xs:string" default="updated_at"/>
+      <xs:element name="createdBy" type="xs:string" default="created_by"/>
+      <xs:element name="updatedBy" type="xs:string" default="updated_by"/>
+      <xs:element name="version" type="xs:string" default="version" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ImmutabilityStrategyType">
+    <xs:sequence>
+      <xs:element name="frozen" type="xs:boolean" default="true"/>
+      <xs:element name="slots" type="xs:boolean" default="true"/>
+      <xs:element name="hashable" type="xs:boolean" default="true"/>
+      <xs:element name="copyMethod" type="xs:string" default="replace"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ValidationRulesMappingType">
+    <xs:sequence>
+      <xs:element name="rule" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dddRule" type="xs:string"/>
+            <xs:element name="pythonValidator" type="xs:string"/>
+            <xs:element name="errorCode" type="xs:string"/>
+            <xs:element name="errorMessage" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="EqualityImplementationType">
+    <xs:sequence>
+      <xs:element name="compareFields" type="xs:string"/>
+      <xs:element name="ignoreFields" type="xs:string" minOccurs="0"/>
+      <xs:element name="customComparator" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="PersistenceMappingType">
+    <xs:sequence>
+      <xs:element name="backend" type="xs:string"/>
+      <xs:element name="tableMapping" type="xs:string"/>
+      <xs:element name="columnMapping" type="bridge:FieldMappingType"/>
+      <xs:element name="indexing" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="QueryMethodsType">
+    <xs:sequence>
+      <xs:element name="method" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="parameters" type="xs:string"/>
+            <xs:element name="returnType" type="xs:string"/>
+            <xs:element name="implementation" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CachingStrategyType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="ttl" type="xs:integer" default="300"/>
+      <xs:element name="keyPattern" type="xs:string"/>
+      <xs:element name="invalidation" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DependencyInjectionType">
+    <xs:sequence>
+      <xs:element name="framework" type="xs:string" default="constructor"/>
+      <xs:element name="dependencies" type="xs:string"/>
+      <xs:element name="scope" default="singleton">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="singleton"/>
+            <xs:enumeration value="transient"/>
+            <xs:enumeration value="scoped"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ServiceMethodMappingType">
+    <xs:sequence>
+      <xs:element name="method" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dddOperation" type="xs:string"/>
+            <xs:element name="pythonMethod" type="xs:string"/>
+            <xs:element name="parameters" type="xs:string"/>
+            <xs:element name="returnType" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="MetadataFieldsType">
+    <xs:sequence>
+      <xs:element name="field" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="name" type="xs:string" use="required"/>
+          <xs:attribute name="type" type="xs:string" use="required"/>
+          <xs:attribute name="required" type="xs:boolean" default="true"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="VersionStrategyType">
+    <xs:sequence>
+      <xs:element name="versionField" type="xs:string" default="version"/>
+      <xs:element name="strategy" default="semantic">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="semantic"/>
+            <xs:enumeration value="sequential"/>
+            <xs:enumeration value="timestamp"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="IdempotencyType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="keyField" type="xs:string" default="idempotency_key"/>
+      <xs:element name="ttl" type="xs:integer" default="86400"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AuthorizationMappingType">
+    <xs:sequence>
+      <xs:element name="roles" type="xs:string" minOccurs="0"/>
+      <xs:element name="permissions" type="xs:string" minOccurs="0"/>
+      <xs:element name="policy" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ResultMappingType">
+    <xs:sequence>
+      <xs:element name="resultType" type="xs:string"/>
+      <xs:element name="dtoMapping" type="xs:string" minOccurs="0"/>
+      <xs:element name="projection" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="PaginationSupportType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="defaultPageSize" type="xs:integer" default="20"/>
+      <xs:element name="maxPageSize" type="xs:integer" default="100"/>
+      <xs:element name="cursorBased" type="xs:boolean" default="false"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SortingSupportType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="sortableFields" type="xs:string"/>
+      <xs:element name="defaultSort" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="FilteringSupportType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="filterableFields" type="xs:string"/>
+      <xs:element name="operators" type="xs:string" default="eq,ne,gt,lt,gte,lte,in,like"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="BusinessRuleValidationType">
+    <xs:sequence>
+      <xs:element name="rules" type="xs:string"/>
+      <xs:element name="enforcement" default="strict">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="strict"/>
+            <xs:enumeration value="lenient"/>
+            <xs:enumeration value="warning"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="DomainConsistencyType">
+    <xs:sequence>
+      <xs:element name="aggregateBoundaries" type="xs:boolean" default="true"/>
+      <xs:element name="invariantChecks" type="xs:boolean" default="true"/>
+      <xs:element name="eventConsistency" type="xs:boolean" default="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ContextualValidationType">
+    <xs:sequence>
+      <xs:element name="boundedContextValidation" type="xs:boolean" default="true"/>
+      <xs:element name="crossContextValidation" type="xs:boolean" default="false"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CrossReferenceValidationType">
+    <xs:sequence>
+      <xs:element name="validateReferences" type="xs:boolean" default="true"/>
+      <xs:element name="validateDependencies" type="xs:boolean" default="true"/>
+      <xs:element name="circularDependencyCheck" type="xs:boolean" default="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="NamingConsistencyType">
+    <xs:sequence>
+      <xs:element name="convention" type="bridge:NamingConventionType"/>
+      <xs:element name="validateCasing" type="xs:boolean" default="true"/>
+      <xs:element name="validateUniqueness" type="xs:boolean" default="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TypeConsistencyType">
+    <xs:sequence>
+      <xs:element name="validateTypeMapping" type="xs:boolean" default="true"/>
+      <xs:element name="validateTypeCompatibility" type="xs:boolean" default="true"/>
+      <xs:element name="coercionRules" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ContractConsistencyType">
+    <xs:sequence>
+      <xs:element name="validatePreconditions" type="xs:boolean" default="true"/>
+      <xs:element name="validatePostconditions" type="xs:boolean" default="true"/>
+      <xs:element name="validateInvariants" type="xs:boolean" default="true"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConflictHandlersType">
+    <xs:sequence>
+      <xs:element name="handler" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="conflictType" type="xs:string"/>
+            <xs:element name="resolution" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

@@ -1,0 +1,1935 @@
+<?xml version='1.0' encoding='utf-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="https://schemas.c4model.org/v2/2025" xmlns:tns="https://schemas.c4model.org/v2/2025" elementFormDefault="qualified" attributeFormDefault="unqualified" version="2.0">
+  <xs:annotation>
+    <xs:documentation>C4 Model schema for software architecture documentation</xs:documentation>
+  </xs:annotation>
+  <xs:simpleType name="SystemIDType">
+    <xs:annotation>
+      <xs:documentation>SystemID identifier pattern SYS-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="SYS-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PersonIDType">
+    <xs:annotation>
+      <xs:documentation>PersonID identifier pattern PER-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="PER-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ContainerIDType">
+    <xs:annotation>
+      <xs:documentation>ContainerID identifier pattern CON-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="CON-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComponentIDType">
+    <xs:annotation>
+      <xs:documentation>ComponentID identifier pattern CMP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="CMP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RelationshipIDType">
+    <xs:annotation>
+      <xs:documentation>RelationshipID identifier pattern REL-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="REL-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ViewIDType">
+    <xs:annotation>
+      <xs:documentation>ViewID identifier pattern VIEW-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="VIEW-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ElementIDType">
+    <xs:annotation>
+      <xs:documentation>ElementID identifier pattern ELEM-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="ELEM-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DeploymentIDType">
+    <xs:annotation>
+      <xs:documentation>DeploymentID identifier pattern DEP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="DEP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="NodeIDType">
+    <xs:annotation>
+      <xs:documentation>NodeID identifier pattern NODE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="NODE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="InfrastructureIDType">
+    <xs:annotation>
+      <xs:documentation>InfrastructureID identifier pattern INFRA-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="INFRA-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TagIDType">
+    <xs:annotation>
+      <xs:documentation>TagID identifier pattern TAG-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TAG-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="StyleIDType">
+    <xs:annotation>
+      <xs:documentation>StyleID identifier pattern STY-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="STY-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DecisionIDType">
+    <xs:annotation>
+      <xs:documentation>DecisionID identifier pattern ADR-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="ADR-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ThreatIDType">
+    <xs:annotation>
+      <xs:documentation>ThreatID identifier pattern THR-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="THR-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AvailabilityType">
+    <xs:annotation>
+      <xs:documentation>Availability percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ReliabilityType">
+    <xs:annotation>
+      <xs:documentation>Reliability percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CPUUtilizationType">
+    <xs:annotation>
+      <xs:documentation>CPUUtilization percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="MemoryUtilizationType">
+    <xs:annotation>
+      <xs:documentation>MemoryUtilization percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DiskUtilizationType">
+    <xs:annotation>
+      <xs:documentation>DiskUtilization percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TestCoverageType">
+    <xs:annotation>
+      <xs:documentation>TestCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PriorityType">
+    <xs:annotation>
+      <xs:documentation>Priority level (1=highest, 5=lowest)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1" />
+      <xs:maxInclusive value="5" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RiskLevelType">
+    <xs:annotation>
+      <xs:documentation>Risk assessment level</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1" />
+      <xs:maxInclusive value="10" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="InstancesType">
+    <xs:annotation>
+      <xs:documentation>Number of instances</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1" />
+      <xs:maxInclusive value="1000" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PortType">
+    <xs:annotation>
+      <xs:documentation>Network port number</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1" />
+      <xs:maxInclusive value="65535" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ResponseTimeMsType">
+    <xs:annotation>
+      <xs:documentation>Response time in milliseconds</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="10000" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GUIDType">
+    <xs:annotation>
+      <xs:documentation>UUID/GUID pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" />
+      <xs:minLength value="36" />
+      <xs:maxLength value="36" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="EmailType">
+    <xs:annotation>
+      <xs:documentation>Email pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="URLType">
+    <xs:annotation>
+      <xs:documentation>Url pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="https?://[\w\-._~:/?#[\]@!$&amp;'()*+,;=]+" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="VersionType">
+    <xs:annotation>
+      <xs:documentation>Version pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d+\\.\\d+(\\.\\d+)?(-[a-zA-Z0-9]+)?" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="IPAddressType">
+    <xs:annotation>
+      <xs:documentation>Ip Address pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CidrType">
+    <xs:annotation>
+      <xs:documentation>Cidr pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ColorHexType">
+    <xs:annotation>
+      <xs:documentation>Color Hex pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="#[0-9A-Fa-f]{6}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ElementType">
+    <xs:annotation>
+      <xs:documentation>Types of C4 model elements</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Person">
+        <xs:annotation>
+          <xs:documentation>A person (user, actor, role, or persona)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Software System">
+        <xs:annotation>
+          <xs:documentation>A software system</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Container">
+        <xs:annotation>
+          <xs:documentation>A container (application or data store)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Component">
+        <xs:annotation>
+          <xs:documentation>A component within a container</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Code Element">
+        <xs:annotation>
+          <xs:documentation>Code-level element (class, interface, etc.)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ContainerType">
+    <xs:annotation>
+      <xs:documentation>Types of containers in the system</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Web Application">
+        <xs:annotation>
+          <xs:documentation>Server-side web application</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Single-Page Application">
+        <xs:annotation>
+          <xs:documentation>Client-side single-page app</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Mobile App">
+        <xs:annotation>
+          <xs:documentation>Mobile application</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Desktop Application">
+        <xs:annotation>
+          <xs:documentation>Desktop client application</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="API">
+        <xs:annotation>
+          <xs:documentation>API (REST, GraphQL, etc.)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Database">
+        <xs:annotation>
+          <xs:documentation>Database (SQL or NoSQL)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="File System">
+        <xs:annotation>
+          <xs:documentation>File system or blob storage</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Message Queue">
+        <xs:annotation>
+          <xs:documentation>Message queue or topic</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Cache">
+        <xs:annotation>
+          <xs:documentation>In-memory cache</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Service">
+        <xs:annotation>
+          <xs:documentation>Background service or daemon</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Serverless Function">
+        <xs:annotation>
+          <xs:documentation>Serverless function/Lambda</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TechnologyType">
+    <xs:annotation>
+      <xs:documentation>TechnologyType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Java" />
+      <xs:enumeration value="C#" />
+      <xs:enumeration value=".NET" />
+      <xs:enumeration value="Python" />
+      <xs:enumeration value="JavaScript" />
+      <xs:enumeration value="TypeScript" />
+      <xs:enumeration value="Go" />
+      <xs:enumeration value="Rust" />
+      <xs:enumeration value="Node.js" />
+      <xs:enumeration value="React" />
+      <xs:enumeration value="Angular" />
+      <xs:enumeration value="Vue.js" />
+      <xs:enumeration value="Spring Boot" />
+      <xs:enumeration value="Django" />
+      <xs:enumeration value="FastAPI" />
+      <xs:enumeration value="PostgreSQL" />
+      <xs:enumeration value="MySQL" />
+      <xs:enumeration value="MongoDB" />
+      <xs:enumeration value="Redis" />
+      <xs:enumeration value="Elasticsearch" />
+      <xs:enumeration value="Kafka" />
+      <xs:enumeration value="RabbitMQ" />
+      <xs:enumeration value="Docker" />
+      <xs:enumeration value="Kubernetes" />
+      <xs:enumeration value="AWS" />
+      <xs:enumeration value="Azure" />
+      <xs:enumeration value="GCP" />
+      <xs:enumeration value="REST" />
+      <xs:enumeration value="GraphQL" />
+      <xs:enumeration value="gRPC" />
+      <xs:enumeration value="WebSocket" />
+      <xs:enumeration value="HTTP/HTTPS" />
+      <xs:enumeration value="TCP" />
+      <xs:enumeration value="UDP" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ProtocolType">
+    <xs:annotation>
+      <xs:documentation>ProtocolType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="HTTP" />
+      <xs:enumeration value="HTTPS" />
+      <xs:enumeration value="WebSocket" />
+      <xs:enumeration value="gRPC" />
+      <xs:enumeration value="REST" />
+      <xs:enumeration value="GraphQL" />
+      <xs:enumeration value="SOAP" />
+      <xs:enumeration value="AMQP" />
+      <xs:enumeration value="MQTT" />
+      <xs:enumeration value="TCP" />
+      <xs:enumeration value="UDP" />
+      <xs:enumeration value="FTP" />
+      <xs:enumeration value="SFTP" />
+      <xs:enumeration value="SSH" />
+      <xs:enumeration value="JDBC" />
+      <xs:enumeration value="ODBC" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ViewType">
+    <xs:annotation>
+      <xs:documentation>ViewType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="System Context">
+        <xs:annotation>
+          <xs:documentation>Level 1: System Context diagram</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Container">
+        <xs:annotation>
+          <xs:documentation>Level 2: Container diagram</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Component">
+        <xs:annotation>
+          <xs:documentation>Level 3: Component diagram</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Code">
+        <xs:annotation>
+          <xs:documentation>Level 4: Code diagram</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="System Landscape">
+        <xs:annotation>
+          <xs:documentation>System Landscape diagram</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Deployment">
+        <xs:annotation>
+          <xs:documentation>Deployment diagram</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Dynamic">
+        <xs:annotation>
+          <xs:documentation>Dynamic diagram (sequence/collaboration)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="EnvironmentType">
+    <xs:annotation>
+      <xs:documentation>EnvironmentType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Development" />
+      <xs:enumeration value="Testing" />
+      <xs:enumeration value="Staging" />
+      <xs:enumeration value="Production" />
+      <xs:enumeration value="DR" />
+      <xs:enumeration value="Demo" />
+      <xs:enumeration value="Training" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="NodeType">
+    <xs:annotation>
+      <xs:documentation>NodeType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Virtual Machine">
+        <xs:annotation>
+          <xs:documentation>Virtual machine instance</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Container">
+        <xs:annotation>
+          <xs:documentation>Docker/OCI container</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Bare Metal">
+        <xs:annotation>
+          <xs:documentation>Physical server</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Serverless">
+        <xs:annotation>
+          <xs:documentation>Serverless compute</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Device">
+        <xs:annotation>
+          <xs:documentation>Mobile or IoT device</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Network">
+        <xs:annotation>
+          <xs:documentation>Network infrastructure</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RelationshipDirection">
+    <xs:annotation>
+      <xs:documentation>RelationshipDirection</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Unidirectional" />
+      <xs:enumeration value="Bidirectional" />
+      <xs:enumeration value="Asynchronous" />
+      <xs:enumeration value="Synchronous" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SecurityZone">
+    <xs:annotation>
+      <xs:documentation>SecurityZone</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Public" />
+      <xs:enumeration value="Private" />
+      <xs:enumeration value="Restricted" />
+      <xs:enumeration value="DMZ" />
+      <xs:enumeration value="Internal" />
+      <xs:enumeration value="External" />
+      <xs:enumeration value="Trusted" />
+      <xs:enumeration value="Untrusted" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DataClassification">
+    <xs:annotation>
+      <xs:documentation>DataClassification</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Public" />
+      <xs:enumeration value="Internal" />
+      <xs:enumeration value="Confidential" />
+      <xs:enumeration value="Secret" />
+      <xs:enumeration value="Top Secret" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ADRStatus">
+    <xs:annotation>
+      <xs:documentation>ADRStatus</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Proposed" />
+      <xs:enumeration value="Accepted" />
+      <xs:enumeration value="Rejected" />
+      <xs:enumeration value="Deprecated" />
+      <xs:enumeration value="Superseded" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ThreatCategory">
+    <xs:annotation>
+      <xs:documentation>ThreatCategory</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Spoofing">
+        <xs:annotation>
+          <xs:documentation>Spoofing identity</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Tampering">
+        <xs:annotation>
+          <xs:documentation>Tampering with data</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Repudiation">
+        <xs:annotation>
+          <xs:documentation>Repudiation of actions</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Information Disclosure">
+        <xs:annotation>
+          <xs:documentation>Information disclosure</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Denial of Service">
+        <xs:annotation>
+          <xs:documentation>Denial of service</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Elevation of Privilege">
+        <xs:annotation>
+          <xs:documentation>Elevation of privilege</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ShapeType">
+    <xs:annotation>
+      <xs:documentation>ShapeType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Box" />
+      <xs:enumeration value="RoundedBox" />
+      <xs:enumeration value="Circle" />
+      <xs:enumeration value="Ellipse" />
+      <xs:enumeration value="Hexagon" />
+      <xs:enumeration value="Cylinder" />
+      <xs:enumeration value="Component" />
+      <xs:enumeration value="Person" />
+      <xs:enumeration value="Robot" />
+      <xs:enumeration value="Folder" />
+      <xs:enumeration value="WebBrowser" />
+      <xs:enumeration value="MobileDevice" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="IconType">
+    <xs:annotation>
+      <xs:documentation>IconType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="None" />
+      <xs:enumeration value="Person" />
+      <xs:enumeration value="Database" />
+      <xs:enumeration value="Component" />
+      <xs:enumeration value="Container" />
+      <xs:enumeration value="System" />
+      <xs:enumeration value="Cloud" />
+      <xs:enumeration value="Server" />
+      <xs:enumeration value="Mobile" />
+      <xs:enumeration value="Desktop" />
+      <xs:enumeration value="API" />
+      <xs:enumeration value="Queue" />
+      <xs:enumeration value="Custom" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="WorkspaceType">
+    <xs:sequence>
+      <xs:element name="Workspace" type="tns:WorkspaceType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual workspace</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="WorkspaceID" type="tns:GUIDType">
+        <xs:annotation>
+          <xs:documentation>WorkspaceID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="WorkspaceName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>WorkspaceName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="WorkspaceDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>WorkspaceDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Version" type="tns:VersionType">
+        <xs:annotation>
+          <xs:documentation>Version</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Author" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Author</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Created" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>Created</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LastModified" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>LastModified</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Properties" type="tns:PropertiesType">
+        <xs:annotation>
+          <xs:documentation>Properties</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ArchitectureStructure" type="tns:ArchitectureStructureType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>C4Model domain-specific structure elements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="optional" />
+    <xs:attribute name="version" type="xs:string" use="optional" fixed="2.0" />
+    <xs:attribute name="generated" type="xs:dateTime" use="optional" />
+    <xs:key name="WorkspaceKey">
+      <xs:selector xpath=".//tns:Workspace" />
+      <xs:field xpath="@id" />
+    </xs:key>
+    <xs:unique name="UniqueSystemIDID">
+      <xs:selector xpath=".//tns:System" />
+      <xs:field xpath="tns:SystemIDType" />
+    </xs:unique>
+    <xs:unique name="UniquePersonIDID">
+      <xs:selector xpath=".//tns:Person" />
+      <xs:field xpath="tns:PersonIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueContainerIDID">
+      <xs:selector xpath=".//tns:Container" />
+      <xs:field xpath="tns:ContainerIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueComponentIDID">
+      <xs:selector xpath=".//tns:Component" />
+      <xs:field xpath="tns:ComponentIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueRelationshipIDID">
+      <xs:selector xpath=".//tns:Relationship" />
+      <xs:field xpath="tns:RelationshipIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueViewIDID">
+      <xs:selector xpath=".//tns:View" />
+      <xs:field xpath="tns:ViewIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueElementIDID">
+      <xs:selector xpath=".//tns:Element" />
+      <xs:field xpath="tns:ElementIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueDeploymentIDID">
+      <xs:selector xpath=".//tns:Deployment" />
+      <xs:field xpath="tns:DeploymentIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueNodeIDID">
+      <xs:selector xpath=".//tns:Node" />
+      <xs:field xpath="tns:NodeIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueInfrastructureIDID">
+      <xs:selector xpath=".//tns:Infrastructure" />
+      <xs:field xpath="tns:InfrastructureIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueTagIDID">
+      <xs:selector xpath=".//tns:Tag" />
+      <xs:field xpath="tns:TagIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueStyleIDID">
+      <xs:selector xpath=".//tns:Style" />
+      <xs:field xpath="tns:StyleIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueDecisionIDID">
+      <xs:selector xpath=".//tns:Decision" />
+      <xs:field xpath="tns:DecisionIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueThreatIDID">
+      <xs:selector xpath=".//tns:Threat" />
+      <xs:field xpath="tns:ThreatIDType" />
+    </xs:unique>
+    <xs:unique name="UniquePersonID">
+      <xs:selector xpath=".//tns:Person" />
+      <xs:field xpath="tns:PersonID" />
+    </xs:unique>
+    <xs:unique name="UniqueSoftwareSystemID">
+      <xs:selector xpath=".//tns:SoftwareSystem" />
+      <xs:field xpath="tns:SoftwareSystemID" />
+    </xs:unique>
+    <xs:unique name="UniqueContainerID">
+      <xs:selector xpath=".//tns:Container" />
+      <xs:field xpath="tns:ContainerID" />
+    </xs:unique>
+    <xs:unique name="UniqueComponentID">
+      <xs:selector xpath=".//tns:Component" />
+      <xs:field xpath="tns:ComponentID" />
+    </xs:unique>
+    <xs:unique name="UniqueRelationshipID">
+      <xs:selector xpath=".//tns:Relationship" />
+      <xs:field xpath="tns:RelationshipID" />
+    </xs:unique>
+    <xs:unique name="UniqueViewID">
+      <xs:selector xpath=".//tns:View" />
+      <xs:field xpath="tns:ViewID" />
+    </xs:unique>
+    <xs:unique name="UniqueDeploymentEnvironmentID">
+      <xs:selector xpath=".//tns:DeploymentEnvironment" />
+      <xs:field xpath="tns:DeploymentEnvironmentID" />
+    </xs:unique>
+    <xs:unique name="UniqueDeploymentNodeID">
+      <xs:selector xpath=".//tns:DeploymentNode" />
+      <xs:field xpath="tns:DeploymentNodeID" />
+    </xs:unique>
+    <xs:unique name="UniqueInfrastructureNodeID">
+      <xs:selector xpath=".//tns:InfrastructureNode" />
+      <xs:field xpath="tns:InfrastructureNodeID" />
+    </xs:unique>
+    <xs:unique name="UniqueElementStyleID">
+      <xs:selector xpath=".//tns:ElementStyle" />
+      <xs:field xpath="tns:ElementStyleID" />
+    </xs:unique>
+    <xs:unique name="UniqueTagID">
+      <xs:selector xpath=".//tns:Tag" />
+      <xs:field xpath="tns:TagID" />
+    </xs:unique>
+    <xs:unique name="UniqueArchitectureDecisionID">
+      <xs:selector xpath=".//tns:ArchitectureDecision" />
+      <xs:field xpath="tns:ArchitectureDecisionID" />
+    </xs:unique>
+    <xs:unique name="UniqueThreatModelID">
+      <xs:selector xpath=".//tns:ThreatModel" />
+      <xs:field xpath="tns:ThreatModelID" />
+    </xs:unique>
+    <xs:keyref name="SystemReference" refer="tns:UniqueSystemID">
+      <xs:selector xpath=".//tns:SystemRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ContainerReference" refer="tns:UniqueContainerID">
+      <xs:selector xpath=".//tns:ContainerRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="SourceIDReference" refer="tns:UniqueElementID">
+      <xs:selector xpath=".//tns:SourceID" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="DestinationIDReference" refer="tns:UniqueElementID">
+      <xs:selector xpath=".//tns:DestinationID" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ElementScopeReference" refer="tns:UniqueElementID">
+      <xs:selector xpath=".//tns:ElementScope" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ElementReference" refer="tns:UniqueElementID">
+      <xs:selector xpath=".//tns:ElementRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="RelationshipReference" refer="tns:UniqueRelationshipID">
+      <xs:selector xpath=".//tns:RelationshipRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="AffectedElementsReference" refer="tns:UniqueElementID">
+      <xs:selector xpath=".//tns:AffectedElements" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="RelatedDecisionsReference" refer="tns:UniqueDecisionID">
+      <xs:selector xpath=".//tns:RelatedDecisions" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="BusinessActorsReference" refer="tns:UniquePersonID">
+      <xs:selector xpath=".//tns:BusinessActors" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="BusinessSystemsReference" refer="tns:UniqueSystemID">
+      <xs:selector xpath=".//tns:BusinessSystems" />
+      <xs:field xpath="." />
+    </xs:keyref>
+  </xs:complexType>
+  <xs:complexType name="PropertiesType">
+    <xs:sequence>
+      <xs:element name="Organization" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Organization</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Team" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Team</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Repository" type="tns:URLType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Repository</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Documentation" type="tns:URLType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Documentation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IssueTracker" type="tns:URLType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IssueTracker</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PersonType">
+    <xs:sequence>
+      <xs:element name="PersonID" type="tns:PersonIDType">
+        <xs:annotation>
+          <xs:documentation>PersonID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PersonName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PersonName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PersonDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PersonDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PersonRole" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PersonRole</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PersonLocation" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PersonLocation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PersonEmail" type="tns:EmailType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PersonEmail</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsExternal" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsExternal</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Tags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Tags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SoftwareSystemType">
+    <xs:sequence>
+      <xs:element name="SystemID" type="tns:SystemIDType">
+        <xs:annotation>
+          <xs:documentation>SystemID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SystemName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>SystemName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SystemDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>SystemDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SystemLocation" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SystemLocation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsExternal" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsExternal</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Owner" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Owner</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Tags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Tags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Containers" type="tns:ContainersType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Containers</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Documentation" type="tns:DocumentationType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Documentation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ContainersType">
+    <xs:sequence>
+      <xs:element name="Container" type="tns:ContainerType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Container</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DocumentationType">
+    <xs:sequence>
+      <xs:element name="Overview" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Overview</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FunctionalRequirements" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FunctionalRequirements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NonFunctionalRequirements" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>NonFunctionalRequirements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Constraints" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Constraints</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ContainerComplexType">
+    <xs:sequence>
+      <xs:element name="ContainerID" type="tns:ContainerIDType">
+        <xs:annotation>
+          <xs:documentation>ContainerID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ContainerName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ContainerName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ContainerDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ContainerDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ContainerType" type="tns:ContainerType">
+        <xs:annotation>
+          <xs:documentation>ContainerType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Technology" type="tns:TechnologyType" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Technology</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SystemRef" type="tns:SystemIDType">
+        <xs:annotation>
+          <xs:documentation>SystemRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuntimePlatform" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RuntimePlatform</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Tags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Tags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Components" type="tns:ComponentsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Components</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="HealthCheck" type="tns:HealthCheckType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>HealthCheck</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ComponentsType">
+    <xs:sequence>
+      <xs:element name="Component" type="tns:ComponentType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Component</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="HealthCheckType">
+    <xs:sequence>
+      <xs:element name="Endpoint" type="tns:URLType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Endpoint</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Interval" type="xs:duration" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Interval</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Timeout" type="xs:duration" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Timeout</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ComponentType">
+    <xs:sequence>
+      <xs:element name="ComponentID" type="tns:ComponentIDType">
+        <xs:annotation>
+          <xs:documentation>ComponentID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComponentName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ComponentName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComponentDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ComponentDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Technology" type="tns:TechnologyType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Technology</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ContainerRef" type="tns:ContainerIDType">
+        <xs:annotation>
+          <xs:documentation>ContainerRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceCode" type="tns:URLType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SourceCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsAbstract" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsAbstract</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Tags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Tags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CodeElements" type="tns:CodeElementsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CodeElements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CodeElementsType">
+    <xs:sequence>
+      <xs:element name="Class" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Class</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Interface" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Interface</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Package" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Package</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RelationshipType">
+    <xs:sequence>
+      <xs:element name="RelationshipID" type="tns:RelationshipIDType">
+        <xs:annotation>
+          <xs:documentation>RelationshipID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceID" type="tns:ElementIDType">
+        <xs:annotation>
+          <xs:documentation>SourceID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DestinationID" type="tns:ElementIDType">
+        <xs:annotation>
+          <xs:documentation>DestinationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RelationshipDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RelationshipDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Technology" type="tns:ProtocolType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Technology</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Direction" type="tns:RelationshipDirection" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Direction</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Tags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Tags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InteractionStyle" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>InteractionStyle</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Order" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Order</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ViewComplexType">
+    <xs:sequence>
+      <xs:element name="ViewID" type="tns:ViewIDType">
+        <xs:annotation>
+          <xs:documentation>ViewID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViewType" type="tns:ViewType">
+        <xs:annotation>
+          <xs:documentation>ViewType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViewTitle" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ViewTitle</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViewDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ViewDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViewKey" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ViewKey</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ElementScope" type="tns:ElementIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ElementScope</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AutoLayout" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>AutoLayout</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RankDirection" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RankDirection</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Elements" type="tns:ElementsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Elements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Relationships" type="tns:RelationshipsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Relationships</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViewProperties" type="tns:ViewPropertiesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ViewProperties</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ElementsType">
+    <xs:sequence>
+      <xs:element name="ElementRef" type="tns:ElementIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ElementRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RelationshipsType">
+    <xs:sequence>
+      <xs:element name="RelationshipRef" type="tns:RelationshipIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>RelationshipRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ViewPropertiesType">
+    <xs:sequence>
+      <xs:element name="ShowLegend" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ShowLegend</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ShowNotation" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ShowNotation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PaperSize" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PaperSize</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DeploymentEnvironmentType">
+    <xs:sequence>
+      <xs:element name="EnvironmentName" type="tns:EnvironmentType">
+        <xs:annotation>
+          <xs:documentation>EnvironmentName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EnvironmentDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EnvironmentDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DeploymentNodes" type="tns:DeploymentNodesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DeploymentNodes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DeploymentNodesType">
+    <xs:sequence>
+      <xs:element name="DeploymentNode" type="tns:DeploymentNodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DeploymentNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DeploymentNodeType">
+    <xs:sequence>
+      <xs:element name="NodeID" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>NodeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NodeName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>NodeName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NodeDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>NodeDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NodeType" type="tns:NodeType">
+        <xs:annotation>
+          <xs:documentation>NodeType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Technology" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Technology</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Instances" type="tns:InstancesType">
+        <xs:annotation>
+          <xs:documentation>Instances</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Environment" type="tns:EnvironmentType">
+        <xs:annotation>
+          <xs:documentation>Environment</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OperatingSystem" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OperatingSystem</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Location" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Location</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IPAddress" type="tns:IPAddressType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IPAddress</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Tags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Tags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ContainerInstances" type="tns:ContainerInstancesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ContainerInstances</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ChildNodes" type="tns:ChildNodesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ChildNodes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InfrastructureNodes" type="tns:InfrastructureNodesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>InfrastructureNodes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ContainerInstancesType">
+    <xs:sequence>
+      <xs:element name="ContainerRef" type="tns:ContainerIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ContainerRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ChildNodesType">
+    <xs:sequence>
+      <xs:element name="DeploymentNode" type="tns:DeploymentNodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DeploymentNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="InfrastructureNodesType">
+    <xs:sequence>
+      <xs:element name="InfrastructureNode" type="tns:InfrastructureNodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>InfrastructureNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="InfrastructureNodeType">
+    <xs:sequence>
+      <xs:element name="InfrastructureID" type="tns:InfrastructureIDType">
+        <xs:annotation>
+          <xs:documentation>InfrastructureID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InfrastructureName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>InfrastructureName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InfrastructureDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>InfrastructureDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Technology" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Technology</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Environment" type="tns:EnvironmentType">
+        <xs:annotation>
+          <xs:documentation>Environment</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ElementStyleType">
+    <xs:sequence>
+      <xs:element name="StyleID" type="tns:StyleIDType">
+        <xs:annotation>
+          <xs:documentation>StyleID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StyleTag" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>StyleTag</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Width" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Width</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Height" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Height</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Background" type="tns:ColorHexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Background</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Color" type="tns:ColorHexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Color</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Shape" type="tns:ShapeType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Shape</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Icon" type="tns:IconType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Icon</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Border" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Border</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Opacity" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Opacity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FontSize" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FontSize</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Metadata" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Metadata</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Description" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TagType">
+    <xs:sequence>
+      <xs:element name="TagID" type="tns:TagIDType">
+        <xs:annotation>
+          <xs:documentation>TagID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TagName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TagName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TagDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TagDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TagColor" type="tns:ColorHexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TagColor</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ArchitectureDecisionType">
+    <xs:sequence>
+      <xs:element name="DecisionID" type="tns:DecisionIDType">
+        <xs:annotation>
+          <xs:documentation>DecisionID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DecisionTitle" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>DecisionTitle</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DecisionDate" type="xs:date">
+        <xs:annotation>
+          <xs:documentation>DecisionDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DecisionStatus" type="tns:ADRStatus">
+        <xs:annotation>
+          <xs:documentation>DecisionStatus</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Context" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Context</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Decision" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Decision</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Consequences" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Consequences</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Alternatives" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Alternatives</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RelatedDecisions" type="tns:DecisionIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>RelatedDecisions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ThreatModelType">
+    <xs:sequence>
+      <xs:element name="ThreatID" type="tns:ThreatIDType">
+        <xs:annotation>
+          <xs:documentation>ThreatID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ThreatTitle" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ThreatTitle</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ThreatCategory" type="tns:ThreatCategory">
+        <xs:annotation>
+          <xs:documentation>ThreatCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ThreatDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ThreatDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ThreatAgent" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ThreatAgent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RiskLevel" type="tns:RiskLevelType">
+        <xs:annotation>
+          <xs:documentation>RiskLevel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Likelihood" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Likelihood</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Impact" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Impact</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Mitigation" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Mitigation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AffectedElements" type="tns:ElementIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>AffectedElements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Status" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Status</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ArchitectureStructureType">
+    <xs:sequence>
+      <xs:element name="SystemLandscape" type="tns:SystemLandscapeType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SystemLandscape</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TechnicalArchitecture" type="tns:TechnicalArchitectureType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TechnicalArchitecture</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SecurityArchitecture" type="tns:SecurityArchitectureType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SecurityArchitecture</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataArchitecture" type="tns:DataArchitectureType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DataArchitecture</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SystemLandscapeType">
+    <xs:sequence>
+      <xs:element name="EnterpriseContext" type="tns:EnterpriseContextType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>EnterpriseContext</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="EnterpriseContextType">
+    <xs:sequence>
+      <xs:element name="EnterpriseName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>EnterpriseName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BusinessCapabilities" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>BusinessCapabilities</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OrganizationalUnits" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OrganizationalUnits</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BusinessContext" type="tns:BusinessContextType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>BusinessContext</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BusinessContextType">
+    <xs:sequence>
+      <xs:element name="BusinessProcess" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BusinessProcess</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BusinessActors" type="tns:PersonIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>BusinessActors</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BusinessSystems" type="tns:SystemIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>BusinessSystems</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TechnicalArchitectureType">
+    <xs:sequence>
+      <xs:element name="Layer" type="tns:LayerType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Layer</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="LayerType">
+    <xs:sequence>
+      <xs:element name="LayerName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>LayerName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LayerType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>LayerType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LayerDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>LayerDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LayerContainers" type="tns:LayerContainersType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>LayerContainers</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LayerProtocols" type="tns:LayerProtocolsType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>LayerProtocols</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="LayerContainersType">
+    <xs:sequence>
+      <xs:element name="ContainerRef" type="tns:ContainerIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ContainerRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="LayerProtocolsType">
+    <xs:sequence>
+      <xs:element name="Protocol" type="tns:ProtocolType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Protocol</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SecurityArchitectureType">
+    <xs:sequence>
+      <xs:element name="SecurityZone" type="tns:SecurityZoneType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SecurityZone</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SecurityZoneType">
+    <xs:sequence>
+      <xs:element name="ZoneName" type="tns:SecurityZone">
+        <xs:annotation>
+          <xs:documentation>ZoneName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ZoneDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ZoneDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TrustLevel" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TrustLevel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataClassification" type="tns:DataClassification" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DataClassification</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ZoneElements" type="tns:ZoneElementsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ZoneElements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SecurityControls" type="tns:SecurityControlsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SecurityControls</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ZoneElementsType">
+    <xs:sequence>
+      <xs:element name="ElementRef" type="tns:ElementIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ElementRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SecurityControlsType">
+    <xs:sequence>
+      <xs:element name="ControlName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ControlName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ControlType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ControlType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ControlDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ControlDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DataArchitectureType">
+    <xs:sequence>
+      <xs:element name="DataFlow" type="tns:DataFlowType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DataFlow</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DataFlowType">
+    <xs:sequence>
+      <xs:element name="FlowName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>FlowName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceElement" type="tns:ElementIDType">
+        <xs:annotation>
+          <xs:documentation>SourceElement</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetElement" type="tns:ElementIDType">
+        <xs:annotation>
+          <xs:documentation>TargetElement</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>DataType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataVolume" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DataVolume</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Frequency" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Frequency</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataClassification" type="tns:DataClassification" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DataClassification</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EncryptionRequired" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EncryptionRequired</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="C4Workspace" type="tns:WorkspaceType">
+    <xs:annotation>
+      <xs:documentation>Root element for C4 Model schema for software architecture documentation</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+</xs:schema>

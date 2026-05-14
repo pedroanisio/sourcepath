@@ -1,0 +1,478 @@
+<?xml version="1.0" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:ddd="https://schema.ddd-python.org/v3.0.0" xmlns:common="https://schema.ddd-python.org/v3.0.0/common" xmlns:domain="https://schema.ddd-python.org/v3.0.0/domain" xmlns:app="https://schema.ddd-python.org/v3.0.0/application" xmlns:infra="https://schema.ddd-python.org/v3.0.0/infrastructure" xmlns:cc="https://schema.ddd-python.org/v3.0.0/crosscutting" targetNamespace="https://schema.ddd-python.org/v3.0.0" elementFormDefault="qualified" version="3.0.0">
+  <!-- Import all module schemas -->
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/common" schemaLocation="common-types.xsd"/>
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/domain" schemaLocation="domain-types.xsd"/>
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/application" schemaLocation="application-types.xsd"/>
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/infrastructure" schemaLocation="infrastructure-types.xsd"/>
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/crosscutting" schemaLocation="cross-cutting-types.xsd"/>
+  <!-- Root Element -->
+  <xs:element name="ddd_application" type="ddd:dddApplicationType">
+    <xs:annotation>
+      <xs:documentation>
+        Domain-Driven Design Universal Application Schema v3.0.0
+        Complete production-ready schema for defining any DDD application
+      </xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <!-- Main Application Type -->
+  <xs:complexType name="dddApplicationType">
+    <xs:sequence>
+      <xs:element name="extends" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="schema" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="mixins" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="mixin" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="project" type="ddd:projectType"/>
+      <xs:element name="bounded_contexts">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="bounded_context" type="ddd:boundedContextType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="context_map" type="ddd:contextMapType" minOccurs="0"/>
+      <xs:element name="shared_kernel" type="ddd:sharedKernelType" minOccurs="0"/>
+      <xs:element name="event_sourcing" type="ddd:eventSourcingType" minOccurs="0"/>
+      <xs:element name="transactional_outbox" type="ddd:transactionalOutboxType" minOccurs="0"/>
+      <xs:element name="inbox_deduplication" type="ddd:inboxDeduplicationType" minOccurs="0"/>
+      <xs:element name="business_rules_engine" type="ddd:businessRulesEngineType" minOccurs="0"/>
+      <xs:element name="workflow_engine" type="ddd:workflowEngineType" minOccurs="0"/>
+      <xs:element name="document_management" type="ddd:documentManagementType" minOccurs="0"/>
+      <xs:element name="search_capabilities" type="ddd:searchCapabilitiesType" minOccurs="0"/>
+      <xs:element name="analytics" type="ddd:analyticsType" minOccurs="0"/>
+      <xs:element name="data_exchange" type="ddd:dataExchangeType" minOccurs="0"/>
+      <xs:element name="subscription_management" type="ddd:subscriptionManagementType" minOccurs="0"/>
+      <xs:element name="communication" type="ddd:communicationType" minOccurs="0"/>
+      <xs:element name="batch_operations" type="ddd:batchOperationsType" minOccurs="0"/>
+      <xs:element name="api_integrations" type="ddd:apiIntegrationsType" minOccurs="0"/>
+      <xs:element name="testing" type="ddd:testingType" minOccurs="0"/>
+      <xs:element name="security" type="ddd:securityType" minOccurs="0"/>
+      <xs:element name="observability" type="ddd:observabilityType" minOccurs="0"/>
+      <xs:element name="performance" type="ddd:performanceType" minOccurs="0"/>
+      <xs:element name="documentation" type="ddd:documentationType" minOccurs="0"/>
+      <xs:element name="deployment" type="ddd:deploymentType" minOccurs="0"/>
+      <xs:element name="workflows" type="ddd:workflowsType" minOccurs="0"/>
+      <xs:element name="evolution" type="ddd:evolutionType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Project Configuration Type -->
+  <xs:complexType name="projectType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="domain" type="xs:string"/>
+      <xs:element name="version" type="xs:string" default="1.0.0" minOccurs="0"/>
+      <xs:element name="python_version" type="common:pythonVersionType" default="3.11" minOccurs="0"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+      <xs:element name="metadata" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="architecture" type="ddd:architectureType" minOccurs="0"/>
+      <xs:element name="dependencies" type="ddd:dependenciesType" minOccurs="0"/>
+      <xs:element name="package_structure" type="ddd:packageStructureType" minOccurs="0"/>
+      <xs:element name="code_generation" type="ddd:codeGenerationType" minOccurs="0"/>
+      <xs:element name="plugins" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="plugin" type="ddd:pluginDefinitionType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Architecture Configuration Type -->
+  <xs:complexType name="architectureType">
+    <xs:all>
+      <xs:element name="style" type="common:architectureStyleType" default="hexagonal" minOccurs="0"/>
+      <xs:element name="api_framework" type="common:apiFrameworkType" default="fastapi" minOccurs="0"/>
+      <xs:element name="api_versioning" type="ddd:apiVersioningType" minOccurs="0"/>
+      <xs:element name="persistence" type="common:persistenceType" default="sqlalchemy" minOccurs="0"/>
+      <xs:element name="event_store" type="common:eventStoreType" default="inmemory" minOccurs="0"/>
+      <xs:element name="dependency_injection" type="ddd:dependencyInjectionType" default="dependency_injector" minOccurs="0"/>
+      <xs:element name="multi_tenancy" type="ddd:multiTenancyType" minOccurs="0"/>
+      <xs:element name="ports" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="port" type="ddd:portDefinitionType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <!-- Bounded Context Type -->
+  <xs:complexType name="boundedContextType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="subdomain_type" type="common:subdomainType"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+      <xs:element name="metadata" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="ubiquitous_language" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="term" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:simpleContent>
+                  <xs:extension base="xs:string">
+                    <xs:attribute name="key" type="xs:string" use="required"/>
+                  </xs:extension>
+                </xs:simpleContent>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="temporal_modeling" type="ddd:temporalConfigurationType" minOccurs="0"/>
+      <xs:element name="domain_layer" type="ddd:domainLayerType" minOccurs="0"/>
+      <xs:element name="application_layer" type="ddd:applicationLayerType" minOccurs="0"/>
+      <xs:element name="infrastructure_layer" type="ddd:infrastructureLayerType" minOccurs="0"/>
+      <xs:element name="presentation_layer" type="ddd:presentationLayerType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Layer Types -->
+  <xs:complexType name="domainLayerType">
+    <xs:all>
+      <xs:element name="aggregates" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="aggregate" type="domain:aggregateType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="entities" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="entity" type="domain:entityType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="value_objects" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="value_object" type="domain:valueObjectType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="domain_services" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="service" type="domain:domainServiceType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="domain_events" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="domain:domainEventType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="specifications" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="specification" type="domain:specificationType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="policies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="policy" type="domain:domainPolicyType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="factories" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="factory" type="domain:domainFactoryType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="computed_fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="computed_field" type="domain:computedFieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="applicationLayerType">
+    <xs:all>
+      <xs:element name="commands" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="command" type="app:commandType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="queries" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="query" type="app:queryType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="command_handlers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="handler" type="app:commandHandlerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="query_handlers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="handler" type="app:queryHandlerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="application_services" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="service" type="app:applicationServiceType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="dto" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dto" type="app:dtoType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="event_handlers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="handler" type="app:eventHandlerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="sagas" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="saga" type="app:sagaType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="notification_channels" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="channel" type="app:notificationChannelType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="use_cases" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="use_case" type="app:useCaseType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="infrastructureLayerType">
+    <xs:all>
+      <xs:element name="repositories" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="repository" type="infra:repositoryImplementationType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="external_services" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="service" type="infra:externalServiceType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="database_models" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="model" type="infra:databaseModelType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="event_store" type="infra:eventStoreConfigType" minOccurs="0"/>
+      <xs:element name="message_bus" type="infra:messageBusConfigType" minOccurs="0"/>
+      <xs:element name="adapters" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="adapter" type="infra:adapterType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="facades" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="facade" type="infra:facadeServiceType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="cache_repositories" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="repository" type="infra:cacheRepositoryType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="presentationLayerType">
+    <xs:all>
+      <xs:element name="controllers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="controller" type="cc:controllerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="api_endpoints" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="endpoint" type="cc:apiEndpointType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="serializers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="serializer" type="cc:serializerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="middleware" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="middleware" type="cc:middlewareType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="error_handlers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="handler" type="cc:errorHandlerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="graphql_schema" type="cc:graphqlSchemaType" minOccurs="0"/>
+      <xs:element name="websocket_handlers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="handler" type="cc:websocketHandlerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="sse_endpoints" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="endpoint" type="cc:sseEndpointType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <!-- Additional Complex Types (truncated for length - continues with all remaining types) -->
+  <xs:simpleType name="dependencyInjectionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="dependency_injector"/>
+      <xs:enumeration value="punq"/>
+      <xs:enumeration value="manual"/>
+      <xs:enumeration value="injector"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="apiVersioningType">
+    <xs:all>
+      <xs:element name="strategy" default="url_path" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="url_path"/>
+            <xs:enumeration value="header"/>
+            <xs:enumeration value="query_param"/>
+            <xs:enumeration value="content_negotiation"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="default_version" type="xs:string" default="v1" minOccurs="0"/>
+      <xs:element name="supported_versions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="version" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="multiTenancyType">
+    <xs:all>
+      <xs:element name="enabled" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="strategy" default="database" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="database"/>
+            <xs:enumeration value="schema"/>
+            <xs:enumeration value="shared"/>
+            <xs:enumeration value="hybrid"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="tenant_resolution" default="header" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="subdomain"/>
+            <xs:enumeration value="header"/>
+            <xs:enumeration value="jwt_claim"/>
+            <xs:enumeration value="path"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="data_isolation" default="complete" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="complete"/>
+            <xs:enumeration value="shared_reference"/>
+            <xs:enumeration value="row_level"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <!-- Stub definitions for remaining complex types -->
+  <xs:complexType name="portDefinitionType"/>
+  <xs:complexType name="dependenciesType"/>
+  <xs:complexType name="packageStructureType"/>
+  <xs:complexType name="codeGenerationType"/>
+  <xs:complexType name="pluginDefinitionType"/>
+  <xs:complexType name="temporalConfigurationType"/>
+  <xs:complexType name="contextMapType"/>
+  <xs:complexType name="sharedKernelType"/>
+  <xs:complexType name="eventSourcingType"/>
+  <xs:complexType name="transactionalOutboxType"/>
+  <xs:complexType name="inboxDeduplicationType"/>
+  <xs:complexType name="businessRulesEngineType"/>
+  <xs:complexType name="workflowEngineType"/>
+  <xs:complexType name="documentManagementType"/>
+  <xs:complexType name="searchCapabilitiesType"/>
+  <xs:complexType name="analyticsType"/>
+  <xs:complexType name="dataExchangeType"/>
+  <xs:complexType name="subscriptionManagementType"/>
+  <xs:complexType name="communicationType"/>
+  <xs:complexType name="batchOperationsType"/>
+  <xs:complexType name="apiIntegrationsType"/>
+  <xs:complexType name="testingType"/>
+  <xs:complexType name="securityType"/>
+  <xs:complexType name="observabilityType"/>
+  <xs:complexType name="performanceType"/>
+  <xs:complexType name="documentationType"/>
+  <xs:complexType name="deploymentType"/>
+  <xs:complexType name="workflowsType"/>
+  <xs:complexType name="evolutionType"/>
+</xs:schema>

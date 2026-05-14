@@ -31,7 +31,14 @@ frontend/
 tests/
 ├── verify_l2.py        chunks_embeddings contract suite
 ├── verify_l3.py        concept_graph contract + cross-layer (with/without L2)
-└── verify_xrefs.py     symbol_xrefs schema/vocab/sidecar (Phase 1)
+├── verify_xrefs.py     symbol_xrefs schema/vocab/sidecar (Phase 1)
+└── verify_xsd_fixture.py  static/schemas/ classifier coverage
+static/
+└── schemas/            vendored industry-standard XSDs (IEEE 12207/29148,
+                        IEC 5055, EIC, DDD v3, C4, AST, python-metacode,
+                        ddd-python-bridge); used as classifier fixtures and
+                        a future vocab seed. See static/schemas/ for the
+                        full inventory.
 ```
 
 ## Install
@@ -274,6 +281,7 @@ python tests/verify_vocab_emission.py       # controlled-vocab RDF + SHACL
 python tests/verify_vocab_wiring.py         # controlled-vocab aggregator wiring
 python tests/verify_vocab_pipeline.py       # controlled-vocab end-to-end pipeline
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
+python tests/verify_xsd_fixture.py          # static/schemas/ classifier coverage
 ```
 
 All verifiers resolve `repo_root` from their own `__file__`, so they

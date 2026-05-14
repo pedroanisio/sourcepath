@@ -1,0 +1,407 @@
+<?xml version="1.0" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:domain="https://schema.ddd-python.org/v3.0.0/domain" xmlns:common="https://schema.ddd-python.org/v3.0.0/common" targetNamespace="https://schema.ddd-python.org/v3.0.0/domain" elementFormDefault="qualified" version="3.0.0">
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/common" schemaLocation="common-types.xsd"/>
+  <!-- Aggregate Type -->
+  <xs:complexType name="aggregateType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+      <xs:element name="metadata" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="root_entity" type="xs:string"/>
+      <xs:element name="entities" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="entity" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="value_objects" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="value_object" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="invariants" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="invariant" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="commands" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="command" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="events" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="version" type="xs:integer" default="1" minOccurs="0"/>
+      <xs:element name="lifecycle_hooks" type="domain:lifecycleHooksType" minOccurs="0"/>
+      <xs:element name="concurrency_control" type="common:concurrencyControlType" default="optimistic_locking" minOccurs="0"/>
+      <xs:element name="state_transitions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="transition" type="domain:stateTransitionType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="aggregate_references" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="reference" type="domain:aggregateReferenceType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="consistency_boundary" type="domain:consistencyBoundaryType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Entity Type -->
+  <xs:complexType name="entityType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+      <xs:element name="identity_field" type="xs:string"/>
+      <xs:element name="fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="computed_fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="computed_field" type="domain:computedFieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="methods" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="method" type="domain:domainMethodType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="relationships" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="relationship" type="domain:relationshipType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="base_class" type="xs:string" default="Entity" minOccurs="0"/>
+      <xs:element name="auditable" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="soft_delete" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="temporal" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Value Object Type -->
+  <xs:complexType name="valueObjectType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+      <xs:element name="fields">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="validation_rules" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="rule" type="common:validationRuleComplexType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="methods" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="method" type="domain:domainMethodType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="immutable" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="base_class" type="xs:string" default="ValueObject" minOccurs="0"/>
+      <xs:element name="comparable" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="serializable" type="xs:boolean" default="true" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Domain Service Type -->
+  <xs:complexType name="domainServiceType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="methods">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="method" type="domain:domainMethodType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="dependencies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dependency" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Domain Event Type -->
+  <xs:complexType name="domainEventType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="aggregate_id" type="xs:string" minOccurs="0"/>
+      <xs:element name="fields">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="metadata" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="version" type="xs:integer" default="1" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Supporting Types -->
+  <xs:complexType name="lifecycleHooksType">
+    <xs:all>
+      <xs:element name="on_create" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="hook" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="on_update" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="hook" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="on_delete" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="hook" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="on_restore" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="hook" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="stateTransitionType">
+    <xs:sequence>
+      <xs:element name="from_state" type="xs:string"/>
+      <xs:element name="to_state" type="xs:string"/>
+      <xs:element name="trigger" type="xs:string"/>
+      <xs:element name="guard" type="xs:string" minOccurs="0"/>
+      <xs:element name="action" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="aggregateReferenceType">
+    <xs:sequence>
+      <xs:element name="referenced_aggregate" type="xs:string"/>
+      <xs:element name="reference_type" default="id_only">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="id_only"/>
+            <xs:enumeration value="snapshot"/>
+            <xs:enumeration value="projection"/>
+            <xs:enumeration value="full"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="consistency" default="eventual" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="immediate"/>
+            <xs:enumeration value="eventual"/>
+            <xs:enumeration value="weak"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="staleness_tolerance_ms" type="xs:integer" minOccurs="0"/>
+      <xs:element name="cascade_events" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="consistencyBoundaryType">
+    <xs:all>
+      <xs:element name="strong_consistency" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="entity" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="eventual_consistency" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="entity" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="computedFieldType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="computation" type="xs:string"/>
+      <xs:element name="return_type" type="xs:string"/>
+      <xs:element name="dependencies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dependency" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="cache_strategy" default="lazy" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="none"/>
+            <xs:enumeration value="lazy"/>
+            <xs:enumeration value="eager"/>
+            <xs:enumeration value="ttl"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="cache_ttl" type="xs:integer" minOccurs="0"/>
+      <xs:element name="trigger" default="on_read" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="on_read"/>
+            <xs:enumeration value="on_write"/>
+            <xs:enumeration value="scheduled"/>
+            <xs:enumeration value="on_event"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="async" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="domainMethodType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="parameters" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="parameter" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="return_type" type="xs:string" minOccurs="0"/>
+      <xs:element name="preconditions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="precondition" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="postconditions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="postcondition" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="relationshipType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="target" type="xs:string"/>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="one_to_one"/>
+            <xs:enumeration value="one_to_many"/>
+            <xs:enumeration value="many_to_one"/>
+            <xs:enumeration value="many_to_many"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="cascade" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="lazy" type="xs:boolean" default="true" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="specificationType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="expression" type="xs:string"/>
+      <xs:element name="error_message" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="domainPolicyType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="rules">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="rule" type="domain:businessRuleType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="businessRuleType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="condition" type="xs:string"/>
+      <xs:element name="action" type="xs:string"/>
+      <xs:element name="priority" type="xs:integer" minOccurs="0"/>
+      <xs:element name="enabled" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="domainFactoryType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="creates" type="xs:string"/>
+      <xs:element name="methods">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="method" type="domain:domainMethodType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="domainExceptionType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="error_code" type="xs:string" minOccurs="0"/>
+      <xs:element name="http_status" type="xs:integer" minOccurs="0"/>
+      <xs:element name="fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

@@ -1,0 +1,2011 @@
+<?xml version='1.0' encoding='utf-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="https://schemas.iso.org/iec/5055/2021" xmlns:tns="https://schemas.iso.org/iec/5055/2021" elementFormDefault="qualified" attributeFormDefault="unqualified" version="2021.1">
+  <xs:annotation>
+    <xs:documentation>ISO/IEC 5055-compliant schema for automated source code quality measurement</xs:documentation>
+  </xs:annotation>
+  <xs:simpleType name="AssessmentIDType">
+    <xs:annotation>
+      <xs:documentation>AssessmentID identifier pattern ASSESS-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="ASSESS-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ApplicationIDType">
+    <xs:annotation>
+      <xs:documentation>ApplicationID identifier pattern APP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="APP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComponentIDType">
+    <xs:annotation>
+      <xs:documentation>ComponentID identifier pattern COMP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="COMP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ModuleIDType">
+    <xs:annotation>
+      <xs:documentation>ModuleID identifier pattern MOD-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="MOD-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ViolationIDType">
+    <xs:annotation>
+      <xs:documentation>ViolationID identifier pattern VIOL-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="VIOL-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RuleIDType">
+    <xs:annotation>
+      <xs:documentation>RuleID identifier pattern RULE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="RULE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatternIDType">
+    <xs:annotation>
+      <xs:documentation>PatternID identifier pattern PTRN-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="PTRN-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="WeaknessIDType">
+    <xs:annotation>
+      <xs:documentation>WeaknessID identifier pattern CWE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="CWE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RemediationIDType">
+    <xs:annotation>
+      <xs:documentation>RemediationID identifier pattern REM-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="REM-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="BaselineIDType">
+    <xs:annotation>
+      <xs:documentation>BaselineID identifier pattern BASE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="BASE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TrendIDType">
+    <xs:annotation>
+      <xs:documentation>TrendID identifier pattern TREND-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TREND-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ThresholdIDType">
+    <xs:annotation>
+      <xs:documentation>ThresholdID identifier pattern THRESH-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="THRESH-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ScanIDType">
+    <xs:annotation>
+      <xs:documentation>ScanID identifier pattern SCAN-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="SCAN-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TechnologyIDType">
+    <xs:annotation>
+      <xs:documentation>TechnologyID identifier pattern TECH-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TECH-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComplianceRateType">
+    <xs:annotation>
+      <xs:documentation>ComplianceRate percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CodeCoverageType">
+    <xs:annotation>
+      <xs:documentation>CodeCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RuleViolationRateType">
+    <xs:annotation>
+      <xs:documentation>RuleViolationRate percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RemediationProgressType">
+    <xs:annotation>
+      <xs:documentation>RemediationProgress percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="QualityImprovementType">
+    <xs:annotation>
+      <xs:documentation>QualityImprovement percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TechnicalDebtRatioType">
+    <xs:annotation>
+      <xs:documentation>TechnicalDebtRatio percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SecurityCoverageType">
+    <xs:annotation>
+      <xs:documentation>SecurityCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TestCoverageType">
+    <xs:annotation>
+      <xs:documentation>TestCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="QualityScoreType">
+    <xs:annotation>
+      <xs:documentation>Overall quality score</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0.0" />
+      <xs:maxInclusive value="100.0" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SeverityScoreType">
+    <xs:annotation>
+      <xs:documentation>Violation severity score</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1.0" />
+      <xs:maxInclusive value="10.0" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComplexityIndexType">
+    <xs:annotation>
+      <xs:documentation>Cyclomatic complexity</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1" />
+      <xs:maxInclusive value="1000" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TechnicalDebtHoursType">
+    <xs:annotation>
+      <xs:documentation>Technical debt in hours</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RiskIndexType">
+    <xs:annotation>
+      <xs:documentation>Risk assessment index</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0.0" />
+      <xs:maxInclusive value="100.0" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="MaintainabilityIndexType">
+    <xs:annotation>
+      <xs:documentation>Maintainability index</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0.0" />
+      <xs:maxInclusive value="100.0" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PropagationCostType">
+    <xs:annotation>
+      <xs:documentation>Change propagation cost</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0.0" />
+      <xs:maxInclusive value="1.0" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CouplingLevelType">
+    <xs:annotation>
+      <xs:documentation>Coupling between components</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GUIDType">
+    <xs:annotation>
+      <xs:documentation>UUID/GUID pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" />
+      <xs:minLength value="36" />
+      <xs:maxLength value="36" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="VersionType">
+    <xs:annotation>
+      <xs:documentation>Version pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d+\\.\\d+(\\.\\d+)?" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CwereferenceType">
+    <xs:annotation>
+      <xs:documentation>Cwe Reference pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="CWE-\\d+" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="OwaspreferenceType">
+    <xs:annotation>
+      <xs:documentation>Owasp Reference pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="A\\d{1,2}:\\d{4}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="FilepathType">
+    <xs:annotation>
+      <xs:documentation>File Path pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="[^\\0]+" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="LinerangeType">
+    <xs:annotation>
+      <xs:documentation>Line Range pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d+(-\\d+)?" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CodesnippetType">
+    <xs:annotation>
+      <xs:documentation>Code Snippet pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value=".{1,5000}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="QualityCharacteristicType">
+    <xs:annotation>
+      <xs:documentation>ISO/IEC 5055 Core Quality Characteristics</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Reliability">
+        <xs:annotation>
+          <xs:documentation>Degree to which a system performs specified functions under specified conditions</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Security">
+        <xs:annotation>
+          <xs:documentation>Degree to which information and data are protected</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Performance Efficiency">
+        <xs:annotation>
+          <xs:documentation>Performance relative to the amount of resources used</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Maintainability">
+        <xs:annotation>
+          <xs:documentation>Degree of effectiveness and efficiency with which the product can be modified</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ReliabilityMeasureType">
+    <xs:annotation>
+      <xs:documentation>Reliability Quality Measures</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Null Pointer Dereference">
+        <xs:annotation>
+          <xs:documentation>Accessing memory through null pointer</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Resource Management">
+        <xs:annotation>
+          <xs:documentation>Improper resource allocation/deallocation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Memory Corruption">
+        <xs:annotation>
+          <xs:documentation>Buffer overflow and memory violations</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Synchronization Issues">
+        <xs:annotation>
+          <xs:documentation>Race conditions and deadlocks</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Exception Handling">
+        <xs:annotation>
+          <xs:documentation>Improper error and exception handling</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Type Conversion">
+        <xs:annotation>
+          <xs:documentation>Unsafe type conversions</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="API Misuse">
+        <xs:annotation>
+          <xs:documentation>Incorrect API usage patterns</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Data Integrity">
+        <xs:annotation>
+          <xs:documentation>Data corruption vulnerabilities</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SecurityMeasureType">
+    <xs:annotation>
+      <xs:documentation>Security Quality Measures</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Input Validation">
+        <xs:annotation>
+          <xs:documentation>Improper input validation and sanitization</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="SQL Injection">
+        <xs:annotation>
+          <xs:documentation>SQL injection vulnerabilities</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="XSS">
+        <xs:annotation>
+          <xs:documentation>Cross-site scripting vulnerabilities</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Path Traversal">
+        <xs:annotation>
+          <xs:documentation>Directory traversal vulnerabilities</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Command Injection">
+        <xs:annotation>
+          <xs:documentation>OS command injection</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Authentication">
+        <xs:annotation>
+          <xs:documentation>Weak authentication mechanisms</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Cryptography">
+        <xs:annotation>
+          <xs:documentation>Weak cryptographic practices</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Session Management">
+        <xs:annotation>
+          <xs:documentation>Improper session handling</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Access Control">
+        <xs:annotation>
+          <xs:documentation>Broken access control</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Information Exposure">
+        <xs:annotation>
+          <xs:documentation>Sensitive data exposure</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PerformanceMeasureType">
+    <xs:annotation>
+      <xs:documentation>Performance Efficiency Quality Measures</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Algorithm Complexity">
+        <xs:annotation>
+          <xs:documentation>Inefficient algorithms</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Database Performance">
+        <xs:annotation>
+          <xs:documentation>Inefficient database operations</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Memory Leaks">
+        <xs:annotation>
+          <xs:documentation>Memory not properly released</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Resource Contention">
+        <xs:annotation>
+          <xs:documentation>Excessive resource locking</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Caching Issues">
+        <xs:annotation>
+          <xs:documentation>Improper or missing caching</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Network Latency">
+        <xs:annotation>
+          <xs:documentation>Excessive network calls</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Loop Inefficiency">
+        <xs:annotation>
+          <xs:documentation>Inefficient loop constructs</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="String Operations">
+        <xs:annotation>
+          <xs:documentation>Inefficient string handling</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="MaintainabilityMeasureType">
+    <xs:annotation>
+      <xs:documentation>Maintainability Quality Measures</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Code Complexity">
+        <xs:annotation>
+          <xs:documentation>High cyclomatic complexity</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Code Duplication">
+        <xs:annotation>
+          <xs:documentation>Duplicated code blocks</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Dead Code">
+        <xs:annotation>
+          <xs:documentation>Unreachable or unused code</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Documentation">
+        <xs:annotation>
+          <xs:documentation>Missing or inadequate documentation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Naming Conventions">
+        <xs:annotation>
+          <xs:documentation>Poor naming standards</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Coupling">
+        <xs:annotation>
+          <xs:documentation>High coupling between modules</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Cohesion">
+        <xs:annotation>
+          <xs:documentation>Low cohesion within modules</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Architecture Violations">
+        <xs:annotation>
+          <xs:documentation>Violations of architectural patterns</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ViolationSeverityType">
+    <xs:annotation>
+      <xs:documentation>ViolationSeverityType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Info">
+        <xs:annotation>
+          <xs:documentation>Informational finding</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Minor">
+        <xs:annotation>
+          <xs:documentation>Minor issue with minimal impact</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Major">
+        <xs:annotation>
+          <xs:documentation>Significant issue requiring attention</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Critical">
+        <xs:annotation>
+          <xs:documentation>Critical issue requiring immediate action</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Blocker">
+        <xs:annotation>
+          <xs:documentation>Blocking issue preventing release</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RemediationPriorityType">
+    <xs:annotation>
+      <xs:documentation>RemediationPriorityType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Immediate" />
+      <xs:enumeration value="High" />
+      <xs:enumeration value="Medium" />
+      <xs:enumeration value="Low" />
+      <xs:enumeration value="Deferred" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="LanguageType">
+    <xs:annotation>
+      <xs:documentation>LanguageType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Java" />
+      <xs:enumeration value="C" />
+      <xs:enumeration value="C++" />
+      <xs:enumeration value="C#" />
+      <xs:enumeration value="Python" />
+      <xs:enumeration value="JavaScript" />
+      <xs:enumeration value="TypeScript" />
+      <xs:enumeration value="Go" />
+      <xs:enumeration value="Rust" />
+      <xs:enumeration value="Swift" />
+      <xs:enumeration value="Kotlin" />
+      <xs:enumeration value="Ruby" />
+      <xs:enumeration value="PHP" />
+      <xs:enumeration value="COBOL" />
+      <xs:enumeration value="SQL" />
+      <xs:enumeration value="ABAP" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="FrameworkType">
+    <xs:annotation>
+      <xs:documentation>FrameworkType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Spring" />
+      <xs:enumeration value="Django" />
+      <xs:enumeration value="React" />
+      <xs:enumeration value="Angular" />
+      <xs:enumeration value="Vue" />
+      <xs:enumeration value=".NET" />
+      <xs:enumeration value="Rails" />
+      <xs:enumeration value="Express" />
+      <xs:enumeration value="Flask" />
+      <xs:enumeration value="Laravel" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AssessmentStatusType">
+    <xs:annotation>
+      <xs:documentation>AssessmentStatusType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Pending" />
+      <xs:enumeration value="In Progress" />
+      <xs:enumeration value="Completed" />
+      <xs:enumeration value="Failed" />
+      <xs:enumeration value="Partial" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComponentTypeType">
+    <xs:annotation>
+      <xs:documentation>ComponentTypeType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Application" />
+      <xs:enumeration value="Service" />
+      <xs:enumeration value="Library" />
+      <xs:enumeration value="Module" />
+      <xs:enumeration value="Package" />
+      <xs:enumeration value="Class" />
+      <xs:enumeration value="Function" />
+      <xs:enumeration value="Database" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AnalysisTypeType">
+    <xs:annotation>
+      <xs:documentation>AnalysisTypeType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Static" />
+      <xs:enumeration value="Dynamic" />
+      <xs:enumeration value="Interactive" />
+      <xs:enumeration value="Composition" />
+      <xs:enumeration value="Configuration" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RemediationStatusType">
+    <xs:annotation>
+      <xs:documentation>RemediationStatusType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Open" />
+      <xs:enumeration value="In Progress" />
+      <xs:enumeration value="Fixed" />
+      <xs:enumeration value="Won't Fix" />
+      <xs:enumeration value="False Positive" />
+      <xs:enumeration value="Accepted Risk" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TrendDirectionType">
+    <xs:annotation>
+      <xs:documentation>TrendDirectionType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Improving" />
+      <xs:enumeration value="Stable" />
+      <xs:enumeration value="Degrading" />
+      <xs:enumeration value="Unknown" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RuleOriginType">
+    <xs:annotation>
+      <xs:documentation>RuleOriginType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ISO/IEC 5055">
+        <xs:annotation>
+          <xs:documentation>ISO/IEC 5055 standard rule</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="CWE">
+        <xs:annotation>
+          <xs:documentation>Common Weakness Enumeration</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="OWASP">
+        <xs:annotation>
+          <xs:documentation>OWASP Top 10</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="CERT">
+        <xs:annotation>
+          <xs:documentation>CERT Secure Coding</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Custom">
+        <xs:annotation>
+          <xs:documentation>Organization-specific rule</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="AssessmentType">
+    <xs:sequence>
+      <xs:element name="Assessment" type="tns:AssessmentType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual assessment</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AssessmentID" type="tns:AssessmentIDType">
+        <xs:annotation>
+          <xs:documentation>AssessmentID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AssessmentGUID" type="tns:GUIDType">
+        <xs:annotation>
+          <xs:documentation>AssessmentGUID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AssessmentName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AssessmentName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AssessmentDate" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>AssessmentDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AssessmentStatus" type="tns:AssessmentStatusType">
+        <xs:annotation>
+          <xs:documentation>AssessmentStatus</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AssessmentType" type="tns:AnalysisTypeType">
+        <xs:annotation>
+          <xs:documentation>AssessmentType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OrganizationName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>OrganizationName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TeamName" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TeamName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ToolName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ToolName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ToolVersion" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ToolVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StandardVersion" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>StandardVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Description" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OverallMetrics" type="tns:OverallMetricsType">
+        <xs:annotation>
+          <xs:documentation>OverallMetrics</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="QualityScores" type="tns:QualityScoresType">
+        <xs:annotation>
+          <xs:documentation>QualityScores</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ExecutionContext" type="tns:ExecutionContextType">
+        <xs:annotation>
+          <xs:documentation>ExecutionContext</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="QualityStructure" type="tns:QualityStructureType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ISO_IEC_5055 domain-specific structure elements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="optional" />
+    <xs:attribute name="version" type="xs:string" use="optional" fixed="2021.1" />
+    <xs:attribute name="generated" type="xs:dateTime" use="required" />
+    <xs:key name="AssessmentKey">
+      <xs:selector xpath=".//tns:Assessment" />
+      <xs:field xpath="@id" />
+    </xs:key>
+    <xs:unique name="UniqueAssessmentIDID">
+      <xs:selector xpath=".//tns:Assessment" />
+      <xs:field xpath="tns:AssessmentIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueApplicationIDID">
+      <xs:selector xpath=".//tns:Application" />
+      <xs:field xpath="tns:ApplicationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueComponentIDID">
+      <xs:selector xpath=".//tns:Component" />
+      <xs:field xpath="tns:ComponentIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueModuleIDID">
+      <xs:selector xpath=".//tns:Module" />
+      <xs:field xpath="tns:ModuleIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueViolationIDID">
+      <xs:selector xpath=".//tns:Violation" />
+      <xs:field xpath="tns:ViolationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueRuleIDID">
+      <xs:selector xpath=".//tns:Rule" />
+      <xs:field xpath="tns:RuleIDType" />
+    </xs:unique>
+    <xs:unique name="UniquePatternIDID">
+      <xs:selector xpath=".//tns:Pattern" />
+      <xs:field xpath="tns:PatternIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueWeaknessIDID">
+      <xs:selector xpath=".//tns:Weakness" />
+      <xs:field xpath="tns:WeaknessIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueRemediationIDID">
+      <xs:selector xpath=".//tns:Remediation" />
+      <xs:field xpath="tns:RemediationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueBaselineIDID">
+      <xs:selector xpath=".//tns:Baseline" />
+      <xs:field xpath="tns:BaselineIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueTrendIDID">
+      <xs:selector xpath=".//tns:Trend" />
+      <xs:field xpath="tns:TrendIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueThresholdIDID">
+      <xs:selector xpath=".//tns:Threshold" />
+      <xs:field xpath="tns:ThresholdIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueScanIDID">
+      <xs:selector xpath=".//tns:Scan" />
+      <xs:field xpath="tns:ScanIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueTechnologyIDID">
+      <xs:selector xpath=".//tns:Technology" />
+      <xs:field xpath="tns:TechnologyIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueApplicationID">
+      <xs:selector xpath=".//tns:Application" />
+      <xs:field xpath="tns:ApplicationID" />
+    </xs:unique>
+    <xs:unique name="UniqueComponentID">
+      <xs:selector xpath=".//tns:Component" />
+      <xs:field xpath="tns:ComponentID" />
+    </xs:unique>
+    <xs:unique name="UniqueModuleID">
+      <xs:selector xpath=".//tns:Module" />
+      <xs:field xpath="tns:ModuleID" />
+    </xs:unique>
+    <xs:unique name="UniqueQualityRuleID">
+      <xs:selector xpath=".//tns:QualityRule" />
+      <xs:field xpath="tns:QualityRuleID" />
+    </xs:unique>
+    <xs:unique name="UniqueViolationID">
+      <xs:selector xpath=".//tns:Violation" />
+      <xs:field xpath="tns:ViolationID" />
+    </xs:unique>
+    <xs:unique name="UniqueRemediationPlanID">
+      <xs:selector xpath=".//tns:RemediationPlan" />
+      <xs:field xpath="tns:RemediationPlanID" />
+    </xs:unique>
+    <xs:unique name="UniqueBaselineID">
+      <xs:selector xpath=".//tns:Baseline" />
+      <xs:field xpath="tns:BaselineID" />
+    </xs:unique>
+    <xs:unique name="UniqueTrendAnalysisID">
+      <xs:selector xpath=".//tns:TrendAnalysis" />
+      <xs:field xpath="tns:TrendAnalysisID" />
+    </xs:unique>
+    <xs:unique name="UniqueQualityThresholdID">
+      <xs:selector xpath=".//tns:QualityThreshold" />
+      <xs:field xpath="tns:QualityThresholdID" />
+    </xs:unique>
+    <xs:unique name="UniqueTechnologyID">
+      <xs:selector xpath=".//tns:Technology" />
+      <xs:field xpath="tns:TechnologyID" />
+    </xs:unique>
+    <xs:unique name="UniqueApplicationLinesOfCode">
+      <xs:selector xpath=".//tns:Application" />
+      <xs:field xpath="tns:LinesOfCode" />
+    </xs:unique>
+    <xs:unique name="UniqueComponentLinesOfCode">
+      <xs:selector xpath=".//tns:Component" />
+      <xs:field xpath="tns:LinesOfCode" />
+    </xs:unique>
+    <xs:unique name="UniqueModuleLinesOfCode">
+      <xs:selector xpath=".//tns:Module" />
+      <xs:field xpath="tns:LinesOfCode" />
+    </xs:unique>
+    <xs:unique name="UniqueTechnologyLinesOfCode">
+      <xs:selector xpath=".//tns:Technology" />
+      <xs:field xpath="tns:LinesOfCode" />
+    </xs:unique>
+    <xs:keyref name="ViolationRuleReference" refer="tns:UniqueRuleID">
+      <xs:selector xpath=".//tns:ViolationRuleRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ViolationApplicationReference" refer="tns:UniqueApplicationID">
+      <xs:selector xpath=".//tns:ViolationApplicationRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ViolationComponentReference" refer="tns:UniqueComponentID">
+      <xs:selector xpath=".//tns:ViolationComponentRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="RemediationViolationReference" refer="tns:UniqueViolationID">
+      <xs:selector xpath=".//tns:RemediationViolationRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ThresholdCharacteristicReference" refer="tns:UniqueQualityCharacteristicID">
+      <xs:selector xpath=".//tns:ThresholdCharacteristicRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="CustomRuleReference" refer="tns:UniqueRuleID">
+      <xs:selector xpath=".//tns:CustomRuleRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ThresholdProfileReference" refer="tns:UniqueThresholdID">
+      <xs:selector xpath=".//tns:ThresholdProfileRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+  </xs:complexType>
+  <xs:complexType name="OverallMetricsType">
+    <xs:sequence>
+      <xs:element name="TotalLinesOfCode" type="xs:long">
+        <xs:annotation>
+          <xs:documentation>TotalLinesOfCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TotalFiles" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>TotalFiles</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TotalViolations" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>TotalViolations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CriticalViolations" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>CriticalViolations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MajorViolations" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>MajorViolations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MinorViolations" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>MinorViolations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OverallQualityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>OverallQualityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComplianceRate" type="tns:ComplianceRateType">
+        <xs:annotation>
+          <xs:documentation>ComplianceRate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TechnicalDebtHours" type="tns:TechnicalDebtHoursType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TechnicalDebtHours</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TechnicalDebtRatio" type="tns:TechnicalDebtRatioType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TechnicalDebtRatio</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="QualityScoresType">
+    <xs:sequence>
+      <xs:element name="ReliabilityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>ReliabilityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SecurityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>SecurityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PerformanceScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>PerformanceScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MaintainabilityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>MaintainabilityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ExecutionContextType">
+    <xs:sequence>
+      <xs:element name="StartTime" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>StartTime</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EndTime" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>EndTime</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Duration" type="xs:duration">
+        <xs:annotation>
+          <xs:documentation>Duration</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MachineInfo" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MachineInfo</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OperatingSystem" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OperatingSystem</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ProcessorCores" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ProcessorCores</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MemoryGB" type="xs:decimal" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MemoryGB</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ApplicationType">
+    <xs:sequence>
+      <xs:element name="ApplicationID" type="tns:ApplicationIDType">
+        <xs:annotation>
+          <xs:documentation>ApplicationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicationName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ApplicationName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicationVersion" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ApplicationVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicationType" type="tns:ComponentTypeType">
+        <xs:annotation>
+          <xs:documentation>ApplicationType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Repository" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Repository</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Branch" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Branch</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CommitHash" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CommitHash</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PrimaryLanguage" type="tns:LanguageType">
+        <xs:annotation>
+          <xs:documentation>PrimaryLanguage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Frameworks" type="tns:FrameworkType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Frameworks</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LinesOfCode" type="xs:long">
+        <xs:annotation>
+          <xs:documentation>LinesOfCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FileCount" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>FileCount</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Components" type="tns:ComponentsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Components</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ComponentsType">
+    <xs:sequence>
+      <xs:element name="Component" type="tns:ComponentType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Component</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ComponentType">
+    <xs:sequence>
+      <xs:element name="ComponentID" type="tns:ComponentIDType">
+        <xs:annotation>
+          <xs:documentation>ComponentID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComponentName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ComponentName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComponentType" type="tns:ComponentTypeType">
+        <xs:annotation>
+          <xs:documentation>ComponentType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComponentPath" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ComponentPath</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Language" type="tns:LanguageType">
+        <xs:annotation>
+          <xs:documentation>Language</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LinesOfCode" type="xs:long">
+        <xs:annotation>
+          <xs:documentation>LinesOfCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CyclomaticComplexity" type="tns:ComplexityIndexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CyclomaticComplexity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CouplingLevel" type="tns:CouplingLevelType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CouplingLevel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MaintainabilityIndex" type="tns:MaintainabilityIndexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MaintainabilityIndex</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Modules" type="tns:ModulesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Modules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ModulesType">
+    <xs:sequence>
+      <xs:element name="Module" type="tns:ModuleType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Module</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ModuleType">
+    <xs:sequence>
+      <xs:element name="ModuleID" type="tns:ModuleIDType">
+        <xs:annotation>
+          <xs:documentation>ModuleID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ModuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ModuleName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ModulePath" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ModulePath</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StartLine" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>StartLine</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EndLine" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EndLine</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LinesOfCode" type="xs:long">
+        <xs:annotation>
+          <xs:documentation>LinesOfCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComplexityScore" type="tns:ComplexityIndexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ComplexityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="QualityRuleType">
+    <xs:sequence>
+      <xs:element name="RuleID" type="tns:RuleIDType">
+        <xs:annotation>
+          <xs:documentation>RuleID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="QualityCharacteristic" type="tns:QualityCharacteristicType">
+        <xs:annotation>
+          <xs:documentation>QualityCharacteristic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleOrigin" type="tns:RuleOriginType">
+        <xs:annotation>
+          <xs:documentation>RuleOrigin</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CWEReference" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CWEReference</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OWASPReference" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OWASPReference</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DefaultSeverity" type="tns:ViolationSeverityType">
+        <xs:annotation>
+          <xs:documentation>DefaultSeverity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RemediationCost" type="tns:TechnicalDebtHoursType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RemediationCost</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Tags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Tags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ViolationType">
+    <xs:sequence>
+      <xs:element name="ViolationID" type="tns:ViolationIDType">
+        <xs:annotation>
+          <xs:documentation>ViolationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleID" type="tns:RuleIDType">
+        <xs:annotation>
+          <xs:documentation>RuleID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicationID" type="tns:ApplicationIDType">
+        <xs:annotation>
+          <xs:documentation>ApplicationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComponentID" type="tns:ComponentIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ComponentID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ModuleID" type="tns:ModuleIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ModuleID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FilePath" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>FilePath</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StartLine" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>StartLine</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EndLine" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EndLine</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StartColumn" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>StartColumn</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EndColumn" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EndColumn</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CodeSnippet" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CodeSnippet</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViolationMessage" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ViolationMessage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Severity" type="tns:ViolationSeverityType">
+        <xs:annotation>
+          <xs:documentation>Severity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RemediationStatus" type="tns:RemediationStatusType">
+        <xs:annotation>
+          <xs:documentation>RemediationStatus</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RemediationEffort" type="tns:TechnicalDebtHoursType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RemediationEffort</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DetectionDate" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>DetectionDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FixedDate" type="xs:dateTime" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FixedDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AssignedTo" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>AssignedTo</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FalsePositive" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FalsePositive</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PropagationCost" type="tns:PropagationCostType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PropagationCost</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RemediationPlanType">
+    <xs:sequence>
+      <xs:element name="RemediationID" type="tns:RemediationIDType">
+        <xs:annotation>
+          <xs:documentation>RemediationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViolationID" type="tns:ViolationIDType">
+        <xs:annotation>
+          <xs:documentation>ViolationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Priority" type="tns:RemediationPriorityType">
+        <xs:annotation>
+          <xs:documentation>Priority</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EstimatedEffort" type="tns:TechnicalDebtHoursType">
+        <xs:annotation>
+          <xs:documentation>EstimatedEffort</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ActualEffort" type="tns:TechnicalDebtHoursType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ActualEffort</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RemediationSteps" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RemediationSteps</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ResponsibleTeam" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ResponsibleTeam</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetDate" type="xs:date" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TargetDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CompletionDate" type="xs:date" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CompletionDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RemediationNotes" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RemediationNotes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="VerificationRequired" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>VerificationRequired</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BaselineType">
+    <xs:sequence>
+      <xs:element name="BaselineID" type="tns:BaselineIDType">
+        <xs:annotation>
+          <xs:documentation>BaselineID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BaselineName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BaselineName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BaselineDate" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>BaselineDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicationVersion" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ApplicationVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TotalViolations" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>TotalViolations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="QualityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>QualityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ReliabilityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>ReliabilityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SecurityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>SecurityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PerformanceScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>PerformanceScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MaintainabilityScore" type="tns:QualityScoreType">
+        <xs:annotation>
+          <xs:documentation>MaintainabilityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsRelease" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsRelease</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TrendAnalysisType">
+    <xs:sequence>
+      <xs:element name="TrendID" type="tns:TrendIDType">
+        <xs:annotation>
+          <xs:documentation>TrendID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MetricName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>MetricName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PeriodStart" type="xs:date">
+        <xs:annotation>
+          <xs:documentation>PeriodStart</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PeriodEnd" type="xs:date">
+        <xs:annotation>
+          <xs:documentation>PeriodEnd</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StartValue" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>StartValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EndValue" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>EndValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ChangePercent" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>ChangePercent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TrendDirection" type="tns:TrendDirectionType">
+        <xs:annotation>
+          <xs:documentation>TrendDirection</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Forecast" type="xs:decimal" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Forecast</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="QualityThresholdType">
+    <xs:sequence>
+      <xs:element name="ThresholdID" type="tns:ThresholdIDType">
+        <xs:annotation>
+          <xs:documentation>ThresholdID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MetricName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>MetricName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="QualityCharacteristic" type="tns:QualityCharacteristicType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>QualityCharacteristic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MinValue" type="xs:decimal" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MinValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MaxValue" type="xs:decimal" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MaxValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetValue" type="xs:decimal" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TargetValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsBlocking" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsBlocking</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ThresholdType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ThresholdType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TechnologyType">
+    <xs:sequence>
+      <xs:element name="TechnologyID" type="tns:TechnologyIDType">
+        <xs:annotation>
+          <xs:documentation>TechnologyID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TechnologyName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TechnologyName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TechnologyType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TechnologyType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Version" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Version</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FileExtensions" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>FileExtensions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LinesOfCode" type="xs:long">
+        <xs:annotation>
+          <xs:documentation>LinesOfCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FileCount" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>FileCount</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViolationCount" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>ViolationCount</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="QualityStructureType">
+    <xs:sequence>
+      <xs:element name="Reliability" type="tns:ReliabilityType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Reliability</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Security" type="tns:SecurityType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Security</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PerformanceEfficiency" type="tns:PerformanceEfficiencyType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PerformanceEfficiency</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Maintainability" type="tns:MaintainabilityType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Maintainability</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ReliabilityType">
+    <xs:sequence>
+      <xs:element name="ReliabilityCategory" type="tns:ReliabilityCategoryType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ReliabilityCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ReliabilityCategoryType">
+    <xs:sequence>
+      <xs:element name="CategoryID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CategoryName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MeasureType" type="tns:ReliabilityMeasureType">
+        <xs:annotation>
+          <xs:documentation>MeasureType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViolationCount" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>ViolationCount</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SeverityDistribution" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SeverityDistribution</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ReliabilityPattern" type="tns:ReliabilityPatternType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ReliabilityPattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ReliabilityPatternType">
+    <xs:sequence>
+      <xs:element name="PatternID" type="tns:PatternIDType">
+        <xs:annotation>
+          <xs:documentation>PatternID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PatternName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PatternDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DetectionLogic" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DetectionLogic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CWEMapping" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CWEMapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ExampleCode" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ExampleCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FixGuidance" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FixGuidance</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SecurityType">
+    <xs:sequence>
+      <xs:element name="SecurityCategory" type="tns:SecurityCategoryType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SecurityCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SecurityCategoryType">
+    <xs:sequence>
+      <xs:element name="CategoryID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CategoryName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MeasureType" type="tns:SecurityMeasureType">
+        <xs:annotation>
+          <xs:documentation>MeasureType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViolationCount" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>ViolationCount</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RiskLevel" type="tns:RiskIndexType">
+        <xs:annotation>
+          <xs:documentation>RiskLevel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ExploitabilityScore" type="tns:SeverityScoreType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ExploitabilityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SecurityPattern" type="tns:SecurityPatternType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SecurityPattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SecurityPatternType">
+    <xs:sequence>
+      <xs:element name="PatternID" type="tns:PatternIDType">
+        <xs:annotation>
+          <xs:documentation>PatternID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PatternName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ThreatCategory" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ThreatCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AttackVector" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>AttackVector</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CWEMapping" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CWEMapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OWASPMapping" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OWASPMapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MitigationStrategy" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>MitigationStrategy</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PerformanceEfficiencyType">
+    <xs:sequence>
+      <xs:element name="PerformanceCategory" type="tns:PerformanceCategoryType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>PerformanceCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PerformanceCategoryType">
+    <xs:sequence>
+      <xs:element name="CategoryID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CategoryName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MeasureType" type="tns:PerformanceMeasureType">
+        <xs:annotation>
+          <xs:documentation>MeasureType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViolationCount" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>ViolationCount</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PerformanceImpact" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PerformanceImpact</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PerformancePattern" type="tns:PerformancePatternType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>PerformancePattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PerformancePatternType">
+    <xs:sequence>
+      <xs:element name="PatternID" type="tns:PatternIDType">
+        <xs:annotation>
+          <xs:documentation>PatternID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PatternName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComplexityThreshold" type="tns:ComplexityIndexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ComplexityThreshold</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ResourceUsage" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ResourceUsage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OptimizationHint" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>OptimizationHint</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MaintainabilityType">
+    <xs:sequence>
+      <xs:element name="MaintainabilityCategory" type="tns:MaintainabilityCategoryType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>MaintainabilityCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MaintainabilityCategoryType">
+    <xs:sequence>
+      <xs:element name="CategoryID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CategoryName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CategoryName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MeasureType" type="tns:MaintainabilityMeasureType">
+        <xs:annotation>
+          <xs:documentation>MeasureType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ViolationCount" type="xs:int">
+        <xs:annotation>
+          <xs:documentation>ViolationCount</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MaintainabilityIndex" type="tns:MaintainabilityIndexType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MaintainabilityIndex</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MaintainabilityPattern" type="tns:MaintainabilityPatternType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>MaintainabilityPattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MaintainabilityPatternType">
+    <xs:sequence>
+      <xs:element name="PatternID" type="tns:PatternIDType">
+        <xs:annotation>
+          <xs:documentation>PatternID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PatternName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CodeSmellType" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CodeSmellType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RefactoringType" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RefactoringType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DesignPrinciple" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DesignPrinciple</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BestPractice" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BestPractice</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="CodeQualityAssessment" type="tns:AssessmentType">
+    <xs:annotation>
+      <xs:documentation>Root element for ISO/IEC 5055-compliant schema for automated source code quality measurement</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+</xs:schema>

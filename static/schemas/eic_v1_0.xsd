@@ -1,0 +1,2379 @@
+<?xml version='1.0' encoding='utf-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="https://schemas.domaintriple.org/eic/v1/2025" xmlns:tns="https://schemas.domaintriple.org/eic/v1/2025" elementFormDefault="qualified" attributeFormDefault="unqualified" version="1.0">
+  <xs:annotation>
+    <xs:documentation>Domain Triple E-I-C aligned schema for software specification and generation</xs:documentation>
+  </xs:annotation>
+  <xs:simpleType name="SpecificationIDType">
+    <xs:annotation>
+      <xs:documentation>SpecificationID identifier pattern SPEC-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="SPEC-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="EntityIDType">
+    <xs:annotation>
+      <xs:documentation>EntityID identifier pattern ENT-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="ENT-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="IntentIDType">
+    <xs:annotation>
+      <xs:documentation>IntentID identifier pattern INT-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="INT-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ConstraintIDType">
+    <xs:annotation>
+      <xs:documentation>ConstraintID identifier pattern CON-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="CON-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AttributeIDType">
+    <xs:annotation>
+      <xs:documentation>AttributeID identifier pattern ATTR-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="ATTR-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RelationshipIDType">
+    <xs:annotation>
+      <xs:documentation>RelationshipID identifier pattern REL-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="REL-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="BehaviorIDType">
+    <xs:annotation>
+      <xs:documentation>BehaviorID identifier pattern BEH-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="BEH-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="OperationIDType">
+    <xs:annotation>
+      <xs:documentation>OperationID identifier pattern OP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="OP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RuleIDType">
+    <xs:annotation>
+      <xs:documentation>RuleID identifier pattern RULE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="RULE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ValidationIDType">
+    <xs:annotation>
+      <xs:documentation>ValidationID identifier pattern VAL-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="VAL-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GeneratorIDType">
+    <xs:annotation>
+      <xs:documentation>GeneratorID identifier pattern GEN-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="GEN-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatternIDType">
+    <xs:annotation>
+      <xs:documentation>PatternID identifier pattern PAT-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="PAT-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TemplateIDType">
+    <xs:annotation>
+      <xs:documentation>TemplateID identifier pattern TPL-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TPL-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CompositionIDType">
+    <xs:annotation>
+      <xs:documentation>CompositionID identifier pattern COMP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="COMP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DerivationIDType">
+    <xs:annotation>
+      <xs:documentation>DerivationID identifier pattern DER-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="DER-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ExtensionPointIDType">
+    <xs:annotation>
+      <xs:documentation>ExtensionPointID identifier pattern EXT-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="EXT-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SemanticGapIDType">
+    <xs:annotation>
+      <xs:documentation>SemanticGapID identifier pattern SEM-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="SEM-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SynthesisIDType">
+    <xs:annotation>
+      <xs:documentation>SynthesisID identifier pattern SYN-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="SYN-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="MappingIDType">
+    <xs:annotation>
+      <xs:documentation>MappingID identifier pattern MAP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="MAP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DomainIDType">
+    <xs:annotation>
+      <xs:documentation>DomainID identifier pattern DOM-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="DOM-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DerivabilityPercentageType">
+    <xs:annotation>
+      <xs:documentation>DerivabilityPercentage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GenerationCoverageType">
+    <xs:annotation>
+      <xs:documentation>GenerationCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AutomationRateType">
+    <xs:annotation>
+      <xs:documentation>AutomationRate percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CompletionPercentageType">
+    <xs:annotation>
+      <xs:documentation>CompletionPercentage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SemanticCoverageType">
+    <xs:annotation>
+      <xs:documentation>SemanticCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="MechanicalRatioType">
+    <xs:annotation>
+      <xs:documentation>MechanicalRatio percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComplexityReductionType">
+    <xs:annotation>
+      <xs:documentation>ComplexityReduction percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatternCoverageType">
+    <xs:annotation>
+      <xs:documentation>PatternCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComplexityScoreType">
+    <xs:annotation>
+      <xs:documentation>Complexity score (0-10)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="10" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DerivabilityScoreType">
+    <xs:annotation>
+      <xs:documentation>Derivability score (0-1)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="1" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SemanticRichnessType">
+    <xs:annotation>
+      <xs:documentation>Semantic richness level (0-10)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="10" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AbstractionLevelType">
+    <xs:annotation>
+      <xs:documentation>Abstraction level (1-5)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1" />
+      <xs:maxInclusive value="5" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GenerationConfidenceType">
+    <xs:annotation>
+      <xs:documentation>Generation confidence percentage</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatternMaturityType">
+    <xs:annotation>
+      <xs:documentation>Pattern maturity level (1-5)</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="1" />
+      <xs:maxInclusive value="5" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GUIDType">
+    <xs:annotation>
+      <xs:documentation>UUID/GUID pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" />
+      <xs:minLength value="36" />
+      <xs:maxLength value="36" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SemanticuriType">
+    <xs:annotation>
+      <xs:documentation>Semantic Uri pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="https?://[a-zA-Z0-9.-]+/[a-zA-Z0-9/._-]*" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatterncodeType">
+    <xs:annotation>
+      <xs:documentation>Pattern Code pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="[A-Z]{2,4}-[0-9]{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TemplaterefType">
+    <xs:annotation>
+      <xs:documentation>Template Ref pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TPL-[A-Z]{2}-[0-9]{4}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="VersionType">
+    <xs:annotation>
+      <xs:documentation>Version pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d+\\.\\d+(\\.\\d+)?" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TripleElementType">
+    <xs:annotation>
+      <xs:documentation>Core Domain Triple elements</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Entity">
+        <xs:annotation>
+          <xs:documentation>Data structures and domain objects (what exists)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Intent">
+        <xs:annotation>
+          <xs:documentation>Behaviors and operations (what happens)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Constraint">
+        <xs:annotation>
+          <xs:documentation>Rules and restrictions (how it's limited)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="EntityType">
+    <xs:annotation>
+      <xs:documentation>Types of entities in the domain</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Domain Entity">
+        <xs:annotation>
+          <xs:documentation>Core business domain object</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Value Object">
+        <xs:annotation>
+          <xs:documentation>Immutable value type</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Aggregate">
+        <xs:annotation>
+          <xs:documentation>Consistency boundary</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Service Entity">
+        <xs:annotation>
+          <xs:documentation>Service representation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Resource">
+        <xs:annotation>
+          <xs:documentation>External resource</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Event">
+        <xs:annotation>
+          <xs:documentation>Domain event</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Component">
+        <xs:annotation>
+          <xs:documentation>System component</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="IntentType">
+    <xs:annotation>
+      <xs:documentation>Types of intents/behaviors</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Command">
+        <xs:annotation>
+          <xs:documentation>State-changing operation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Query">
+        <xs:annotation>
+          <xs:documentation>Read-only operation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Process">
+        <xs:annotation>
+          <xs:documentation>Business process or workflow</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Transformation">
+        <xs:annotation>
+          <xs:documentation>Data transformation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Computation">
+        <xs:annotation>
+          <xs:documentation>Calculation or algorithm</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Orchestration">
+        <xs:annotation>
+          <xs:documentation>Multi-step coordination</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Interaction">
+        <xs:annotation>
+          <xs:documentation>User or system interaction</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ConstraintType">
+    <xs:annotation>
+      <xs:documentation>Types of constraints</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Validation">
+        <xs:annotation>
+          <xs:documentation>Data validation rule</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Invariant">
+        <xs:annotation>
+          <xs:documentation>Domain invariant</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Precondition">
+        <xs:annotation>
+          <xs:documentation>Operation precondition</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Postcondition">
+        <xs:annotation>
+          <xs:documentation>Operation postcondition</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Policy">
+        <xs:annotation>
+          <xs:documentation>Business policy</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Security">
+        <xs:annotation>
+          <xs:documentation>Security constraint</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Performance">
+        <xs:annotation>
+          <xs:documentation>Performance requirement</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Compliance">
+        <xs:annotation>
+          <xs:documentation>Regulatory compliance</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DerivabilityType">
+    <xs:annotation>
+      <xs:documentation>DerivabilityType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Fully Derivable" />
+      <xs:enumeration value="Partially Derivable" />
+      <xs:enumeration value="Template-Based" />
+      <xs:enumeration value="Pattern-Based" />
+      <xs:enumeration value="Non-Derivable" />
+      <xs:enumeration value="Semantic" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GenerationStrategyType">
+    <xs:annotation>
+      <xs:documentation>GenerationStrategyType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Template" />
+      <xs:enumeration value="Scaffolding" />
+      <xs:enumeration value="Model-Driven" />
+      <xs:enumeration value="Example-Based" />
+      <xs:enumeration value="Synthesis" />
+      <xs:enumeration value="Hybrid" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComplexityType">
+    <xs:annotation>
+      <xs:documentation>ComplexityType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Essential" />
+      <xs:enumeration value="Accidental" />
+      <xs:enumeration value="Structural" />
+      <xs:enumeration value="Behavioral" />
+      <xs:enumeration value="Semantic" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatternType">
+    <xs:annotation>
+      <xs:documentation>PatternType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="CRUD" />
+      <xs:enumeration value="Repository" />
+      <xs:enumeration value="Factory" />
+      <xs:enumeration value="Observer" />
+      <xs:enumeration value="Strategy" />
+      <xs:enumeration value="Command" />
+      <xs:enumeration value="Aggregate" />
+      <xs:enumeration value="Event Sourcing" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SynthesisMethodType">
+    <xs:annotation>
+      <xs:documentation>SynthesisMethodType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Sketching" />
+      <xs:enumeration value="SyGuS" />
+      <xs:enumeration value="Type-Directed" />
+      <xs:enumeration value="Component-Based" />
+      <xs:enumeration value="Example-Based" />
+      <xs:enumeration value="Constraint-Based" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SemanticGapType">
+    <xs:annotation>
+      <xs:documentation>SemanticGapType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Intent Ambiguity" />
+      <xs:enumeration value="Quality Judgment" />
+      <xs:enumeration value="Trade-off Decision" />
+      <xs:enumeration value="Creative Solution" />
+      <xs:enumeration value="Context Dependent" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RelationshipType">
+    <xs:annotation>
+      <xs:documentation>RelationshipType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Association" />
+      <xs:enumeration value="Aggregation" />
+      <xs:enumeration value="Composition" />
+      <xs:enumeration value="Inheritance" />
+      <xs:enumeration value="Dependency" />
+      <xs:enumeration value="Realization" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AttributeType">
+    <xs:annotation>
+      <xs:documentation>AttributeType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Identifier" />
+      <xs:enumeration value="Descriptor" />
+      <xs:enumeration value="Measure" />
+      <xs:enumeration value="State" />
+      <xs:enumeration value="Reference" />
+      <xs:enumeration value="Computed" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ValidationSeverity">
+    <xs:annotation>
+      <xs:documentation>ValidationSeverity</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Error" />
+      <xs:enumeration value="Warning" />
+      <xs:enumeration value="Info" />
+      <xs:enumeration value="Critical" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="OperationScope">
+    <xs:annotation>
+      <xs:documentation>OperationScope</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Entity" />
+      <xs:enumeration value="Aggregate" />
+      <xs:enumeration value="Domain" />
+      <xs:enumeration value="Application" />
+      <xs:enumeration value="System" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RuleEnforcement">
+    <xs:annotation>
+      <xs:documentation>RuleEnforcement</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Compile-Time" />
+      <xs:enumeration value="Runtime" />
+      <xs:enumeration value="Design-Time" />
+      <xs:enumeration value="Deploy-Time" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GenerationPhase">
+    <xs:annotation>
+      <xs:documentation>GenerationPhase</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Analysis" />
+      <xs:enumeration value="Design" />
+      <xs:enumeration value="Implementation" />
+      <xs:enumeration value="Testing" />
+      <xs:enumeration value="Deployment" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ExtensionType">
+    <xs:annotation>
+      <xs:documentation>ExtensionType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Override" />
+      <xs:enumeration value="Augment" />
+      <xs:enumeration value="Replace" />
+      <xs:enumeration value="Intercept" />
+      <xs:enumeration value="Compose" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DomainMaturity">
+    <xs:annotation>
+      <xs:documentation>DomainMaturity</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Well-Understood" />
+      <xs:enumeration value="Evolving" />
+      <xs:enumeration value="Experimental" />
+      <xs:enumeration value="Stable" />
+      <xs:enumeration value="Legacy" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TemplateScope">
+    <xs:annotation>
+      <xs:documentation>TemplateScope</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Entity" />
+      <xs:enumeration value="Service" />
+      <xs:enumeration value="Repository" />
+      <xs:enumeration value="Controller" />
+      <xs:enumeration value="View" />
+      <xs:enumeration value="Test" />
+      <xs:enumeration value="Configuration" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="TripleSpecificationType">
+    <xs:sequence>
+      <xs:element name="DomainSpecification" type="tns:DomainSpecificationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual domainspecification</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:key name="DomainSpecificationKey">
+      <xs:selector xpath=".//tns:DomainSpecification" />
+      <xs:field xpath="@id" />
+    </xs:key>
+    <xs:unique name="UniqueSpecificationIDID">
+      <xs:selector xpath=".//tns:Specification" />
+      <xs:field xpath="tns:SpecificationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueEntityIDID">
+      <xs:selector xpath=".//tns:Entity" />
+      <xs:field xpath="tns:EntityIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueIntentIDID">
+      <xs:selector xpath=".//tns:Intent" />
+      <xs:field xpath="tns:IntentIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueConstraintIDID">
+      <xs:selector xpath=".//tns:Constraint" />
+      <xs:field xpath="tns:ConstraintIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueAttributeIDID">
+      <xs:selector xpath=".//tns:Attribute" />
+      <xs:field xpath="tns:AttributeIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueRelationshipIDID">
+      <xs:selector xpath=".//tns:Relationship" />
+      <xs:field xpath="tns:RelationshipIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueBehaviorIDID">
+      <xs:selector xpath=".//tns:Behavior" />
+      <xs:field xpath="tns:BehaviorIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueOperationIDID">
+      <xs:selector xpath=".//tns:Operation" />
+      <xs:field xpath="tns:OperationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueRuleIDID">
+      <xs:selector xpath=".//tns:Rule" />
+      <xs:field xpath="tns:RuleIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueValidationIDID">
+      <xs:selector xpath=".//tns:Validation" />
+      <xs:field xpath="tns:ValidationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueGeneratorIDID">
+      <xs:selector xpath=".//tns:Generator" />
+      <xs:field xpath="tns:GeneratorIDType" />
+    </xs:unique>
+    <xs:unique name="UniquePatternIDID">
+      <xs:selector xpath=".//tns:Pattern" />
+      <xs:field xpath="tns:PatternIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueTemplateIDID">
+      <xs:selector xpath=".//tns:Template" />
+      <xs:field xpath="tns:TemplateIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueCompositionIDID">
+      <xs:selector xpath=".//tns:Composition" />
+      <xs:field xpath="tns:CompositionIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueDerivationIDID">
+      <xs:selector xpath=".//tns:Derivation" />
+      <xs:field xpath="tns:DerivationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueExtensionPointIDID">
+      <xs:selector xpath=".//tns:ExtensionPoint" />
+      <xs:field xpath="tns:ExtensionPointIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueSemanticGapIDID">
+      <xs:selector xpath=".//tns:SemanticGap" />
+      <xs:field xpath="tns:SemanticGapIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueSynthesisIDID">
+      <xs:selector xpath=".//tns:Synthesis" />
+      <xs:field xpath="tns:SynthesisIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueMappingIDID">
+      <xs:selector xpath=".//tns:Mapping" />
+      <xs:field xpath="tns:MappingIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueDomainIDID">
+      <xs:selector xpath=".//tns:Domain" />
+      <xs:field xpath="tns:DomainIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueEntityID">
+      <xs:selector xpath=".//tns:Entity" />
+      <xs:field xpath="tns:EntityID" />
+    </xs:unique>
+    <xs:unique name="UniqueAttributeID">
+      <xs:selector xpath=".//tns:Attribute" />
+      <xs:field xpath="tns:AttributeID" />
+    </xs:unique>
+    <xs:unique name="UniqueIntentID">
+      <xs:selector xpath=".//tns:Intent" />
+      <xs:field xpath="tns:IntentID" />
+    </xs:unique>
+    <xs:unique name="UniqueBehaviorID">
+      <xs:selector xpath=".//tns:Behavior" />
+      <xs:field xpath="tns:BehaviorID" />
+    </xs:unique>
+    <xs:unique name="UniqueOperationID">
+      <xs:selector xpath=".//tns:Operation" />
+      <xs:field xpath="tns:OperationID" />
+    </xs:unique>
+    <xs:unique name="UniqueConstraintID">
+      <xs:selector xpath=".//tns:Constraint" />
+      <xs:field xpath="tns:ConstraintID" />
+    </xs:unique>
+    <xs:unique name="UniqueRuleID">
+      <xs:selector xpath=".//tns:Rule" />
+      <xs:field xpath="tns:RuleID" />
+    </xs:unique>
+    <xs:unique name="UniqueRelationshipID">
+      <xs:selector xpath=".//tns:Relationship" />
+      <xs:field xpath="tns:RelationshipID" />
+    </xs:unique>
+    <xs:unique name="UniquePatternID">
+      <xs:selector xpath=".//tns:Pattern" />
+      <xs:field xpath="tns:PatternID" />
+    </xs:unique>
+    <xs:unique name="UniqueTemplateID">
+      <xs:selector xpath=".//tns:Template" />
+      <xs:field xpath="tns:TemplateID" />
+    </xs:unique>
+    <xs:unique name="UniqueGeneratorID">
+      <xs:selector xpath=".//tns:Generator" />
+      <xs:field xpath="tns:GeneratorID" />
+    </xs:unique>
+    <xs:unique name="UniqueExtensionPointID">
+      <xs:selector xpath=".//tns:ExtensionPoint" />
+      <xs:field xpath="tns:ExtensionPointID" />
+    </xs:unique>
+    <xs:unique name="UniqueSemanticGapID">
+      <xs:selector xpath=".//tns:SemanticGap" />
+      <xs:field xpath="tns:SemanticGapID" />
+    </xs:unique>
+    <xs:unique name="UniqueCompositionID">
+      <xs:selector xpath=".//tns:Composition" />
+      <xs:field xpath="tns:CompositionID" />
+    </xs:unique>
+    <xs:unique name="UniqueDerivationID">
+      <xs:selector xpath=".//tns:Derivation" />
+      <xs:field xpath="tns:DerivationID" />
+    </xs:unique>
+    <xs:unique name="UniqueSynthesisRuleID">
+      <xs:selector xpath=".//tns:SynthesisRule" />
+      <xs:field xpath="tns:SynthesisRuleID" />
+    </xs:unique>
+    <xs:unique name="UniqueMappingID">
+      <xs:selector xpath=".//tns:Mapping" />
+      <xs:field xpath="tns:MappingID" />
+    </xs:unique>
+    <xs:unique name="UniqueValidationRuleID">
+      <xs:selector xpath=".//tns:ValidationRule" />
+      <xs:field xpath="tns:ValidationRuleID" />
+    </xs:unique>
+    <xs:keyref name="InputEntitiesReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:InputEntities" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="OutputEntitiesReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:OutputEntities" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="PreconditionsReference" refer="tns:UniqueConstraintID">
+      <xs:selector xpath=".//tns:Preconditions" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="PostconditionsReference" refer="tns:UniqueConstraintID">
+      <xs:selector xpath=".//tns:Postconditions" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ValidationRulesReference" refer="tns:UniqueValidationID">
+      <xs:selector xpath=".//tns:ValidationRules" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="SourceEntityReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:SourceEntity" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="TargetEntityReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:TargetEntity" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ApplicableEntitiesReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:ApplicableEntities" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ApplicableIntentsReference" refer="tns:UniqueIntentID">
+      <xs:selector xpath=".//tns:ApplicableIntents" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="SupportedPatternsReference" refer="tns:UniquePatternID">
+      <xs:selector xpath=".//tns:SupportedPatterns" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="TemplatesUsedReference" refer="tns:UniqueTemplateID">
+      <xs:selector xpath=".//tns:TemplatesUsed" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ComposedEntitiesReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:ComposedEntities" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ComposedIntentsReference" refer="tns:UniqueIntentID">
+      <xs:selector xpath=".//tns:ComposedIntents" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ComposedConstraintsReference" refer="tns:UniqueConstraintID">
+      <xs:selector xpath=".//tns:ComposedConstraints" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ImplementationPatternReference" refer="tns:UniquePatternID">
+      <xs:selector xpath=".//tns:ImplementationPattern" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="TemplateReference" refer="tns:UniqueTemplateID">
+      <xs:selector xpath=".//tns:TemplateRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="AggregateRootReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:AggregateRoot" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="InvariantRulesReference" refer="tns:UniqueConstraintID">
+      <xs:selector xpath=".//tns:InvariantRules" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="PropertiesReference" refer="tns:UniqueAttributeID">
+      <xs:selector xpath=".//tns:Properties" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="GenerationPatternReference" refer="tns:UniquePatternID">
+      <xs:selector xpath=".//tns:GenerationPattern" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="EntityReference" refer="tns:UniqueEntityID">
+      <xs:selector xpath=".//tns:EntityRef" />
+      <xs:field xpath="." />
+    </xs:keyref>
+  </xs:complexType>
+  <xs:complexType name="DomainSpecificationType">
+    <xs:sequence>
+      <xs:element name="SpecificationID" type="tns:SpecificationIDType">
+        <xs:annotation>
+          <xs:documentation>SpecificationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SpecificationGUID" type="tns:GUIDType">
+        <xs:annotation>
+          <xs:documentation>SpecificationGUID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>DomainName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>DomainDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainMaturity" type="tns:DomainMaturityType">
+        <xs:annotation>
+          <xs:documentation>DomainMaturity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetPlatform" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TargetPlatform</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GenerationStrategy" type="tns:GenerationStrategyType">
+        <xs:annotation>
+          <xs:documentation>GenerationStrategy</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EstimatedCoverage" type="tns:GenerationCoverageType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EstimatedCoverage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CreatedDate" type="xs:date">
+        <xs:annotation>
+          <xs:documentation>CreatedDate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Version" type="tns:VersionType">
+        <xs:annotation>
+          <xs:documentation>Version</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GenerationMetrics" type="tns:GenerationMetricsType">
+        <xs:annotation>
+          <xs:documentation>GenerationMetrics</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainBoundary" type="tns:DomainBoundaryType">
+        <xs:annotation>
+          <xs:documentation>DomainBoundary</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TripleStructure" type="tns:TripleStructureType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DomainTriple domain-specific structure elements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="optional" />
+  </xs:complexType>
+  <xs:complexType name="GenerationMetricsType">
+    <xs:sequence>
+      <xs:element name="MechanicalCodeRatio" type="tns:MechanicalRatioType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MechanicalCodeRatio</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SemanticCodeRatio" type="tns:SemanticCoverageType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SemanticCodeRatio</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AutomationRate" type="tns:AutomationRateType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>AutomationRate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComplexityReduction" type="tns:ComplexityReductionType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ComplexityReduction</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternCoverage" type="tns:PatternCoverageType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PatternCoverage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DomainBoundaryType">
+    <xs:sequence>
+      <xs:element name="BoundedContext" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BoundedContext</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="UbiquitousLanguage" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>UbiquitousLanguage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainExperts" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DomainExperts</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IntegrationPoints" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>IntegrationPoints</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="EntityComplexType">
+    <xs:sequence>
+      <xs:element name="EntityID" type="tns:EntityIDType">
+        <xs:annotation>
+          <xs:documentation>EntityID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EntityName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>EntityName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EntityType" type="tns:EntityType">
+        <xs:annotation>
+          <xs:documentation>EntityType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Description" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsAggregateRoot" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsAggregateRoot</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BoundedContext" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>BoundedContext</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComplexityScore" type="tns:ComplexityScoreType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ComplexityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DerivabilityScore" type="tns:DerivabilityScoreType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DerivabilityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Attributes" type="tns:AttributesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Attributes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainEvents" type="tns:DomainEventsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DomainEvents</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="derivability" type="xs:decimal" use="optional" />
+  </xs:complexType>
+  <xs:complexType name="AttributesType">
+    <xs:sequence>
+      <xs:element name="Attribute" type="tns:AttributeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Attribute</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DomainEventsType">
+    <xs:sequence>
+      <xs:element name="DomainEvent" type="tns:EventType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DomainEvent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AttributeComplexType">
+    <xs:sequence>
+      <xs:element name="AttributeID" type="tns:AttributeIDType">
+        <xs:annotation>
+          <xs:documentation>AttributeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AttributeName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AttributeName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AttributeType" type="tns:AttributeType">
+        <xs:annotation>
+          <xs:documentation>AttributeType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>DataType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsRequired" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsRequired</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsUnique" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsUnique</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DefaultValue" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DefaultValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationRules" type="tns:ValidationIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ValidationRules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Derivability" type="tns:DerivabilityType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Derivability</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="IntentComplexType">
+    <xs:sequence>
+      <xs:element name="IntentID" type="tns:IntentIDType">
+        <xs:annotation>
+          <xs:documentation>IntentID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IntentName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>IntentName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IntentType" type="tns:IntentType">
+        <xs:annotation>
+          <xs:documentation>IntentType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Description" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OperationScope" type="tns:OperationScope">
+        <xs:annotation>
+          <xs:documentation>OperationScope</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InputEntities" type="tns:EntityIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>InputEntities</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OutputEntities" type="tns:EntityIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>OutputEntities</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Preconditions" type="tns:ConstraintIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Preconditions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Postconditions" type="tns:ConstraintIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Postconditions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsIdempotent" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsIdempotent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsCacheable" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsCacheable</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DerivabilityType" type="tns:DerivabilityType">
+        <xs:annotation>
+          <xs:documentation>DerivabilityType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Behaviors" type="tns:BehaviorsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Behaviors</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Operations" type="tns:OperationsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Operations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BehaviorsType">
+    <xs:sequence>
+      <xs:element name="Behavior" type="tns:BehaviorType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Behavior</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OperationsType">
+    <xs:sequence>
+      <xs:element name="Operation" type="tns:OperationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Operation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BehaviorType">
+    <xs:sequence>
+      <xs:element name="BehaviorID" type="tns:BehaviorIDType">
+        <xs:annotation>
+          <xs:documentation>BehaviorID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BehaviorName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BehaviorName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BehaviorDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BehaviorDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TriggerEvent" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TriggerEvent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StateMutation" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>StateMutation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SideEffects" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SideEffects</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ImplementationPattern" type="tns:PatternIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ImplementationPattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OperationType">
+    <xs:sequence>
+      <xs:element name="OperationID" type="tns:OperationIDType">
+        <xs:annotation>
+          <xs:documentation>OperationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OperationName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>OperationName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Parameters" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Parameters</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ReturnType" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ReturnType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Throws" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Throws</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsAsync" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsAsync</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateRef" type="tns:TemplateIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TemplateRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ConstraintComplexType">
+    <xs:sequence>
+      <xs:element name="ConstraintID" type="tns:ConstraintIDType">
+        <xs:annotation>
+          <xs:documentation>ConstraintID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ConstraintName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ConstraintName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ConstraintType" type="tns:ConstraintType">
+        <xs:annotation>
+          <xs:documentation>ConstraintType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Description" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AppliesTo" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AppliesTo</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Expression" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Expression</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EnforcementTime" type="tns:RuleEnforcement">
+        <xs:annotation>
+          <xs:documentation>EnforcementTime</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Severity" type="tns:ValidationSeverity">
+        <xs:annotation>
+          <xs:documentation>Severity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ErrorMessage" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ErrorMessage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsDerivable" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsDerivable</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Rules" type="tns:RulesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Rules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RulesType">
+    <xs:sequence>
+      <xs:element name="Rule" type="tns:RuleType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Rule</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RuleType">
+    <xs:sequence>
+      <xs:element name="RuleID" type="tns:RuleIDType">
+        <xs:annotation>
+          <xs:documentation>RuleID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleExpression" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleExpression</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleLanguage" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RuleLanguage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Priority" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Priority</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RelationshipComplexType">
+    <xs:sequence>
+      <xs:element name="RelationshipID" type="tns:RelationshipIDType">
+        <xs:annotation>
+          <xs:documentation>RelationshipID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RelationshipType" type="tns:RelationshipType">
+        <xs:annotation>
+          <xs:documentation>RelationshipType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceEntity" type="tns:EntityIDType">
+        <xs:annotation>
+          <xs:documentation>SourceEntity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetEntity" type="tns:EntityIDType">
+        <xs:annotation>
+          <xs:documentation>TargetEntity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Cardinality" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Cardinality</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsBidirectional" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsBidirectional</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CascadeRules" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CascadeRules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NavigationProperty" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>NavigationProperty</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PatternComplexType">
+    <xs:sequence>
+      <xs:element name="PatternID" type="tns:PatternIDType">
+        <xs:annotation>
+          <xs:documentation>PatternID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PatternName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternType" type="tns:PatternType">
+        <xs:annotation>
+          <xs:documentation>PatternType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Description" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Context" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Context</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Problem" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Problem</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Solution" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Solution</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GenerationCoverage" type="tns:GenerationCoverageType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>GenerationCoverage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MaturityLevel" type="tns:PatternMaturityType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MaturityLevel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicableEntities" type="tns:EntityIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ApplicableEntities</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicableIntents" type="tns:IntentIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ApplicableIntents</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TemplateType">
+    <xs:sequence>
+      <xs:element name="TemplateID" type="tns:TemplateIDType">
+        <xs:annotation>
+          <xs:documentation>TemplateID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TemplateName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateScope" type="tns:TemplateScope">
+        <xs:annotation>
+          <xs:documentation>TemplateScope</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateLanguage" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TemplateLanguage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateContent" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TemplateContent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Variables" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Variables</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GenerationPhase" type="tns:GenerationPhase">
+        <xs:annotation>
+          <xs:documentation>GenerationPhase</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OutputFormat" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OutputFormat</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="GeneratorType">
+    <xs:sequence>
+      <xs:element name="GeneratorID" type="tns:GeneratorIDType">
+        <xs:annotation>
+          <xs:documentation>GeneratorID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GeneratorName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>GeneratorName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GeneratorType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>GeneratorType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InputTriple" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>InputTriple</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OutputArtifacts" type="xs:string" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>OutputArtifacts</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GenerationStrategy" type="tns:GenerationStrategyType">
+        <xs:annotation>
+          <xs:documentation>GenerationStrategy</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SupportedPatterns" type="tns:PatternIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SupportedPatterns</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplatesUsed" type="tns:TemplateIDType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TemplatesUsed</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EstimatedCoverage" type="tns:GenerationCoverageType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EstimatedCoverage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RequiresHumanInput" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RequiresHumanInput</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="coverage" type="xs:decimal" use="optional" />
+  </xs:complexType>
+  <xs:complexType name="ExtensionPointType">
+    <xs:sequence>
+      <xs:element name="ExtensionPointID" type="tns:ExtensionPointIDType">
+        <xs:annotation>
+          <xs:documentation>ExtensionPointID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ExtensionName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ExtensionName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ExtensionType" type="tns:ExtensionType">
+        <xs:annotation>
+          <xs:documentation>ExtensionType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Location" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Location</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Interface" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Interface</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Purpose" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Purpose</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DefaultBehavior" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DefaultBehavior</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AllowedCustomizations" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>AllowedCustomizations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SemanticGapComplexType">
+    <xs:sequence>
+      <xs:element name="SemanticGapID" type="tns:SemanticGapIDType">
+        <xs:annotation>
+          <xs:documentation>SemanticGapID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GapType" type="tns:SemanticGapType">
+        <xs:annotation>
+          <xs:documentation>GapType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Description" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AffectedElements" type="xs:string" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>AffectedElements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RequiresHumanJudgment" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>RequiresHumanJudgment</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MitigationStrategy" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MitigationStrategy</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SemanticRichness" type="tns:SemanticRichnessType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SemanticRichness</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Examples" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Examples</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CompositionType">
+    <xs:sequence>
+      <xs:element name="CompositionID" type="tns:CompositionIDType">
+        <xs:annotation>
+          <xs:documentation>CompositionID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CompositionName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CompositionName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComposedEntities" type="tns:EntityIDType" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ComposedEntities</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComposedIntents" type="tns:IntentIDType" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ComposedIntents</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComposedConstraints" type="tns:ConstraintIDType" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ComposedConstraints</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CompositionRules" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CompositionRules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ResultingCapability" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ResultingCapability</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DerivationType">
+    <xs:sequence>
+      <xs:element name="DerivationID" type="tns:DerivationIDType">
+        <xs:annotation>
+          <xs:documentation>DerivationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceElements" type="xs:string" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SourceElements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DerivedElements" type="xs:string" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DerivedElements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DerivationRules" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>DerivationRules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DerivationConfidence" type="tns:GenerationConfidenceType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DerivationConfidence</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsAutomatic" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsAutomatic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SynthesisRuleType">
+    <xs:sequence>
+      <xs:element name="SynthesisID" type="tns:SynthesisIDType">
+        <xs:annotation>
+          <xs:documentation>SynthesisID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SynthesisMethod" type="tns:SynthesisMethodType">
+        <xs:annotation>
+          <xs:documentation>SynthesisMethod</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InputSpecification" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>InputSpecification</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SyntacticConstraints" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SyntacticConstraints</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SemanticConstraints" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SemanticConstraints</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BackgroundTheory" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>BackgroundTheory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SearchSpace" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SearchSpace</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OutputProgram" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OutputProgram</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MappingType">
+    <xs:sequence>
+      <xs:element name="MappingID" type="tns:MappingIDType">
+        <xs:annotation>
+          <xs:documentation>MappingID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceDomain" type="tns:DomainIDType">
+        <xs:annotation>
+          <xs:documentation>SourceDomain</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetDomain" type="tns:DomainIDType">
+        <xs:annotation>
+          <xs:documentation>TargetDomain</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MappingRules" type="xs:string" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>MappingRules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TransformationType" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TransformationType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsReversible" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsReversible</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ValidationRuleType">
+    <xs:sequence>
+      <xs:element name="ValidationID" type="tns:ValidationIDType">
+        <xs:annotation>
+          <xs:documentation>ValidationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ValidationName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationLogic" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ValidationLogic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationExpression" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ValidationExpression</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AppliesTo" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AppliesTo</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AppliesTo" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AppliesTo</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Severity" type="tns:ValidationSeverity">
+        <xs:annotation>
+          <xs:documentation>Severity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ErrorMessage" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ErrorMessage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Context" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Context</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TripleStructureType">
+    <xs:sequence>
+      <xs:element name="EntityLayer" type="tns:EntityLayerType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EntityLayer</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IntentLayer" type="tns:IntentLayerType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IntentLayer</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ConstraintLayer" type="tns:ConstraintLayerType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ConstraintLayer</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GenerationLayer" type="tns:GenerationLayerType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>GenerationLayer</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="EntityLayerType">
+    <xs:sequence>
+      <xs:element name="DomainModel" type="tns:DomainModelType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DomainModel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DomainModelType">
+    <xs:sequence>
+      <xs:element name="ModelName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ModelName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ModelVersion" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ModelVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AbstractionLevel" type="tns:AbstractionLevelType">
+        <xs:annotation>
+          <xs:documentation>AbstractionLevel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Aggregate" type="tns:AggregateType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Aggregate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValueObject" type="tns:ValueObjectType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ValueObject</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AggregateType">
+    <xs:sequence>
+      <xs:element name="AggregateName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AggregateName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AggregateRoot" type="tns:EntityIDType">
+        <xs:annotation>
+          <xs:documentation>AggregateRoot</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ConsistencyBoundary" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ConsistencyBoundary</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InvariantRules" type="tns:ConstraintIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>InvariantRules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ValueObjectType">
+    <xs:sequence>
+      <xs:element name="ValueObjectName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ValueObjectName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Properties" type="tns:AttributeIDType">
+        <xs:annotation>
+          <xs:documentation>Properties</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsImmutable" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsImmutable</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="IntentLayerType">
+    <xs:sequence>
+      <xs:element name="BehaviorModel" type="tns:BehaviorModelType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>BehaviorModel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BehaviorModelType">
+    <xs:sequence>
+      <xs:element name="ModelName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ModelName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ProcessType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ProcessType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="UseCase" type="tns:UseCaseType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>UseCase</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainService" type="tns:DomainServiceType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DomainService</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ApplicationService" type="tns:ApplicationServiceType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ApplicationService</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="UseCaseType">
+    <xs:sequence>
+      <xs:element name="UseCaseName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>UseCaseName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Actors" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Actors</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Preconditions" type="tns:ConstraintIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Preconditions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MainFlow" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>MainFlow</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AlternativeFlows" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>AlternativeFlows</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Postconditions" type="tns:ConstraintIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Postconditions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DomainServiceType">
+    <xs:sequence>
+      <xs:element name="ServiceName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ServiceName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ServiceOperations" type="tns:OperationIDType">
+        <xs:annotation>
+          <xs:documentation>ServiceOperations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ServiceContract" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ServiceContract</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ApplicationServiceType">
+    <xs:sequence>
+      <xs:element name="ServiceName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ServiceName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Orchestration" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Orchestration</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TransactionBoundary" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TransactionBoundary</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ConstraintLayerType">
+    <xs:sequence>
+      <xs:element name="RuleModel" type="tns:RuleModelType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>RuleModel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RuleModelType">
+    <xs:sequence>
+      <xs:element name="ModelName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ModelName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleEngine" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RuleEngine</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BusinessRule" type="tns:BusinessRuleType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>BusinessRule</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationRule" type="tns:ValidationRuleType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ValidationRule</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SecurityPolicy" type="tns:SecurityPolicyType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SecurityPolicy</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BusinessRuleType">
+    <xs:sequence>
+      <xs:element name="RuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleCondition" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleCondition</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleAction" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleAction</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RulePriority" type="xs:int" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RulePriority</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SecurityPolicyType">
+    <xs:sequence>
+      <xs:element name="PolicyName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>PolicyName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AccessControl" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AccessControl</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataProtection" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DataProtection</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="GenerationLayerType">
+    <xs:sequence>
+      <xs:element name="MechanicalCode" type="tns:MechanicalCodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>MechanicalCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SemanticCode" type="tns:SemanticCodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SemanticCode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MechanicalCodeType">
+    <xs:sequence>
+      <xs:element name="CodeType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CodeType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GenerationPattern" type="tns:PatternIDType">
+        <xs:annotation>
+          <xs:documentation>GenerationPattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CoveragePercentage" type="tns:GenerationCoverageType">
+        <xs:annotation>
+          <xs:documentation>CoveragePercentage</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CRUDOperations" type="tns:CRUDOperationsType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CRUDOperations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataAccessLayer" type="tns:DataAccessLayerType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DataAccessLayer</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="APIScaffolding" type="tns:APIScaffoldingType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>APIScaffolding</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CRUDOperationsType">
+    <xs:sequence>
+      <xs:element name="EntityRef" type="tns:EntityIDType">
+        <xs:annotation>
+          <xs:documentation>EntityRef</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="GeneratedMethods" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>GeneratedMethods</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DataAccessLayerType">
+    <xs:sequence>
+      <xs:element name="RepositoryPattern" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RepositoryPattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="QueryMethods" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>QueryMethods</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="APIScaffoldingType">
+    <xs:sequence>
+      <xs:element name="EndpointPattern" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>EndpointPattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="HTTPMethods" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>HTTPMethods</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SemanticCodeType">
+    <xs:sequence>
+      <xs:element name="CodeType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CodeType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RequiresHumanInput" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>RequiresHumanInput</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BusinessLogic" type="tns:BusinessLogicType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>BusinessLogic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CreativeSolution" type="tns:CreativeSolutionType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CreativeSolution</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BusinessLogicType">
+    <xs:sequence>
+      <xs:element name="LogicDescription" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>LogicDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ComplexityScore" type="tns:ComplexityScoreType">
+        <xs:annotation>
+          <xs:documentation>ComplexityScore</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DomainExpertise" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DomainExpertise</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CreativeSolutionType">
+    <xs:sequence>
+      <xs:element name="ProblemStatement" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ProblemStatement</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="InnovationType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>InnovationType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="DomainTripleSpecification" type="tns:TripleSpecificationType">
+    <xs:annotation>
+      <xs:documentation>Root element for Domain Triple E-I-C aligned schema for software specification and generation</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+</xs:schema>

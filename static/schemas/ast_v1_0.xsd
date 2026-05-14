@@ -1,0 +1,2181 @@
+<?xml version='1.0' encoding='utf-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="https://schemas.ast.org/universal/v1/2025" xmlns:tns="https://schemas.ast.org/universal/v1/2025" elementFormDefault="qualified" attributeFormDefault="unqualified" version="1.0">
+  <xs:annotation>
+    <xs:documentation>Universal AST schema for representing any programming language or formal system</xs:documentation>
+  </xs:annotation>
+  <xs:simpleType name="NodeIDType">
+    <xs:annotation>
+      <xs:documentation>NodeID identifier pattern NODE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="NODE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TypeIDType">
+    <xs:annotation>
+      <xs:documentation>TypeID identifier pattern TYPE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TYPE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SymbolIDType">
+    <xs:annotation>
+      <xs:documentation>SymbolID identifier pattern SYM-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="SYM-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ScopeIDType">
+    <xs:annotation>
+      <xs:documentation>ScopeID identifier pattern SCOPE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="SCOPE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="RuleIDType">
+    <xs:annotation>
+      <xs:documentation>RuleID identifier pattern RULE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="RULE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ModuleIDType">
+    <xs:annotation>
+      <xs:documentation>ModuleID identifier pattern MOD-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="MOD-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="NamespaceIDType">
+    <xs:annotation>
+      <xs:documentation>NamespaceID identifier pattern NS-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="NS-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AnnotationIDType">
+    <xs:annotation>
+      <xs:documentation>AnnotationID identifier pattern ANN-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="ANN-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DiagnosticIDType">
+    <xs:annotation>
+      <xs:documentation>DiagnosticID identifier pattern DIAG-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="DIAG-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="MacroIDType">
+    <xs:annotation>
+      <xs:documentation>MacroID identifier pattern MACRO-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="MACRO-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TemplateIDType">
+    <xs:annotation>
+      <xs:documentation>TemplateID identifier pattern TMPL-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TMPL-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatternIDType">
+    <xs:annotation>
+      <xs:documentation>PatternID identifier pattern PAT-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="PAT-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CodeCoverageType">
+    <xs:annotation>
+      <xs:documentation>CodeCoverage percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ConfidenceType">
+    <xs:annotation>
+      <xs:documentation>Confidence percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SimilarityType">
+    <xs:annotation>
+      <xs:documentation>Similarity percentage value 0-100</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PrecedenceType">
+    <xs:annotation>
+      <xs:documentation>Operator precedence level</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="1000" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ComplexityScoreType">
+    <xs:annotation>
+      <xs:documentation>Cyclomatic complexity</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="10000" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="NestingLevelType">
+    <xs:annotation>
+      <xs:documentation>Maximum nesting depth</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="100" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ArityValueType">
+    <xs:annotation>
+      <xs:documentation>Function arity</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0" />
+      <xs:maxInclusive value="255" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="GUIDType">
+    <xs:annotation>
+      <xs:documentation>UUID/GUID pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" />
+      <xs:minLength value="36" />
+      <xs:maxLength value="36" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="IdentifierType">
+    <xs:annotation>
+      <xs:documentation>Identifier pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="QualifiednameType">
+    <xs:annotation>
+      <xs:documentation>Qualified Name pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="VersionpatternType">
+    <xs:annotation>
+      <xs:documentation>Version Pattern pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d+\\.\\d+(\\.\\d+)?(-[a-zA-Z0-9]+)?" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SourcelocationType">
+    <xs:annotation>
+      <xs:documentation>Source Location pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="\\d+:\\d+(-\\d+:\\d+)?" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="BinaryliteralType">
+    <xs:annotation>
+      <xs:documentation>Binary Literal pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="0[bB][01]+" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="HexliteralType">
+    <xs:annotation>
+      <xs:documentation>Hex Literal pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="0[xX][0-9a-fA-F]+" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="OctalliteralType">
+    <xs:annotation>
+      <xs:documentation>Octal Literal pattern</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="0[oO]?[0-7]+" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="NodeCategoryType">
+    <xs:annotation>
+      <xs:documentation>High-level AST node categories</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Statement">
+        <xs:annotation>
+          <xs:documentation>Executable statement</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Expression">
+        <xs:annotation>
+          <xs:documentation>Value-producing expression</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Declaration">
+        <xs:annotation>
+          <xs:documentation>Name binding declaration</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Type">
+        <xs:annotation>
+          <xs:documentation>Type specification</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Pattern">
+        <xs:annotation>
+          <xs:documentation>Pattern matching construct</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Module">
+        <xs:annotation>
+          <xs:documentation>Module or compilation unit</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Metadata">
+        <xs:annotation>
+          <xs:documentation>Annotations and attributes</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Comment">
+        <xs:annotation>
+          <xs:documentation>Documentation or comment</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Directive">
+        <xs:annotation>
+          <xs:documentation>Compiler directive or pragma</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Macro">
+        <xs:annotation>
+          <xs:documentation>Macro definition or expansion</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="StatementKindType">
+    <xs:annotation>
+      <xs:documentation>StatementKindType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Block" />
+      <xs:enumeration value="Expression" />
+      <xs:enumeration value="Return" />
+      <xs:enumeration value="If" />
+      <xs:enumeration value="Switch" />
+      <xs:enumeration value="Case" />
+      <xs:enumeration value="While" />
+      <xs:enumeration value="DoWhile" />
+      <xs:enumeration value="For" />
+      <xs:enumeration value="ForEach" />
+      <xs:enumeration value="Break" />
+      <xs:enumeration value="Continue" />
+      <xs:enumeration value="Goto" />
+      <xs:enumeration value="Label" />
+      <xs:enumeration value="Try" />
+      <xs:enumeration value="Catch" />
+      <xs:enumeration value="Finally" />
+      <xs:enumeration value="Throw" />
+      <xs:enumeration value="Assert" />
+      <xs:enumeration value="With" />
+      <xs:enumeration value="Using" />
+      <xs:enumeration value="Lock" />
+      <xs:enumeration value="Yield" />
+      <xs:enumeration value="Await" />
+      <xs:enumeration value="Empty" />
+      <xs:enumeration value="Compound" />
+      <xs:enumeration value="Atomic" />
+      <xs:enumeration value="Parallel" />
+      <xs:enumeration value="Select" />
+      <xs:enumeration value="Channel" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ExpressionKindType">
+    <xs:annotation>
+      <xs:documentation>ExpressionKindType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Literal" />
+      <xs:enumeration value="Identifier" />
+      <xs:enumeration value="Binary" />
+      <xs:enumeration value="Unary" />
+      <xs:enumeration value="Ternary" />
+      <xs:enumeration value="Assignment" />
+      <xs:enumeration value="Call" />
+      <xs:enumeration value="Method" />
+      <xs:enumeration value="Field" />
+      <xs:enumeration value="Index" />
+      <xs:enumeration value="Slice" />
+      <xs:enumeration value="Cast" />
+      <xs:enumeration value="TypeCheck" />
+      <xs:enumeration value="Lambda" />
+      <xs:enumeration value="Closure" />
+      <xs:enumeration value="Array" />
+      <xs:enumeration value="Object" />
+      <xs:enumeration value="Tuple" />
+      <xs:enumeration value="List" />
+      <xs:enumeration value="Set" />
+      <xs:enumeration value="Map" />
+      <xs:enumeration value="Comprehension" />
+      <xs:enumeration value="Generator" />
+      <xs:enumeration value="Await" />
+      <xs:enumeration value="Yield" />
+      <xs:enumeration value="Spread" />
+      <xs:enumeration value="Rest" />
+      <xs:enumeration value="Template" />
+      <xs:enumeration value="Interpolation" />
+      <xs:enumeration value="Regex" />
+      <xs:enumeration value="Query" />
+      <xs:enumeration value="Pipeline" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DeclarationKindType">
+    <xs:annotation>
+      <xs:documentation>DeclarationKindType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Variable" />
+      <xs:enumeration value="Constant" />
+      <xs:enumeration value="Function" />
+      <xs:enumeration value="Method" />
+      <xs:enumeration value="Constructor" />
+      <xs:enumeration value="Destructor" />
+      <xs:enumeration value="Class" />
+      <xs:enumeration value="Interface" />
+      <xs:enumeration value="Struct" />
+      <xs:enumeration value="Enum" />
+      <xs:enumeration value="Union" />
+      <xs:enumeration value="Trait" />
+      <xs:enumeration value="Protocol" />
+      <xs:enumeration value="Type" />
+      <xs:enumeration value="Alias" />
+      <xs:enumeration value="Module" />
+      <xs:enumeration value="Namespace" />
+      <xs:enumeration value="Package" />
+      <xs:enumeration value="Import" />
+      <xs:enumeration value="Export" />
+      <xs:enumeration value="Property" />
+      <xs:enumeration value="Field" />
+      <xs:enumeration value="Parameter" />
+      <xs:enumeration value="Generic" />
+      <xs:enumeration value="Template" />
+      <xs:enumeration value="Macro" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TypeKindType">
+    <xs:annotation>
+      <xs:documentation>TypeKindType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Primitive" />
+      <xs:enumeration value="Void" />
+      <xs:enumeration value="Never" />
+      <xs:enumeration value="Any" />
+      <xs:enumeration value="Unknown" />
+      <xs:enumeration value="Boolean" />
+      <xs:enumeration value="Integer" />
+      <xs:enumeration value="Float" />
+      <xs:enumeration value="Decimal" />
+      <xs:enumeration value="Character" />
+      <xs:enumeration value="String" />
+      <xs:enumeration value="Array" />
+      <xs:enumeration value="Tuple" />
+      <xs:enumeration value="Record" />
+      <xs:enumeration value="Union" />
+      <xs:enumeration value="Intersection" />
+      <xs:enumeration value="Function" />
+      <xs:enumeration value="Method" />
+      <xs:enumeration value="Constructor" />
+      <xs:enumeration value="Generic" />
+      <xs:enumeration value="Parametric" />
+      <xs:enumeration value="Existential" />
+      <xs:enumeration value="Universal" />
+      <xs:enumeration value="Dependent" />
+      <xs:enumeration value="Refinement" />
+      <xs:enumeration value="Nullable" />
+      <xs:enumeration value="Optional" />
+      <xs:enumeration value="Reference" />
+      <xs:enumeration value="Pointer" />
+      <xs:enumeration value="Slice" />
+      <xs:enumeration value="Range" />
+      <xs:enumeration value="Enum" />
+      <xs:enumeration value="Class" />
+      <xs:enumeration value="Interface" />
+      <xs:enumeration value="Protocol" />
+      <xs:enumeration value="Trait" />
+      <xs:enumeration value="Module" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="BinaryOperatorType">
+    <xs:annotation>
+      <xs:documentation>BinaryOperatorType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="+">
+        <xs:annotation>
+          <xs:documentation>Addition</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="-">
+        <xs:annotation>
+          <xs:documentation>Subtraction</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="*">
+        <xs:annotation>
+          <xs:documentation>Multiplication</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="/">
+        <xs:annotation>
+          <xs:documentation>Division</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="%">
+        <xs:annotation>
+          <xs:documentation>Modulo</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="**">
+        <xs:annotation>
+          <xs:documentation>Exponentiation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&amp;&amp;">
+        <xs:annotation>
+          <xs:documentation>Logical AND</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="||">
+        <xs:annotation>
+          <xs:documentation>Logical OR</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="^">
+        <xs:annotation>
+          <xs:documentation>Bitwise XOR</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="==">
+        <xs:annotation>
+          <xs:documentation>Equality</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="!=">
+        <xs:annotation>
+          <xs:documentation>Inequality</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&lt;">
+        <xs:annotation>
+          <xs:documentation>Less than</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&gt;">
+        <xs:annotation>
+          <xs:documentation>Greater than</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&lt;=">
+        <xs:annotation>
+          <xs:documentation>Less than or equal</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&gt;=">
+        <xs:annotation>
+          <xs:documentation>Greater than or equal</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&lt;&lt;">
+        <xs:annotation>
+          <xs:documentation>Shift left</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&gt;&gt;">
+        <xs:annotation>
+          <xs:documentation>Shift right</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="&amp;">
+        <xs:annotation>
+          <xs:documentation>Bitwise AND</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="|">
+        <xs:annotation>
+          <xs:documentation>Bitwise OR</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="++">
+        <xs:annotation>
+          <xs:documentation>Concatenation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="..">
+        <xs:annotation>
+          <xs:documentation>Range</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="??">
+        <xs:annotation>
+          <xs:documentation>Null coalescing</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="|&gt;">
+        <xs:annotation>
+          <xs:documentation>Pipeline</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="UnaryOperatorType">
+    <xs:annotation>
+      <xs:documentation>UnaryOperatorType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Plus" />
+      <xs:enumeration value="Minus" />
+      <xs:enumeration value="Not" />
+      <xs:enumeration value="BitwiseNot" />
+      <xs:enumeration value="Increment" />
+      <xs:enumeration value="Decrement" />
+      <xs:enumeration value="Dereference" />
+      <xs:enumeration value="AddressOf" />
+      <xs:enumeration value="Typeof" />
+      <xs:enumeration value="Sizeof" />
+      <xs:enumeration value="Await" />
+      <xs:enumeration value="Delete" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="AccessModifierType">
+    <xs:annotation>
+      <xs:documentation>AccessModifierType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Public" />
+      <xs:enumeration value="Private" />
+      <xs:enumeration value="Protected" />
+      <xs:enumeration value="Internal" />
+      <xs:enumeration value="Package" />
+      <xs:enumeration value="Module" />
+      <xs:enumeration value="Friend" />
+      <xs:enumeration value="Published" />
+      <xs:enumeration value="Open" />
+      <xs:enumeration value="Closed" />
+      <xs:enumeration value="Sealed" />
+      <xs:enumeration value="Final" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="StorageModifierType">
+    <xs:annotation>
+      <xs:documentation>StorageModifierType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Static" />
+      <xs:enumeration value="Const" />
+      <xs:enumeration value="Mutable" />
+      <xs:enumeration value="Immutable" />
+      <xs:enumeration value="Volatile" />
+      <xs:enumeration value="Atomic" />
+      <xs:enumeration value="ThreadLocal" />
+      <xs:enumeration value="Weak" />
+      <xs:enumeration value="Strong" />
+      <xs:enumeration value="Lazy" />
+      <xs:enumeration value="Computed" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SemanticRoleType">
+    <xs:annotation>
+      <xs:documentation>SemanticRoleType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Definition" />
+      <xs:enumeration value="Declaration" />
+      <xs:enumeration value="Reference" />
+      <xs:enumeration value="Call" />
+      <xs:enumeration value="Type" />
+      <xs:enumeration value="Value" />
+      <xs:enumeration value="Assignment" />
+      <xs:enumeration value="Initialization" />
+      <xs:enumeration value="Import" />
+      <xs:enumeration value="Export" />
+      <xs:enumeration value="Annotation" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ScopeKindType">
+    <xs:annotation>
+      <xs:documentation>ScopeKindType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Global" />
+      <xs:enumeration value="Module" />
+      <xs:enumeration value="Namespace" />
+      <xs:enumeration value="Class" />
+      <xs:enumeration value="Function" />
+      <xs:enumeration value="Block" />
+      <xs:enumeration value="Loop" />
+      <xs:enumeration value="Conditional" />
+      <xs:enumeration value="Try" />
+      <xs:enumeration value="Catch" />
+      <xs:enumeration value="With" />
+      <xs:enumeration value="Lambda" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DiagnosticSeverityType">
+    <xs:annotation>
+      <xs:documentation>DiagnosticSeverityType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Error" />
+      <xs:enumeration value="Warning" />
+      <xs:enumeration value="Information" />
+      <xs:enumeration value="Hint" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ParadigmType">
+    <xs:annotation>
+      <xs:documentation>ParadigmType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Imperative" />
+      <xs:enumeration value="Declarative" />
+      <xs:enumeration value="Functional" />
+      <xs:enumeration value="ObjectOriented" />
+      <xs:enumeration value="Procedural" />
+      <xs:enumeration value="Logic" />
+      <xs:enumeration value="Concurrent" />
+      <xs:enumeration value="Reactive" />
+      <xs:enumeration value="Dataflow" />
+      <xs:enumeration value="StackBased" />
+      <xs:enumeration value="EventDriven" />
+      <xs:enumeration value="AspectOriented" />
+      <xs:enumeration value="Generic" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="TypeSystemFeatureType">
+    <xs:annotation>
+      <xs:documentation>TypeSystemFeatureType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Static" />
+      <xs:enumeration value="Dynamic" />
+      <xs:enumeration value="Strong" />
+      <xs:enumeration value="Weak" />
+      <xs:enumeration value="Duck" />
+      <xs:enumeration value="Structural" />
+      <xs:enumeration value="Nominal" />
+      <xs:enumeration value="Gradual" />
+      <xs:enumeration value="Dependent" />
+      <xs:enumeration value="Linear" />
+      <xs:enumeration value="Affine" />
+      <xs:enumeration value="Uniqueness" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatternKindType">
+    <xs:annotation>
+      <xs:documentation>PatternKindType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Wildcard" />
+      <xs:enumeration value="Variable" />
+      <xs:enumeration value="Literal" />
+      <xs:enumeration value="Constructor" />
+      <xs:enumeration value="Tuple" />
+      <xs:enumeration value="Array" />
+      <xs:enumeration value="Record" />
+      <xs:enumeration value="Guard" />
+      <xs:enumeration value="As" />
+      <xs:enumeration value="Or" />
+      <xs:enumeration value="Range" />
+      <xs:enumeration value="Type" />
+      <xs:enumeration value="Destructuring" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="MemoryManagementType">
+    <xs:annotation>
+      <xs:documentation>MemoryManagementType</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Manual" />
+      <xs:enumeration value="GarbageCollected" />
+      <xs:enumeration value="ReferenceCounting" />
+      <xs:enumeration value="RAII" />
+      <xs:enumeration value="Ownership" />
+      <xs:enumeration value="Borrowing" />
+      <xs:enumeration value="Linear" />
+      <xs:enumeration value="Affine" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="LanguageSpecificationType">
+    <xs:sequence>
+      <xs:element name="LanguageSpecification" type="tns:LanguageSpecificationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual languagespecification</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LanguageName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>LanguageName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LanguageVersion" type="tns:VersionType">
+        <xs:annotation>
+          <xs:documentation>LanguageVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LanguageFamily" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>LanguageFamily</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FileExtensions" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FileExtensions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MimeTypes" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MimeTypes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StandardVersion" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>StandardVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CompilerVersion" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CompilerVersion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LanguageFeatures" type="tns:LanguageFeaturesType">
+        <xs:annotation>
+          <xs:documentation>LanguageFeatures</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CompilationUnit" type="tns:CompilationUnitType">
+        <xs:annotation>
+          <xs:documentation>CompilationUnit</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FlowStructure" type="tns:FlowStructureType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>UniversalAST domain-specific structure elements</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="version" type="xs:string" use="optional" fixed="1.0" />
+    <xs:attribute name="generated" type="xs:dateTime" use="optional" />
+    <xs:key name="LanguageSpecificationKey">
+      <xs:selector xpath=".//tns:LanguageSpecification" />
+      <xs:field xpath="@id" />
+    </xs:key>
+    <xs:unique name="UniqueNodeIDID">
+      <xs:selector xpath=".//tns:Node" />
+      <xs:field xpath="tns:NodeIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueTypeIDID">
+      <xs:selector xpath=".//tns:Type" />
+      <xs:field xpath="tns:TypeIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueSymbolIDID">
+      <xs:selector xpath=".//tns:Symbol" />
+      <xs:field xpath="tns:SymbolIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueScopeIDID">
+      <xs:selector xpath=".//tns:Scope" />
+      <xs:field xpath="tns:ScopeIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueRuleIDID">
+      <xs:selector xpath=".//tns:Rule" />
+      <xs:field xpath="tns:RuleIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueModuleIDID">
+      <xs:selector xpath=".//tns:Module" />
+      <xs:field xpath="tns:ModuleIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueNamespaceIDID">
+      <xs:selector xpath=".//tns:Namespace" />
+      <xs:field xpath="tns:NamespaceIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueAnnotationIDID">
+      <xs:selector xpath=".//tns:Annotation" />
+      <xs:field xpath="tns:AnnotationIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueDiagnosticIDID">
+      <xs:selector xpath=".//tns:Diagnostic" />
+      <xs:field xpath="tns:DiagnosticIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueMacroIDID">
+      <xs:selector xpath=".//tns:Macro" />
+      <xs:field xpath="tns:MacroIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueTemplateIDID">
+      <xs:selector xpath=".//tns:Template" />
+      <xs:field xpath="tns:TemplateIDType" />
+    </xs:unique>
+    <xs:unique name="UniquePatternIDID">
+      <xs:selector xpath=".//tns:Pattern" />
+      <xs:field xpath="tns:PatternIDType" />
+    </xs:unique>
+    <xs:unique name="UniqueASTNodeID">
+      <xs:selector xpath=".//tns:ASTNode" />
+      <xs:field xpath="tns:ASTNodeID" />
+    </xs:unique>
+    <xs:unique name="UniqueSyntaxTreeID">
+      <xs:selector xpath=".//tns:SyntaxTree" />
+      <xs:field xpath="tns:SyntaxTreeID" />
+    </xs:unique>
+    <xs:unique name="UniqueStatementID">
+      <xs:selector xpath=".//tns:Statement" />
+      <xs:field xpath="tns:StatementID" />
+    </xs:unique>
+    <xs:unique name="UniqueExpressionID">
+      <xs:selector xpath=".//tns:Expression" />
+      <xs:field xpath="tns:ExpressionID" />
+    </xs:unique>
+    <xs:unique name="UniqueDeclarationID">
+      <xs:selector xpath=".//tns:Declaration" />
+      <xs:field xpath="tns:DeclarationID" />
+    </xs:unique>
+    <xs:unique name="UniqueTypeDefinitionID">
+      <xs:selector xpath=".//tns:TypeDefinition" />
+      <xs:field xpath="tns:TypeDefinitionID" />
+    </xs:unique>
+    <xs:unique name="UniqueSymbolID">
+      <xs:selector xpath=".//tns:Symbol" />
+      <xs:field xpath="tns:SymbolID" />
+    </xs:unique>
+    <xs:unique name="UniqueScopeID">
+      <xs:selector xpath=".//tns:Scope" />
+      <xs:field xpath="tns:ScopeID" />
+    </xs:unique>
+    <xs:unique name="UniqueSemanticRuleID">
+      <xs:selector xpath=".//tns:SemanticRule" />
+      <xs:field xpath="tns:SemanticRuleID" />
+    </xs:unique>
+    <xs:unique name="UniqueSyntaxRuleID">
+      <xs:selector xpath=".//tns:SyntaxRule" />
+      <xs:field xpath="tns:SyntaxRuleID" />
+    </xs:unique>
+    <xs:unique name="UniquePatternID">
+      <xs:selector xpath=".//tns:Pattern" />
+      <xs:field xpath="tns:PatternID" />
+    </xs:unique>
+    <xs:unique name="UniqueMacroDefinitionID">
+      <xs:selector xpath=".//tns:MacroDefinition" />
+      <xs:field xpath="tns:MacroDefinitionID" />
+    </xs:unique>
+    <xs:unique name="UniqueTemplateDefinitionID">
+      <xs:selector xpath=".//tns:TemplateDefinition" />
+      <xs:field xpath="tns:TemplateDefinitionID" />
+    </xs:unique>
+    <xs:unique name="UniqueDiagnosticID">
+      <xs:selector xpath=".//tns:Diagnostic" />
+      <xs:field xpath="tns:DiagnosticID" />
+    </xs:unique>
+    <xs:unique name="UniqueMetadataEntryID">
+      <xs:selector xpath=".//tns:MetadataEntry" />
+      <xs:field xpath="tns:MetadataEntryID" />
+    </xs:unique>
+    <xs:unique name="UniqueAnnotationID">
+      <xs:selector xpath=".//tns:Annotation" />
+      <xs:field xpath="tns:AnnotationID" />
+    </xs:unique>
+    <xs:keyref name="ParentNodeReference" refer="tns:UniqueNodeID">
+      <xs:selector xpath=".//tns:ParentNode" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="RootNodeReference" refer="tns:UniqueNodeID">
+      <xs:selector xpath=".//tns:RootNode" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="DeclarationNodeReference" refer="tns:UniqueNodeID">
+      <xs:selector xpath=".//tns:DeclarationNode" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="DefinitionNodeReference" refer="tns:UniqueNodeID">
+      <xs:selector xpath=".//tns:DefinitionNode" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="OwnerNodeReference" refer="tns:UniqueNodeID">
+      <xs:selector xpath=".//tns:OwnerNode" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ParentScopeReference" refer="tns:UniqueScopeID">
+      <xs:selector xpath=".//tns:ParentScope" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="SymbolTypeReference" refer="tns:UniqueTypeID">
+      <xs:selector xpath=".//tns:SymbolType" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ResultTypeReference" refer="tns:UniqueTypeID">
+      <xs:selector xpath=".//tns:ResultType" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="PatternTypeReference" refer="tns:UniqueTypeID">
+      <xs:selector xpath=".//tns:PatternType" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ResolvedSymbolReference" refer="tns:UniqueSymbolID">
+      <xs:selector xpath=".//tns:ResolvedSymbol" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="TargetFunctionReference" refer="tns:UniqueSymbolID">
+      <xs:selector xpath=".//tns:TargetFunction" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="SuperTypeIDReference" refer="tns:UniqueTypeID">
+      <xs:selector xpath=".//tns:SuperTypeID" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="SubTypeIDReference" refer="tns:UniqueTypeID">
+      <xs:selector xpath=".//tns:SubTypeID" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="InferredTypeReference" refer="tns:UniqueTypeID">
+      <xs:selector xpath=".//tns:InferredType" />
+      <xs:field xpath="." />
+    </xs:keyref>
+    <xs:keyref name="ConstraintTypeReference" refer="tns:UniqueTypeID">
+      <xs:selector xpath=".//tns:ConstraintType" />
+      <xs:field xpath="." />
+    </xs:keyref>
+  </xs:complexType>
+  <xs:complexType name="LanguageFeaturesType">
+    <xs:sequence>
+      <xs:element name="Paradigms" type="tns:ParadigmType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Paradigms</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeSystemFeatures" type="tns:TypeSystemFeatureType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TypeSystemFeatures</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MemoryModel" type="tns:MemoryManagementType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>MemoryModel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ConcurrencyModel" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ConcurrencyModel</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ModuleSystem" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ModuleSystem</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CompilationUnitType">
+    <xs:sequence>
+      <xs:element name="SourceFile" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>SourceFile</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Encoding" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Encoding</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Checksum" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Checksum</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CompilationFlags" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CompilationFlags</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ASTNodeType">
+    <xs:sequence>
+      <xs:element name="NodeID" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>NodeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NodeCategory" type="tns:NodeCategoryType">
+        <xs:annotation>
+          <xs:documentation>NodeCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NodeKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>NodeKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ParentNode" type="tns:NodeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ParentNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceLocation" type="tns:SourceLocationType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SourceLocation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsGenerated" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsGenerated</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsImplicit" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsImplicit</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Children" type="tns:ChildrenType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Children</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Attributes" type="tns:AttributesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Attributes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID" use="optional" />
+  </xs:complexType>
+  <xs:complexType name="ChildrenType">
+    <xs:sequence>
+      <xs:element name="ASTNode" type="tns:ASTNodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ASTNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AttributesType">
+    <xs:sequence>
+      <xs:element name="AttributeName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AttributeName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AttributeValue" type="xs:anyType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>AttributeValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SyntaxTreeType">
+    <xs:sequence>
+      <xs:element name="TreeID" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>TreeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RootNode" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>RootNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceFile" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>SourceFile</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Language" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Language</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ParseTime" type="xs:duration" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ParseTime</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Nodes" type="tns:NodesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Nodes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Comments" type="tns:CommentsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Comments</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Trivia" type="tns:TriviaType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Trivia</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="language" type="xs:string" use="required" />
+    <xs:attribute name="dialect" type="xs:string" use="optional" />
+    <xs:attribute name="syntaxVersion" type="xs:string" use="optional" />
+  </xs:complexType>
+  <xs:complexType name="NodesType">
+    <xs:sequence>
+      <xs:element name="ASTNode" type="tns:ASTNodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ASTNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CommentsType">
+    <xs:sequence>
+      <xs:element name="Comment" type="tns:CommentType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Comment</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TriviaType">
+    <xs:sequence>
+      <xs:element name="TriviaNode" type="tns:TriviaType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TriviaNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="StatementType">
+    <xs:sequence>
+      <xs:element name="StatementKind" type="tns:StatementKindType">
+        <xs:annotation>
+          <xs:documentation>StatementKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Label" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Label</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsAsync" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsAsync</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Condition" type="tns:ConditionType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Condition</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Body" type="tns:BodyType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Body</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ElseBody" type="tns:ElseBodyType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ElseBody</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Cases" type="tns:CasesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Cases</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Handlers" type="tns:HandlersType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Handlers</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CasesType">
+    <xs:sequence>
+      <xs:element name="CaseClause" type="tns:CaseType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CaseClause</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="HandlersType">
+    <xs:sequence>
+      <xs:element name="ExceptionHandler" type="tns:HandlerType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ExceptionHandler</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ExpressionType">
+    <xs:sequence>
+      <xs:element name="ExpressionKind" type="tns:ExpressionKindType">
+        <xs:annotation>
+          <xs:documentation>ExpressionKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ResultType" type="tns:TypeID" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ResultType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsConstant" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsConstant</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ConstantValue" type="xs:anyType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ConstantValue</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Operator" type="tns:OperatorType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Operator</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Operands" type="tns:OperandsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Operands</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Arguments" type="tns:ArgumentsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Arguments</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeArguments" type="tns:TypeArgumentsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TypeArguments</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OperandsType">
+    <xs:sequence>
+      <xs:element name="Expression" type="tns:ExpressionType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Expression</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ArgumentsType">
+    <xs:sequence>
+      <xs:element name="Argument" type="tns:ArgumentType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Argument</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TypeArgumentsType">
+    <xs:sequence>
+      <xs:element name="TypeExpression" type="tns:TypeExpressionType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TypeExpression</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DeclarationType">
+    <xs:sequence>
+      <xs:element name="DeclarationKind" type="tns:DeclarationKindType">
+        <xs:annotation>
+          <xs:documentation>DeclarationKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DeclaredName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>DeclaredName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AccessModifier" type="tns:AccessModifierType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>AccessModifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StorageModifiers" type="tns:StorageModifierType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>StorageModifiers</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsExported" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsExported</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DeclaredType" type="tns:DeclaredTypeType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DeclaredType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Initializer" type="tns:InitializerType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Initializer</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeParameters" type="tns:TypeParametersType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TypeParameters</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Constraints" type="tns:ConstraintsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Constraints</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Annotations" type="tns:AnnotationsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Annotations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TypeParametersType">
+    <xs:sequence>
+      <xs:element name="TypeParameter" type="tns:TypeParameterType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TypeParameter</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ConstraintsType">
+    <xs:sequence>
+      <xs:element name="TypeConstraint" type="tns:ConstraintType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TypeConstraint</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AnnotationsType">
+    <xs:sequence>
+      <xs:element name="Annotation" type="tns:AnnotationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Annotation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TypeDefinitionType">
+    <xs:sequence>
+      <xs:element name="TypeID" type="tns:TypeIDType">
+        <xs:annotation>
+          <xs:documentation>TypeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TypeName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeKind" type="tns:TypeKindType">
+        <xs:annotation>
+          <xs:documentation>TypeKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsGeneric" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsGeneric</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsAbstract" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsAbstract</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsFinal" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsFinal</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SuperTypes" type="tns:SuperTypesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SuperTypes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Members" type="tns:MembersType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Members</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Methods" type="tns:MethodsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Methods</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SuperTypesType">
+    <xs:sequence>
+      <xs:element name="TypeReference" type="tns:TypeReferenceType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TypeReference</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MembersType">
+    <xs:sequence>
+      <xs:element name="TypeMember" type="tns:MemberType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TypeMember</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MethodsType">
+    <xs:sequence>
+      <xs:element name="MethodSignature" type="tns:MethodType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>MethodSignature</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SymbolType">
+    <xs:sequence>
+      <xs:element name="SymbolID" type="tns:SymbolIDType">
+        <xs:annotation>
+          <xs:documentation>SymbolID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SymbolName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>SymbolName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SymbolKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>SymbolKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DeclarationNode" type="tns:NodeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DeclarationNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DefinitionNode" type="tns:NodeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DefinitionNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SymbolType" type="tns:TypeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SymbolType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ScopeID" type="tns:ScopeIDType">
+        <xs:annotation>
+          <xs:documentation>ScopeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsPublic" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsPublic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="References" type="tns:ReferencesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>References</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ReferencesType">
+    <xs:sequence>
+      <xs:element name="SymbolReference" type="tns:ReferenceType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>SymbolReference</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ScopeType">
+    <xs:sequence>
+      <xs:element name="ScopeID" type="tns:ScopeIDType">
+        <xs:annotation>
+          <xs:documentation>ScopeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ScopeKind" type="tns:ScopeKindType">
+        <xs:annotation>
+          <xs:documentation>ScopeKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ParentScope" type="tns:ScopeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ParentScope</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="OwnerNode" type="tns:NodeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>OwnerNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StartLocation" type="tns:SourceLocationType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>StartLocation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EndLocation" type="tns:SourceLocationType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>EndLocation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="LocalSymbols" type="tns:LocalSymbolsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>LocalSymbols</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ImportedSymbols" type="tns:ImportedSymbolsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ImportedSymbols</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ChildScopes" type="tns:ChildScopesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ChildScopes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="LocalSymbolsType">
+    <xs:sequence>
+      <xs:element name="Symbol" type="tns:SymbolType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Symbol</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ImportedSymbolsType">
+    <xs:sequence>
+      <xs:element name="ImportedSymbol" type="tns:ImportType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ImportedSymbol</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ChildScopesType">
+    <xs:sequence>
+      <xs:element name="Scope" type="tns:ScopeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Scope</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SemanticRuleType">
+    <xs:sequence>
+      <xs:element name="RuleID" type="tns:RuleIDType">
+        <xs:annotation>
+          <xs:documentation>RuleID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleCategory" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleCategory</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RuleDescription</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Severity" type="tns:DiagnosticSeverityType">
+        <xs:annotation>
+          <xs:documentation>Severity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsEnabled" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsEnabled</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Action" type="tns:ActionType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Action</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Diagnostics" type="tns:DiagnosticsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Diagnostics</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DiagnosticsType">
+    <xs:sequence>
+      <xs:element name="DiagnosticTemplate" type="tns:DiagnosticTemplateType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DiagnosticTemplate</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SyntaxRuleType">
+    <xs:sequence>
+      <xs:element name="RuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>RuleName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsTerminal" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>IsTerminal</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Precedence" type="tns:PrecedenceType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Precedence</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Associativity" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Associativity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Productions" type="tns:ProductionsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Productions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FirstSet" type="tns:FirstSetType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FirstSet</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FollowSet" type="tns:FollowSetType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>FollowSet</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ProductionsType">
+    <xs:sequence>
+      <xs:element name="Production" type="tns:ProductionType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Production</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FirstSetType">
+    <xs:sequence>
+      <xs:element name="xs:string" type="tns:" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>xs:string</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FollowSetType">
+    <xs:sequence>
+      <xs:element name="xs:string" type="tns:" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>xs:string</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PatternType">
+    <xs:sequence>
+      <xs:element name="PatternID" type="tns:PatternIDType">
+        <xs:annotation>
+          <xs:documentation>PatternID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternKind" type="tns:PatternKindType">
+        <xs:annotation>
+          <xs:documentation>PatternKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BindingName" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>BindingName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PatternType" type="tns:TypeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>PatternType</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SubPatterns" type="tns:SubPatternsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>SubPatterns</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Guard" type="tns:GuardType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Guard</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SubPatternsType">
+    <xs:sequence>
+      <xs:element name="Pattern" type="tns:PatternType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Pattern</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MacroDefinitionType">
+    <xs:sequence>
+      <xs:element name="MacroID" type="tns:MacroIDType">
+        <xs:annotation>
+          <xs:documentation>MacroID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MacroName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>MacroName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MacroKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>MacroKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsHygienic" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsHygienic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Parameters" type="tns:ParametersType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Parameters</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Expansions" type="tns:ExpansionsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Expansions</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ParametersType">
+    <xs:sequence>
+      <xs:element name="MacroParameter" type="tns:MacroParameterType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>MacroParameter</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ExpansionsType">
+    <xs:sequence>
+      <xs:element name="MacroExpansion" type="tns:ExpansionType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>MacroExpansion</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TemplateDefinitionType">
+    <xs:sequence>
+      <xs:element name="TemplateID" type="tns:TemplateIDType">
+        <xs:annotation>
+          <xs:documentation>TemplateID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TemplateName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TemplateKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsVariadic" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsVariadic</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TemplateParameters" type="tns:TemplateParametersType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TemplateParameters</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Specializations" type="tns:SpecializationsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Specializations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Instantiations" type="tns:InstantiationsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Instantiations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TemplateParametersType">
+    <xs:sequence>
+      <xs:element name="TemplateParameter" type="tns:TemplateParameterType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TemplateParameter</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SpecializationsType">
+    <xs:sequence>
+      <xs:element name="TemplateSpecialization" type="tns:SpecializationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TemplateSpecialization</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="InstantiationsType">
+    <xs:sequence>
+      <xs:element name="TemplateInstantiation" type="tns:InstantiationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>TemplateInstantiation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DiagnosticType">
+    <xs:sequence>
+      <xs:element name="DiagnosticID" type="tns:DiagnosticIDType">
+        <xs:annotation>
+          <xs:documentation>DiagnosticID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Severity" type="tns:DiagnosticSeverityType">
+        <xs:annotation>
+          <xs:documentation>Severity</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Code" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Code</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Message" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Message</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceLocation" type="tns:SourceLocationType">
+        <xs:annotation>
+          <xs:documentation>SourceLocation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Category" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Category</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RelatedLocations" type="tns:RelatedLocationsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>RelatedLocations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Fixes" type="tns:FixesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Fixes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Notes" type="tns:NotesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Notes</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RelatedLocationsType">
+    <xs:sequence>
+      <xs:element name="RelatedLocation" type="tns:LocationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>RelatedLocation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FixesType">
+    <xs:sequence>
+      <xs:element name="CodeFix" type="tns:FixType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CodeFix</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="NotesType">
+    <xs:sequence>
+      <xs:element name="xs:string" type="tns:" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>xs:string</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MetadataEntryType">
+    <xs:sequence>
+      <xs:element name="Key" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Key</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Value" type="xs:anyType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Value</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Category" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Category</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetNode" type="tns:NodeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>TargetNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AnnotationType">
+    <xs:sequence>
+      <xs:element name="AnnotationID" type="tns:AnnotationIDType">
+        <xs:annotation>
+          <xs:documentation>AnnotationID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AnnotationName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>AnnotationName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetNode" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>TargetNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FlowStructureType">
+    <xs:sequence>
+      <xs:element name="ControlFlowGraph" type="tns:ControlFlowGraphType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>ControlFlowGraph</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DataFlowGraph" type="tns:DataFlowGraphType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DataFlowGraph</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CallGraph" type="tns:CallGraphType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>CallGraph</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ControlFlowGraphType">
+    <xs:sequence>
+      <xs:element name="BasicBlock" type="tns:BasicBlockType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>BasicBlock</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BasicBlockType">
+    <xs:sequence>
+      <xs:element name="BlockID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BlockID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BlockKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>BlockKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StartNode" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>StartNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EndNode" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>EndNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Successor" type="tns:SuccessorType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Successor</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SuccessorType">
+    <xs:sequence>
+      <xs:element name="TargetBlock" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TargetBlock</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="EdgeKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>EdgeKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Condition" type="tns:NodeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Condition</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DataFlowGraphType">
+    <xs:sequence>
+      <xs:element name="DataFlowNode" type="tns:DataFlowNodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>DataFlowNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DataFlowNodeType">
+    <xs:sequence>
+      <xs:element name="NodeID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>NodeID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValueKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>ValueKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DefiningNode" type="tns:NodeIDType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>DefiningNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Use" type="tns:UseType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Use</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="UseType">
+    <xs:sequence>
+      <xs:element name="UserNode" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>UserNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="UseKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>UseKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CallGraphType">
+    <xs:sequence>
+      <xs:element name="CallGraphNode" type="tns:CallGraphNodeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CallGraphNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CallGraphNodeType">
+    <xs:sequence>
+      <xs:element name="FunctionID" type="tns:SymbolIDType">
+        <xs:annotation>
+          <xs:documentation>FunctionID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="FunctionName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>FunctionName</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsRecursive" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>IsRecursive</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CallSite" type="tns:CallSiteType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>CallSite</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CallSiteType">
+    <xs:sequence>
+      <xs:element name="CallNode" type="tns:NodeIDType">
+        <xs:annotation>
+          <xs:documentation>CallNode</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetFunction" type="tns:SymbolIDType">
+        <xs:annotation>
+          <xs:documentation>TargetFunction</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CallKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>CallKind</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="LanguageModel" type="tns:LanguageSpecificationType">
+    <xs:annotation>
+      <xs:documentation>Root element for Universal AST schema for representing any programming language or formal system</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+</xs:schema>

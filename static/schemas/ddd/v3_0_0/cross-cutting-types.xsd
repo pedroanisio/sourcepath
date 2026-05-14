@@ -1,0 +1,454 @@
+<?xml version="1.0" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:cc="https://schema.ddd-python.org/v3.0.0/crosscutting" xmlns:common="https://schema.ddd-python.org/v3.0.0/common" targetNamespace="https://schema.ddd-python.org/v3.0.0/crosscutting" elementFormDefault="qualified" version="3.0.0">
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/common" schemaLocation="common-types.xsd"/>
+  <!-- API Endpoint Type -->
+  <xs:complexType name="apiEndpointType">
+    <xs:sequence>
+      <xs:element name="path" type="xs:string"/>
+      <xs:element name="method">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="GET"/>
+            <xs:enumeration value="POST"/>
+            <xs:enumeration value="PUT"/>
+            <xs:enumeration value="PATCH"/>
+            <xs:enumeration value="DELETE"/>
+            <xs:enumeration value="OPTIONS"/>
+            <xs:enumeration value="HEAD"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="handler" type="xs:string"/>
+      <xs:element name="request_schema" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="response_schema" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="authentication_required" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="authorization" type="cc:authorizationPolicyType" minOccurs="0"/>
+      <xs:element name="rate_limit" type="cc:rateLimitType" minOccurs="0"/>
+      <xs:element name="cache_config" type="cc:endpointCacheType" minOccurs="0"/>
+      <xs:element name="version" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Controller Type -->
+  <xs:complexType name="controllerType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="base_path" type="xs:string"/>
+      <xs:element name="endpoints">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="endpoint" type="cc:apiEndpointType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="middleware" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="middleware" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Serializer Type -->
+  <xs:complexType name="serializerType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="model" type="xs:string"/>
+      <xs:element name="fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="exclude_fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="nested_serializers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="serializer" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Middleware Type -->
+  <xs:complexType name="middlewareType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="authentication"/>
+            <xs:enumeration value="authorization"/>
+            <xs:enumeration value="logging"/>
+            <xs:enumeration value="rate_limiting"/>
+            <xs:enumeration value="cors"/>
+            <xs:enumeration value="compression"/>
+            <xs:enumeration value="error_handling"/>
+            <xs:enumeration value="custom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="priority" type="xs:integer" default="0" minOccurs="0"/>
+      <xs:element name="configuration" type="common:metadataType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Security Types -->
+  <xs:complexType name="authorizationPolicyType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string" minOccurs="0"/>
+      <xs:element name="roles" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="role" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="permissions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="permission" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="rules" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="rule" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="roleDefinitionType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="permissions">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="permission" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="inherits" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="role" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="constraints" type="common:metadataType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="permissionDefinitionType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="resource" type="xs:string"/>
+      <xs:element name="action" type="xs:string"/>
+      <xs:element name="conditions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="condition" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Rate Limiting Type -->
+  <xs:complexType name="rateLimitType">
+    <xs:sequence>
+      <xs:element name="requests_per_minute" type="xs:integer" default="60"/>
+      <xs:element name="burst_size" type="xs:integer" default="10" minOccurs="0"/>
+      <xs:element name="scope" default="ip" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="ip"/>
+            <xs:enumeration value="user"/>
+            <xs:enumeration value="api_key"/>
+            <xs:enumeration value="global"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Cache Configuration Type -->
+  <xs:complexType name="endpointCacheType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="false"/>
+      <xs:element name="ttl" type="xs:integer" default="300" minOccurs="0"/>
+      <xs:element name="vary_by" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="header" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="invalidation_triggers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="trigger" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Monitoring Types -->
+  <xs:complexType name="metricType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="counter"/>
+            <xs:enumeration value="gauge"/>
+            <xs:enumeration value="histogram"/>
+            <xs:enumeration value="summary"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="labels" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="label" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="unit" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="healthCheckType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="endpoint" type="xs:string"/>
+      <xs:element name="interval" type="xs:integer" default="30"/>
+      <xs:element name="timeout" type="xs:integer" default="5"/>
+      <xs:element name="dependencies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dependency" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Testing Types -->
+  <xs:complexType name="testDataBuilderType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="entity" type="xs:string"/>
+      <xs:element name="defaults" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="factories" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="factory" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="acceptanceTestScenarioType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="given" type="xs:string"/>
+      <xs:element name="when" type="xs:string"/>
+      <xs:element name="then" type="xs:string"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="contractTestType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="provider" type="xs:string"/>
+      <xs:element name="consumer" type="xs:string"/>
+      <xs:element name="contract" type="common:metadataType"/>
+      <xs:element name="version" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Environment Configuration Type -->
+  <xs:complexType name="environmentConfigType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="config_overrides" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="secrets_management" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="env_vars"/>
+            <xs:enumeration value="vault"/>
+            <xs:enumeration value="aws_secrets"/>
+            <xs:enumeration value="azure_keyvault"/>
+            <xs:enumeration value="gcp_secret_manager"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="feature_flags" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="flag" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="scaling_config" type="cc:scalingConfigType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="scalingConfigType">
+    <xs:all>
+      <xs:element name="min_replicas" type="xs:integer" minOccurs="0"/>
+      <xs:element name="max_replicas" type="xs:integer" minOccurs="0"/>
+      <xs:element name="target_cpu" type="xs:integer" minOccurs="0"/>
+      <xs:element name="target_memory" type="xs:integer" minOccurs="0"/>
+      <xs:element name="custom_metrics" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="metric" type="cc:scalingMetricType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="scalingMetricType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="target" type="xs:decimal"/>
+      <xs:element name="type" default="average">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="average"/>
+            <xs:enumeration value="total"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Documentation Types -->
+  <xs:complexType name="adrType">
+    <xs:sequence>
+      <xs:element name="number" type="xs:integer"/>
+      <xs:element name="title" type="xs:string"/>
+      <xs:element name="status">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="proposed"/>
+            <xs:enumeration value="accepted"/>
+            <xs:enumeration value="deprecated"/>
+            <xs:enumeration value="superseded"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="context" type="xs:string"/>
+      <xs:element name="decision" type="xs:string"/>
+      <xs:element name="consequences" type="xs:string"/>
+      <xs:element name="date" type="xs:date"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Error Handler Type -->
+  <xs:complexType name="errorHandlerType">
+    <xs:sequence>
+      <xs:element name="exception_type" type="xs:string"/>
+      <xs:element name="handler" type="xs:string"/>
+      <xs:element name="status_code" type="xs:integer" minOccurs="0"/>
+      <xs:element name="log_level" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="DEBUG"/>
+            <xs:enumeration value="INFO"/>
+            <xs:enumeration value="WARNING"/>
+            <xs:enumeration value="ERROR"/>
+            <xs:enumeration value="CRITICAL"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="include_stacktrace" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- GraphQL Schema Type -->
+  <xs:complexType name="graphqlSchemaType">
+    <xs:sequence>
+      <xs:element name="queries" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="query" type="cc:graphqlOperationType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="mutations" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="mutation" type="cc:graphqlOperationType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="subscriptions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="subscription" type="cc:graphqlOperationType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="types" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="type" type="common:metadataType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="graphqlOperationType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="arguments" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="return_type" type="xs:string"/>
+      <xs:element name="resolver" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- WebSocket Handler Type -->
+  <xs:complexType name="websocketHandlerType">
+    <xs:sequence>
+      <xs:element name="namespace" type="xs:string"/>
+      <xs:element name="events">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="cc:websocketEventType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="authentication" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="heartbeat_interval" type="xs:integer" default="30" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="websocketEventType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="handler" type="xs:string"/>
+      <xs:element name="schema" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="acknowledgment" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- SSE Endpoint Type -->
+  <xs:complexType name="sseEndpointType">
+    <xs:sequence>
+      <xs:element name="path" type="xs:string"/>
+      <xs:element name="events">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="authentication" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="retry_interval" type="xs:integer" default="3000" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

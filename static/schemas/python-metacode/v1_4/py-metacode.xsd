@@ -1,0 +1,1410 @@
+<?xml version="1.0" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" xmlns:py="http://schemas.python.org/metacode/v1.4" targetNamespace="http://schemas.python.org/metacode/v1.4" elementFormDefault="qualified" attributeFormDefault="unqualified" vc:minVersion="1.1" version="1.4">
+  <!-- ============================================== -->
+  <!-- Root Elements                                  -->
+  <!-- ============================================== -->
+  <xs:element name="module" type="py:ModuleType"/>
+  <xs:element name="project" type="py:ProjectType"/>
+  <!-- ============================================== -->
+  <!-- Foundational Simple Types                      -->
+  <!-- ============================================== -->
+  <xs:simpleType name="IdentifierType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Za-z_][A-Za-z0-9_]*"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ModulePathType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="([A-Za-z_][A-Za-z0-9_]*)(\.[A-Za-z_][A-Za-z0-9_]*)*"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SemVerType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d+\.\d+\.\d+([\-+][0-9A-Za-z\.\-]+)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PythonVersionType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="3\.(1[0-3]|[0-9])(\.\d+)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="SeverityType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="error"/>
+      <xs:enumeration value="warning"/>
+      <xs:enumeration value="info"/>
+      <xs:enumeration value="hint"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="DocstringFormatType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="google"/>
+      <xs:enumeration value="numpy"/>
+      <xs:enumeration value="sphinx"/>
+      <xs:enumeration value="epytext"/>
+      <xs:enumeration value="plain"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- ============================================== -->
+  <!-- Module Definition                               -->
+  <!-- ============================================== -->
+  <xs:complexType name="ModuleType">
+    <xs:sequence>
+      <xs:element name="metadata" type="py:ModuleMetadataType" minOccurs="0"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+      <xs:element name="context" type="py:ContextType" minOccurs="0"/>
+      <xs:element name="codeGen" type="py:CodeGenType" minOccurs="0"/>
+      <xs:element name="imports" type="py:ImportsType" minOccurs="0"/>
+      <xs:element name="moduleCode" type="py:ModuleCodeType" minOccurs="0"/>
+      <xs:element name="typeAliases" type="py:TypeAliasesType" minOccurs="0"/>
+      <xs:element name="constants" type="py:ConstantsType" minOccurs="0"/>
+      <xs:element name="variables" type="py:VariablesType" minOccurs="0"/>
+      <xs:element name="functions" type="py:FunctionsType" minOccurs="0"/>
+      <xs:element name="classes" type="py:ClassesType" minOccurs="0"/>
+      <xs:element name="protocols" type="py:ProtocolsType" minOccurs="0"/>
+      <xs:element name="typedDicts" type="py:TypedDictsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="package" type="py:ModulePathType"/>
+    <xs:attribute name="version" type="py:SemVerType"/>
+    <xs:attribute name="pythonVersion" type="py:PythonVersionType" default="3.13"/>
+    <!-- Uniqueness constraints -->
+    <xs:unique name="uniqueFunctionNames">
+      <xs:selector xpath="py:functions/py:function"/>
+      <xs:field xpath="@name"/>
+    </xs:unique>
+    <xs:unique name="uniqueClassNames">
+      <xs:selector xpath="py:classes/py:class"/>
+      <xs:field xpath="@name"/>
+    </xs:unique>
+  </xs:complexType>
+  <xs:complexType name="ModuleMetadataType">
+    <xs:sequence>
+      <xs:element name="author" type="xs:string" minOccurs="0"/>
+      <xs:element name="license" type="xs:string" minOccurs="0"/>
+      <xs:element name="encoding" type="xs:string" minOccurs="0"/>
+      <xs:element name="annotations" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- NEW in v1.4: Module-level execution code -->
+  <xs:complexType name="ModuleCodeType">
+    <xs:sequence>
+      <xs:element name="block" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="statement" type="py:StatementType" maxOccurs="unbounded"/>
+          </xs:sequence>
+          <xs:attribute name="order" type="xs:integer" use="required"/>
+          <xs:attribute name="condition" type="xs:string"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- NEW in v1.4: Docstring with format -->
+  <xs:complexType name="DocstringType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="format" type="py:DocstringFormatType" default="plain"/>
+        <xs:attribute name="raw" type="xs:boolean" default="false"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Statement Types (NEW in v1.4)                  -->
+  <!-- ============================================== -->
+  <xs:complexType name="StatementType">
+    <xs:choice>
+      <xs:element name="assignment" type="py:AssignmentType"/>
+      <xs:element name="expression" type="py:ValueType"/>
+      <xs:element name="tryBlock" type="py:TryBlockType"/>
+      <xs:element name="withBlock" type="py:WithBlockType"/>
+      <xs:element name="ifBlock" type="py:IfBlockType"/>
+      <xs:element name="forLoop" type="py:ForLoopType"/>
+      <xs:element name="whileLoop" type="py:WhileLoopType"/>
+      <xs:element name="return" type="py:ReturnType"/>
+      <xs:element name="yield" type="py:YieldType"/>
+      <xs:element name="raise" type="py:RaiseType"/>
+      <xs:element name="assert" type="py:AssertType"/>
+      <xs:element name="break" type="py:EmptyType"/>
+      <xs:element name="continue" type="py:EmptyType"/>
+      <xs:element name="pass" type="py:EmptyType"/>
+      <xs:element name="delete" type="py:DeleteType"/>
+      <xs:element name="global" type="py:GlobalType"/>
+      <xs:element name="nonlocal" type="py:NonlocalType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="BlockType">
+    <xs:sequence>
+      <xs:element name="statement" type="py:StatementType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AssignmentType">
+    <xs:sequence>
+      <xs:element name="target" type="py:ValueType" maxOccurs="unbounded"/>
+      <xs:element name="value" type="py:ValueType"/>
+    </xs:sequence>
+    <xs:attribute name="augmented" type="xs:string"/>
+    <!-- +=, -=, etc. -->
+  </xs:complexType>
+  <!-- Exception Handling (NEW in v1.4) -->
+  <xs:complexType name="TryBlockType">
+    <xs:sequence>
+      <xs:element name="try" type="py:BlockType"/>
+      <xs:element name="except" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="exceptionType" type="py:TypeType" minOccurs="0"/>
+            <xs:element name="as" type="py:IdentifierType" minOccurs="0"/>
+            <xs:element name="body" type="py:BlockType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="else" type="py:BlockType" minOccurs="0"/>
+      <xs:element name="finally" type="py:BlockType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Context Managers (NEW in v1.4) -->
+  <xs:complexType name="WithBlockType">
+    <xs:sequence>
+      <xs:element name="contextManager" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="expression" type="py:ValueType"/>
+            <xs:element name="as" type="py:IdentifierType" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="body" type="py:BlockType"/>
+    </xs:sequence>
+    <xs:attribute name="async" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <!-- Control Flow (NEW in v1.4) -->
+  <xs:complexType name="IfBlockType">
+    <xs:sequence>
+      <xs:element name="condition" type="py:ValueType"/>
+      <xs:element name="then" type="py:BlockType"/>
+      <xs:element name="elif" minOccurs="0" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="condition" type="py:ValueType"/>
+            <xs:element name="then" type="py:BlockType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="else" type="py:BlockType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ForLoopType">
+    <xs:sequence>
+      <xs:element name="target" type="py:ValueType"/>
+      <xs:element name="iterable" type="py:ValueType"/>
+      <xs:element name="body" type="py:BlockType"/>
+      <xs:element name="else" type="py:BlockType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="async" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="WhileLoopType">
+    <xs:sequence>
+      <xs:element name="condition" type="py:ValueType"/>
+      <xs:element name="body" type="py:BlockType"/>
+      <xs:element name="else" type="py:BlockType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ReturnType">
+    <xs:sequence>
+      <xs:element name="value" type="py:ValueType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="YieldType">
+    <xs:sequence>
+      <xs:element name="value" type="py:ValueType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="from" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="RaiseType">
+    <xs:sequence>
+      <xs:element name="exception" type="py:ValueType" minOccurs="0"/>
+      <xs:element name="from" type="py:ValueType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AssertType">
+    <xs:sequence>
+      <xs:element name="test" type="py:ValueType"/>
+      <xs:element name="message" type="py:ValueType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DeleteType">
+    <xs:sequence>
+      <xs:element name="target" type="py:ValueType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="GlobalType">
+    <xs:sequence>
+      <xs:element name="name" type="py:IdentifierType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="NonlocalType">
+    <xs:sequence>
+      <xs:element name="name" type="py:IdentifierType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="EmptyType"/>
+  <!-- ============================================== -->
+  <!-- Context Type (Enhanced in v1.4)                -->
+  <!-- ============================================== -->
+  <xs:complexType name="ContextType">
+    <xs:sequence>
+      <!-- Local context: immediate scope -->
+      <xs:element name="local" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="variables" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="variable" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:attribute name="name" type="xs:string" use="required"/>
+                      <xs:attribute name="type" type="xs:string"/>
+                      <xs:attribute name="source" type="xs:string"/>
+                      <xs:attribute name="mutable" type="xs:boolean" default="true"/>
+                      <xs:attribute name="scope" type="xs:string"/>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="dependencies" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="dependency" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:attribute name="type" type="xs:string" use="required"/>
+                      <xs:attribute name="usage" type="xs:string"/>
+                      <xs:attribute name="methods" type="xs:string"/>
+                      <xs:attribute name="async" type="xs:boolean" default="false"/>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="siblings" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="sibling" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:attribute name="name" type="xs:string" use="required"/>
+                      <xs:attribute name="relationship" type="xs:string"/>
+                      <xs:attribute name="order" type="xs:integer"/>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="callers" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="caller" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:attribute name="qualifiedName" type="xs:string" use="required"/>
+                      <xs:attribute name="contract" type="xs:string"/>
+                      <xs:attribute name="frequency" type="xs:string"/>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="callees" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="callee" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:attribute name="qualifiedName" type="xs:string" use="required"/>
+                      <xs:attribute name="purpose" type="xs:string"/>
+                      <xs:attribute name="optional" type="xs:boolean" default="false"/>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <!-- Global context: project-wide -->
+      <xs:element name="global" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="domainModel" type="xs:string" minOccurs="0"/>
+            <xs:element name="projectPatterns" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="pattern" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:simpleContent>
+                        <xs:extension base="xs:string">
+                          <xs:attribute name="name" type="xs:string" use="required"/>
+                          <xs:attribute name="applies" type="xs:boolean" default="true"/>
+                          <xs:attribute name="side" type="xs:string"/>
+                        </xs:extension>
+                      </xs:simpleContent>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="sharedTypes" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="type" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:attribute name="name" type="xs:string" use="required"/>
+                      <xs:attribute name="module" type="xs:string"/>
+                      <xs:attribute name="immutable" type="xs:boolean" default="false"/>
+                      <xs:attribute name="validation" type="xs:string"/>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="conventions" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="convention" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:simpleContent>
+                        <xs:extension base="xs:string">
+                          <xs:attribute name="rule" type="xs:string" use="required"/>
+                          <xs:attribute name="severity" type="py:SeverityType" default="error"/>
+                        </xs:extension>
+                      </xs:simpleContent>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="crossCuttingConcerns" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="concern" maxOccurs="unbounded">
+                    <xs:complexType>
+                      <xs:attribute name="aspect" type="xs:string" use="required"/>
+                      <xs:attribute name="strategy" type="xs:string"/>
+                      <xs:attribute name="config" type="xs:string"/>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <!-- Performance hints (NEW in v1.4) -->
+      <xs:element name="performance" type="py:PerformanceHintsType" minOccurs="0"/>
+      <!-- Security annotations (NEW in v1.4) -->
+      <xs:element name="security" type="py:SecurityAnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Performance Hints (NEW in v1.4) -->
+  <xs:complexType name="PerformanceHintsType">
+    <xs:sequence>
+      <xs:element name="complexity" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="time" type="xs:string"/>
+          <xs:attribute name="space" type="xs:string"/>
+          <xs:attribute name="description" type="xs:string"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="cacheable" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="hotPath" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="memoryIntensive" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="cpuIntensive" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="ioIntensive" type="xs:boolean" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Security Annotations (NEW in v1.4) -->
+  <xs:complexType name="SecurityAnnotationsType">
+    <xs:sequence>
+      <xs:element name="trustBoundary" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="sanitizes" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="type" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="validates" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="type" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="taintSources" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="source" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="privileged" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="auditLog" type="xs:boolean" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Code Generation Type (Enhanced v1.4)           -->
+  <!-- ============================================== -->
+  <xs:complexType name="CodeGenType">
+    <xs:sequence>
+      <xs:element name="systemPrompt" type="xs:string" minOccurs="0"/>
+      <xs:element name="prompt" type="xs:string" minOccurs="0"/>
+      <xs:element name="context" type="py:ContextType" minOccurs="0"/>
+      <xs:element name="examples" type="py:CodeExamplesType" minOccurs="0"/>
+      <xs:element name="testCases" type="py:TestCasesType" minOccurs="0"/>
+      <xs:element name="constraints" type="py:ConstraintsType" minOccurs="0"/>
+      <xs:element name="validation" type="py:ValidationSpecType" minOccurs="0"/>
+      <xs:element name="modelConfig" type="py:CodeGenModelType" minOccurs="0"/>
+      <xs:element name="strategy" type="py:StrategyType" minOccurs="0"/>
+      <xs:element name="annotations" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="scope" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="project"/>
+          <xs:enumeration value="module"/>
+          <xs:enumeration value="class"/>
+          <xs:enumeration value="method"/>
+          <xs:enumeration value="property"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="inherit" type="xs:boolean" default="true"/>
+  </xs:complexType>
+  <xs:complexType name="ConstraintsType">
+    <xs:sequence>
+      <xs:element name="constraint" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0"/>
+            <xs:element name="validator" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+          <xs:attribute name="name" type="xs:string" use="required"/>
+          <xs:attribute name="level" use="required">
+            <xs:simpleType>
+              <xs:restriction base="xs:string">
+                <xs:enumeration value="must"/>
+                <xs:enumeration value="should"/>
+                <xs:enumeration value="may"/>
+                <xs:enumeration value="could"/>
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Validation Specification (Enhanced in v1.4) -->
+  <xs:complexType name="ValidationSpecType">
+    <xs:sequence>
+      <xs:element name="postconditions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="condition" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:simpleContent>
+                  <xs:extension base="xs:string">
+                    <xs:attribute name="name" type="xs:string" use="required"/>
+                    <xs:attribute name="type" use="required">
+                      <xs:simpleType>
+                        <xs:restriction base="xs:string">
+                          <xs:enumeration value="invariant"/>
+                          <xs:enumeration value="ensures"/>
+                          <xs:enumeration value="maintains"/>
+                          <xs:enumeration value="establishes"/>
+                        </xs:restriction>
+                      </xs:simpleType>
+                    </xs:attribute>
+                    <xs:attribute name="language" type="xs:string" default="natural"/>
+                  </xs:extension>
+                </xs:simpleContent>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="proofs" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="proof" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:choice>
+                  <xs:element name="regex" type="py:RegexProofType"/>
+                  <xs:element name="eval" type="py:EvalProofType"/>
+                  <xs:element name="ast" type="py:ASTProofType"/>
+                  <xs:element name="smt" type="py:SMTProofType"/>
+                  <xs:element name="test" type="py:TestProofType"/>
+                  <xs:element name="external" type="py:ExternalProofType"/>
+                </xs:choice>
+                <xs:attribute name="name" type="xs:string" use="required"/>
+                <xs:attribute name="severity" type="py:SeverityType" default="error"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Structured Proof Types (NEW in v1.4) -->
+  <xs:complexType name="RegexProofType">
+    <xs:sequence>
+      <xs:element name="pattern" type="xs:string"/>
+      <xs:element name="flags" type="xs:string" minOccurs="0"/>
+      <xs:element name="target" type="xs:string" default="code"/>
+    </xs:sequence>
+    <xs:attribute name="mustMatch" type="xs:boolean" default="true"/>
+  </xs:complexType>
+  <xs:complexType name="EvalProofType">
+    <xs:sequence>
+      <xs:element name="expression" type="xs:string"/>
+      <xs:element name="context" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="safe" type="xs:boolean" default="true"/>
+  </xs:complexType>
+  <xs:complexType name="ASTProofType">
+    <xs:sequence>
+      <xs:element name="nodeType" type="xs:string"/>
+      <xs:element name="xpath" type="xs:string" minOccurs="0"/>
+      <xs:element name="assertion" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SMTProofType">
+    <xs:sequence>
+      <xs:element name="solver" type="xs:string" default="z3"/>
+      <xs:element name="formula" type="xs:string"/>
+      <xs:element name="timeout" type="xs:integer" default="5000"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TestProofType">
+    <xs:sequence>
+      <xs:element name="testFile" type="xs:string" minOccurs="0"/>
+      <xs:element name="testName" type="xs:string"/>
+      <xs:element name="expectedResult" type="xs:string" default="pass"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ExternalProofType">
+    <xs:sequence>
+      <xs:element name="command" type="xs:string"/>
+      <xs:element name="args" type="xs:string" minOccurs="0"/>
+      <xs:element name="expectedExitCode" type="xs:integer" default="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CodeGenModelType">
+    <xs:sequence>
+      <xs:element name="provider" type="xs:string" minOccurs="0"/>
+      <xs:element name="model" type="xs:string" minOccurs="0"/>
+      <xs:element name="temperature" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="topP" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="maxTokens" type="xs:integer" minOccurs="0"/>
+      <xs:element name="seed" type="xs:integer" minOccurs="0"/>
+      <xs:element name="params" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="StrategyType">
+    <xs:sequence>
+      <xs:element name="mode" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="create"/>
+            <xs:enumeration value="replace"/>
+            <xs:enumeration value="append"/>
+            <xs:enumeration value="merge"/>
+            <xs:enumeration value="augment"/>
+            <xs:enumeration value="refactor"/>
+            <xs:enumeration value="optimize"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="retryMax" type="xs:integer" minOccurs="0"/>
+      <xs:element name="retryBackoffMs" type="xs:integer" minOccurs="0"/>
+      <xs:element name="cacheResults" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="validateOutput" type="xs:boolean" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CodeExamplesType">
+    <xs:sequence>
+      <xs:element name="example" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="input" type="xs:string"/>
+            <xs:element name="output" type="xs:string"/>
+            <xs:element name="explanation" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TestCasesType">
+    <xs:sequence>
+      <xs:element name="testCase" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="input" type="xs:string"/>
+            <xs:element name="expectedOutput" type="xs:string"/>
+            <xs:element name="description" type="xs:string" minOccurs="0"/>
+          </xs:sequence>
+          <xs:attribute name="name" type="py:IdentifierType"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Import Declarations                             -->
+  <!-- ============================================== -->
+  <xs:complexType name="ImportsType">
+    <xs:sequence>
+      <xs:element name="import" type="py:ImportType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ImportType">
+    <xs:sequence>
+      <xs:element name="alias" type="py:AliasType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="module" type="xs:string" use="required"/>
+    <xs:attribute name="from" type="xs:string"/>
+    <xs:attribute name="level" type="xs:int" default="0"/>
+  </xs:complexType>
+  <xs:complexType name="AliasType">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="asname" type="py:IdentifierType"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Type System (Continued from v1.3)              -->
+  <!-- ============================================== -->
+  <xs:complexType name="TypeAliasesType">
+    <xs:sequence>
+      <xs:element name="typeAlias" type="py:TypeAliasType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TypeAliasType">
+    <xs:sequence>
+      <xs:element name="typeParameters" type="py:TypeParametersType" minOccurs="0"/>
+      <xs:element name="type" type="py:TypeType"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="visibility" type="py:VisibilityType" default="public"/>
+  </xs:complexType>
+  <xs:complexType name="TypeParametersType">
+    <xs:sequence>
+      <xs:element name="typeParam" type="py:TypeParameterType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TypeParameterType">
+    <xs:sequence>
+      <xs:element name="bound" type="py:TypeType" minOccurs="0"/>
+      <xs:element name="constraints" type="py:TypeConstraintsType" minOccurs="0"/>
+      <xs:element name="default" type="py:TypeType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="kind" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="TypeVar"/>
+          <xs:enumeration value="ParamSpec"/>
+          <xs:enumeration value="TypeVarTuple"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="variance" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="covariant"/>
+          <xs:enumeration value="contravariant"/>
+          <xs:enumeration value="invariant"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:complexType name="TypeConstraintsType">
+    <xs:sequence>
+      <xs:element name="constraint" type="py:TypeType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ConstantsType">
+    <xs:sequence>
+      <xs:element name="constant" type="py:VariableType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="VariablesType">
+    <xs:sequence>
+      <xs:element name="variable" type="py:VariableType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="VariableType">
+    <xs:sequence>
+      <xs:element name="type" type="py:TypeType" minOccurs="0"/>
+      <xs:element name="defaultValue" type="py:ValueType" minOccurs="0"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+      <xs:element name="annotations" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="scope" type="py:ScopeType" default="module"/>
+    <xs:attribute name="final" type="xs:boolean" default="false"/>
+    <xs:attribute name="classVar" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Function Definitions                            -->
+  <!-- ============================================== -->
+  <xs:complexType name="FunctionsType">
+    <xs:sequence>
+      <xs:element name="function" type="py:FunctionType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FunctionType">
+    <xs:sequence>
+      <xs:element name="decorators" type="py:DecoratorsType" minOccurs="0"/>
+      <xs:element name="typeParameters" type="py:TypeParametersType" minOccurs="0"/>
+      <xs:element name="parameters" type="py:ParametersType" minOccurs="0"/>
+      <xs:element name="returnType" type="py:TypeType" minOccurs="0"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+      <xs:element name="raises" type="py:ExceptionsType" minOccurs="0"/>
+      <xs:element name="body" type="py:BlockType" minOccurs="0"/>
+      <xs:element name="context" type="py:ContextType" minOccurs="0"/>
+      <xs:element name="codeGen" type="py:CodeGenType" minOccurs="0"/>
+      <xs:element name="annotations" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="async" type="xs:boolean" default="false"/>
+    <xs:attribute name="generator" type="xs:boolean" default="false"/>
+    <xs:attribute name="visibility" type="py:VisibilityType" default="public"/>
+    <xs:attribute name="static" type="xs:boolean" default="false"/>
+    <xs:attribute name="classmethod" type="xs:boolean" default="false"/>
+    <xs:attribute name="abstract" type="xs:boolean" default="false"/>
+    <xs:attribute name="override" type="xs:boolean" default="false"/>
+    <!-- Decorator exclusivity constraint -->
+    <xs:assert test="not(@static = true() and @classmethod = true())"/>
+  </xs:complexType>
+  <xs:complexType name="ParametersType">
+    <xs:sequence>
+      <xs:element name="parameter" type="py:ParameterType" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <!-- Python signature ordering constraints -->
+    <xs:assert test="count(py:parameter[@kind='varargs']) &lt;= 1"/>
+    <xs:assert test="count(py:parameter[@kind='kwargs']) &lt;= 1"/>
+  </xs:complexType>
+  <xs:complexType name="ParameterType">
+    <xs:sequence>
+      <xs:element name="type" type="py:TypeType" minOccurs="0"/>
+      <xs:element name="defaultValue" type="py:ValueType" minOccurs="0"/>
+      <xs:element name="annotations" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="kind" type="py:ParameterKindType" use="required"/>
+    <xs:attribute name="optional" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Class Definitions                               -->
+  <!-- ============================================== -->
+  <xs:complexType name="ClassesType">
+    <xs:sequence>
+      <xs:element name="class" type="py:ClassType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ClassType">
+    <xs:sequence>
+      <xs:element name="decorators" type="py:DecoratorsType" minOccurs="0"/>
+      <xs:element name="typeParameters" type="py:TypeParametersType" minOccurs="0"/>
+      <xs:element name="inheritance" type="py:InheritanceType" minOccurs="0"/>
+      <xs:element name="metaclass" type="xs:string" minOccurs="0"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+      <xs:element name="classVariables" type="py:VariablesType" minOccurs="0"/>
+      <xs:element name="properties" type="py:PropertiesType" minOccurs="0"/>
+      <xs:element name="methods" type="py:FunctionsType" minOccurs="0"/>
+      <xs:element name="nestedClasses" type="py:ClassesType" minOccurs="0"/>
+      <xs:element name="matchCases" type="py:MatchCasesType" minOccurs="0"/>
+      <xs:element name="context" type="py:ContextType" minOccurs="0"/>
+      <xs:element name="codeGen" type="py:CodeGenType" minOccurs="0"/>
+      <xs:element name="annotations" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="abstract" type="xs:boolean" default="false"/>
+    <xs:attribute name="dataclass" type="xs:boolean" default="false"/>
+    <xs:attribute name="frozen" type="xs:boolean" default="false"/>
+    <xs:attribute name="slots" type="xs:boolean" default="false"/>
+    <xs:attribute name="weakrefSlot" type="xs:boolean" default="false"/>
+    <xs:attribute name="visibility" type="py:VisibilityType" default="public"/>
+    <!-- Uniqueness constraints -->
+    <xs:unique name="uniquePropertyNames">
+      <xs:selector xpath="py:properties/py:property"/>
+      <xs:field xpath="@name"/>
+    </xs:unique>
+    <xs:unique name="uniqueMethodNames">
+      <xs:selector xpath="py:methods/py:function"/>
+      <xs:field xpath="@name"/>
+    </xs:unique>
+  </xs:complexType>
+  <xs:complexType name="InheritanceType">
+    <xs:sequence>
+      <xs:element name="baseClass" type="py:BaseClassType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BaseClassType">
+    <xs:sequence>
+      <xs:element name="typeArguments" type="py:TypeArgumentsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="module" type="py:ModulePathType"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Protocol, TypedDict, Pattern Matching          -->
+  <!-- ============================================== -->
+  <xs:complexType name="ProtocolsType">
+    <xs:sequence>
+      <xs:element name="protocol" type="py:ProtocolType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ProtocolType">
+    <xs:sequence>
+      <xs:element name="typeParameters" type="py:TypeParametersType" minOccurs="0"/>
+      <xs:element name="inheritance" type="py:InheritanceType" minOccurs="0"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+      <xs:element name="methods" type="py:FunctionsType" minOccurs="0"/>
+      <xs:element name="properties" type="py:PropertiesType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="runtime_checkable" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="TypedDictsType">
+    <xs:sequence>
+      <xs:element name="typedDict" type="py:TypedDictType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TypedDictType">
+    <xs:sequence>
+      <xs:element name="inheritance" type="py:InheritanceType" minOccurs="0"/>
+      <xs:element name="field" type="py:TypedDictFieldType" maxOccurs="unbounded"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="total" type="xs:boolean" default="true"/>
+  </xs:complexType>
+  <xs:complexType name="TypedDictFieldType">
+    <xs:sequence>
+      <xs:element name="type" type="py:TypeType"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="required" type="xs:boolean" default="true"/>
+    <xs:attribute name="readonly" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="MatchCasesType">
+    <xs:sequence>
+      <xs:element name="matchCase" type="py:MatchCaseType" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="subject" type="xs:string" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="MatchCaseType">
+    <xs:sequence>
+      <xs:element name="pattern" type="py:PatternType"/>
+      <xs:element name="guard" type="xs:string" minOccurs="0"/>
+      <xs:element name="body" type="py:BlockType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PatternType">
+    <xs:choice>
+      <xs:element name="literal" type="xs:string"/>
+      <xs:element name="capture" type="py:IdentifierType"/>
+      <xs:element name="wildcard" type="xs:string" fixed="_"/>
+      <xs:element name="class" type="py:ClassPatternType"/>
+      <xs:element name="sequence" type="py:SequencePatternType"/>
+      <xs:element name="mapping" type="py:MappingPatternType"/>
+      <xs:element name="or" type="py:OrPatternType"/>
+      <xs:element name="as" type="py:AsPatternType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="ClassPatternType">
+    <xs:sequence>
+      <xs:element name="arg" type="py:PatternType" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="class" type="xs:string" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="SequencePatternType">
+    <xs:sequence>
+      <xs:element name="item" type="py:PatternType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="MappingPatternType">
+    <xs:sequence>
+      <xs:element name="entry" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="key" type="xs:string"/>
+            <xs:element name="pattern" type="py:PatternType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OrPatternType">
+    <xs:sequence>
+      <xs:element name="pattern" type="py:PatternType" minOccurs="2" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AsPatternType">
+    <xs:sequence>
+      <xs:element name="pattern" type="py:PatternType"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Properties                                      -->
+  <!-- ============================================== -->
+  <xs:complexType name="PropertiesType">
+    <xs:sequence>
+      <xs:element name="property" type="py:PropertyType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PropertyType">
+    <xs:sequence>
+      <xs:element name="getter" type="py:PropertyAccessorType" minOccurs="0"/>
+      <xs:element name="setter" type="py:PropertyAccessorType" minOccurs="0"/>
+      <xs:element name="deleter" type="py:PropertyAccessorType" minOccurs="0"/>
+      <xs:element name="type" type="py:TypeType" minOccurs="0"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+      <xs:element name="codeGen" type="py:CodeGenType" minOccurs="0"/>
+      <xs:element name="annotations" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="readonly" type="xs:boolean" default="false"/>
+    <xs:attribute name="visibility" type="py:VisibilityType" default="public"/>
+  </xs:complexType>
+  <xs:complexType name="PropertyAccessorType">
+    <xs:sequence>
+      <xs:element name="decorators" type="py:DecoratorsType" minOccurs="0"/>
+      <xs:element name="docstring" type="py:DocstringType" minOccurs="0"/>
+      <xs:element name="body" type="py:BlockType" minOccurs="0"/>
+      <xs:element name="codeGen" type="py:CodeGenType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="method" type="py:IdentifierType"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Decorators                                      -->
+  <!-- ============================================== -->
+  <xs:complexType name="DecoratorsType">
+    <xs:sequence>
+      <xs:element name="decorator" type="py:DecoratorType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DecoratorType">
+    <xs:sequence>
+      <xs:element name="argument" type="py:ArgumentType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="module" type="py:ModulePathType"/>
+    <xs:attribute name="builtin" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <xs:complexType name="ArgumentType">
+    <xs:sequence>
+      <xs:element name="value" type="py:ValueType"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType"/>
+    <xs:attribute name="keyword" type="xs:boolean" default="false"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Type Information                                -->
+  <!-- ============================================== -->
+  <xs:complexType name="TypeType">
+    <xs:sequence>
+      <xs:element name="genericArguments" type="py:TypeArgumentsType" minOccurs="0"/>
+      <xs:element name="unionTypes" type="py:UnionTypesType" minOccurs="0"/>
+      <xs:element name="literalValues" type="py:LiteralValuesType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="module" type="py:ModulePathType"/>
+    <xs:attribute name="optional" type="xs:boolean" default="false"/>
+    <xs:attribute name="builtin" type="xs:boolean" default="false"/>
+    <xs:attribute name="special" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="Self"/>
+          <xs:enumeration value="LiteralString"/>
+          <xs:enumeration value="TypeGuard"/>
+          <xs:enumeration value="TypeIs"/>
+          <xs:enumeration value="Never"/>
+          <xs:enumeration value="NoReturn"/>
+          <xs:enumeration value="NotRequired"/>
+          <xs:enumeration value="Required"/>
+          <xs:enumeration value="ReadOnly"/>
+          <xs:enumeration value="Any"/>
+          <xs:enumeration value="Unknown"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:complexType name="TypeArgumentsType">
+    <xs:sequence>
+      <xs:element name="typeArgument" type="py:TypeType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="UnionTypesType">
+    <xs:sequence>
+      <xs:element name="unionType" type="py:TypeType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="LiteralValuesType">
+    <xs:sequence>
+      <xs:element name="literal" type="py:LiteralValueType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Value Representation                            -->
+  <!-- ============================================== -->
+  <xs:complexType name="ValueType">
+    <xs:choice>
+      <xs:element name="literal" type="py:LiteralValueType"/>
+      <xs:element name="reference" type="py:ReferenceValueType"/>
+      <xs:element name="call" type="py:CallValueType"/>
+      <xs:element name="collection" type="py:CollectionValueType"/>
+      <xs:element name="comprehension" type="py:ComprehensionValueType"/>
+      <xs:element name="lambda" type="py:LambdaValueType"/>
+      <xs:element name="binaryOp" type="py:BinaryOpType"/>
+      <xs:element name="unaryOp" type="py:UnaryOpType"/>
+      <xs:element name="conditional" type="py:ConditionalType"/>
+      <xs:element name="attribute" type="py:AttributeType"/>
+      <xs:element name="subscript" type="py:SubscriptType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="LiteralValueType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="type" type="py:LiteralType" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="ReferenceValueType">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="module" type="py:ModulePathType"/>
+  </xs:complexType>
+  <xs:complexType name="CallValueType">
+    <xs:sequence>
+      <xs:element name="target" type="py:ValueType"/>
+      <xs:element name="arguments" type="py:CallArgumentsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CallArgumentsType">
+    <xs:sequence>
+      <xs:element name="argument" type="py:ArgumentType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CollectionValueType">
+    <xs:sequence>
+      <xs:element name="item" type="py:ValueType" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="type" type="py:CollectionType" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="ComprehensionValueType">
+    <xs:sequence>
+      <xs:element name="expression" type="py:ValueType"/>
+      <xs:element name="iterator" type="py:ValueType"/>
+      <xs:element name="iterable" type="py:ValueType"/>
+      <xs:element name="condition" type="py:ValueType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="type" type="py:CollectionType" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="LambdaValueType">
+    <xs:sequence>
+      <xs:element name="parameters" type="py:ParametersType" minOccurs="0"/>
+      <xs:element name="expression" type="py:ValueType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BinaryOpType">
+    <xs:sequence>
+      <xs:element name="left" type="py:ValueType"/>
+      <xs:element name="right" type="py:ValueType"/>
+    </xs:sequence>
+    <xs:attribute name="op" type="xs:string" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="UnaryOpType">
+    <xs:sequence>
+      <xs:element name="operand" type="py:ValueType"/>
+    </xs:sequence>
+    <xs:attribute name="op" type="xs:string" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="ConditionalType">
+    <xs:sequence>
+      <xs:element name="test" type="py:ValueType"/>
+      <xs:element name="ifTrue" type="py:ValueType"/>
+      <xs:element name="ifFalse" type="py:ValueType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AttributeType">
+    <xs:sequence>
+      <xs:element name="object" type="py:ValueType"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="SubscriptType">
+    <xs:sequence>
+      <xs:element name="object" type="py:ValueType"/>
+      <xs:element name="index" type="py:ValueType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Exception Information                           -->
+  <!-- ============================================== -->
+  <xs:complexType name="ExceptionsType">
+    <xs:sequence>
+      <xs:element name="exception" type="py:ExceptionType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ExceptionType">
+    <xs:sequence>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="type" type="xs:string" use="required"/>
+    <xs:attribute name="module" type="py:ModulePathType"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Annotations                                     -->
+  <!-- ============================================== -->
+  <xs:complexType name="AnnotationsType">
+    <xs:sequence>
+      <xs:element name="annotation" type="py:AnnotationType" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AnnotationType">
+    <xs:sequence>
+      <xs:element name="value" type="py:ValueType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="key" type="xs:string" use="required"/>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Project-Level Definitions                       -->
+  <!-- ============================================== -->
+  <xs:complexType name="ProjectType">
+    <xs:sequence>
+      <xs:element name="metadata" type="py:ProjectMetadataType" minOccurs="0"/>
+      <xs:element name="context" type="py:ContextType" minOccurs="0"/>
+      <xs:element name="dependencies" type="py:DependenciesType" minOccurs="0"/>
+      <xs:element name="settings" type="py:SettingsType" minOccurs="0"/>
+      <xs:element name="testing" type="py:TestingType" minOccurs="0"/>
+      <xs:element name="api" type="py:ApiType" minOccurs="0"/>
+      <xs:element name="persistence" type="py:PersistenceType" minOccurs="0"/>
+      <xs:element name="observability" type="py:ObservabilityType" minOccurs="0"/>
+      <xs:element name="codeGen" type="py:CodeGenType" minOccurs="0"/>
+      <xs:element name="modules" minOccurs="1">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="module" type="py:ModuleType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+    <xs:attribute name="version" type="py:SemVerType" use="optional"/>
+    <xs:attribute name="pythonVersion" type="py:PythonVersionType" default="3.13"/>
+  </xs:complexType>
+  <xs:complexType name="ProjectMetadataType">
+    <xs:sequence>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="license" type="xs:string" minOccurs="0"/>
+      <xs:element name="authors" type="xs:string" minOccurs="0"/>
+      <xs:element name="repository" type="xs:string" minOccurs="0"/>
+      <xs:element name="homepage" type="xs:string" minOccurs="0"/>
+      <xs:element name="runtime" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="python" type="py:PythonVersionType" use="required"/>
+          <xs:attribute name="freeThreaded" type="xs:boolean" default="false"/>
+          <xs:attribute name="jit" type="xs:boolean" default="false"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="packaging" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="backend" type="xs:string" use="optional"/>
+          <xs:attribute name="entrypoint" type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="ci" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DependenciesType">
+    <xs:sequence>
+      <xs:element name="runtime" type="py:DependencyListType" minOccurs="0"/>
+      <xs:element name="dev" type="py:DependencyListType" minOccurs="0"/>
+      <xs:element name="extras" type="py:DependencyListType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DependencyListType">
+    <xs:sequence>
+      <xs:element name="dependency" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="name" type="xs:string" use="required"/>
+          <xs:attribute name="version" type="xs:string" use="optional"/>
+          <xs:attribute name="extras" type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="SettingsType">
+    <xs:sequence>
+      <xs:element name="entry" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:attribute name="path" type="xs:string" use="required"/>
+          <xs:attribute name="value" type="xs:string" use="optional"/>
+          <xs:attribute name="type" type="xs:string" use="optional"/>
+          <xs:attribute name="secret" type="xs:boolean" use="optional" default="false"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TestingType">
+    <xs:sequence>
+      <xs:element name="strategy" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="unit" type="xs:boolean" default="true"/>
+          <xs:attribute name="integration" type="xs:boolean" default="true"/>
+          <xs:attribute name="contract" type="xs:boolean" default="false"/>
+          <xs:attribute name="e2e" type="xs:boolean" default="false"/>
+          <xs:attribute name="property" type="xs:boolean" default="false"/>
+          <xs:attribute name="mutation" type="xs:boolean" default="false"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="coverage" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="min" type="xs:int" use="optional"/>
+          <xs:attribute name="lines" type="xs:int" use="optional"/>
+          <xs:attribute name="branches" type="xs:int" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="fixtures" type="py:AnnotationsType" minOccurs="0"/>
+      <xs:element name="framework" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ApiType">
+    <xs:sequence>
+      <xs:element name="route" maxOccurs="unbounded" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="handlerRef" type="xs:string" minOccurs="0"/>
+            <xs:element name="requestModel" type="xs:string" minOccurs="0"/>
+            <xs:element name="responseModel" type="xs:string" minOccurs="0"/>
+            <xs:element name="middlewares" type="py:AnnotationsType" minOccurs="0"/>
+            <xs:element name="auth" type="py:AnnotationsType" minOccurs="0"/>
+            <xs:element name="rateLimit" minOccurs="0">
+              <xs:complexType>
+                <xs:attribute name="requests" type="xs:int" use="required"/>
+                <xs:attribute name="period" type="xs:string" use="required"/>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+          <xs:attribute name="path" type="xs:string" use="required"/>
+          <xs:attribute name="method" use="required">
+            <xs:simpleType>
+              <xs:restriction base="xs:string">
+                <xs:enumeration value="GET"/>
+                <xs:enumeration value="POST"/>
+                <xs:enumeration value="PUT"/>
+                <xs:enumeration value="PATCH"/>
+                <xs:enumeration value="DELETE"/>
+                <xs:enumeration value="HEAD"/>
+                <xs:enumeration value="OPTIONS"/>
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:attribute>
+          <xs:attribute name="deprecated" type="xs:boolean" default="false"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="framework" type="xs:string" use="optional"/>
+    <xs:attribute name="version" type="xs:string" use="optional"/>
+  </xs:complexType>
+  <xs:complexType name="PersistenceType">
+    <xs:sequence>
+      <xs:element name="entity" maxOccurs="unbounded" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+                <xs:attribute name="type" type="xs:string" use="required"/>
+                <xs:attribute name="nullable" type="xs:boolean" default="false"/>
+                <xs:attribute name="unique" type="xs:boolean" default="false"/>
+                <xs:attribute name="index" type="xs:boolean" default="false"/>
+                <xs:attribute name="primary" type="xs:boolean" default="false"/>
+                <xs:attribute name="autoincrement" type="xs:boolean" default="false"/>
+              </xs:complexType>
+            </xs:element>
+            <xs:element name="relations" type="py:AnnotationsType" minOccurs="0"/>
+            <xs:element name="constraints" type="py:AnnotationsType" minOccurs="0"/>
+            <xs:element name="indexes" type="py:AnnotationsType" minOccurs="0"/>
+          </xs:sequence>
+          <xs:attribute name="name" type="py:IdentifierType" use="required"/>
+          <xs:attribute name="table" type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="backend" type="xs:string" use="optional"/>
+  </xs:complexType>
+  <xs:complexType name="ObservabilityType">
+    <xs:sequence>
+      <xs:element name="logging" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="level" type="xs:string" use="optional"/>
+          <xs:attribute name="format" type="xs:string" use="optional"/>
+          <xs:attribute name="handler" type="xs:string" use="optional"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="metrics" type="py:AnnotationsType" minOccurs="0"/>
+      <xs:element name="tracing" type="py:AnnotationsType" minOccurs="0"/>
+      <xs:element name="profiling" type="py:AnnotationsType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- ============================================== -->
+  <!-- Enumerations                                    -->
+  <!-- ============================================== -->
+  <xs:simpleType name="ScopeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="module"/>
+      <xs:enumeration value="class"/>
+      <xs:enumeration value="function"/>
+      <xs:enumeration value="local"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="VisibilityType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="public"/>
+      <xs:enumeration value="protected"/>
+      <xs:enumeration value="private"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ParameterKindType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="positional"/>
+      <xs:enumeration value="keyword"/>
+      <xs:enumeration value="varargs"/>
+      <xs:enumeration value="kwargs"/>
+      <xs:enumeration value="positional_only"/>
+      <xs:enumeration value="keyword_only"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="LiteralType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="string"/>
+      <xs:enumeration value="integer"/>
+      <xs:enumeration value="float"/>
+      <xs:enumeration value="boolean"/>
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="bytes"/>
+      <xs:enumeration value="complex"/>
+      <xs:enumeration value="ellipsis"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CollectionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="list"/>
+      <xs:enumeration value="tuple"/>
+      <xs:enumeration value="set"/>
+      <xs:enumeration value="dict"/>
+      <xs:enumeration value="frozenset"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

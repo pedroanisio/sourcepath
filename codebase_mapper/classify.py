@@ -194,6 +194,10 @@ def classify(path: str, content_head: bytes) -> str:
     # *.patch — git/quilt patch files (contain diffs)
     if suffix == ".patch":
         return "data"
+    # *.xsd — W3C XML Schema Definition. Machine-readable shape/constraint
+    # descriptions. Closer to structured fixture data than configuration.
+    if suffix == ".xsd":
+        return "data"
     if name in {"tsconfig.json", "tsconfig.base.json", "jsconfig.json",
                 "rollup.config.js", "rollup.config.ts", "rollup.config.mjs",
                 "vite.config.js", "vite.config.ts", "webpack.config.js",

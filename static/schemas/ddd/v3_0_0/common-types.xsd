@@ -1,0 +1,176 @@
+<?xml version="1.0" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:common="https://schema.ddd-python.org/v3.0.0/common" targetNamespace="https://schema.ddd-python.org/v3.0.0/common" elementFormDefault="qualified" version="3.0.0">
+  <!-- Simple Types -->
+  <xs:simpleType name="pythonVersionType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="3\.[8-9]|3\.[1-9][0-9]"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="architectureStyleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="hexagonal"/>
+      <xs:enumeration value="clean"/>
+      <xs:enumeration value="onion"/>
+      <xs:enumeration value="layered"/>
+      <xs:enumeration value="modular_monolith"/>
+      <xs:enumeration value="microservices"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="apiFrameworkType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="fastapi"/>
+      <xs:enumeration value="flask"/>
+      <xs:enumeration value="django"/>
+      <xs:enumeration value="falcon"/>
+      <xs:enumeration value="graphql"/>
+      <xs:enumeration value="grpc"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="persistenceType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="sqlalchemy"/>
+      <xs:enumeration value="django_orm"/>
+      <xs:enumeration value="mongodb"/>
+      <xs:enumeration value="dynamodb"/>
+      <xs:enumeration value="cassandra"/>
+      <xs:enumeration value="multi_model"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="eventStoreType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="inmemory"/>
+      <xs:enumeration value="redis"/>
+      <xs:enumeration value="kafka"/>
+      <xs:enumeration value="rabbitmq"/>
+      <xs:enumeration value="aws_eventbridge"/>
+      <xs:enumeration value="eventstore_db"/>
+      <xs:enumeration value="pulsar"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="subdomainType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="core"/>
+      <xs:enumeration value="supporting"/>
+      <xs:enumeration value="generic"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="concurrencyControlType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="optimistic_locking"/>
+      <xs:enumeration value="pessimistic_locking"/>
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="event_sourced"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="validationRuleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="required"/>
+      <xs:enumeration value="min_length"/>
+      <xs:enumeration value="max_length"/>
+      <xs:enumeration value="pattern"/>
+      <xs:enumeration value="custom"/>
+      <xs:enumeration value="range"/>
+      <xs:enumeration value="email"/>
+      <xs:enumeration value="url"/>
+      <xs:enumeration value="uuid"/>
+      <xs:enumeration value="date"/>
+      <xs:enumeration value="business_rule"/>
+      <xs:enumeration value="async"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="severityType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="error"/>
+      <xs:enumeration value="warning"/>
+      <xs:enumeration value="info"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="portDirectionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="inbound"/>
+      <xs:enumeration value="outbound"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Complex Types -->
+  <xs:complexType name="fieldType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="type" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="required" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="default" type="xs:anyType" minOccurs="0"/>
+      <xs:element name="validation" type="common:validationRuleType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="constraints" type="common:fieldConstraintsType" minOccurs="0"/>
+      <xs:element name="sensitive" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="indexed" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="searchable" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="encrypted" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="auditable" type="xs:boolean" default="true" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="fieldConstraintsType">
+    <xs:all>
+      <xs:element name="min_length" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="max_length" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="min_value" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="max_value" type="xs:decimal" minOccurs="0"/>
+      <xs:element name="pattern" type="xs:string" minOccurs="0"/>
+      <xs:element name="enum" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="value" type="xs:anyType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="unique" type="xs:boolean" minOccurs="0"/>
+      <xs:element name="format" type="xs:string" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="validationRuleComplexType">
+    <xs:sequence>
+      <xs:element name="type" type="common:validationRuleType"/>
+      <xs:element name="value" type="xs:anyType" minOccurs="0"/>
+      <xs:element name="message" type="xs:string" minOccurs="0"/>
+      <xs:element name="custom_validator" type="xs:string" minOccurs="0"/>
+      <xs:element name="business_rule" type="xs:string" minOccurs="0"/>
+      <xs:element name="depends_on" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="async" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="error_code" type="xs:string" minOccurs="0"/>
+      <xs:element name="severity" type="common:severityType" default="error" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="retryPolicyType">
+    <xs:all>
+      <xs:element name="max_attempts" type="xs:integer" default="3" minOccurs="0"/>
+      <xs:element name="backoff_strategy" default="exponential" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="fixed"/>
+            <xs:enumeration value="exponential"/>
+            <xs:enumeration value="linear"/>
+            <xs:enumeration value="fibonacci"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="initial_delay_ms" type="xs:integer" default="1000" minOccurs="0"/>
+      <xs:element name="max_delay_ms" type="xs:integer" default="60000" minOccurs="0"/>
+      <xs:element name="jitter" type="xs:boolean" default="true" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="metadataType">
+    <xs:sequence>
+      <xs:any namespace="##any" processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="tagsType">
+    <xs:sequence>
+      <xs:element name="tag" type="xs:string" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

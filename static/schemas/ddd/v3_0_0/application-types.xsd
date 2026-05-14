@@ -1,0 +1,326 @@
+<?xml version="1.0" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:app="https://schema.ddd-python.org/v3.0.0/application" xmlns:common="https://schema.ddd-python.org/v3.0.0/common" targetNamespace="https://schema.ddd-python.org/v3.0.0/application" elementFormDefault="qualified" version="3.0.0">
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/common" schemaLocation="common-types.xsd"/>
+  <!-- Command Type -->
+  <xs:complexType name="commandType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="aggregate" type="xs:string" minOccurs="0"/>
+      <xs:element name="fields">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="validation_rules" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="rule" type="common:validationRuleComplexType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="authorization" type="app:authorizationType" minOccurs="0"/>
+      <xs:element name="idempotent" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="compensatable" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Query Type -->
+  <xs:complexType name="queryType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="fields">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="return_type" type="xs:string"/>
+      <xs:element name="pagination" type="app:paginationType" minOccurs="0"/>
+      <xs:element name="sorting" type="app:sortingType" minOccurs="0"/>
+      <xs:element name="filtering" type="app:filteringType" minOccurs="0"/>
+      <xs:element name="authorization" type="app:authorizationType" minOccurs="0"/>
+      <xs:element name="cacheable" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="cache_ttl" type="xs:integer" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Command Handler Type -->
+  <xs:complexType name="commandHandlerType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="handles" type="xs:string"/>
+      <xs:element name="dependencies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dependency" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="events_raised" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="transaction_boundary" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="retry_policy" type="common:retryPolicyType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Query Handler Type -->
+  <xs:complexType name="queryHandlerType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="handles" type="xs:string"/>
+      <xs:element name="dependencies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dependency" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="optimization_hints" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="hint" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Application Service Type -->
+  <xs:complexType name="applicationServiceType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="methods">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="method" type="app:serviceMethodType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="dependencies" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="dependency" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- DTO Type -->
+  <xs:complexType name="dtoType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="fields">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="validation_rules" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="rule" type="common:validationRuleComplexType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="serializable" type="xs:boolean" default="true" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Event Handler Type -->
+  <xs:complexType name="eventHandlerType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="handles" type="xs:string"/>
+      <xs:element name="processing_type" default="async">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="sync"/>
+            <xs:enumeration value="async"/>
+            <xs:enumeration value="scheduled"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="priority" type="xs:integer" default="0" minOccurs="0"/>
+      <xs:element name="retry_policy" type="common:retryPolicyType" minOccurs="0"/>
+      <xs:element name="dead_letter_queue" type="xs:boolean" default="true" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Saga Type -->
+  <xs:complexType name="sagaType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="trigger" type="xs:string"/>
+      <xs:element name="steps">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="step" type="app:sagaStepType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="compensation_strategy" default="backward">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="backward"/>
+            <xs:enumeration value="forward"/>
+            <xs:enumeration value="custom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="timeout" type="xs:integer" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Supporting Types -->
+  <xs:complexType name="authorizationType">
+    <xs:sequence>
+      <xs:element name="roles" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="role" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="permissions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="permission" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="policy" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="paginationType">
+    <xs:all>
+      <xs:element name="default_page_size" type="xs:integer" default="20" minOccurs="0"/>
+      <xs:element name="max_page_size" type="xs:integer" default="100" minOccurs="0"/>
+      <xs:element name="cursor_based" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="sortingType">
+    <xs:sequence>
+      <xs:element name="sortable_fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="default_sort" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="filteringType">
+    <xs:sequence>
+      <xs:element name="filterable_fields" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="full_text_search" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="serviceMethodType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="parameters" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="parameter" type="common:fieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="return_type" type="xs:string" minOccurs="0"/>
+      <xs:element name="transaction_boundary" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="sagaStepType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="command" type="xs:string"/>
+      <xs:element name="compensation_command" type="xs:string" minOccurs="0"/>
+      <xs:element name="timeout" type="xs:integer" minOccurs="0"/>
+      <xs:element name="retry_policy" type="common:retryPolicyType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="notificationChannelType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="email"/>
+            <xs:enumeration value="sms"/>
+            <xs:enumeration value="push"/>
+            <xs:enumeration value="in_app"/>
+            <xs:enumeration value="webhook"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="configuration" type="common:metadataType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="useCaseType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="actors">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="actor" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="preconditions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="precondition" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="flow">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="step" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="postconditions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="postcondition" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="alternative_flows" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="flow" type="app:alternativeFlowType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="alternativeFlowType">
+    <xs:sequence>
+      <xs:element name="condition" type="xs:string"/>
+      <xs:element name="steps">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="step" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

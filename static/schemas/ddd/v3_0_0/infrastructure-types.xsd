@@ -1,0 +1,481 @@
+<?xml version="1.0" ?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:infra="https://schema.ddd-python.org/v3.0.0/infrastructure" xmlns:common="https://schema.ddd-python.org/v3.0.0/common" targetNamespace="https://schema.ddd-python.org/v3.0.0/infrastructure" elementFormDefault="qualified" version="3.0.0">
+  <xs:import namespace="https://schema.ddd-python.org/v3.0.0/common" schemaLocation="common-types.xsd"/>
+  <!-- Repository Implementation Type -->
+  <xs:complexType name="repositoryImplementationType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="aggregate" type="xs:string"/>
+      <xs:element name="persistence_type" type="common:persistenceType"/>
+      <xs:element name="table_name" type="xs:string" minOccurs="0"/>
+      <xs:element name="indexes" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="index" type="infra:indexType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="partitioning" type="infra:partitioningType" minOccurs="0"/>
+      <xs:element name="caching" type="infra:cachingConfigType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- External Service Type -->
+  <xs:complexType name="externalServiceType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="rest"/>
+            <xs:enumeration value="soap"/>
+            <xs:enumeration value="grpc"/>
+            <xs:enumeration value="graphql"/>
+            <xs:enumeration value="database"/>
+            <xs:enumeration value="message_queue"/>
+            <xs:enumeration value="storage"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="endpoint" type="xs:string" minOccurs="0"/>
+      <xs:element name="authentication" type="infra:authenticationType" minOccurs="0"/>
+      <xs:element name="timeout" type="xs:integer" default="30" minOccurs="0"/>
+      <xs:element name="retry_policy" type="common:retryPolicyType" minOccurs="0"/>
+      <xs:element name="circuit_breaker" type="infra:circuitBreakerType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Database Model Type -->
+  <xs:complexType name="databaseModelType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="table_name" type="xs:string"/>
+      <xs:element name="schema" type="xs:string" minOccurs="0"/>
+      <xs:element name="fields">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" type="infra:databaseFieldType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="indexes" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="index" type="infra:indexType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="constraints" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="constraint" type="infra:constraintType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="triggers" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="trigger" type="infra:triggerType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Event Store Configuration Type -->
+  <xs:complexType name="eventStoreConfigType">
+    <xs:sequence>
+      <xs:element name="provider" type="common:eventStoreType"/>
+      <xs:element name="retention_policy" type="infra:retentionPolicyType" minOccurs="0"/>
+      <xs:element name="snapshot_strategy" type="infra:snapshotStrategyType" minOccurs="0"/>
+      <xs:element name="projections" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="projection" type="infra:projectionType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="read_models" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="read_model" type="infra:readModelType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Message Bus Configuration Type -->
+  <xs:complexType name="messageBusConfigType">
+    <xs:sequence>
+      <xs:element name="provider">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="in_memory"/>
+            <xs:enumeration value="redis"/>
+            <xs:enumeration value="rabbitmq"/>
+            <xs:enumeration value="kafka"/>
+            <xs:enumeration value="aws_sqs"/>
+            <xs:enumeration value="azure_service_bus"/>
+            <xs:enumeration value="gcp_pubsub"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="topics" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="topic" type="infra:topicType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="queues" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="queue" type="infra:queueType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="dead_letter_queue" type="infra:deadLetterQueueType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Adapter Type -->
+  <xs:complexType name="adapterType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="port" type="xs:string"/>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="inbound"/>
+            <xs:enumeration value="outbound"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="implementation" type="xs:string"/>
+      <xs:element name="configuration" type="common:metadataType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Supporting Types -->
+  <xs:complexType name="indexType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="fields">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="field" maxOccurs="unbounded">
+              <xs:complexType>
+                <xs:simpleContent>
+                  <xs:extension base="xs:string">
+                    <xs:attribute name="order" type="infra:sortOrderType" default="asc"/>
+                  </xs:extension>
+                </xs:simpleContent>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="unique" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="partial" type="xs:string" minOccurs="0"/>
+      <xs:element name="type" default="btree" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="btree"/>
+            <xs:enumeration value="hash"/>
+            <xs:enumeration value="gin"/>
+            <xs:enumeration value="gist"/>
+            <xs:enumeration value="fulltext"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="sortOrderType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="asc"/>
+      <xs:enumeration value="desc"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="partitioningType">
+    <xs:sequence>
+      <xs:element name="strategy">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="range"/>
+            <xs:enumeration value="list"/>
+            <xs:enumeration value="hash"/>
+            <xs:enumeration value="composite"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="partition_key" type="xs:string"/>
+      <xs:element name="partitions" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="partition" type="infra:partitionType" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="partitionType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="condition" type="xs:string"/>
+      <xs:element name="tablespace" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="cachingConfigType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="ttl" type="xs:integer" default="300"/>
+      <xs:element name="strategy">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="read_through"/>
+            <xs:enumeration value="write_through"/>
+            <xs:enumeration value="write_behind"/>
+            <xs:enumeration value="cache_aside"/>
+            <xs:enumeration value="refresh_ahead"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="invalidation_events" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="authenticationType">
+    <xs:sequence>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="basic"/>
+            <xs:enumeration value="bearer"/>
+            <xs:enumeration value="api_key"/>
+            <xs:enumeration value="oauth2"/>
+            <xs:enumeration value="certificate"/>
+            <xs:enumeration value="custom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="credentials" type="common:metadataType" minOccurs="0"/>
+      <xs:element name="token_refresh" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="circuitBreakerType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="failure_threshold" type="xs:integer" default="5"/>
+      <xs:element name="recovery_timeout" type="xs:integer" default="60"/>
+      <xs:element name="half_open_requests" type="xs:integer" default="3"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="databaseFieldType">
+    <xs:complexContent>
+      <xs:extension base="common:fieldType">
+        <xs:sequence>
+          <xs:element name="column_name" type="xs:string" minOccurs="0"/>
+          <xs:element name="column_type" type="xs:string" minOccurs="0"/>
+          <xs:element name="primary_key" type="xs:boolean" default="false" minOccurs="0"/>
+          <xs:element name="foreign_key" type="infra:foreignKeyType" minOccurs="0"/>
+          <xs:element name="auto_increment" type="xs:boolean" default="false" minOccurs="0"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <xs:complexType name="foreignKeyType">
+    <xs:sequence>
+      <xs:element name="reference_table" type="xs:string"/>
+      <xs:element name="reference_field" type="xs:string"/>
+      <xs:element name="on_delete" default="restrict">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="cascade"/>
+            <xs:enumeration value="restrict"/>
+            <xs:enumeration value="set_null"/>
+            <xs:enumeration value="no_action"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="on_update" default="cascade">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="cascade"/>
+            <xs:enumeration value="restrict"/>
+            <xs:enumeration value="set_null"/>
+            <xs:enumeration value="no_action"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="constraintType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="type">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="unique"/>
+            <xs:enumeration value="check"/>
+            <xs:enumeration value="exclude"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="expression" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="triggerType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="timing">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="before"/>
+            <xs:enumeration value="after"/>
+            <xs:enumeration value="instead_of"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="event">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="insert"/>
+            <xs:enumeration value="update"/>
+            <xs:enumeration value="delete"/>
+            <xs:enumeration value="truncate"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="function" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="retentionPolicyType">
+    <xs:sequence>
+      <xs:element name="retention_days" type="xs:integer"/>
+      <xs:element name="archive_strategy" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="delete"/>
+            <xs:enumeration value="archive"/>
+            <xs:enumeration value="compress"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="snapshotStrategyType">
+    <xs:sequence>
+      <xs:element name="frequency" type="xs:integer" default="100"/>
+      <xs:element name="storage" type="xs:string" minOccurs="0"/>
+      <xs:element name="compression" type="xs:boolean" default="true" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="projectionType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="events">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="handler" type="xs:string"/>
+      <xs:element name="storage" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="readModelType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="source_events">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="schema" type="common:metadataType"/>
+      <xs:element name="update_strategy">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="synchronous"/>
+            <xs:enumeration value="asynchronous"/>
+            <xs:enumeration value="eventual"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="topicType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="partitions" type="xs:integer" default="1" minOccurs="0"/>
+      <xs:element name="replication_factor" type="xs:integer" default="1" minOccurs="0"/>
+      <xs:element name="retention_ms" type="xs:integer" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="queueType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="durable" type="xs:boolean" default="true" minOccurs="0"/>
+      <xs:element name="exclusive" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="auto_delete" type="xs:boolean" default="false" minOccurs="0"/>
+      <xs:element name="max_priority" type="xs:integer" minOccurs="0"/>
+      <xs:element name="ttl" type="xs:integer" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="deadLetterQueueType">
+    <xs:sequence>
+      <xs:element name="enabled" type="xs:boolean" default="true"/>
+      <xs:element name="max_retries" type="xs:integer" default="3"/>
+      <xs:element name="retention_days" type="xs:integer" default="7"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="facadeServiceType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="description" type="xs:string" minOccurs="0"/>
+      <xs:element name="aggregates_services">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="service" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="interface" type="common:metadataType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="cacheRepositoryType">
+    <xs:sequence>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="entity" type="xs:string"/>
+      <xs:element name="strategy" type="infra:cacheStrategyType"/>
+      <xs:element name="serialization" default="json">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="json"/>
+            <xs:enumeration value="pickle"/>
+            <xs:enumeration value="msgpack"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="cacheStrategyType">
+    <xs:sequence>
+      <xs:element name="entity" type="xs:string"/>
+      <xs:element name="ttl" type="xs:integer"/>
+      <xs:element name="invalidation_events" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="event" type="xs:string" maxOccurs="unbounded"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="cache_key_pattern" type="xs:string" minOccurs="0"/>
+      <xs:element name="tags" type="common:tagsType" minOccurs="0"/>
+      <xs:element name="warm_on_startup" type="xs:boolean" default="false" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

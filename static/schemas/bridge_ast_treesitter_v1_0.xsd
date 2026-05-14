@@ -1,0 +1,671 @@
+<?xml version='1.0' encoding='utf-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+           targetNamespace="https://schemas.bridge.org/ast-treesitter/v1/2025" 
+           xmlns:tns="https://schemas.bridge.org/ast-treesitter/v1/2025"
+           xmlns:ast="https://schemas.ast.org/universal/v1/2025"
+           xmlns:ts="https://schemas.tree-sitter.io/v1/2025"
+           elementFormDefault="qualified" 
+           attributeFormDefault="unqualified" 
+           version="1.0">
+  
+  <xs:annotation>
+    <xs:documentation>
+      Bridge schema connecting Universal AST (ast_v1.0.xsd) and Tree-sitter (tree_sitter-v.0.25.8.xsd) models.
+      Enables cross-schema relationships, transformations, and unified analysis.
+    </xs:documentation>
+  </xs:annotation>
+
+  <!-- Import both schemas -->
+  <xs:import namespace="https://schemas.ast.org/universal/v1/2025" schemaLocation="ast_v1.0.xsd"/>
+  <xs:import namespace="https://schemas.tree-sitter.io/v1/2025" schemaLocation="tree_sitter-v.0.25.8.xsd"/>
+
+  <!-- Bridge-specific ID types -->
+  <xs:simpleType name="BridgeIDType">
+    <xs:annotation>
+      <xs:documentation>Bridge identifier pattern BRIDGE-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="BRIDGE-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="MappingIDType">
+    <xs:annotation>
+      <xs:documentation>Mapping identifier pattern MAP-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="MAP-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TransformationIDType">
+    <xs:annotation>
+      <xs:documentation>Transformation identifier pattern TRANS-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="TRANS-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="CorrelationIDType">
+    <xs:annotation>
+      <xs:documentation>Correlation identifier pattern CORR-YYYY-NNN</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:token">
+      <xs:pattern value="CORR-\\d{4}-\\d{3}" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Bridge-specific enumerations -->
+  <xs:simpleType name="MappingType">
+    <xs:annotation>
+      <xs:documentation>Types of mappings between schemas</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="OneToOne">
+        <xs:annotation>
+          <xs:documentation>Direct 1:1 mapping</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="OneToMany">
+        <xs:annotation>
+          <xs:documentation>One AST element maps to multiple Tree-sitter elements</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="ManyToOne">
+        <xs:annotation>
+          <xs:documentation>Multiple Tree-sitter elements map to one AST element</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="ManyToMany">
+        <xs:annotation>
+          <xs:documentation>Complex many-to-many relationship</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Derived">
+        <xs:annotation>
+          <xs:documentation>Mapping through transformation or computation</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Semantic">
+        <xs:annotation>
+          <xs:documentation>Semantic equivalence mapping</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="TransformationDirection">
+    <xs:annotation>
+      <xs:documentation>Direction of transformation</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ASTToTreeSitter" />
+      <xs:enumeration value="TreeSitterToAST" />
+      <xs:enumeration value="Bidirectional" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ConfidenceLevel">
+    <xs:annotation>
+      <xs:documentation>Confidence level for mappings and transformations</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:decimal">
+      <xs:minInclusive value="0.0" />
+      <xs:maxInclusive value="1.0" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Core Bridge Types -->
+  
+  <!-- Node Mapping Complex Type -->
+  <xs:complexType name="NodeMappingType">
+    <xs:annotation>
+      <xs:documentation>Maps Universal AST nodes to Tree-sitter nodes</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="MappingID" type="tns:MappingIDType">
+        <xs:annotation>
+          <xs:documentation>Unique mapping identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ASTNodeID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Reference to Universal AST node ID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TreeSitterNodeID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Reference to Tree-sitter node ID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MappingType" type="tns:MappingType">
+        <xs:annotation>
+          <xs:documentation>Type of mapping relationship</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Confidence" type="tns:ConfidenceLevel">
+        <xs:annotation>
+          <xs:documentation>Confidence level of the mapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SemanticEquivalence" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Whether nodes are semantically equivalent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StructuralEquivalence" type="xs:boolean" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Whether nodes are structurally equivalent</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MappingNotes" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Additional notes about the mapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TransformationRules" type="tns:TransformationRulesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Rules for transforming between representations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Symbol Correlation Type -->
+  <xs:complexType name="SymbolCorrelationType">
+    <xs:annotation>
+      <xs:documentation>Correlates symbols between Universal AST and Tree-sitter</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="CorrelationID" type="tns:CorrelationIDType">
+        <xs:annotation>
+          <xs:documentation>Unique correlation identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ASTSymbolID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Reference to Universal AST symbol ID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TreeSitterSymbolID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Reference to Tree-sitter symbol ID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SymbolName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Common symbol name</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SymbolKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Kind of symbol (function, variable, class, etc.)</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="DefinitionMapping" type="tns:NodeMappingType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Mapping for symbol definition</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ReferencesMappings" type="tns:ReferencesMappingsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Mappings for symbol references</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Type System Bridge -->
+  <xs:complexType name="TypeSystemBridgeType">
+    <xs:annotation>
+      <xs:documentation>Bridges type systems between schemas</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BridgeID" type="tns:BridgeIDType">
+        <xs:annotation>
+          <xs:documentation>Unique bridge identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ASTTypeID" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Reference to Universal AST type ID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TreeSitterRuleID" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Reference to Tree-sitter rule ID</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Common type name</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeCategory" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Category of type (primitive, composite, etc.)</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeMappings" type="tns:TypeMappingsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Detailed type mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Transformation Rules -->
+  <xs:complexType name="TransformationRulesType">
+    <xs:annotation>
+      <xs:documentation>Rules for transforming between representations</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="TransformationRule" type="tns:TransformationRuleType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual transformation rule</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TransformationRuleType">
+    <xs:annotation>
+      <xs:documentation>Individual transformation rule</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="TransformationID" type="tns:TransformationIDType">
+        <xs:annotation>
+          <xs:documentation>Unique transformation identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RuleName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Name of the transformation rule</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Direction" type="tns:TransformationDirection">
+        <xs:annotation>
+          <xs:documentation>Direction of transformation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourcePattern" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Pattern to match in source schema</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetPattern" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Pattern to generate in target schema</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TransformationLogic" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Logic or algorithm for transformation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Preconditions" type="tns:ConditionsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Conditions that must be met for transformation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Postconditions" type="tns:ConditionsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Conditions guaranteed after transformation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Supporting Types -->
+  <xs:complexType name="ReferencesMappingsType">
+    <xs:sequence>
+      <xs:element name="ReferenceMapping" type="tns:NodeMappingType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual reference mapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TypeMappingsType">
+    <xs:sequence>
+      <xs:element name="TypeMapping" type="tns:TypeMappingType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual type mapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TypeMappingType">
+    <xs:sequence>
+      <xs:element name="MappingID" type="tns:MappingIDType">
+        <xs:annotation>
+          <xs:documentation>Unique mapping identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Source type identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TargetType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Target type identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="MappingType" type="tns:MappingType">
+        <xs:annotation>
+          <xs:documentation>Type of mapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConditionsType">
+    <xs:sequence>
+      <xs:element name="Condition" type="tns:ConditionType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual condition</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ConditionType">
+    <xs:sequence>
+      <xs:element name="ConditionExpression" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Boolean expression for the condition</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ConditionDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Human-readable description</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Analysis and Metrics -->
+  <xs:complexType name="BridgeAnalysisType">
+    <xs:annotation>
+      <xs:documentation>Analysis results for bridge mappings</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="AnalysisID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Unique analysis identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AnalysisTimestamp" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>When analysis was performed</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CoverageMetrics" type="tns:CoverageMetricsType">
+        <xs:annotation>
+          <xs:documentation>Coverage metrics for mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="QualityMetrics" type="tns:QualityMetricsType">
+        <xs:annotation>
+          <xs:documentation>Quality metrics for mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationResults" type="tns:ValidationResultsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Validation results</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="CoverageMetricsType">
+    <xs:sequence>
+      <xs:element name="ASTNodesCovered" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>Percentage of AST nodes with mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TreeSitterNodesCovered" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>Percentage of Tree-sitter nodes with mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SymbolsCovered" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>Percentage of symbols with correlations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypesCovered" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>Percentage of types with bridges</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="QualityMetricsType">
+    <xs:sequence>
+      <xs:element name="AverageConfidence" type="tns:ConfidenceLevel">
+        <xs:annotation>
+          <xs:documentation>Average confidence of all mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SemanticAccuracy" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>Percentage of semantically accurate mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="StructuralAccuracy" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>Percentage of structurally accurate mappings</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TransformationSuccess" type="xs:decimal">
+        <xs:annotation>
+          <xs:documentation>Success rate of transformations</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ValidationResultsType">
+    <xs:sequence>
+      <xs:element name="ValidationResult" type="tns:ValidationResultType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual validation result</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ValidationResultType">
+    <xs:sequence>
+      <xs:element name="ValidationID" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Unique validation identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationRule" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Rule that was validated</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="IsValid" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether validation passed</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ValidationMessage" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Validation message or error</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AffectedElements" type="tns:AffectedElementsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Elements affected by validation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AffectedElementsType">
+    <xs:sequence>
+      <xs:element name="ElementID" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>ID of affected element</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Root Bridge Container -->
+  <xs:complexType name="BridgeModelType">
+    <xs:annotation>
+      <xs:documentation>Root container for bridge model connecting AST and Tree-sitter</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BridgeMetadata" type="tns:BridgeMetadataType">
+        <xs:annotation>
+          <xs:documentation>Metadata about the bridge</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NodeMappings" type="tns:NodeMappingsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Node mappings between schemas</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SymbolCorrelations" type="tns:SymbolCorrelationsType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Symbol correlations between schemas</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TypeSystemBridges" type="tns:TypeSystemBridgesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Type system bridges</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TransformationRules" type="tns:TransformationRulesType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Transformation rules</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BridgeAnalysis" type="tns:BridgeAnalysisType" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Analysis results</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="version" type="xs:string" use="optional" fixed="1.0" />
+    <xs:attribute name="created" type="xs:dateTime" use="optional" />
+    <xs:attribute name="lastModified" type="xs:dateTime" use="optional" />
+  </xs:complexType>
+
+  <!-- Container Types -->
+  <xs:complexType name="BridgeMetadataType">
+    <xs:sequence>
+      <xs:element name="BridgeID" type="tns:BridgeIDType">
+        <xs:annotation>
+          <xs:documentation>Unique bridge identifier</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BridgeName" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Human-readable bridge name</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BridgeDescription" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Description of the bridge</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceLanguage" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Programming language being bridged</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ASTSchemaVersion" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Version of Universal AST schema</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="TreeSitterSchemaVersion" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Version of Tree-sitter schema</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CreatedBy" type="xs:string" minOccurs="0">
+        <xs:annotation>
+          <xs:documentation>Creator of the bridge</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CreationDate" type="xs:dateTime">
+        <xs:annotation>
+          <xs:documentation>When bridge was created</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="NodeMappingsType">
+    <xs:sequence>
+      <xs:element name="NodeMapping" type="tns:NodeMappingType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual node mapping</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SymbolCorrelationsType">
+    <xs:sequence>
+      <xs:element name="SymbolCorrelation" type="tns:SymbolCorrelationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual symbol correlation</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="TypeSystemBridgesType">
+    <xs:sequence>
+      <xs:element name="TypeSystemBridge" type="tns:TypeSystemBridgeType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Individual type system bridge</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Root Element -->
+  <xs:element name="BridgeModel" type="tns:BridgeModelType">
+    <xs:annotation>
+      <xs:documentation>Root element for AST-TreeSitter bridge model</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+
+  <!-- Key and Reference Constraints -->
+  <xs:key name="UniqueBridgeID">
+    <xs:selector xpath=".//tns:BridgeModel" />
+    <xs:field xpath="tns:BridgeMetadata/tns:BridgeID" />
+  </xs:key>
+
+  <xs:key name="UniqueMappingID">
+    <xs:selector xpath=".//tns:NodeMapping" />
+    <xs:field xpath="tns:MappingID" />
+  </xs:key>
+
+  <xs:key name="UniqueCorrelationID">
+    <xs:selector xpath=".//tns:SymbolCorrelation" />
+    <xs:field xpath="tns:CorrelationID" />
+  </xs:key>
+
+  <xs:key name="UniqueTransformationID">
+    <xs:selector xpath=".//tns:TransformationRule" />
+    <xs:field xpath="tns:TransformationID" />
+  </xs:key>
+
+</xs:schema>
