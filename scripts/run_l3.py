@@ -41,6 +41,16 @@ def main(argv: list[str] | None = None) -> int:
                    help="Disable typed concepts entirely. Emitted L3 graphs "
                         "match pre-vocab bundles (no cbml3:conceptKind, no "
                         "skos:Collection nodes).")
+    p.add_argument("--llm-enrich", action="store_true",
+                   help="Also register the L4 LLM-enrichment plugin "
+                        "(plugins/llm_enrich/). Default model "
+                        "qwen2.5-coder:7b, default scopes "
+                        "files+concepts+schemas, default cache "
+                        "~/.cache/cbm-llm/. Requires a local Ollama "
+                        "server; on failure the bundle degrades cleanly "
+                        "to L1+L2+L3. For fine-grained control "
+                        "(--llm-model, --llm-host, --llm-scope, ...) use "
+                        "scripts/run_l4.py.")
     args = p.parse_args(argv)
 
     if args.concept_vocab and args.no_builtin_vocab:
@@ -63,6 +73,22 @@ def main(argv: list[str] | None = None) -> int:
     else:
         l3_vocab = concept_graph.USE_BUILTIN
     concept_graph.register_all(vocab=l3_vocab)
+
+    if args.llm_enrich:
+        from plugins import llm_enrich
+        client = llm_enrich.OllamaClient()
+        if not client.ping():
+            print(
+                f"NOTE: Ollama unreachable at {client.host} — L4 "
+                f"enrichment will be skipped, but the pipeline will "
+                f"still emit a SHACL-conforming L1+L2+L3 bundle.",
+                file=sys.stderr,
+            )
+        llm_enrich.register_all(
+            client=client,
+            cache=llm_enrich.Cache(),
+            scopes=llm_enrich.ALL_SCOPES,
+        )
 
     with resolve_repo_source(args.repo, args.state) as repo:
         repo_name = args.name or repo.name
