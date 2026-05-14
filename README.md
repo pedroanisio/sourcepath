@@ -288,6 +288,7 @@ python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (
 python tests/verify_xsd_fixture.py          # static/schemas/ classifier coverage
 python tests/verify_proto_fixture.py        # static/proto/ classifier + import coverage
 python tests/verify_repository_summary.py   # MCP repository_summary tool contract
+python tests/verify_rust_ast.py             # Rust deep-AST items + chunker (Stage 1)
 ```
 
 All verifiers resolve `repo_root` from their own `__file__`, so they

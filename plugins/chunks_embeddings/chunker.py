@@ -61,6 +61,8 @@ class ChunkExtractor:
             chunks = _chunk_python(content, record.path)
         elif record.language in ("typescript", "javascript"):
             chunks = _chunk_tsjs(content, record.path)
+        elif record.language == "rust":
+            chunks = _chunk_rust(content, record.path)
         elif record.language is not None or record.type_ in {"documentation", "configuration", "test_code", "source_code"}:
             # whole-file chunk for any text file we recognize
             chunks = _whole_file_chunk(content, record.path)
@@ -318,3 +320,110 @@ def _chunk_from_ts_node(node, kind: str, parent: str | None, name: str,
         "text": text,
         "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Rust chunker (tree-sitter)
+# ---------------------------------------------------------------------------
+
+
+def _rust_chunk_name(node, content: bytes) -> str | None:
+    """Pull the symbol name. Prefers tree-sitter's ``name``/``type`` fields;
+    falls back to the first identifier-like child."""
+    name_node = node.child_by_field_name("name")
+    if name_node is not None:
+        return content[name_node.start_byte:name_node.end_byte].decode("utf-8", "replace")
+    type_node = node.child_by_field_name("type")
+    if type_node is not None:
+        return content[type_node.start_byte:type_node.end_byte].decode("utf-8", "replace")
+    for c in node.children:
+        if c.type in ("identifier", "type_identifier", "scoped_type_identifier"):
+            return content[c.start_byte:c.end_byte].decode("utf-8", "replace")
+    return None
+
+
+def _rust_decl_list(node):
+    """Return the inner ``declaration_list`` body for impl/trait/mod, or None."""
+    for c in node.children:
+        if c.type == "declaration_list":
+            return c
+    return None
+
+
+def _chunk_rust(content: bytes, path: str) -> list[dict]:
+    """Symbol-level chunks for Rust source files.
+
+    Emits one chunk per:
+      - top-level ``function_item``
+      - ``struct_item`` / ``enum_item`` / ``union_item`` (kind: ``class``)
+      - ``trait_item`` (kind: ``class``) + one chunk per
+        ``function_item`` / ``function_signature_item`` inside its body
+        (kind: ``method``)
+      - ``impl_item`` (kind: ``class``, symbol = implementing type) +
+        one chunk per inner ``function_item`` (kind: ``method``)
+
+    Falls back to a whole-file chunk if tree-sitter is unavailable, the
+    grammar disagrees, or no top-level chunkable items are found.
+    """
+    from codebase_mapper.ts_setup import TS_AVAILABLE, _ts_setup, _TS_LANGS, ts
+
+    if not TS_AVAILABLE:
+        return _whole_file_chunk(content, path)
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+
+    _ts_setup()
+    parser = ts.Parser(_TS_LANGS["rust"])
+    tree = parser.parse(content)
+    src_lines = text.splitlines(keepends=True)
+    line_byte_starts = _line_byte_starts(content)
+
+    chunks: list[dict] = []
+    for node in tree.root_node.children:
+        if not node.is_named or node.type in ("attribute_item", "inner_attribute_item"):
+            continue
+        t = node.type
+        if t == "function_item":
+            name = _rust_chunk_name(node, content)
+            if name:
+                chunks.append(_chunk_from_ts_node(node, "function", None, name,
+                                                  src_lines, line_byte_starts))
+        elif t in ("struct_item", "enum_item", "union_item"):
+            name = _rust_chunk_name(node, content)
+            if name:
+                chunks.append(_chunk_from_ts_node(node, "class", None, name,
+                                                  src_lines, line_byte_starts))
+        elif t == "trait_item":
+            name = _rust_chunk_name(node, content)
+            if not name:
+                continue
+            chunks.append(_chunk_from_ts_node(node, "class", None, name,
+                                              src_lines, line_byte_starts))
+            body = _rust_decl_list(node)
+            if body is not None:
+                for m in body.children:
+                    if m.is_named and m.type in ("function_item", "function_signature_item"):
+                        m_name = _rust_chunk_name(m, content)
+                        if m_name:
+                            chunks.append(_chunk_from_ts_node(m, "method", name, m_name,
+                                                              src_lines, line_byte_starts))
+        elif t == "impl_item":
+            impl_name = _rust_chunk_name(node, content)
+            if not impl_name:
+                continue
+            chunks.append(_chunk_from_ts_node(node, "class", None, impl_name,
+                                              src_lines, line_byte_starts))
+            body = _rust_decl_list(node)
+            if body is not None:
+                for m in body.children:
+                    if m.is_named and m.type == "function_item":
+                        m_name = _rust_chunk_name(m, content)
+                        if m_name:
+                            chunks.append(_chunk_from_ts_node(m, "method", impl_name, m_name,
+                                                              src_lines, line_byte_starts))
+
+    if not chunks:
+        return _whole_file_chunk(content, path)
+    return chunks

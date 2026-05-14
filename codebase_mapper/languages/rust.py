@@ -15,6 +15,99 @@ from ..ts_setup import _TS_LANGS, _TS_QUERIES, _ts_setup
 from ..ts_setup import TS_AVAILABLE, ts
 
 
+_RUST_ITEM_KINDS: dict[str, str] = {
+    "function_item": "function",
+    "function_signature_item": "function",
+    "struct_item": "struct",
+    "enum_item": "enum",
+    "union_item": "union",
+    "trait_item": "trait",
+    "impl_item": "impl",
+    "mod_item": "mod",
+    "type_item": "type_alias",
+    "const_item": "const",
+    "static_item": "static",
+}
+
+
+def _ts_node_text(node, content: bytes) -> str:
+    return content[node.start_byte:node.end_byte].decode("utf-8", "replace")
+
+
+def _rust_node_name(node, content: bytes) -> str | None:
+    """Best-effort name extraction. Prefers the ``name`` field; falls back
+    to the first identifier-like child. Used for both items (function/struct)
+    and impl blocks (where the ``type`` field carries the target type)."""
+    name_node = node.child_by_field_name("name")
+    if name_node is not None:
+        return _ts_node_text(name_node, content)
+    type_node = node.child_by_field_name("type")
+    if type_node is not None:
+        return _ts_node_text(type_node, content)
+    for c in node.children:
+        if c.type in ("identifier", "type_identifier", "scoped_type_identifier"):
+            return _ts_node_text(c, content)
+    return None
+
+
+def _rust_has_pub_modifier(node) -> bool:
+    return any(c.type == "visibility_modifier" for c in node.children)
+
+
+def _rust_has_async_modifier(node, content: bytes) -> bool:
+    for c in node.children:
+        if c.type == "function_modifiers" and "async" in _ts_node_text(c, content):
+            return True
+    return False
+
+
+def _rust_find_decl_list(node):
+    for c in node.children:
+        if c.type == "declaration_list":
+            return c
+    return None
+
+
+def _walk_rust_decl_list(parent_node, content: bytes, items: list[dict], parent: str | None) -> None:
+    """Walk a ``source_file`` root or any ``declaration_list`` body, emitting
+    items into ``items``. Attributes appear as siblings preceding the item
+    they decorate (tree-sitter-rust grammar convention)."""
+    pending_attrs: list[str] = []
+    for child in parent_node.children:
+        if not child.is_named:
+            continue
+        ct = child.type
+        if ct in ("attribute_item", "inner_attribute_item"):
+            pending_attrs.append(_ts_node_text(child, content))
+            continue
+        kind = _RUST_ITEM_KINDS.get(ct)
+        if kind is None:
+            # Attribute didn't decorate a known item; drop the pending set so
+            # it can't accidentally attach to a later item.
+            pending_attrs = []
+            continue
+        name = _rust_node_name(child, content) or f"<{kind}>"
+        item_kind = "method" if (kind == "function" and parent is not None) else kind
+        items.append({
+            "kind": item_kind,
+            "name": name,
+            "parent": parent,
+            "begin_byte": child.start_byte,
+            "end_byte": child.end_byte,
+            "begin_line": child.start_point[0] + 1,
+            "end_line": child.end_point[0] + 1,
+            "attributes": pending_attrs,
+            "is_pub": _rust_has_pub_modifier(child),
+            "is_async": (kind == "function" and _rust_has_async_modifier(child, content)),
+        })
+        pending_attrs = []
+        # Recurse into bodies that can hold further items.
+        if ct in ("impl_item", "trait_item", "mod_item"):
+            body = _rust_find_decl_list(child)
+            if body is not None:
+                _walk_rust_decl_list(body, content, items, parent=name)
+
+
 def extract_rust_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[str]]:
     if not TS_AVAILABLE:
         return None, ["tree_sitter_unavailable"]
@@ -45,12 +138,23 @@ def extract_rust_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
             elif cap == "class_name":
                 classes.append(text)
     use_paths.sort(key=lambda x: (x["lineno"], x["path"]))
+
+    # Stage 1: rich item walk. The ``items`` list carries per-symbol metadata
+    # (kind, name, parent, byte/line range, attributes, is_pub, is_async).
+    # No source-text bodies are stored here — those live in L2 chunks. This
+    # keeps the AST summary lightweight while making every function, method,
+    # struct, enum, trait, impl, mod, type alias, const, and static
+    # individually addressable.
+    items: list[dict] = []
+    _walk_rust_decl_list(tree.root_node, content, items, parent=None)
+
     return {
         "language": "rust",
         "imports": use_paths,
         "mod_decls": sorted(set(mods)),
         "top_level_functions": sorted(set(funcs)),
         "top_level_classes": sorted(set(classes)),
+        "items": items,
     }, errors
 
 def detect_rust_workspaces(records: list[FileRecord], read: Callable[[str], bytes]) -> list[dict]:
