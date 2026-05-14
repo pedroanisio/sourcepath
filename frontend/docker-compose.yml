@@ -1,7 +1,12 @@
 services:
   backend:
     build:
-      context: ./backend
+      # Context is the REPO ROOT (..) — required so the Dockerfile can
+      # `COPY codebase_mapper ./codebase_mapper` and `COPY pyproject.toml`.
+      # The Dockerfile is referenced explicitly because moving the
+      # context up means it's no longer auto-discovered.
+      context: ..
+      dockerfile: frontend/backend/Dockerfile
       args:
         WITH_SBERT: "${WITH_SBERT:-0}"
     image: cbm-backend:${TAG:-latest}
