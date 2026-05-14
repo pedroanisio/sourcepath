@@ -90,8 +90,10 @@ import argparse, json, sys
 from pathlib import Path
 
 from plugins import chunks_embeddings, concept_graph
-from codebase_mapper import emit, map_codebase, reset_registries
-from codebase_mapper.repo_source import resolve_repo_source
+from codebase_mapper.emission.application.emit_bundle import emit
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.shared_kernel.extensions import reset_registries
+from codebase_mapper.inspection.repo_source import resolve_repo_source
 
 
 def main():
@@ -235,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         g_with.parse(str(out_with / "shapes.shacl.ttl"), format="turtle")
         CBML4 = Namespace(CBML4_URI)
         # Both L4 shapes must exist with their documented targetClasses.
-        from codebase_mapper.constants import CBM
+        from codebase_mapper.shared_kernel.constants import CBM
 
         file_shape = URIRef(f"{CBML4_URI}LlmFileShape")
         check(

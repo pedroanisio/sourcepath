@@ -40,7 +40,7 @@ from pathlib import Path
 from rdflib import Graph, Namespace, URIRef
 from rdflib.namespace import RDF
 
-from codebase_mapper.constants import CBM, CBML4, CBML4_NS
+from codebase_mapper.shared_kernel.constants import CBM, CBML4, CBML4_NS
 from plugins.llm_enrich import register_all
 from plugins.llm_enrich.cache import Cache
 from plugins.llm_enrich.client import OllamaClient
@@ -105,8 +105,10 @@ def _emit_bundle(
     *, with_l4: bool, scopes: tuple[str, ...] = (),
     client_host: str | None = None,
 ) -> tuple[dict, dict]:
-    from codebase_mapper import emit, map_codebase, reset_registries
-    from codebase_mapper.repo_source import resolve_repo_source
+    from codebase_mapper.emission.application.emit_bundle import emit
+    from codebase_mapper.inspection.pipeline import map_codebase
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+    from codebase_mapper.inspection.repo_source import resolve_repo_source
     from plugins import chunks_embeddings, concept_graph
 
     reset_registries()

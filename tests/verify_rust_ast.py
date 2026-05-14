@@ -75,7 +75,7 @@ def _items_with_parent(items: list[dict], parent: str | None) -> list[dict]:
 
 
 def test_summary_has_items_field() -> None:
-    from codebase_mapper.languages.rust import extract_rust_ast_summary
+    from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary
 
     content = _load_fixture()
     summary, errors = extract_rust_ast_summary(content, "sample.rs")
@@ -86,7 +86,7 @@ def test_summary_has_items_field() -> None:
 
 
 def test_top_level_kinds_present() -> None:
-    from codebase_mapper.languages.rust import extract_rust_ast_summary
+    from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary
 
     summary, _ = extract_rust_ast_summary(_load_fixture(), "sample.rs")
     items = summary["items"]
@@ -106,7 +106,7 @@ def test_top_level_kinds_present() -> None:
 
 
 def test_attributes_attach() -> None:
-    from codebase_mapper.languages.rust import extract_rust_ast_summary
+    from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary
 
     summary, _ = extract_rust_ast_summary(_load_fixture(), "sample.rs")
     items = summary["items"]
@@ -128,7 +128,7 @@ def test_attributes_attach() -> None:
 
 
 def test_impl_methods_recurse() -> None:
-    from codebase_mapper.languages.rust import extract_rust_ast_summary
+    from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary
 
     summary, _ = extract_rust_ast_summary(_load_fixture(), "sample.rs")
     items = summary["items"]
@@ -149,7 +149,7 @@ def test_impl_methods_recurse() -> None:
 
 
 def test_trait_methods_recurse() -> None:
-    from codebase_mapper.languages.rust import extract_rust_ast_summary
+    from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary
 
     summary, _ = extract_rust_ast_summary(_load_fixture(), "sample.rs")
     items = summary["items"]
@@ -161,7 +161,7 @@ def test_trait_methods_recurse() -> None:
 
 
 def test_nested_mod_recurses() -> None:
-    from codebase_mapper.languages.rust import extract_rust_ast_summary
+    from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary
 
     summary, _ = extract_rust_ast_summary(_load_fixture(), "sample.rs")
     items = summary["items"]

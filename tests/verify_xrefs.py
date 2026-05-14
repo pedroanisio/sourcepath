@@ -114,15 +114,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF
 
-from codebase_mapper import emit, map_codebase, reset_registries
-from codebase_mapper.constants import (
+from codebase_mapper.emission.application.emit_bundle import emit
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.shared_kernel.extensions import reset_registries
+from codebase_mapper.shared_kernel.constants import (
     CBMI_NS, CBMXR, CBMXR_NS,
     XREF_KINDS, XREF_RESOLUTIONS, XREF_UNRESOLVED_REASONS,
 )
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.models import (
-    FileRecord, XrefKind, XrefResolution, XrefUnresolvedReason,
-)
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.emission.models import XrefKind, XrefResolution, XrefUnresolvedReason
+from codebase_mapper.inspection.models import FileRecord
 from plugins import chunks_embeddings, symbol_xrefs
 from plugins.symbol_xrefs.aggregator import XREF_INDEX_KEY, XrefAggregator
 from plugins.symbol_xrefs.python_resolver import (
@@ -845,7 +846,7 @@ def main(argv: list[str] | None = None) -> int:
             chunks_embeddings.DeterministicHashBackend(dimension=64),
         )
         symbol_xrefs.register_all()
-        from codebase_mapper.pipeline import map_codebase as _map
+        from codebase_mapper.inspection.pipeline import map_codebase as _map
         mapped = _map(p2_fixture.resolve(), "HEAD")
         unit_ctx = mapped["ctx"]
         py_records = [r for r in mapped["records"] if r.language == "python"]
@@ -876,7 +877,7 @@ def main(argv: list[str] | None = None) -> int:
         # =====================================================
         # Phase 3: persistence contract
         # =====================================================
-        from codebase_mapper.models import SymbolXrefEdge
+        from codebase_mapper.emission.models import SymbolXrefEdge
 
         # --- 16. Sidecar → SymbolXrefEdge round-trip ---
         unit_edge_set = set(unit_edges)
@@ -1023,7 +1024,7 @@ def main(argv: list[str] | None = None) -> int:
             chunks_embeddings.DeterministicHashBackend(dimension=64),
         )
         symbol_xrefs.register_all()
-        from codebase_mapper.pipeline import map_codebase as _map4
+        from codebase_mapper.inspection.pipeline import map_codebase as _map4
         p4_mapped = _map4(p4_fixture.resolve(), "HEAD")
         p4_ctx = p4_mapped["ctx"]
         p4_app_record = next(
@@ -1086,7 +1087,7 @@ def main(argv: list[str] | None = None) -> int:
             chunks_embeddings.DeterministicHashBackend(dimension=64),
         )
         symbol_xrefs.register_all()
-        from codebase_mapper.pipeline import map_codebase as _map8
+        from codebase_mapper.inspection.pipeline import map_codebase as _map8
         p8_mapped = _map8(p8_fixture.resolve(), "HEAD")
         p8_ctx = p8_mapped["ctx"]
         all_chunks = p8_ctx.indices["l2_10_chunks"]

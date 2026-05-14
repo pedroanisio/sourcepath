@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
-from codebase_mapper.vocab import Vocabulary, builtin_vocabulary, load_vocabulary
+from codebase_mapper.emission.infrastructure.vocab import Vocabulary, builtin_vocabulary, load_vocabulary
 from plugins.concept_graph import USE_BUILTIN
 from plugins.concept_graph.artifact import ConceptsArtifact, _concept_payload
 from plugins.concept_graph.concepts import (

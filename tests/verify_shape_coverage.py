@@ -46,8 +46,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
-from codebase_mapper import emit, map_codebase, reset_registries
-from codebase_mapper.constants import CBM_NS
+from codebase_mapper.emission.application.emit_bundle import emit
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.shared_kernel.extensions import reset_registries
+from codebase_mapper.shared_kernel.constants import CBM_NS
 from plugins import chunks_embeddings, concept_graph
 
 

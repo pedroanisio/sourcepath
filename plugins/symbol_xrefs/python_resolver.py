@@ -49,11 +49,10 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import cast
 
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.languages.python import _jsonable_to_ast
-from codebase_mapper.models import (
-    FileRecord, SymbolXrefEdge, UnresolvedSymbolRef,
-)
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.inspection.languages.python import _jsonable_to_ast
+from codebase_mapper.emission.models import SymbolXrefEdge, UnresolvedSymbolRef
+from codebase_mapper.inspection.models import FileRecord
 
 
 RESOLVER_INTRA = "python_intra_file"

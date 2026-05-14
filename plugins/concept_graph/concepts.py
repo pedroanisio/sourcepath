@@ -47,8 +47,8 @@ from typing import cast
 
 import numpy as np
 
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.vocab import Vocabulary, builtin_vocabulary
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.emission.infrastructure.vocab import Vocabulary, builtin_vocabulary
 
 
 # Programming-context stopwords. Conservative: anything in this set is

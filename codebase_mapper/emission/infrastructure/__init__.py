@@ -1,0 +1,1 @@
+"""Emission infrastructure namespace."""

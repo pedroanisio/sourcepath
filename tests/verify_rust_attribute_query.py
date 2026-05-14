@@ -42,9 +42,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from codebase_mapper.emit_bundle import _emit_rust_items_sidecar  # noqa: E402
-from codebase_mapper.languages.rust import extract_rust_ast_summary  # noqa: E402
-from codebase_mapper.models import FileRecord  # noqa: E402
+from codebase_mapper.emission.application.emit_bundle import _emit_rust_items_sidecar  # noqa: E402
+from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary  # noqa: E402
+from codebase_mapper.inspection.models import FileRecord  # noqa: E402
 from frontend.backend.app import _load_rust_items  # noqa: E402
 
 

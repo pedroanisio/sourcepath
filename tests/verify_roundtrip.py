@@ -35,11 +35,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from rdflib import URIRef
 
-from codebase_mapper.blobs import emit_blobs
-from codebase_mapper.constants import CBMI_NS
-from codebase_mapper.pipeline import map_codebase
-from codebase_mapper.rdf_emit import build_inventory_graph
-from codebase_mapper.reconstruct import (
+from codebase_mapper.emission.infrastructure.storage.filesystem_blob_store import emit_blobs
+from codebase_mapper.shared_kernel.constants import CBMI_NS
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import build_inventory_graph
+from codebase_mapper.emission.application.reconstruct import (
     reconstruct,
     verify_reconstructed,
     verify_roundtrip,

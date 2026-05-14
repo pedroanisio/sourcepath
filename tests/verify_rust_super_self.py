@@ -42,7 +42,7 @@ FIXTURE = REPO_ROOT / "tests" / "fixtures" / "rust" / "module_hierarchy"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from codebase_mapper.languages.rust import (  # noqa: E402
+from codebase_mapper.inspection.languages.rust import (  # noqa: E402
     _file_module_path,
     extract_rust_ast_summary,
     resolve_rust_imports,

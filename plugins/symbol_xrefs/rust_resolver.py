@@ -55,10 +55,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.models import (
-    FileRecord, SymbolXrefEdge, UnresolvedSymbolRef,
-)
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.emission.models import SymbolXrefEdge, UnresolvedSymbolRef
+from codebase_mapper.inspection.models import FileRecord
 from codebase_mapper.ts_setup import (
     TS_AVAILABLE, _ts_setup, _TS_LANGS, ts,
 )
@@ -522,14 +521,14 @@ def _resolve_use_to_path(
     elif head == "self":
         # ``self::X::Y::…`` resolves relative to the file's module path.
         # Rewrite to ``<file_module>::X::Y::…`` against this file's crate.
-        from codebase_mapper.languages.rust import _file_module_path
+        from codebase_mapper.inspection.languages.rust import _file_module_path
         crate_dir = _crate_dir_for(src_path, crates)
         src_root = (crate_dir + "/src/") if crate_dir else "src/"
         file_mod = _file_module_path(src_path, crate_dir)
         rest = file_mod + rest
     elif head == "super":
         # ``super::…`` strips one module-path segment per ``super``.
-        from codebase_mapper.languages.rust import _file_module_path
+        from codebase_mapper.inspection.languages.rust import _file_module_path
         n_super = 1
         while rest and rest[0] == "super":
             n_super += 1

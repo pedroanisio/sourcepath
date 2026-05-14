@@ -124,19 +124,21 @@ def check_handlers_load_without_keyerror() -> None:
 
 
 # ───────────────────────────────────────────────────────────────────────
-# Finding #13 — models.py ↔ rdf_emit.py shared-import contract
+# Finding #13 — inspection/emission model surfaces ↔ RDF emitter contract
 # ───────────────────────────────────────────────────────────────────────
 
 
 def check_models_rdf_emit_shared_import() -> None:
     try:
-        from codebase_mapper.rdf_emit import (  # noqa: F401
+        from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import (  # noqa: F401
             build_inventory_graph, build_shacl_graph,
         )
-        from codebase_mapper.models import (  # noqa: F401
+        from codebase_mapper.emission.models import (  # noqa: F401
+            SymbolXrefEdge, UnresolvedSymbolRef,
+        )
+        from codebase_mapper.inspection.models import (  # noqa: F401
             DeclaresDependencyEdge, FileRecord, ImportEdge,
-            ImportExternalEdge, PinsDependencyEdge,
-            SymbolXrefEdge, TestsEdge, UnresolvedSymbolRef,
+            ImportExternalEdge, PinsDependencyEdge, TestsEdge,
         )
         ok = True
         detail = ""
@@ -144,14 +146,14 @@ def check_models_rdf_emit_shared_import() -> None:
         ok = False
         detail = f"{type(e).__name__}: {e}"
     check(
-        "rdf_emit.py + models.py imports resolve "
+        "rdflib_emitter + inspection/emission model imports resolve "
         "(shared-import contract intact)",
         ok, detail,
     )
 
     # Reinforce: every dataclass used by rdf_emit.build_inventory_graph's
     # signature is still importable under its expected name.
-    from codebase_mapper.models import (
+    from codebase_mapper.inspection.models import (
         DeclaresDependencyEdge, FileRecord, ImportEdge,
         ImportExternalEdge, PinsDependencyEdge, TestsEdge,
     )
@@ -170,7 +172,7 @@ def check_models_rdf_emit_shared_import() -> None:
         actual = {f.name for f in fields(cls)}
         missing = required - actual
         check(
-            f"models.{cls.__name__} carries the required fields "
+            f"inspection.models.{cls.__name__} carries the required fields "
             f"({len(required)} expected)",
             not missing,
             f"missing={sorted(missing)}\nactual={sorted(actual)}",
@@ -219,7 +221,7 @@ def check_prompt_registry_shas() -> None:
 
 def check_concept_kind_literals_sync() -> None:
     from plugins.concept_graph.graph_writer import CONCEPT_KIND_LITERALS
-    from codebase_mapper.vocab.loader import _CONCEPT_KINDS  # type: ignore
+    from codebase_mapper.emission.infrastructure.vocab.loader import _CONCEPT_KINDS  # type: ignore
     check(
         "CONCEPT_KIND_LITERALS (writer) == _CONCEPT_KINDS (loader)",
         set(CONCEPT_KIND_LITERALS) == set(_CONCEPT_KINDS),
@@ -305,8 +307,8 @@ def check_cache_fixture_schema_version() -> None:
 
 
 def check_ast_schema_versions() -> None:
-    from codebase_mapper.languages.python import PY_AST_SCHEMA_VERSION
-    from codebase_mapper.languages.rust   import RUST_AST_SCHEMA_VERSION
+    from codebase_mapper.inspection.languages.python import PY_AST_SCHEMA_VERSION
+    from codebase_mapper.inspection.languages.rust   import RUST_AST_SCHEMA_VERSION
 
     for name, ver, mod_path in (
         ("PY_AST_SCHEMA_VERSION",

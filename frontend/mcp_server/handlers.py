@@ -15,26 +15,25 @@ though the protocol layer runs ``validate_in`` first.
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import Any, Callable
 
-# Make the backend importable when this package is loaded standalone
-# (e.g. by pytest collecting from repo root).
-_BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
-if str(_BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(_BACKEND_DIR))
+from fastapi import HTTPException
 
-from fastapi import HTTPException  # noqa: E402  (after sys.path tweak)
-import app as backend_app  # noqa: E402  (after sys.path tweak)
+from frontend.backend.serving.application import bundles as backend_bundles_app
+from frontend.backend.serving.application import bundle_data as backend_bundle_data
+from frontend.backend.serving.application import chunks as backend_chunks_app
+from frontend.backend.serving.application import concepts as backend_concepts_app
+from frontend.backend.serving.application import files as backend_files_app
+from frontend.backend.serving.application import impact as backend_impact_app
+from frontend.backend.serving.application import summary as backend_summary_app
 
-from .schemas import (  # noqa: E402
+from .schemas import (
     INPUT_SCHEMAS,
     OUTPUT_SCHEMAS,
     validate_in,
     validate_out,
 )
-from .validators import (  # noqa: E402
+from .validators import (
     INTERNAL,
     INVALID_ARGUMENT,
     NOT_FOUND,
@@ -59,13 +58,17 @@ BLOB_FULL_BYTES = 20_000
 def _get_bundle(name: str | None):
     """Resolve and load a bundle, mapping FastAPI's HTTPException to ToolError."""
     try:
-        return backend_app.get_bundle(name)
+        return backend_bundle_data.get_bundle(name)
     except HTTPException as e:
-        if e.status_code == 404:
-            raise ToolError(NOT_FOUND, str(e.detail)) from e
-        if e.status_code == 400:
-            raise ToolError(INVALID_ARGUMENT, str(e.detail)) from e
-        raise ToolError(INTERNAL, str(e.detail)) from e
+        _raise_mapped_http_error(e)
+
+
+def _raise_mapped_http_error(error: HTTPException) -> None:
+    if error.status_code == 404:
+        raise ToolError(NOT_FOUND, str(error.detail)) from error
+    if error.status_code == 400:
+        raise ToolError(INVALID_ARGUMENT, str(error.detail)) from error
+    raise ToolError(INTERNAL, str(error.detail)) from error
 
 
 def _pick_bundle_name(args: dict[str, Any], bundle_default: str | None) -> str | None:
@@ -139,7 +142,6 @@ def _file_record(rec: dict[str, Any]) -> dict[str, Any]:
 def _chunk_row(rec: dict[str, Any], *, score: float | None = None) -> dict[str, Any]:
     out = {
         "idx": rec["idx"],
-        "uri": rec.get("uri"),
         "symbol": rec.get("symbol"),
         "kind": rec.get("kind"),
         "file": rec.get("file"),
@@ -148,9 +150,19 @@ def _chunk_row(rec: dict[str, Any], *, score: float | None = None) -> dict[str, 
         "embeddingRow": rec.get("embeddingRow"),
         "contentSha256": rec.get("contentSha256"),
     }
+    if rec.get("uri"):
+        out["uri"] = rec["uri"]
     if score is not None:
         out["score"] = score
     return out
+
+
+def _bundle_chunk_row(b, rec: dict[str, Any], *, score: float | None = None) -> dict[str, Any]:
+    idx = rec["idx"]
+    full_rec = rec
+    if 0 <= idx < len(b.chunks):
+        full_rec = {**b.chunks[idx], **rec}
+    return _chunk_row(full_rec, score=score)
 
 
 # --------------------------------------------------------------------------
@@ -213,24 +225,7 @@ def _orient_bundle(args: dict[str, Any], default: str | None) -> dict[str, Any]:
 @tool("bundle_summary")
 def _bundle_summary(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     name = _pick_bundle_name(args, default)
-    b = _get_bundle(name)
-    m = b.manifest
-    backend_meta = b.embeddings_meta.get("backend") or {}
-    return {
-        "repo_name": m.get("repo_name"),
-        "commit_sha": m.get("commit_sha"),
-        "generated_at": m.get("generated_at"),
-        "tool_version": m.get("tool_version"),
-        "counts": m.get("counts", {}),
-        "files_by_language": m.get("files_by_language", {}),
-        "files_by_type": m.get("files_by_type", {}),
-        "embeddings_backend": backend_meta.get("name"),
-        "embeddings_dimension": b.embeddings_meta.get("dimension"),
-        "n_chunks": b.embeddings_meta.get("n_chunks", 0),
-        "n_concepts": len(b.concepts.get("concepts", {})),
-        "shacl_conforms": (m.get("shacl_self_check") or {}).get("conforms"),
-        "output_dir": str(b.output_dir),
-    }
+    return backend_summary_app.build_summary_response(name)
 
 
 _ENTRY_POINT_BASENAMES: dict[str, str] = {
@@ -442,11 +437,9 @@ def _repository_summary(args: dict[str, Any], default: str | None) -> dict[str, 
 
 @tool("list_bundles")
 def _list_bundles(args: dict[str, Any], default: str | None) -> dict[str, Any]:
-    return {
-        "bundles": backend_app.list_bundles(),
-        "selected": default or backend_app._default_bundle_name(),
-        "bundles_root": str(backend_app._bundles_root()),
-    }
+    payload = backend_bundles_app.list_bundles_response()
+    payload["selected"] = default or payload["selected"]
+    return payload
 
 
 @tool("select_bundle")
@@ -503,22 +496,18 @@ def _file_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     name = _pick_bundle_name(args, default)
     path = validate_relative_path(args["path"])
     b = _get_bundle(name)
-    rec = b.file_by_path.get(path)
-    if not rec:
-        raise ToolError(NOT_FOUND, f"file not found: {path}")
-    chunk_idxs = b.chunks_by_file.get(path, [])
-    chunks = [
-        _chunk_row(b.chunks[i]) for i in chunk_idxs
-    ]
-    concepts = list((b.concepts.get("per_path_concepts") or {}).get(path, []))
+    try:
+        payload = backend_files_app.get_file_detail_response(path, name)
+    except HTTPException as e:
+        _raise_mapped_http_error(e)
     payload: dict[str, Any] = {
-        "file": _file_record(rec),
-        "imports_out": sorted(b.imports_out.get(path, [])),
-        "imports_in": sorted(b.imports_in.get(path, [])),
+        "file": _file_record(payload["file"]),
+        "imports_out": payload["imports_out"],
+        "imports_in": payload["imports_in"],
         "tests": sorted(b.tests_for_subject.get(path, [])),
         "tested_subjects": sorted(b.subjects_for_test.get(path, [])),
-        "chunks": chunks,
-        "concepts": concepts,
+        "chunks": [_bundle_chunk_row(b, row) for row in payload["chunks"]],
+        "concepts": payload["concepts"],
     }
     # L4 surfaces (Step 7). Two possible attributes per file: an LLM
     # summary of the source file (file_summary kind), or — for schema
@@ -581,33 +570,22 @@ def _file_impact(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     depth = int(args.get("depth", 2))
     limit = int(args.get("limit", 100))
     b = _get_bundle(name)
-    if path not in b.file_by_path:
-        raise ToolError(NOT_FOUND, f"file not found: {path}")
-
-    deps, dep_trunc = _walk_paths(path, b.imports_out, depth, limit)
-    dependents, rev_trunc = _walk_paths(path, b.imports_in, depth, limit)
-
-    related_tests = set(b.tests_for_subject.get(path, []))
-    tested_subjects = set(b.subjects_for_test.get(path, []))
-    for impacted in dependents:
-        related_tests.update(b.tests_for_subject.get(impacted, []))
-
-    chunk_idxs = b.chunks_by_file.get(path, [])[:25]
-    chunks = [_chunk_row(b.chunks[i]) for i in chunk_idxs]
-    concepts = list((b.concepts.get("per_path_concepts") or {}).get(path, []))
-
+    try:
+        payload = backend_impact_app.get_impact_response(path, depth, limit, name)
+    except HTTPException as e:
+        _raise_mapped_http_error(e)
     return {
-        "file": path,
-        "depth": depth,
-        "direct_dependencies": sorted(b.imports_out.get(path, [])),
-        "direct_dependents": sorted(b.imports_in.get(path, [])),
-        "transitive_dependencies": deps,
-        "transitive_dependents": dependents,
-        "related_tests": sorted(related_tests),
-        "tested_subjects": sorted(tested_subjects),
-        "concepts": concepts,
-        "chunks": chunks,
-        "truncated": dep_trunc or rev_trunc,
+        "file": payload["file"],
+        "depth": payload["depth"],
+        "direct_dependencies": payload["direct_dependencies"],
+        "direct_dependents": payload["direct_dependents"],
+        "transitive_dependencies": payload["transitive_dependencies"],
+        "transitive_dependents": payload["transitive_dependents"],
+        "related_tests": payload["related_tests"],
+        "tested_subjects": payload["tested_subjects"],
+        "concepts": payload["concepts"],
+        "chunks": [_bundle_chunk_row(b, row) for row in payload["chunks"]],
+        "truncated": payload["truncated"],
     }
 
 
@@ -636,23 +614,16 @@ def _chunk_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     name = _pick_bundle_name(args, default)
     idx = int(args["idx"])
     b = _get_bundle(name)
-    if idx < 0 or idx >= len(b.chunks):
-        raise ToolError(NOT_FOUND, f"chunk idx out of range: {idx}")
-    rec = b.chunks[idx]
-    sha = rec.get("contentSha256")
-    blob_preview: str | None = None
-    if sha and len(sha) == 64 and all(c in "0123456789abcdef" for c in sha):
-        p = b.output_dir / "blobs" / sha
-        if p.exists():
-            try:
-                raw = p.read_text(errors="replace")
-            except OSError:
-                raw = None
-            if raw is not None:
-                blob_preview, _ = truncate_text(raw, BLOB_PREVIEW_BYTES)
+    try:
+        payload = backend_chunks_app.get_chunk_detail_response(idx, name)
+    except HTTPException as e:
+        _raise_mapped_http_error(e)
+    blob_preview = payload["blob_preview"]
+    if blob_preview is not None:
+        blob_preview, _ = truncate_text(blob_preview, BLOB_PREVIEW_BYTES)
     return {
-        "chunk": _chunk_row(rec),
-        "concepts": list(b.chunk_concepts.get(idx, [])),
+        "chunk": _bundle_chunk_row(b, payload["chunk"]),
+        "concepts": payload["concepts"],
         "blob_preview": blob_preview,
     }
 
@@ -677,25 +648,16 @@ def _chunk_blob(args: dict[str, Any], default: str | None) -> dict[str, Any]:
 @tool("list_chunks")
 def _list_chunks(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     name = _pick_bundle_name(args, default)
-    q = (args.get("q") or "").lower()
     limit = int(args.get("limit", 50))
     offset = int(args.get("offset", 0))
+    q = args.get("q")
     b = _get_bundle(name)
-    rows = b.chunks
-    if q:
-        rows = [
-            r for r in rows
-            if (r.get("symbol") or "").lower().find(q) >= 0
-            or (r.get("file") or "").lower().find(q) >= 0
-        ]
-    total = len(rows)
-    page = rows[offset:offset + limit]
-    return {
-        "chunks": [_chunk_row(r) for r in page],
-        "total": total,
-        "backend": (b.embeddings_meta.get("backend") or {}).get("name"),
-        "mode": "lexical",
-    }
+    try:
+        payload = backend_chunks_app.list_chunks_response(q, limit, offset, name)
+    except HTTPException as e:
+        _raise_mapped_http_error(e)
+    payload["chunks"] = [_bundle_chunk_row(b, r) for r in payload["chunks"]]
+    return payload
 
 
 @tool("semantic_neighbors")
@@ -704,51 +666,12 @@ def _semantic_neighbors(args: dict[str, Any], default: str | None) -> dict[str, 
     q = args["q"]
     k = int(args.get("k", 20))
     b = _get_bundle(name)
-    backend_name = (b.embeddings_meta.get("backend") or {}).get("name") or ""
-    is_sbert = any(
-        s in backend_name.lower() for s in ("sentence-transformer", "sbert", "minilm")
-    )
-
-    if not is_sbert or b.chunk_vectors is None:
-        ql = q.lower()
-        scored = [
-            (r, 1.0 if (r.get("symbol") or "").lower().find(ql) >= 0
-             else (0.5 if (r.get("file") or "").lower().find(ql) >= 0 else 0.0))
-            for r in b.chunks
-        ]
-        scored = [s for s in scored if s[1] > 0]
-        scored.sort(key=lambda s: s[1], reverse=True)
-        out = scored[:k]
-        return {
-            "chunks": [_chunk_row(r, score=score) for r, score in out],
-            "total": len(scored),
-            "backend": backend_name or None,
-            "mode": "lexical",
-        }
-
-    # Semantic path: embed query, cosine top-k.
-    import numpy as np  # local import keeps the module light when sbert isn't used
-
-    model = backend_app._get_model("sentence-transformers/all-MiniLM-L6-v2")
-    q_vec = model.encode([q], normalize_embeddings=True)[0].astype("float32")
-    sims = b.chunk_vectors @ q_vec
-    top_idx = np.argsort(-sims)[:k]
-    by_row: dict[int, dict[str, Any]] = {
-        r["embeddingRow"]: r for r in b.chunks if r.get("embeddingRow") is not None
-    }
-    out_chunks: list[dict[str, Any]] = []
-    for i in top_idx:
-        row = int(i)
-        r = by_row.get(row)
-        if r is None:
-            continue
-        out_chunks.append(_chunk_row(r, score=float(sims[row])))
-    return {
-        "chunks": out_chunks,
-        "total": len(out_chunks),
-        "backend": backend_name,
-        "mode": "semantic",
-    }
+    try:
+        payload = backend_chunks_app.search_chunks_response(q, k, name)
+    except HTTPException as e:
+        _raise_mapped_http_error(e)
+    payload["chunks"] = [_bundle_chunk_row(b, r, score=r.get("score")) for r in payload["chunks"]]
+    return payload
 
 
 @tool("concept_detail")
@@ -759,21 +682,13 @@ def _concept_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]
     chunk_k = int(args.get("chunk_k", 50))
     file_k = int(args.get("file_k", 100))
     b = _get_bundle(name)
-    c = b.concepts.get("concepts", {}).get(concept_name)
-    if not c:
-        raise ToolError(NOT_FOUND, f"concept not found: {concept_name}")
-    files: list[str] = []
-    total_files = 0
-    for path, names in (b.concepts.get("per_path_concepts") or {}).items():
-        if concept_name in names:
-            total_files += 1
-            if len(files) < file_k:
-                files.append(path)
-    cooc = [
-        {"name": n, "weight": int(w)} for n, w in b.cooccur.get(concept_name, [])[:cooccur_k]
-    ]
-    chunk_idxs = b.concept_chunks.get(concept_name, [])[:chunk_k]
-    chunks = [_chunk_row(b.chunks[i]) for i in chunk_idxs]
+    try:
+        payload = backend_concepts_app.get_concept_detail_response(
+            concept_name, cooccur_k, chunk_k, file_k, name
+        )
+    except HTTPException as e:
+        _raise_mapped_http_error(e)
+    c = payload["concept"]
     concept_payload: dict[str, Any] = {
         "label": c.get("label", concept_name),
         "alt_labels": list(c.get("alt_labels", [])),
@@ -790,12 +705,12 @@ def _concept_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]
         concept_payload["broader"] = c["broader"]
     payload: dict[str, Any] = {
         "concept": concept_payload,
-        "files": files,
-        "cooccurring": cooc,
-        "chunks": chunks,
+        "files": payload["files"],
+        "cooccurring": payload["cooccurring"],
+        "chunks": [_bundle_chunk_row(b, chunk) for chunk in payload["chunks"]],
         "components": list(c.get("components", [])),
-        "file_count_total": total_files,
-        "chunk_count_total": len(b.concept_chunks.get(concept_name, [])),
+        "file_count_total": payload["file_count_total"],
+        "chunk_count_total": payload["chunk_count_total"],
     }
     # L4 surface (Step 7): concept_description enrichments live on
     # the concept's canonical name. Curated-vocab concepts (those with

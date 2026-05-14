@@ -24,8 +24,8 @@ from typing import TYPE_CHECKING, cast
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
-from codebase_mapper.constants import CBMI_NS, CBML4, CBML4_NS
-from codebase_mapper.rdf_emit import file_iri
+from codebase_mapper.shared_kernel.constants import CBMI_NS, CBML4, CBML4_NS
+from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import file_iri
 
 # Concept subjects come from the L3 concept-graph plugin; we mirror its
 # IRI scheme here rather than importing the plugin to keep dependency
@@ -38,7 +38,7 @@ def _concept_iri(canonical_form: str) -> URIRef:
     return URIRef(f"{CBMI_NS}concept/{safe}")
 
 if TYPE_CHECKING:
-    from codebase_mapper.extensions import PipelineCtx
+    from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 
 SH_NS = "http://www.w3.org/ns/shacl#"
@@ -184,7 +184,7 @@ class LlmShapes:
         # Bind the cbml4 prefix on the shapes graph for readability.
         shapes.bind("cbml4", CBML4)
 
-        from codebase_mapper.constants import CBM
+        from codebase_mapper.shared_kernel.constants import CBM
 
         # --- LlmFileShape: file_summary + schema_purpose -----------
         file_shape = URIRef(f"{CBML4_NS}LlmFileShape")

@@ -32,7 +32,64 @@ dependencies = [
 [project.scripts]
 codebase-mapper = "codebase_mapper.cli:main"
 
+[project.optional-dependencies]
+dev = [
+    "import-linter",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["codebase_mapper*", "plugins*"]
 exclude = ["tests*", "scripts*"]
+
+[tool.importlinter]
+root_package = "codebase_mapper"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "shared-kernel-stays-independent"
+type = "forbidden"
+source_modules = ["codebase_mapper.shared_kernel"]
+forbidden_modules = [
+    "codebase_mapper.inspection",
+    "codebase_mapper.emission",
+]
+ignore_imports = [
+    "codebase_mapper.shared_kernel.extensions -> codebase_mapper.inspection.models",
+    "codebase_mapper.shared_kernel.extensions -> codebase_mapper.inspection._builtins",
+]
+
+[[tool.importlinter.contracts]]
+name = "inspection-domain-ports-stay-out-of-emission"
+type = "forbidden"
+source_modules = ["codebase_mapper.inspection.domain"]
+forbidden_modules = ["codebase_mapper.emission"]
+
+[[tool.importlinter.contracts]]
+name = "emission-domain-ports-stay-out-of-infrastructure"
+type = "forbidden"
+source_modules = ["codebase_mapper.emission.domain"]
+forbidden_modules = ["codebase_mapper.emission.infrastructure"]
+
+[[tool.importlinter.contracts]]
+name = "inspection-domain-does-not-import-emission-domain"
+type = "forbidden"
+source_modules = ["codebase_mapper.inspection.domain"]
+forbidden_modules = ["codebase_mapper.emission.domain"]
+
+[[tool.importlinter.contracts]]
+name = "emission-domain-does-not-import-inspection-domain"
+type = "forbidden"
+source_modules = ["codebase_mapper.emission.domain"]
+forbidden_modules = ["codebase_mapper.inspection.domain"]
+
+[[tool.importlinter.contracts]]
+name = "domain-ports-avoid-framework-imports"
+type = "forbidden"
+source_modules = ["codebase_mapper.emission.domain"]
+forbidden_modules = [
+    "click",
+    "flask",
+    "rdflib",
+    "yaml",
+]

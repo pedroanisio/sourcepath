@@ -54,11 +54,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import cast
 
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.languages.tsjs import resolve_tsjs_import
-from codebase_mapper.models import (
-    FileRecord, SymbolXrefEdge, UnresolvedSymbolRef,
-)
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.inspection.languages.tsjs import resolve_tsjs_import
+from codebase_mapper.emission.models import SymbolXrefEdge, UnresolvedSymbolRef
+from codebase_mapper.inspection.models import FileRecord
 from codebase_mapper.ts_setup import (
     TS_AVAILABLE, _ts_grammar_for, _ts_setup, _TS_LANGS, ts,
 )

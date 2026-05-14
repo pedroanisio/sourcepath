@@ -38,12 +38,12 @@ RUST_FIXTURES = REPO_ROOT / "tests" / "fixtures" / "rust"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from codebase_mapper.languages.rust import (  # noqa: E402
+from codebase_mapper.inspection.languages.rust import (  # noqa: E402
     RUST_AST_SCHEMA_VERSION,
     extract_rust_ast_summary,
     regenerate_rust_source,
 )
-from codebase_mapper.regenerate import supported_languages, _REGENERATORS  # noqa: E402
+from codebase_mapper.emission.application.regenerate import supported_languages, _REGENERATORS  # noqa: E402
 
 
 # --------------------------------------------------------------------------

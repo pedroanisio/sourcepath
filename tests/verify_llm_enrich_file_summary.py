@@ -109,8 +109,9 @@ def _run_pipeline_with_l4(
     # Local imports + reset to avoid touching the parent process's
     # registries (the host's _builtins.py registers analyzers/resolvers
     # at import; we need those *and* L4).
-    from codebase_mapper import map_codebase, reset_registries
-    from codebase_mapper.repo_source import resolve_repo_source
+    from codebase_mapper.inspection.pipeline import map_codebase
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+    from codebase_mapper.inspection.repo_source import resolve_repo_source
 
     reset_registries()
     client = OllamaClient(host=client_host) if client_host else OllamaClient()

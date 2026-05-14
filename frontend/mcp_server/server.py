@@ -26,10 +26,11 @@ from mcp.server.stdio import stdio_server
 from mcp.types import GetPromptResult, Prompt, Resource, ResourceTemplate, Tool
 from pydantic import AnyUrl
 
+from frontend.backend.serving.application import bundle_data as backend_bundle_data
+
 from . import prompts as _p
 from . import resources as _r
 from .handlers import HANDLERS, dispatch
-from .handlers import backend_app  # imported indirectly to access cache_clear
 from .observability import configure_audit_logger, dispatch_with_budget
 from .schemas import DESCRIPTIONS, INPUT_SCHEMAS, OUTPUT_SCHEMAS, TOOL_NAMES
 from .subscriptions import ManifestWatcher, SubscriptionManager, manifest_uri
@@ -69,7 +70,7 @@ def prewarm_default_bundle() -> None:
     tool call will surface the configuration error to the agent).
     """
     try:
-        backend_app.get_bundle(None)
+        backend_bundle_data.get_bundle(None)
     except Exception:  # noqa: BLE001
         logger.info("prewarm skipped — no default bundle resolvable")
 
@@ -202,7 +203,15 @@ async def manifest_changed(uri: str, manager: SubscriptionManager) -> None:
     by tests that want to simulate a manifest change without touching
     the filesystem.
     """
-    backend_app.get_bundle.cache_clear()
+    backend_bundle_data.get_bundle.cache_clear()
+    try:  # Keep the legacy `import app` compatibility surface coherent too.
+        import app as legacy_backend_app  # type: ignore
+    except ImportError:
+        legacy_backend_app = None
+    if legacy_backend_app is not None:
+        clear_legacy_cache = getattr(legacy_backend_app.get_bundle, "cache_clear", None)
+        if callable(clear_legacy_cache):
+            clear_legacy_cache()
     # Drop the SPARQL graph cache too — same data, separate parse.
     from . import sparql as _sparql_mod
     _sparql_mod.clear_graph_cache()

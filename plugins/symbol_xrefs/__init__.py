@@ -53,7 +53,7 @@ _RESOLVERS: dict = {
 
 def register_all() -> None:
     """Register every xref-layer component with the host's registries."""
-    from codebase_mapper.extensions import (
+    from codebase_mapper.shared_kernel.extensions import (
         register_aggregator, register_artifact_emitter,
         register_graph_contributor, register_shape_contributor,
     )

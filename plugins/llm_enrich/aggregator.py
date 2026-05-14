@@ -41,7 +41,7 @@ from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
 from .prompts import PROMPT_REGISTRY
 
 if TYPE_CHECKING:
-    from codebase_mapper.extensions import PipelineCtx
+    from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 
 AGGREGATOR_NAME = "l4_20_enrich"

@@ -42,7 +42,7 @@ from pathlib import Path
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF, XSD
 
-from codebase_mapper.constants import CBM, CBMI_NS, CBML4
+from codebase_mapper.shared_kernel.constants import CBM, CBMI_NS, CBML4
 from plugins.llm_enrich import register_all
 from plugins.llm_enrich.cache import Cache
 from plugins.llm_enrich.client import OllamaClient
@@ -84,7 +84,7 @@ def _concept_iri(canon: str) -> URIRef:
 
 
 def _file_iri(path: str) -> URIRef:
-    from codebase_mapper.rdf_emit import file_iri as _fi
+    from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import file_iri as _fi
     return _fi(path)
 
 
@@ -151,8 +151,10 @@ def _emit_bundle(
     client_host: str | None = None,
 ) -> tuple[dict, dict]:
     """Returns (mapped, manifest)."""
-    from codebase_mapper import emit, map_codebase, reset_registries
-    from codebase_mapper.repo_source import resolve_repo_source
+    from codebase_mapper.emission.application.emit_bundle import emit
+    from codebase_mapper.inspection.pipeline import map_codebase
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+    from codebase_mapper.inspection.repo_source import resolve_repo_source
     from plugins import chunks_embeddings, concept_graph
 
     reset_registries()

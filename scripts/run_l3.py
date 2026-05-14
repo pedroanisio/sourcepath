@@ -13,8 +13,10 @@ from pathlib import Path
 
 from plugins import chunks_embeddings
 from plugins import concept_graph
-from codebase_mapper import emit, map_codebase, reset_registries
-from codebase_mapper.repo_source import resolve_repo_source
+from codebase_mapper.emission.application.emit_bundle import emit
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.shared_kernel.extensions import reset_registries
+from codebase_mapper.inspection.repo_source import resolve_repo_source
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--concept-vocab", type=Path, default=None,
                    help="Override the bundled L3 controlled vocabulary "
                         "(YAML). When omitted, software_primitives.yaml is "
-                        "used. See codebase_mapper/vocab/loader.py.")
+                        "used. See codebase_mapper/emission/infrastructure/vocab/loader.py.")
     p.add_argument("--no-builtin-vocab", action="store_true",
                    help="Disable typed concepts entirely. Emitted L3 graphs "
                         "match pre-vocab bundles (no cbml3:conceptKind, no "
@@ -68,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.no_builtin_vocab:
         l3_vocab = None
     elif args.concept_vocab is not None:
-        from codebase_mapper.vocab import load_vocabulary
+        from codebase_mapper.emission.infrastructure.vocab import load_vocabulary
         l3_vocab = load_vocabulary(args.concept_vocab.resolve())
     else:
         l3_vocab = concept_graph.USE_BUILTIN

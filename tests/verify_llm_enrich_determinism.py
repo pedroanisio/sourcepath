@@ -130,8 +130,10 @@ def _emit_bundle(
     fixture: Path, out: Path, cache_dir: Path,
     *, scopes: tuple[str, ...],
 ) -> tuple[dict, dict]:
-    from codebase_mapper import emit, map_codebase, reset_registries
-    from codebase_mapper.repo_source import resolve_repo_source
+    from codebase_mapper.emission.application.emit_bundle import emit
+    from codebase_mapper.inspection.pipeline import map_codebase
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+    from codebase_mapper.inspection.repo_source import resolve_repo_source
     from plugins import chunks_embeddings, concept_graph
 
     reset_registries()

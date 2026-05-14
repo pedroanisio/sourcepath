@@ -17,8 +17,8 @@ collection is empty. Later phases plug per-language resolvers in via the
 """
 from __future__ import annotations
 
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.models import SymbolXrefEdge, UnresolvedSymbolRef
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.emission.models import SymbolXrefEdge, UnresolvedSymbolRef
 
 
 XREF_INDEX_KEY = "l3_10_xrefs"

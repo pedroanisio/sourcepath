@@ -13,8 +13,10 @@ import sys
 from pathlib import Path
 
 from plugins import chunks_embeddings
-from codebase_mapper import emit, map_codebase, reset_registries
-from codebase_mapper.repo_source import resolve_repo_source
+from codebase_mapper.emission.application.emit_bundle import emit
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.shared_kernel.extensions import reset_registries
+from codebase_mapper.inspection.repo_source import resolve_repo_source
 
 
 def main(argv: list[str] | None = None) -> int:

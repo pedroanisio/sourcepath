@@ -13,9 +13,16 @@ from rdflib.namespace import RDF
 from rdflib.namespace import XSD
 from typing import Callable
 
-from .constants import CBM, CBMI_NS, CBMT_NS
-from .rdf_emit import _plain, build_shacl_graph, file_iri, package_iri, phase_iri, type_iri
-from .reconstruct import verify_roundtrip
+from .emission.application.reconstruct import verify_roundtrip
+from .emission.infrastructure.rdf.rdflib_emitter import (
+    _plain,
+    build_shacl_graph,
+    file_iri,
+    package_iri,
+    phase_iri,
+    type_iri,
+)
+from .shared_kernel.constants import CBM, CBMI_NS, CBMT_NS
 
 
 def self_test() -> int:

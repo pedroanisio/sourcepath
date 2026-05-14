@@ -23,14 +23,14 @@ import traceback
 
 from pathlib import Path
 
-from codebase_mapper.vocab import (
+from codebase_mapper.emission.infrastructure.vocab import (
     VOCAB_SCHEMA_VERSION,
     Vocabulary,
     builtin_vocabulary,
     builtin_vocabulary_path,
     load_vocabulary,
 )
-from codebase_mapper.vocab.loader import VOCAB_SCHEMA_VERSION as _SCHEMA  # noqa: F401
+from codebase_mapper.emission.infrastructure.vocab.loader import VOCAB_SCHEMA_VERSION as _SCHEMA  # noqa: F401
 
 
 def _write_tmp(text: str) -> Path:

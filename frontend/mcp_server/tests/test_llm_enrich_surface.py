@@ -81,8 +81,10 @@ def enriched_bundle(tmp_path_factory):
     """Build a fresh bundle with L4 enrichments and yield (bundle_path,
     bundle_name) for the MCP handlers to consume."""
     sys.path.insert(0, str(REPO_ROOT))
-    from codebase_mapper import emit, map_codebase, reset_registries
-    from codebase_mapper.repo_source import resolve_repo_source
+    from codebase_mapper.emission.application.emit_bundle import emit
+    from codebase_mapper.inspection.pipeline import map_codebase
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+    from codebase_mapper.inspection.repo_source import resolve_repo_source
     from plugins import chunks_embeddings, concept_graph, llm_enrich
     from plugins.llm_enrich.cache import Cache
     from plugins.llm_enrich.client import OllamaClient

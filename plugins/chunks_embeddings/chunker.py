@@ -37,8 +37,8 @@ import hashlib
 import warnings
 from typing import cast
 
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.models import FileRecord
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.inspection.models import FileRecord
 
 
 SKIP_TYPES = {"binary", "asset", "license", "lockfile", "generated"}

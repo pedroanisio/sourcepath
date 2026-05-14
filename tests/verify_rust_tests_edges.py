@@ -30,9 +30,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from codebase_mapper.languages.rust import extract_rust_ast_summary
-from codebase_mapper.models import FileRecord
-from codebase_mapper.tests_edges import (
+from codebase_mapper.inspection.languages.rust import extract_rust_ast_summary
+from codebase_mapper.inspection.models import FileRecord
+from codebase_mapper.inspection.tests_edges import (
     count_rust_inline_test_files,
     infer_tests_edges,
 )

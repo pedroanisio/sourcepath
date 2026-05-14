@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from codebase_mapper.pipeline import map_codebase
-from codebase_mapper.repo_source import (
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.inspection.repo_source import (
     normalize_git_source,
     repo_name_from_source,
     resolve_repo_source,

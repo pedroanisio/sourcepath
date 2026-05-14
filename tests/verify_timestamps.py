@@ -31,9 +31,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
-from codebase_mapper.constants import CBM, CBMI_NS
-from codebase_mapper.pipeline import map_codebase
-from codebase_mapper.rdf_emit import (
+from codebase_mapper.shared_kernel.constants import CBM, CBMI_NS
+from codebase_mapper.inspection.pipeline import map_codebase
+from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import (
     _iso_utc,
     build_inventory_graph,
     build_shacl_graph,

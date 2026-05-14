@@ -25,6 +25,8 @@ from typing import Any
 
 from rdflib import Graph
 
+from frontend.backend.serving.application import bundle_data as backend_bundle_data
+
 from . import handlers as _h
 from .validators import INVALID_ARGUMENT, ToolError
 
@@ -103,7 +105,7 @@ def run_sparql(query: str, *, bundle_default: str | None = None) -> dict[str, An
             f"sparql tool is disabled; set {ENABLE_ENV}=1 to enable",
         )
     _validate_query(query)
-    bundle = _h._get_bundle(bundle_default)
+    bundle = backend_bundle_data.get_bundle(bundle_default)
 
     g = _load_graph(str(bundle.output_dir))
     try:

@@ -6,11 +6,11 @@ import json
 
 from pathlib import Path
 
-from .emit_bundle import emit
-from .pipeline import map_codebase
-from .repo_source import resolve_repo_source
-from .reconstruct import reconstruct, verify_roundtrip
-from .regenerate import regenerate
+from .emission.application.emit_bundle import emit
+from .emission.application.reconstruct import reconstruct, verify_roundtrip
+from .emission.application.regenerate import regenerate
+from .inspection.pipeline import map_codebase
+from .inspection.repo_source import resolve_repo_source
 from .self_test import self_test
 
 

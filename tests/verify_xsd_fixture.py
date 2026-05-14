@@ -19,7 +19,7 @@ import sys
 
 from pathlib import Path
 
-from codebase_mapper.classify import classify
+from codebase_mapper.inspection.classify import classify
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

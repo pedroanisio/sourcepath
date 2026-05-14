@@ -20,8 +20,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import cast
 
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.models import SymbolXrefEdge, UnresolvedSymbolRef
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.emission.models import SymbolXrefEdge, UnresolvedSymbolRef
 
 from .aggregator import XREF_INDEX_KEY
 

@@ -17,7 +17,7 @@ from typing import cast
 
 import numpy as np
 
-from codebase_mapper.extensions import PipelineCtx
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 
 class EmbeddingsArtifact:

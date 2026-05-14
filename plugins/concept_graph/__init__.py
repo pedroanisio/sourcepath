@@ -18,7 +18,7 @@ from .concepts import (
 )
 from .graph_writer import ConceptGraphWriter, ConceptShapes
 from .artifact import ConceptsArtifact
-from codebase_mapper.vocab import Vocabulary
+from codebase_mapper.emission.infrastructure.vocab import Vocabulary
 
 __all__ = [
     "IdentifierSplitter",
@@ -43,7 +43,7 @@ def register_all(vocab: Vocabulary | None | object = USE_BUILTIN) -> None:
       - None: disable typed concepts (pre-vocab behavior; bundles
         contain no cbml3:conceptKind / skos:Collection nodes)
     """
-    from codebase_mapper.extensions import (
+    from codebase_mapper.shared_kernel.extensions import (
         register_record_enricher, register_aggregator,
         register_graph_contributor, register_shape_contributor,
         register_artifact_emitter,

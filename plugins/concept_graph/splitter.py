@@ -24,9 +24,9 @@ import re
 from pathlib import PurePosixPath
 from typing import cast
 
-from codebase_mapper.models import FileRecord
+from codebase_mapper.inspection.models import FileRecord
 
-from codebase_mapper.extensions import PipelineCtx
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 
 # Match runs of letters or digits with sensitivity to camelCase boundaries.

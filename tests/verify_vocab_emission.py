@@ -224,7 +224,7 @@ def test_kind_literal_set_matches_loader() -> None:
     """The writer's allowed-values tuple and the loader's accepted set
     must stay in lockstep. (If you add a fourth kind to one, you must
     add it to the other.)"""
-    from codebase_mapper.vocab.loader import _CONCEPT_KINDS  # type: ignore
+    from codebase_mapper.emission.infrastructure.vocab.loader import _CONCEPT_KINDS  # type: ignore
     assert set(CONCEPT_KIND_LITERALS) == set(_CONCEPT_KINDS), (
         f"drift: writer={set(CONCEPT_KIND_LITERALS)} "
         f"loader={set(_CONCEPT_KINDS)}"

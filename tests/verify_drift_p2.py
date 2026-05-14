@@ -39,7 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from codebase_mapper.constants import LANG_BY_EXT
+from codebase_mapper.shared_kernel.constants import LANG_BY_EXT
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -304,8 +304,8 @@ def _matches_any(name: str, patterns) -> bool:
 
 def check_plugin_name_prefixes() -> None:
     # Bring up every plugin layer so registries are populated.
-    from codebase_mapper import reset_registries
-    from codebase_mapper.extensions import (
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+    from codebase_mapper.shared_kernel.extensions import (
         iter_aggregators, iter_artifact_emitters,
         iter_graph_contributors, iter_import_resolvers,
         iter_language_analyzers, iter_record_enrichers,

@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from codebase_mapper.extensions import PipelineCtx
+    from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 
 ARTIFACT_NAME = "l4_50_artifact"

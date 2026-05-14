@@ -22,6 +22,8 @@ from typing import Any
 from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.types import Resource, ResourceTemplate
 
+from frontend.backend.serving.application import bundle_data as backend_bundle_data
+
 from . import handlers as _h  # for dispatch() into the Phase 2 surface
 from .schemas import RESOURCE_URI_TEMPLATES
 from .validators import (
@@ -113,7 +115,7 @@ def list_static_resources(bundle_default: str | None = None) -> list[Resource]:
 
     # Bundles available right now
     try:
-        bundles = _h.backend_app.list_bundles()
+        bundles = backend_bundle_data.list_bundles()
     except Exception:  # pragma: no cover — defensive
         bundles = []
 

@@ -333,7 +333,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # --- 6. Alias-collapse equivalence (the "superset modulo collapse") ---
         names_off = concept_names_in(g_off)
-        from codebase_mapper.vocab import builtin_vocabulary
+        from codebase_mapper.emission.infrastructure.vocab import builtin_vocabulary
         vocab = builtin_vocabulary()
         unaccounted: list[str] = []
         for n in names_off:

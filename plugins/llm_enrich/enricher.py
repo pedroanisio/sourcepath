@@ -43,8 +43,8 @@ from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
 from .prompts import PROMPT_REGISTRY
 
 if TYPE_CHECKING:
-    from codebase_mapper.extensions import PipelineCtx
-    from codebase_mapper.models import FileRecord
+    from codebase_mapper.shared_kernel.extensions import PipelineCtx
+    from codebase_mapper.inspection.models import FileRecord
 
 
 # Plugin-name prefix follows the project convention: `l<layer>_<step>_<purpose>`.

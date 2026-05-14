@@ -28,10 +28,10 @@ from typing import cast
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
-from codebase_mapper.constants import CBM_NS, CBMI_NS
-from codebase_mapper.rdf_emit import file_iri
+from codebase_mapper.shared_kernel.constants import CBM_NS, CBMI_NS
+from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import file_iri
 
-from codebase_mapper.extensions import PipelineCtx
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 
 CBML2_NS = "https://codebase-mapper.example.org/cbml2#"

@@ -39,7 +39,7 @@ __all__ = [
 
 def register_all(backend: EmbeddingBackend) -> None:
     """Register every L2 plugin with the host's extension registries."""
-    from codebase_mapper.extensions import (
+    from codebase_mapper.shared_kernel.extensions import (
         register_record_enricher, register_aggregator,
         register_graph_contributor, register_shape_contributor,
         register_artifact_emitter,

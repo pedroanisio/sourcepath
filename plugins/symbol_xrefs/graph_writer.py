@@ -26,12 +26,12 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.collection import Collection
 from rdflib.namespace import RDF, XSD
 
-from codebase_mapper.constants import (
+from codebase_mapper.shared_kernel.constants import (
     CBM_NS, CBMI_NS, CBMXR, CBMXR_NS,
     XREF_KINDS, XREF_RESOLUTIONS,
 )
-from codebase_mapper.extensions import PipelineCtx
-from codebase_mapper.models import SymbolXrefEdge
+from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.emission.models import SymbolXrefEdge
 
 from .aggregator import XREF_INDEX_KEY
 

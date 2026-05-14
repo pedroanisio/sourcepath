@@ -71,7 +71,7 @@ def register_all(
       ``model``    Step 3 uses it in the cache key.
       ``scopes``   Step 5 uses it to opt in/out of each enrichment kind.
     """
-    from codebase_mapper.extensions import (
+    from codebase_mapper.shared_kernel.extensions import (
         register_aggregator,
         register_artifact_emitter,
         register_graph_contributor,

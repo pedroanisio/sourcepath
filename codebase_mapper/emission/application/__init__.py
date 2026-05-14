@@ -1,0 +1,1 @@
+"""Emission application use cases."""
