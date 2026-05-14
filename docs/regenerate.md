@@ -53,8 +53,9 @@ You must choose one of:
 
 Tree-sitter grammars have no built-in `unparse`, so byte-identical only
 works if the extractor stores enough of the CST to walk back to source.
-The TS/JS extractor does this; the existing Rust/Go/Swift/etc. extractors
-do **not** — they capture imports and symbol names but throw the rest away.
+The TS/JS and Rust extractors do this; the remaining Go/Swift/Kotlin/etc.
+extractors do **not** — they capture imports and symbol names but throw
+the rest away.
 
 ### 2. Extend `ast_summary` so it carries enough to regenerate
 
@@ -147,9 +148,14 @@ the report's `supported_languages` field or for the per-language counts.
 
 ### 5. Add the contract test
 
-Extend [`tests/verify_regenerate.py`](../tests/verify_regenerate.py) — it is
-the executable contract, not the prose above. The test must include for the
-new language:
+Either extend [`tests/verify_regenerate.py`](../tests/verify_regenerate.py)
+or ship a dedicated `tests/verify_<lang>_regenerate.py`. The shared file
+is the original pattern (Python + TS/JS live there); the per-language
+file is acceptable when the language's surface area or fixture set is
+big enough to warrant isolation. Rust took the per-language path — see
+[`tests/verify_rust_regenerate.py`](../tests/verify_rust_regenerate.py).
+
+The test (wherever it lives) must include for the new language:
 
 1. **Fixture**: at least one non-trivial source file covering the surface
    area you care about (imports, declarations, expressions, control flow,
@@ -213,3 +219,118 @@ Before opening a PR:
       CLI parity for the new language and exits 0.
 - [ ] If Pattern B: `emit_bundle.py` counts `ast_full_bodies_<lang>`.
 - [ ] README updated with fidelity model and size ratio.
+
+
+## Worked example: Rust (Stages 1-8)
+
+Concrete reference implementation that anyone adding the next
+tree-sitter language can copy from. Everything below is in-tree and
+verified by the per-stage test suites.
+
+### Summary shape
+
+`codebase_mapper.languages.rust.extract_rust_ast_summary` returns:
+
+```python
+{
+    "language": "rust",
+    "schema_version": 1,                       # bump on incompatible changes
+    "imports": [...],                          # cbm:imports source — flat list
+    "mod_decls": [...],                        # top-level `mod foo;` declarations
+    "top_level_functions": [...],              # legacy shape, kept for compat
+    "top_level_classes": [...],                # legacy shape, kept for compat
+    "items": [...],                            # Stage 1: rich symbol metadata
+    "cst_json": <node | None>,                 # Stage 6: leaf-text CST
+    "header": "<bytes before root.start_byte>",
+    "footer": "<bytes after root.end_byte>",
+}
+```
+
+`items` and `cst_json` are independent — Stage 1 made the parser-side
+introspection rich; Stage 6 added the regenerate path on top.
+Consumers that only need symbol metadata (xrefs, attribute queries)
+read `items`; consumers that need to materialize bytes (regenerate)
+read `cst_json` + `header` + `footer`.
+
+### Schema versioning rule
+
+`RUST_AST_SCHEMA_VERSION` (currently `1`) is defined as a module-level
+constant in `languages/rust.py`. **Bump it whenever any of the
+following changes incompatibly**:
+
+- `cst_json` encoding (the `_ts_node_to_jsonable` output shape).
+- `items[]` entry schema (kinds, parent semantics, range encoding).
+- `header` / `footer` semantics.
+
+The regenerator's first action is to assert `cst_json is not None`
+and surface the version in the error message, so older bundles that
+predate the bump get a clean `ValueError` rather than a wrong-bytes
+roundtrip.
+
+### CST capture pattern
+
+`_ts_node_to_jsonable(node, content)` lives in `languages/rust.py`,
+copied (not imported) from `languages/tsjs.py`. The function is
+language-agnostic — it walks any tree-sitter `Node` — but each
+language module owns a local copy so the dependency graph stays
+strictly layered (no plugin imports a peer's private helper).
+
+If a third tree-sitter language ever lands (e.g. Go regenerate),
+extract `_ts_node_to_jsonable` to `ts_setup.py` as a public helper.
+Two callers can each own a copy; three is the point where shared
+ownership pays for itself.
+
+### Header / footer
+
+For Rust source files in our fixtures, `header` and `footer` are
+almost always `""` — tree-sitter's `source_file` root spans the
+entire input. The fields exist because:
+
+- Shebang lines (`#!/usr/bin/env rust-script`) sit before the root.
+- Trailing whitespace or end-of-file comments can sit after the root
+  depending on the grammar version.
+
+Discarding these silently would break byte-identical roundtrip on the
+files that have them. Always capture, always emit.
+
+### Verifier
+
+The headline contract is in
+[`tests/verify_rust_regenerate.py`](../tests/verify_rust_regenerate.py):
+**`regenerate(extract(content)) == content`** asserted over every
+Rust fixture in the repo, plus a synthetic file exercising irregular
+whitespace, multi-line signatures, and absence of a trailing newline.
+
+The counter contract (`ast_full_bodies_rust`) is in
+[`tests/verify_rust_ast_body_count.py`](../tests/verify_rust_ast_body_count.py) —
+a separate file because the surface area is wide enough (record-level
+counting + source-grep regression net + MCP `bundle_summary` parity)
+that interleaving it with the regenerate suite would obscure both.
+
+### Measured size cost
+
+For the existing Rust fixtures (~6 files totaling ~3 KB of source),
+`ast_summary` JSON is roughly **10× source** — slightly less than
+TS/JS (~12.5×) because the Rust grammar emits fewer anonymous
+punctuation leaves per statement. Highly attribute-dense files push
+the ratio higher; comment-dense files push it lower (comments are
+captured as interstitial strings in `cst_json.children`, but they're
+not tagged distinctly).
+
+This number is **not** representative of large production codebases —
+expect 8-15× depending on the dialect. Always measure with
+`counts.ast_full_bodies_rust` + `counts.ast_summary_total_bytes`
+before assuming the cost is acceptable for your scale.
+
+### Pointers to the staged implementation
+
+| Stage | Concern | Files |
+|---|---|---|
+| 1 | Deep AST capture (`items[]`) | `codebase_mapper/languages/rust.py::_walk_rust_decl_list` |
+| 2 | Symbol-xref resolver | `plugins/symbol_xrefs/rust_resolver.py` |
+| 3 | Test-edge use-analysis + inline `#[test]` count | `codebase_mapper/tests_edges.py` |
+| 4 | Queryable attribute surface | `rust_items.jsonl` sidecar; `items_by_attribute` MCP tool |
+| 5 | `self::` / `super::` use-path resolution | `codebase_mapper/languages/rust.py::_file_module_path` |
+| 6 | Byte-identical regenerate | `codebase_mapper/languages/rust.py::regenerate_rust_source` |
+| 7 | `ast_full_bodies_rust` counter | `codebase_mapper/emit_bundle.py` |
+| 8 | This document |

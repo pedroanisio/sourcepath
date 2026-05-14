@@ -223,7 +223,10 @@ full-body literals to a sidecar `ast_summaries.jsonl` keyed by
 See [docs/regenerate.md](docs/regenerate.md) for the full contract:
 the `ast_summary` shape, the `regenerate_<lang>_source(summary) -> str`
 signature, registration in `_REGENERATORS`, and the
-`verify_regenerate.py` test cases a new language must satisfy.
+`verify_regenerate.py` test cases a new language must satisfy. The
+doc closes with a **"Worked example: Rust (Stages 1-8)"** appendix
+that maps every part of the contract to a concrete in-tree file —
+copy-from-here when adding the next tree-sitter language.
 
 ## Extension model
 
