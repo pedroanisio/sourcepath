@@ -1,0 +1,1 @@
+{"generated_at": "2026-05-14T09:19:15Z", "kind": "file_summary", "model": "qwen2.5-coder:7b", "prompt_sha": "882a84cb6e165f9cb1ed83c0a019843d4fae94fe9f3b5744dba67136009f9cd4", "target_sha": "339fe36c2213909071a65195c57134ad65a9e56b7e173920d03804a521098938", "text": "a.py defines a UserBehavior class with methods for authentication and contract enforcement.", "v": 1}

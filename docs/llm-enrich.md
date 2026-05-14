@@ -251,7 +251,8 @@ follows the same shape as the existing three:
 | [`verify_llm_enrich_determinism.py`](../tests/verify_llm_enrich_determinism.py) | Step 6: warm-cache determinism (run 2 ≡ run 3 byte-identical) | 23 |
 | [`verify_llm_enrich_offline.py`](../tests/verify_llm_enrich_offline.py) | Step 6: degradation when Ollama is unreachable | 20 |
 | [`verify_llm_enrich_cli.py`](../tests/verify_llm_enrich_cli.py) | Step 8: subprocess-driven script tests | 27 |
-| **Total** | | **183** |
+| [`verify_llm_enrich_ci_determinism.py`](../tests/verify_llm_enrich_ci_determinism.py) | Step 10: warm-cache determinism via committed fixture, no Ollama | 25 |
+| **Total** | | **208** |
 
 The MCP server side has additional coverage in
 [frontend/mcp_server/tests/test_llm_enrich_surface.py](../frontend/mcp_server/tests/test_llm_enrich_surface.py)
@@ -260,6 +261,43 @@ The MCP server side has additional coverage in
 The UI side has coverage in
 [frontend/ui/src/__tests__/empty-states.test.tsx](../frontend/ui/src/__tests__/empty-states.test.tsx)
 (5 tests on ``LlmEnrichmentCard`` visibility + provenance details).
+
+## CI determinism harness
+
+A committed cache fixture under
+[tests/fixtures/llm_cache/](../tests/fixtures/llm_cache/) lets the
+warm-cache determinism guarantee run in CI without a live Ollama.
+The fixture is small (~32 KB across 7 cache files for 7 enrichments
+covering all three kinds) and contains:
+
+- ``cache/<sha256>.json`` × N — pre-populated cache entries
+- ``repo/*`` — the source files those entries were generated from
+- ``manifest.json`` — expected n_enrichments / by_kind / SHACL conforms
+
+The CI verifier [tests/verify_llm_enrich_ci_determinism.py](../tests/verify_llm_enrich_ci_determinism.py)
+materializes the repo, copies the cache to a temp dir, and runs the
+pipeline twice with a *stub* OllamaClient that raises ``CacheMiss``
+on any chat. The two outputs must be byte-identical and every record
+must report ``was_cache_hit=True``.
+
+### When to regenerate the fixture
+
+Run
+[`tests/fixtures/llm_cache/regenerate.py`](../tests/fixtures/llm_cache/regenerate.py)
+(requires a live Ollama) whenever one of these triggers fires:
+
+- A prompt file's bytes change (``file_summary.v1.txt`` edit, or a
+  ``v1 → v2`` bump anywhere in ``PROMPT_REGISTRY``).
+- The default model changes (``qwen2.5-coder:7b`` → something else).
+- The cache schema version bumps
+  (``CACHE_SCHEMA_VERSION 1 → 2`` in
+  [plugins/llm_enrich/cache.py](../plugins/llm_enrich/cache.py)).
+- A new enrichment kind is added that should be exercised by the
+  fixture.
+
+The verifier fails loudly if any of these change without a
+corresponding fixture regeneration. The error message points at the
+regeneration script.
 
 ## File map
 
@@ -283,6 +321,9 @@ The UI side has coverage in
 | `frontend/mcp_server/schemas.py` | `_LLM_ENRICHMENT` building block |
 | `frontend/ui/src/api.ts` | `LlmEnrichment` TypeScript type |
 | `frontend/ui/src/components/LlmEnrichmentCard.tsx` | shared UI card |
+| `tests/fixtures/llm_cache/` | committed cache fixture for CI determinism |
+| `tests/fixtures/llm_cache/regenerate.py` | rebuilds the fixture (requires Ollama) |
+| `tests/verify_llm_enrich_ci_determinism.py` | CI-runnable determinism verifier |
 | `docs/llm-enrich-plan.md` | the 10-step plan (now shipped) |
 | `docs/llm-enrich-poc.md` | the 1-day proof-of-concept doc |
 | `docs/llm-baseline-results.md` | the 5-model benchmark + recommendation |

@@ -347,6 +347,7 @@ python tests/verify_llm_enrich_aggregator.py       # L4 concept_description + sc
 python tests/verify_llm_enrich_determinism.py      # L4 warm-cache determinism (requires Ollama)
 python tests/verify_llm_enrich_offline.py   # L4 graceful degradation when Ollama is unreachable
 python tests/verify_llm_enrich_cli.py       # L4 CLI surface (scripts/run_l4 + --llm-enrich flags)
+python tests/verify_llm_enrich_ci_determinism.py    # L4 warm-cache determinism via committed cache fixture (no Ollama needed)
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 python tests/verify_xsd_fixture.py          # static/schemas/ classifier coverage
 python tests/verify_proto_fixture.py        # static/proto/ classifier + import coverage
