@@ -103,6 +103,7 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
 
     ast_full_bodies_python = 0
     ast_full_bodies_tsjs = 0
+    ast_full_bodies_rust = 0
     ast_summary_total_bytes = 0
     for r in mapped["records"]:
         if r.ast_summary is None:
@@ -113,6 +114,8 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
         elif (r.language in ("typescript", "javascript")
               and r.ast_summary.get("cst_json") is not None):
             ast_full_bodies_tsjs += 1
+        elif r.language == "rust" and r.ast_summary.get("cst_json") is not None:
+            ast_full_bodies_rust += 1
 
     manifest = {
         "tool_version": TOOL_VERSION,
@@ -139,6 +142,7 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
             "unique_blobs_written": blob_count,
             "ast_full_bodies_python": ast_full_bodies_python,
             "ast_full_bodies_tsjs": ast_full_bodies_tsjs,
+            "ast_full_bodies_rust": ast_full_bodies_rust,
             "ast_summary_total_bytes": ast_summary_total_bytes,
             # Rust-specific: source files containing inline #[test]
             # functions (the #[cfg(test)] mod tests pattern). Surfaces

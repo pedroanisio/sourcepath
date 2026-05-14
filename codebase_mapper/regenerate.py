@@ -17,15 +17,17 @@ from rdflib.namespace import RDF
 
 from .constants import CBM
 from .languages.python import regenerate_python_source
+from .languages.rust import regenerate_rust_source
 from .languages.tsjs import regenerate_tsjs_source
 
 
 # language string (matches FileRecord.language) -> regenerator callable.
 # Callable takes the parsed ast_summary dict and returns source text.
 # Python regenerates *semantically* (re-parses to the same AST); TS/JS
-# regenerate *byte-identically* via the stored leaf-text CST.
+# and Rust regenerate *byte-identically* via the stored leaf-text CST.
 _REGENERATORS: dict[str, Callable[[dict], str]] = {
     "python": regenerate_python_source,
+    "rust": regenerate_rust_source,
     "typescript": regenerate_tsjs_source,
     "javascript": regenerate_tsjs_source,
 }

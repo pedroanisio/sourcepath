@@ -166,12 +166,13 @@ process — restart to pick up a new output dir. See
 | Path | Source of truth | Fidelity |
 |---|---|---|
 | `reconstruct` | `inventory.ttl` + `blobs/` | **byte-identical** every file |
-| `regenerate` (new) | `inventory.ttl` + `cbm:astSummary` | Python: **semantic** (re-parses to the same AST); TS/JS: **byte-identical** via leaf-text CST |
+| `regenerate` (new) | `inventory.ttl` + `cbm:astSummary` | Python: **semantic** (re-parses to the same AST); TS/JS + Rust: **byte-identical** via leaf-text CST |
 
 Currently supported by `regenerate`: Python, TypeScript (`.ts`, `.tsx`,
-`.cts`, `.mts`), JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`). Other files
-(markdown, configs, lockfiles, binaries) are enumerated in the report
-under `ast_unsupported` / `no_ast_summary` and not written to disk.
+`.cts`, `.mts`), JavaScript (`.js`, `.jsx`, `.mjs`, `.cjs`), Rust
+(`.rs`). Other files (markdown, configs, lockfiles, binaries) are
+enumerated in the report under `ast_unsupported` / `no_ast_summary`
+and not written to disk.
 
 ```bash
 codebase-mapper --regenerate \
@@ -194,6 +195,11 @@ and the lists of files skipped or errored.
   gaps and any header/footer bytes are captured. Tree-sitter has no
   `unparse`, so the extractor stores enough of the CST to walk back to
   source.
+- **Rust** (byte-perfect): nothing — same approach as TS/JS. The Rust
+  extractor stores the full leaf-text CST under `ast_summary.cst_json`
+  (schema_version 1) plus optional `header` / `footer` bytes for any
+  content outside the parser's root span (rare, but possible with
+  shebang lines).
 
 ### Size cost
 
@@ -203,13 +209,14 @@ and the lists of files skipped or errored.
 |---|---|
 | Python | ~6.6× |
 | TypeScript/JS | ~12.5× |
+| Rust | ~10× (typical; varies with attribute density) |
 
 `run_manifest.json` reports `counts.ast_full_bodies_python`,
-`counts.ast_full_bodies_tsjs`, and `counts.ast_summary_total_bytes` so
-the cost is measurable per run. If TTL size becomes a problem, the
-short retrofit is to move the full-body literals to a sidecar
-`ast_summaries.jsonl` keyed by `cbm:contentSha256` and reference them
-from `inventory.ttl` as URIs.
+`counts.ast_full_bodies_tsjs`, `counts.ast_full_bodies_rust`, and
+`counts.ast_summary_total_bytes` so the cost is measurable per run.
+If TTL size becomes a problem, the short retrofit is to move the
+full-body literals to a sidecar `ast_summaries.jsonl` keyed by
+`cbm:contentSha256` and reference them from `inventory.ttl` as URIs.
 
 ### Adding a new language
 
@@ -293,6 +300,7 @@ python tests/verify_rust_xrefs.py           # Rust intra/inter-file call edges (
 python tests/verify_rust_tests_edges.py     # Rust tests-edges use-analysis + inline #[test] (Stage 3)
 python tests/verify_rust_attribute_query.py # Rust attribute queryable surface (Stage 4)
 python tests/verify_rust_super_self.py      # Rust self::/super:: use-path resolution (Stage 5)
+python tests/verify_rust_regenerate.py      # Rust byte-identical regenerate (Stage 6)
 ```
 
 All verifiers resolve `repo_root` from their own `__file__`, so they

@@ -14,6 +14,86 @@ from ..models import FileRecord
 from ..ts_setup import _TS_LANGS, _TS_QUERIES, _ts_setup
 from ..ts_setup import TS_AVAILABLE, ts
 
+# Schema version for the Rust ast_summary payload. Bumped when the
+# extractor's output shape changes in a backwards-incompatible way
+# (regenerate depends on cst_json being present + schema-compatible).
+RUST_AST_SCHEMA_VERSION = 1
+
+
+def _ts_node_to_jsonable(node, content: bytes):
+    """Serialize a tree-sitter Node to a JSON-safe structure with full
+    byte coverage. Mirrors the encoding used by
+    ``codebase_mapper.languages.tsjs`` so the regenerator can replay
+    bytes exactly.
+
+    Encoding:
+      * Anonymous leaves whose ``type == text`` (keywords like ``fn``,
+        punctuation like ``;``) collapse to a **bare string**.
+      * Named leaves (identifiers, strings, numbers) become
+        ``{"type": ..., "text": ...}``.
+      * Interstitial gaps between siblings (whitespace, line breaks) are
+        emitted as **bare strings** in the children list.
+      * Internal nodes are ``{"type": ..., "children": [...]}``.
+
+    Walking the result pre-order and concatenating every string /
+    ``text`` field reproduces the original bytes exactly (for valid
+    UTF-8 input).
+    """
+    children = node.children
+    if not children:
+        text = content[node.start_byte:node.end_byte].decode("utf-8")
+        if not node.is_named and node.type == text:
+            return text
+        return {"type": node.type, "text": text}
+    out_children: list = []
+    cursor = node.start_byte
+    for child in children:
+        if child.start_byte > cursor:
+            gap = content[cursor:child.start_byte].decode("utf-8")
+            if gap:
+                out_children.append(gap)
+        out_children.append(_ts_node_to_jsonable(child, content))
+        cursor = child.end_byte
+    if cursor < node.end_byte:
+        gap = content[cursor:node.end_byte].decode("utf-8")
+        if gap:
+            out_children.append(gap)
+    return {"type": node.type, "children": out_children}
+
+
+def regenerate_rust_source(summary: dict) -> str:
+    """Reconstitute Rust source from an ``extract_rust_ast_summary`` result.
+
+    Byte-identical to the original file (for valid UTF-8 input) because
+    the extractor stored every leaf token's text plus interstitial gaps
+    and the optional header/footer bytes outside the root node's span.
+
+    Raises ``ValueError`` when the summary lacks ``cst_json`` — that
+    indicates the bundle was produced before Stage 6 or the extraction
+    hit a UTF-8 error and skipped CST capture.
+    """
+    if summary.get("cst_json") is None:
+        raise ValueError(
+            "summary missing 'cst_json' "
+            "(schema_version < 1 or extraction failed)"
+        )
+    parts: list[str] = []
+
+    def walk(node) -> None:
+        if isinstance(node, str):
+            parts.append(node)
+            return
+        if "text" in node:
+            parts.append(node["text"])
+            return
+        for c in node.get("children", ()):
+            walk(c)
+
+    parts.append(summary.get("header", "") or "")
+    walk(summary["cst_json"])
+    parts.append(summary.get("footer", "") or "")
+    return "".join(parts)
+
 
 _RUST_ITEM_KINDS: dict[str, str] = {
     "function_item": "function",
@@ -148,13 +228,39 @@ def extract_rust_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
     items: list[dict] = []
     _walk_rust_decl_list(tree.root_node, content, items, parent=None)
 
+    # Stage 6: leaf-text CST capture for byte-identical regenerate.
+    # Tree-sitter has no unparse, so we serialize every leaf token's
+    # text plus interstitial whitespace into ``cst_json``. ``header``
+    # and ``footer`` capture any bytes outside the root node's span
+    # (rare for Rust, but possible with shebang lines etc.).
+    cst_json: dict | None = None
+    header = ""
+    footer = ""
+    try:
+        root = tree.root_node
+        cst_json = _ts_node_to_jsonable(root, content)
+        if root.start_byte > 0:
+            header = content[:root.start_byte].decode("utf-8")
+        if root.end_byte < len(content):
+            footer = content[root.end_byte:].decode("utf-8")
+    except UnicodeDecodeError as e:
+        errors.append(f"cst_decode_error: {e}")
+        cst_json = None
+    except Exception as e:  # noqa: BLE001 — defensive against grammar surprises
+        errors.append(f"cst_serialize_error: {type(e).__name__}: {e}")
+        cst_json = None
+
     return {
         "language": "rust",
+        "schema_version": RUST_AST_SCHEMA_VERSION,
         "imports": use_paths,
         "mod_decls": sorted(set(mods)),
         "top_level_functions": sorted(set(funcs)),
         "top_level_classes": sorted(set(classes)),
         "items": items,
+        "cst_json": cst_json,
+        "header": header,
+        "footer": footer,
     }, errors
 
 def detect_rust_workspaces(records: list[FileRecord], read: Callable[[str], bytes]) -> list[dict]:
