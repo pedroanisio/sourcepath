@@ -18,6 +18,8 @@ CBMI_NS = "https://codebase-mapper.example.org/cbm/instance#"
 
 CBMXR_NS = "https://codebase-mapper.example.org/cbmxr#"
 
+CBML4_NS = "https://codebase-mapper.example.org/cbml4#"
+
 SPDX_SOFTWARE_NS = "https://spdx.org/rdf/3.0.1/terms/Software/"
 
 SPDX_CORE_NS = "https://spdx.org/rdf/3.0.1/terms/Core/"
@@ -31,6 +33,8 @@ CBMP = Namespace(CBMP_NS)
 CBMI = Namespace(CBMI_NS)
 
 CBMXR = Namespace(CBMXR_NS)
+
+CBML4 = Namespace(CBML4_NS)
 
 SH = Namespace("http://www.w3.org/ns/shacl#")
 
