@@ -105,14 +105,16 @@ class LlmArtifact:
 def _iter_records(ctx: "PipelineCtx"):
     """Yield flattened sidecar rows from all enrichment buckets.
 
-    Step 4 reads only ``llm:file_summary``. Step 5 will extend this
-    to ``llm:concept_description`` and ``llm:schema_purpose``. Sort
-    keys are (target, kind) — kind ordering matters when one target
-    has multiple kinds, but for Step 4 it's just file_summary."""
+    Each bucket holds ``{target_key: {text, model, prompt_sha,
+    target_sha, generated_at, was_cache_hit, …}}``. For file-targeted
+    kinds the target_key is a bundle-relative path; for
+    concept_description it's the concept's canonical name. Sort keys
+    are (kind, target) — kind first so all concept rows group
+    together, then alphabetical within each kind."""
     buckets = (
         ("llm:file_summary", "file_summary"),
-        # Step 5 will append: ("llm:concept_description", "concept_description"),
-        # Step 5 will append: ("llm:schema_purpose", "schema_purpose"),
+        ("llm:concept_description", "concept_description"),
+        ("llm:schema_purpose", "schema_purpose"),
     )
     rows: list[dict[str, Any]] = []
     for scratch_key, kind_label in buckets:
@@ -130,7 +132,7 @@ def _iter_records(ctx: "PipelineCtx"):
                 "target_sha": rec.get("target_sha", ""),
                 "generated_at": rec.get("generated_at", ""),
             })
-    rows.sort(key=lambda r: (r["target"], r["kind"]))
+    rows.sort(key=lambda r: (r["kind"], r["target"]))
     return rows
 
 

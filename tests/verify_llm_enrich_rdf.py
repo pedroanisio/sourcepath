@@ -206,9 +206,10 @@ def test_sidecar_matches_rdf(out: Path) -> None:
     for line in sidecar.read_text().splitlines():
         rows.append(json.loads(line))
 
-    # Sorted by (target, kind)
-    sorted_rows = sorted(rows, key=lambda r: (r["target"], r["kind"]))
-    check("sidecar rows are sorted by (target, kind)",
+    # Sorted by (kind, target) — kind first so all rows of one kind
+    # group together. Step 5 changed this from (target, kind).
+    sorted_rows = sorted(rows, key=lambda r: (r["kind"], r["target"]))
+    check("sidecar rows are sorted by (kind, target)",
           rows == sorted_rows)
 
     # Every row's text matches the corresponding RDF triple

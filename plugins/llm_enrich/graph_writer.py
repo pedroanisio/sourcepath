@@ -1,27 +1,20 @@
 """LlmGraphWriter + LlmShapes — emit cbml4: triples + SHACL shapes.
 
-Step 4 fills in the body. The writer reads enrichment records that
-the enricher (Step 3) stashed on ``ctx.scratch["llm:file_summary"]``
-and emits one triple group per ``cbm:File``. The shape contributor
-declares each predicate at ``maxCount 1`` with no ``minCount`` —
-the optional cardinality the plan committed to so bundles without
-LLM enrichment still SHACL-validate.
+Step 5 extends Step 4 with two more enrichment kinds. The writer now
+covers:
 
-Triple shape (one cbm:File with file_summary):
+  - ``cbml4:fileSummary*``       on cbm:File subjects (Step 4)
+  - ``cbml4:conceptDescription*`` on skos:Concept subjects (Step 5)
+  - ``cbml4:schemaPurpose*``     on cbm:File subjects (Step 5)
 
-    cbmi:file/<safe>
-        cbml4:fileSummary           "…" ;
-        cbml4:fileSummaryModel      "qwen2.5-coder:7b" ;
-        cbml4:fileSummaryPromptSha  "<hex>" ;
-        cbml4:fileSummaryGeneratedAt "2026-05-14T…"^^xsd:dateTime .
-
-A file without an enrichment has none of these predicates — same
-shape as today's pre-L4 bundles. SHACL conforms either way.
+Each kind follows the same four-predicate convention:
+``<kind>``, ``<kind>Model``, ``<kind>PromptSha``, ``<kind>GeneratedAt``.
+Predicates remain at maxCount 1 with no minCount, so a bundle that
+opted into only one kind still SHACL-validates.
 
 The ``cbml4`` prefix is bound only when at least one triple is
-emitted. On an empty run (no scopes opted in, or Ollama unreachable),
-this writer is a no-op and the inventory.ttl carries no ``@prefix
-cbml4:`` line — preserving Step 1's back-compat anchor.
+emitted; on a no-op run, inventory.ttl gains no ``@prefix cbml4:``
+line and Step 1's back-compat anchor holds.
 """
 from __future__ import annotations
 
@@ -31,8 +24,18 @@ from typing import TYPE_CHECKING, cast
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
-from codebase_mapper.constants import CBML4, CBML4_NS
+from codebase_mapper.constants import CBMI_NS, CBML4, CBML4_NS
 from codebase_mapper.rdf_emit import file_iri
+
+# Concept subjects come from the L3 concept-graph plugin; we mirror its
+# IRI scheme here rather than importing the plugin to keep dependency
+# direction one-way (L4 reads L3's index payload, not L3's modules).
+import urllib.parse as _urllib_parse
+
+
+def _concept_iri(canonical_form: str) -> URIRef:
+    safe = _urllib_parse.quote(canonical_form, safe="")
+    return URIRef(f"{CBMI_NS}concept/{safe}")
 
 if TYPE_CHECKING:
     from codebase_mapper.extensions import PipelineCtx
@@ -50,14 +53,42 @@ SHAPES_NAME = "l4_30_shapes"
 # ---------------------------------------------------------------------
 
 
+# Per-kind predicate sets. Each tuple is
+# (content_predicate, model_predicate, prompt_sha_predicate, generated_at_predicate).
+# The graph writer iterates this table to keep emission code uniform
+# across the three kinds (Step 5+).
+_FILE_SUMMARY_PREDICATES = (
+    CBML4.fileSummary,
+    CBML4.fileSummaryModel,
+    CBML4.fileSummaryPromptSha,
+    CBML4.fileSummaryGeneratedAt,
+)
+_CONCEPT_DESCRIPTION_PREDICATES = (
+    CBML4.conceptDescription,
+    CBML4.conceptDescriptionModel,
+    CBML4.conceptDescriptionPromptSha,
+    CBML4.conceptDescriptionGeneratedAt,
+)
+_SCHEMA_PURPOSE_PREDICATES = (
+    CBML4.schemaPurpose,
+    CBML4.schemaPurposeModel,
+    CBML4.schemaPurposePromptSha,
+    CBML4.schemaPurposeGeneratedAt,
+)
+
+
 class LlmGraphWriter:
     """Walks ctx.scratch enrichment buckets and emits cbml4: triples
-    on the corresponding cbm:File subjects.
+    on the correct subjects per kind:
 
-    Per-kind predicate naming convention: ``<kind>`` for the content,
-    ``<kind>Model``, ``<kind>PromptSha``, ``<kind>GeneratedAt`` for the
-    provenance fields. Step 5 will reuse this convention for the
-    concept_description + schema_purpose kinds.
+      file_summary         → cbm:File           (cbmi:file/<path>)
+      concept_description  → skos:Concept       (cbmi:concept/<canon>)
+      schema_purpose       → cbm:File           (cbmi:file/<path>)
+
+    Per-kind predicate naming convention is
+    ``<kind>``, ``<kind>Model``, ``<kind>PromptSha``,
+    ``<kind>GeneratedAt`` — uniform across all kinds so future ones
+    slot in with one table entry plus one writer-loop iteration.
     """
 
     name = GRAPH_WRITER_NAME
@@ -66,7 +97,14 @@ class LlmGraphWriter:
         file_summaries = cast(
             dict, ctx.scratch.get("llm:file_summary", {})
         )
-        if not file_summaries:
+        concept_descs = cast(
+            dict, ctx.scratch.get("llm:concept_description", {})
+        )
+        schema_purposes = cast(
+            dict, ctx.scratch.get("llm:schema_purpose", {})
+        )
+
+        if not (file_summaries or concept_descs or schema_purposes):
             # No enrichments → no triples → no prefix binding. This
             # preserves Step 1's byte-equality back-compat anchor when
             # the plugin is registered but no scope is opted in.
@@ -74,43 +112,41 @@ class LlmGraphWriter:
 
         g.bind("cbml4", CBML4)
 
-        # Sort by path for deterministic emission. RDF graphs are
-        # unordered sets, but the turtle serializer follows insertion
-        # order for subject-blocks in some configurations; sorting
-        # keeps re-emits byte-identical when the underlying records
-        # are byte-identical (the warm-cache determinism story).
+        # Deterministic iteration order so re-emits over warm caches
+        # produce byte-identical turtle.
         for path in sorted(file_summaries):
-            rec = file_summaries[path]
-            subject = file_iri(path)
-            _add_file_summary_triples(g, subject, rec)
+            _add_triples(g, file_iri(path), file_summaries[path],
+                         _FILE_SUMMARY_PREDICATES)
+
+        for name in sorted(concept_descs):
+            _add_triples(g, _concept_iri(name), concept_descs[name],
+                         _CONCEPT_DESCRIPTION_PREDICATES)
+
+        for path in sorted(schema_purposes):
+            _add_triples(g, file_iri(path), schema_purposes[path],
+                         _SCHEMA_PURPOSE_PREDICATES)
 
 
-def _add_file_summary_triples(g: Graph, subject: URIRef, rec: dict) -> None:
-    """Emit one (subject, cbml4:fileSummary*, value) group. ``rec`` is
-    the dict produced by the enricher: ``{text, model, prompt_sha,
-    target_sha, generated_at, was_cache_hit, …}``. Missing optional
-    fields are silently skipped — the SHACL shape allows it."""
+def _add_triples(g: Graph, subject: URIRef, rec: dict,
+                 preds: tuple[URIRef, URIRef, URIRef, URIRef]) -> None:
+    """Emit one (subject, cbml4:<kind>*, value) group. ``rec`` carries
+    ``text``, ``model``, ``prompt_sha``, ``generated_at`` produced by
+    either the enricher (Step 3) or the aggregator (Step 5)."""
+    p_text, p_model, p_sha, p_dt = preds
     text = rec.get("text")
     if not text:
-        # Defensive: a record with no text shouldn't have been stashed,
-        # but if it slipped through, don't emit a useless empty triple.
         return
-    g.add((subject, CBML4.fileSummary, Literal(text)))
-
+    g.add((subject, p_text, Literal(text)))
     model = rec.get("model")
     if model:
-        g.add((subject, CBML4.fileSummaryModel, Literal(model)))
-
+        g.add((subject, p_model, Literal(model)))
     prompt_sha = rec.get("prompt_sha")
     if prompt_sha:
-        g.add((subject, CBML4.fileSummaryPromptSha, Literal(prompt_sha)))
-
+        g.add((subject, p_sha, Literal(prompt_sha)))
     generated_at = rec.get("generated_at")
     if generated_at:
-        g.add((
-            subject, CBML4.fileSummaryGeneratedAt,
-            Literal(generated_at, datatype=XSD.dateTime),
-        ))
+        g.add((subject, p_dt,
+               Literal(generated_at, datatype=XSD.dateTime)))
 
 
 # ---------------------------------------------------------------------
@@ -121,34 +157,37 @@ def _add_file_summary_triples(g: Graph, subject: URIRef, rec: dict) -> None:
 class LlmShapes:
     """Optional-cardinality shape declarations for every cbml4: predicate.
 
-    The shape targets cbm:File. Every predicate is ``maxCount 1`` with
-    no ``minCount`` — files without an enrichment carry zero of these
-    triples, files with one carry exactly one. This is the back-compat
-    contract Commitment #7 spelled out: bundles built without L4 (or
-    with L4 unable to reach Ollama) still validate against this shape.
+    Two node shapes:
 
-    The shape contribution is unconditional — it lands in every bundle
-    where the plugin is registered, even if no triples are emitted. A
-    SHACL shape declaring 'this field is optional' is harmless on a
-    graph that doesn't carry the field. The Step 1 back-compat
-    verifier accommodates this: it compares shapes.shacl.ttl modulo
-    the L4 shape entries when the plugin is registered. (Actually it
-    asserts byte equality. We need to revisit.)
+      ``LlmFileShape``    targets cbm:File. Declares fileSummary*
+                          (Step 4) and schemaPurpose* (Step 5)
+                          predicates as optional.
+      ``LlmConceptShape`` targets skos:Concept. Declares
+                          conceptDescription* predicates as optional.
+
+    Every predicate is ``maxCount 1`` with no ``minCount`` — files /
+    concepts without an enrichment carry zero of these triples, ones
+    with an enrichment carry exactly one. This is the back-compat
+    contract Commitment #7 spelled out: bundles built without L4 (or
+    with L4 unable to reach Ollama, or with only one scope opted in)
+    still validate against these shapes.
+
+    Shape contribution is unconditional — these declarations land in
+    every bundle where the plugin is registered, regardless of whether
+    triples were emitted. Step 1's back-compat verifier compares
+    shapes.shacl.ttl using isomorphism modulo the cbml4: entries.
     """
 
     name = SHAPES_NAME
 
     def contribute(self, shapes: Graph) -> None:
-        # Bind the cbml4 prefix on the shapes graph too, so the
-        # generated shapes.shacl.ttl is readable.
+        # Bind the cbml4 prefix on the shapes graph for readability.
         shapes.bind("cbml4", CBML4)
 
-        # We need a stable CBM_NS reference to declare the target
-        # class. Importing here keeps the writer's import surface
-        # minimal at module load.
         from codebase_mapper.constants import CBM
 
-        file_shape = URIRef(f"{CBML4_NS}LlmFileSummaryShape")
+        # --- LlmFileShape: file_summary + schema_purpose -----------
+        file_shape = URIRef(f"{CBML4_NS}LlmFileShape")
         shapes.add((file_shape, RDF.type, SH.NodeShape))
         shapes.add((file_shape, SH.targetClass, CBM.File))
 
@@ -158,6 +197,31 @@ class LlmShapes:
         _add_optional_string(shapes, file_shape, CBML4.fileSummaryPromptSha,
                              pattern=r"^[a-f0-9]{64}$")
         _add_optional_datetime(shapes, file_shape, CBML4.fileSummaryGeneratedAt)
+
+        _add_optional_string(shapes, file_shape, CBML4.schemaPurpose)
+        _add_optional_string(shapes, file_shape, CBML4.schemaPurposeModel,
+                             min_length=1)
+        _add_optional_string(shapes, file_shape, CBML4.schemaPurposePromptSha,
+                             pattern=r"^[a-f0-9]{64}$")
+        _add_optional_datetime(shapes, file_shape,
+                               CBML4.schemaPurposeGeneratedAt)
+
+        # --- LlmConceptShape: concept_description -------------------
+        concept_shape = URIRef(f"{CBML4_NS}LlmConceptShape")
+        shapes.add((concept_shape, RDF.type, SH.NodeShape))
+        # SKOS concept class — match the L3 plugin's targetClass.
+        SKOS = URIRef("http://www.w3.org/2004/02/skos/core#Concept")
+        shapes.add((concept_shape, SH.targetClass, SKOS))
+
+        _add_optional_string(shapes, concept_shape,
+                             CBML4.conceptDescription)
+        _add_optional_string(shapes, concept_shape,
+                             CBML4.conceptDescriptionModel, min_length=1)
+        _add_optional_string(shapes, concept_shape,
+                             CBML4.conceptDescriptionPromptSha,
+                             pattern=r"^[a-f0-9]{64}$")
+        _add_optional_datetime(shapes, concept_shape,
+                               CBML4.conceptDescriptionGeneratedAt)
 
 
 def _add_optional_string(g: Graph, parent: URIRef, path: URIRef, *,

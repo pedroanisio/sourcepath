@@ -127,10 +127,17 @@ def test_render_leaves_no_placeholders() -> None:
     no leftover ``{placeholder}`` tokens when called with the documented
     placeholder set."""
     # Document the expected placeholders per kind here. Adding a new
-    # kind in Step 5 means adding a row.
+    # kind means adding a row.
     placeholders = {
         "file_summary": dict(path="x.py", language="python",
                              content="def f(): pass"),
+        "concept_description": dict(
+            name="behavior", kind="domain-primitive", frequency=10,
+            alt_labels="Behavior, behaviors", cooccurring="intent, contract",
+            files="auth.py, service.py",
+        ),
+        "schema_purpose": dict(path="static/schemas/x.xsd",
+                               filename="x.xsd", content="<?xml?>"),
     }
     for kind, fields in placeholders.items():
         tmpl = PROMPT_REGISTRY[kind]

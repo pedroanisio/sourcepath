@@ -23,7 +23,13 @@ later step.
 """
 from __future__ import annotations
 
-from .aggregator import LlmAggregator
+from .aggregator import (
+    ALL_SCOPES,
+    LlmAggregator,
+    SCOPE_CONCEPTS,
+    SCOPE_FILES,
+    SCOPE_SCHEMAS,
+)
 from .artifact import LlmArtifact, SIDECAR_FILENAME
 from .cache import Cache
 from .client import OllamaClient
@@ -31,6 +37,7 @@ from .enricher import LlmEnricher
 from .graph_writer import LlmGraphWriter, LlmShapes
 
 __all__ = [
+    "ALL_SCOPES",
     "Cache",
     "LlmAggregator",
     "LlmArtifact",
@@ -38,6 +45,9 @@ __all__ = [
     "LlmGraphWriter",
     "LlmShapes",
     "OllamaClient",
+    "SCOPE_CONCEPTS",
+    "SCOPE_FILES",
+    "SCOPE_SCHEMAS",
     "SIDECAR_FILENAME",
     "register_all",
 ]

@@ -234,16 +234,28 @@ def main(argv: list[str] | None = None) -> int:
         g_with = Graph()
         g_with.parse(str(out_with / "shapes.shacl.ttl"), format="turtle")
         CBML4 = Namespace(CBML4_URI)
-        # The LlmFileSummaryShape node must exist and target cbm:File.
-        shape_iri = URIRef(f"{CBML4_URI}LlmFileSummaryShape")
+        # Both L4 shapes must exist with their documented targetClasses.
         from codebase_mapper.constants import CBM
+
+        file_shape = URIRef(f"{CBML4_URI}LlmFileShape")
         check(
-            "L4 shape declares LlmFileSummaryShape",
-            (shape_iri, RDF.type, URIRef(SH_URI + "NodeShape")) in g_with,
+            "L4 shape declares LlmFileShape",
+            (file_shape, RDF.type, URIRef(SH_URI + "NodeShape")) in g_with,
         )
         check(
-            "L4 shape targets cbm:File",
-            (shape_iri, URIRef(SH_URI + "targetClass"), CBM.File) in g_with,
+            "LlmFileShape targets cbm:File",
+            (file_shape, URIRef(SH_URI + "targetClass"), CBM.File) in g_with,
+        )
+
+        concept_shape = URIRef(f"{CBML4_URI}LlmConceptShape")
+        skos_concept = URIRef("http://www.w3.org/2004/02/skos/core#Concept")
+        check(
+            "L4 shape declares LlmConceptShape",
+            (concept_shape, RDF.type, URIRef(SH_URI + "NodeShape")) in g_with,
+        )
+        check(
+            "LlmConceptShape targets skos:Concept",
+            (concept_shape, URIRef(SH_URI + "targetClass"), skos_concept) in g_with,
         )
 
         # --- 2. run_manifest.json modulo generated_at + l4 fragment ---

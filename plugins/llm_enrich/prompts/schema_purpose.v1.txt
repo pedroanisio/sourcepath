@@ -1,0 +1,11 @@
+SYSTEM:
+You summarize the purpose of a schema or contract definition file (XSD, JSON Schema, OpenAPI, Protobuf, etc.). Write two to three sentences. State (a) what the schema defines, (b) what consumers it serves, (c) any notable elements (root types, version, namespace). Do not speculate about producers or downstream consumers if they aren't apparent from the file. No marketing language. No "this schema is".
+
+USER:
+Path: {path}
+Filename: {filename}
+
+Content:
+```
+{content}
+```

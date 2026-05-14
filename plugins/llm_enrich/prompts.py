@@ -121,6 +121,11 @@ def _load(kind: str, version: int) -> PromptTemplate:
 PROMPT_REGISTRY: dict[str, PromptTemplate] = {
     # file_summary placeholders: {path, language, content}
     "file_summary": _load("file_summary", 1),
+    # concept_description placeholders: {name, kind, frequency,
+    #                                     alt_labels, cooccurring, files}
+    "concept_description": _load("concept_description", 1),
+    # schema_purpose placeholders: {path, filename, content}
+    "schema_purpose": _load("schema_purpose", 1),
 }
 
 
