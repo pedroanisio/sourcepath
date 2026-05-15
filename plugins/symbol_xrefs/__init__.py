@@ -19,6 +19,10 @@ from __future__ import annotations
 from .aggregator import XrefAggregator, XREF_INDEX_KEY
 from .artifact import XrefsArtifact, SIDECAR_FILENAME
 from .graph_writer import XrefGraphWriter, XrefShapes, chunk_iri, edge_iri
+from .cpp_resolver import resolve_cpp_calls
+from .dart_resolver import resolve_dart_calls
+from .java_resolver import resolve_java_calls
+from .objc_resolver import resolve_objc_calls
 from .python_resolver import resolve_python_intra_file
 from .rust_resolver import resolve_rust_calls
 from .tsjs_resolver import resolve_tsjs_calls
@@ -33,6 +37,10 @@ __all__ = [
     "SIDECAR_FILENAME",
     "chunk_iri",
     "edge_iri",
+    "resolve_cpp_calls",
+    "resolve_dart_calls",
+    "resolve_java_calls",
+    "resolve_objc_calls",
     "resolve_python_intra_file",
     "resolve_rust_calls",
     "resolve_tsjs_calls",
@@ -44,6 +52,11 @@ __all__ = [
 # language string (matches FileRecord.language) -> callable
 # (record, ctx) -> (list[SymbolXrefEdge], list[UnresolvedSymbolRef]).
 _RESOLVERS: dict = {
+    "cpp": resolve_cpp_calls,
+    "dart": resolve_dart_calls,
+    "java": resolve_java_calls,
+    "objective-c": resolve_objc_calls,
+    "objective-cpp": resolve_objc_calls,
     "python": resolve_python_intra_file,
     "rust": resolve_rust_calls,
     "typescript": resolve_tsjs_calls,

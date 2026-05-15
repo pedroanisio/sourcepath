@@ -161,15 +161,38 @@ def infer_tests_edges(
                             # __tests__/Foo.X → Foo.X (React/Jest convention,
                             # bare stem inside a test directory).
                             cand = stem
+                        else:
+                            # Java / Kotlin convention: FooTest.java ↔ Foo.java
+                            # (no underscore separator). Match `(.+)Test` or
+                            # `(.+)Tests`, but only as a *trailing* qualifier
+                            # on a CamelCase identifier so we don't strip
+                            # legitimate suffixes from things like `Latest`.
+                            m = re.fullmatch(r"([A-Z][A-Za-z0-9]+?)Tests?", stem)
+                            if m:
+                                cand = m.group(1)
         edges_before = len(edges)
         if cand:
             candidates = subjects_by_basename.get(cand, [])
             if len(candidates) == 1:
                 edges.add(TestsEdge(r.path, candidates[0]))
             elif len(candidates) > 1:
+                # Prefer candidates whose extension matches the test's
+                # extension first. This is the right call for C/C++
+                # repos where `dog.h` (header) and `dog.cpp`
+                # (implementation) share a basename; the test
+                # `dog_test.cpp` exercises the implementation, not the
+                # declaration.
+                test_suffix = p.suffix
+                same_ext = [c for c in candidates
+                            if PurePosixPath(c).suffix == test_suffix]
+                if len(same_ext) == 1:
+                    edges.add(TestsEdge(r.path, same_ext[0]))
+                    ext_pool = []
+                else:
+                    ext_pool = same_ext if same_ext else candidates
                 test_dir = list(p.parts[:-1])
                 best, best_score, tie = None, -1, False
-                for c in candidates:
+                for c in ext_pool:
                     cd = list(PurePosixPath(c).parts[:-1])
                     score = 0
                     for a, b in zip(test_dir, cd):

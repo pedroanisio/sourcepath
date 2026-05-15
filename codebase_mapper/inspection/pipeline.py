@@ -14,8 +14,13 @@ from ..shared_kernel.extensions import (
     iter_language_analyzers, iter_record_enrichers,
 )
 from .git_plumbing import list_commit_times, list_tree, read_blob, resolve_commit
-from .languages.dart import detect_dart_package_name
+from .languages.cpp import build_cpp_symbol_index, refine_cpp_header_languages
+from .languages.dart import detect_dart_package_name, detect_dart_packages
+from .languages.objc import build_objc_symbol_index, refine_objc_header_languages
 from .languages.go import detect_go_module
+from .languages.java import (
+    build_java_fqn_index, build_java_package_index, detect_java_source_roots,
+)
 from .languages.kotlin import build_kotlin_fqn_index
 from .languages.python import build_python_module_index, detect_python_source_roots
 from .languages.rust import detect_rust_workspaces
@@ -65,24 +70,27 @@ def map_codebase(
     )
 
     analyzers = iter_language_analyzers()
+    # Pass 1: classify + build records (no AST yet). We need the full
+    # set of files (and their languages) before we can run language
+    # refinements like ``refine_cpp_header_languages`` — which re-tags
+    # ``.h`` files as C++ when they live in a directory containing any
+    # C++ source. Running this before AST extraction means each header
+    # gets parsed by the correct analyzer.
+    content_by_path: dict[str, bytes] = {}
+    mode_skip_extraction: set[str] = set()
     for path, blob_sha, mode in blobs:
         if path_excluded(path, exclude_patterns):
             continue
         content = read_blob(repo, blob_sha)
+        content_by_path[path] = content
         head = content[:8192]
         if mode == "120000":
-            # Git symlink: the blob content IS the target path. Classify
-            # as a distinct case (using "configuration" since it's
-            # structural metadata, not source/data). Skip AST extraction.
             type_ = "configuration"
             lang = None
+            mode_skip_extraction.add(path)
         else:
             type_ = classify(path, head)
             lang = language_of(path)
-        # Filesystem times from the working tree. lstat (not stat) so a
-        # symlink's own metadata is captured instead of its target's, and
-        # so a dangling symlink doesn't raise. stat() doesn't bump atime,
-        # so this is determinism-safe across consecutive runs.
         atime = mtime = ctime = None
         try:
             st = os.lstat(repo / path)
@@ -98,20 +106,40 @@ def map_codebase(
             atime=atime, mtime=mtime, ctime=ctime,
             git_commit_time=commit_times.get(path),
         )
-        # AST extraction via LanguageAnalyzer registry (first-match-wins).
-        # Builtin analyzers are auto-registered at package import; their
-        # `matches()` implements the same per-language gating as the
-        # legacy if/elif chain.
-        if type_ != "binary" and mode != "120000":
-            for analyzer in analyzers:
-                if analyzer.matches(rec, ctx):
-                    rec.ast_summary, rec.extraction_errors = analyzer.extract(
-                        rec, content, ctx,
-                    )
-                    break
-        rec.phases = refine_phases(rec)
         records.append(rec)
         paths_set.add(rec.path)
+
+    # Pass 1.5: cross-file language refinement. ``.h`` files get
+    # re-tagged based on cross-file evidence so the right analyzer
+    # handles them:
+    #
+    #   * ObjC retag runs first — ``Foo.h`` next to ``Foo.m`` is ObjC.
+    #     Apple's convention is universal across iOS/macOS code; pure-C
+    #     repos are unaffected (the retag is a no-op when no ``.m``
+    #     files exist).
+    #   * C++ retag runs second — picks up any remaining ``.h`` files
+    #     in C++ projects (the cpp grammar is a superset of C and
+    #     parses C correctly, so this is safe).
+    #
+    # New refinements (sibling-aware language decisions across files)
+    # belong here, before AST extraction.
+    refine_objc_header_languages(records)
+    refine_cpp_header_languages(records)
+
+    # Pass 2: AST extraction. Analyzer ``matches()`` reads ``rec.language``,
+    # so the refinement above must be visible here.
+    for rec in records:
+        if rec.type_ == "binary" or rec.path in mode_skip_extraction:
+            rec.phases = refine_phases(rec)
+            continue
+        content = content_by_path[rec.path]
+        for analyzer in analyzers:
+            if analyzer.matches(rec, ctx):
+                rec.ast_summary, rec.extraction_errors = analyzer.extract(
+                    rec, content, ctx,
+                )
+                break
+        rec.phases = refine_phases(rec)
 
     # Indices
     py_roots = detect_python_source_roots(records, read_path)
@@ -120,10 +148,30 @@ def map_codebase(
     rust_crates = detect_rust_workspaces(records, read_path)
     go_module = detect_go_module(records, read_path)
     swift_modules = detect_swift_modules(records, read_path)
+    dart_packages = detect_dart_packages(records, read_path)
+    # Back-compat scalar: the shallowest package name. Kept so any code
+    # still reading host:dart_pkg_name continues to work; new callers
+    # should consume host:dart_packages (multi-package map).
     dart_pkg_name = detect_dart_package_name(records, read_path)
     # Kotlin FQN index must be built after AST extraction is done (it reads
     # ast_summary.package + top_level_classes). That's already happened above.
     kotlin_fqn = build_kotlin_fqn_index(records, read_path)
+    # Java FQN + package indices follow the same pattern as Kotlin: read
+    # the per-file AST summary, fold into ``pkg.ClassName → path`` and
+    # ``pkg → [paths]``. The source-root list anchors Maven-layout repos.
+    java_fqn = build_java_fqn_index(records)
+    java_packages = build_java_package_index(records)
+    java_source_roots = detect_java_source_roots(records)
+    # C++ symbol index: top-level class/struct/function name → list of
+    # defining files. The xref resolver uses it for ``new Foo()`` and
+    # ``Foo::bar()`` receiver binding.
+    cpp_symbols = build_cpp_symbol_index(records)
+    # Objective-C symbol index: class/protocol/category-host name →
+    # defining files. Categories register under both their full name
+    # ``NSString(Greet)`` and their host class ``NSString`` so receiver
+    # references like ``[NSString …]`` bind even when only a category
+    # was imported.
+    objc_symbols = build_objc_symbol_index(records)
 
     # Dependency manifests -> declared deps (needed early so we can match
     # external imports against them).
@@ -146,7 +194,13 @@ def map_codebase(
     ctx.indices["host:go_module"] = go_module
     ctx.indices["host:swift_modules"] = swift_modules
     ctx.indices["host:dart_pkg_name"] = dart_pkg_name
+    ctx.indices["host:dart_packages"] = dart_packages
     ctx.indices["host:kotlin_fqn"] = kotlin_fqn
+    ctx.indices["host:java_fqn"] = java_fqn
+    ctx.indices["host:java_packages"] = java_packages
+    ctx.indices["host:java_source_roots"] = java_source_roots
+    ctx.indices["host:cpp_symbols"] = cpp_symbols
+    ctx.indices["host:objc_symbols"] = objc_symbols
     ctx.indices["host:declared_pkgs"] = declared_pkgs
 
     import_edges: set[ImportEdge] = set()
@@ -220,6 +274,8 @@ def map_codebase(
         "swift_local_modules": list(swift_modules.get("local_modules", {}).keys()),
         "swift_product_modules": sorted(swift_modules.get("product_to_package", {}).keys()),
         "dart_package_name": dart_pkg_name,
+        "dart_packages": dart_packages,
+        "java_source_roots": java_source_roots,
         "kotlin_prefix_matched_packages": sorted(kotlin_prefix_matched),
         "exclude_patterns": exclude_patterns,
         "blob_by_path": blob_by_path,

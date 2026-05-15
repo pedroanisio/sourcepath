@@ -11,8 +11,11 @@ try:
     import tree_sitter_ruby as tsrb
     import tree_sitter_go as tsgo
     import tree_sitter_c as tsc
+    import tree_sitter_cpp as tscpp
     import tree_sitter_kotlin as tsk
     import tree_sitter_swift as tssw
+    import tree_sitter_java as tsja
+    import tree_sitter_objc as tsobjc
     TS_AVAILABLE = True
 except Exception:
     TS_AVAILABLE = False
@@ -23,8 +26,11 @@ except Exception:
     tsrb = None
     tsgo = None
     tsc = None
+    tscpp = None
     tsk = None
     tssw = None
+    tsja = None
+    tsobjc = None
 
 
 
@@ -42,8 +48,11 @@ def _ts_setup() -> None:
     _TS_LANGS["ruby"] = ts.Language(tsrb.language())
     _TS_LANGS["go"] = ts.Language(tsgo.language())
     _TS_LANGS["c"] = ts.Language(tsc.language())
+    _TS_LANGS["cpp"] = ts.Language(tscpp.language())
+    _TS_LANGS["objc"] = ts.Language(tsobjc.language())
     _TS_LANGS["kotlin"] = ts.Language(tsk.language())
     _TS_LANGS["swift"] = ts.Language(tssw.language())
+    _TS_LANGS["java"] = ts.Language(tsja.language())
 
     tsjs_q = """
     (import_statement source: (string) @import_src)
@@ -102,6 +111,23 @@ def _ts_setup() -> None:
     """
     _TS_QUERIES["c"] = ts.Query(_TS_LANGS["c"], c_q)
 
+    # C++ — supports namespaces, templates, classes, and out-of-class
+    # method definitions (``Type::method``). The analyzer walks more
+    # broadly than these captures; the query exists so cheap consumers
+    # (e.g. a future "top-level symbol" stat) can read it the same way
+    # the other languages do.
+    cpp_q = """
+    (preproc_include path: (string_literal) @cpp_local_include)
+    (preproc_include path: (system_lib_string) @cpp_system_include)
+    (namespace_definition (namespace_identifier) @cpp_namespace)
+    (class_specifier name: (type_identifier) @class_name)
+    (struct_specifier name: (type_identifier) @class_name)
+    (union_specifier name: (type_identifier) @class_name)
+    (enum_specifier name: (type_identifier) @class_name)
+    (function_definition declarator: (function_declarator declarator: (identifier) @func_name))
+    """
+    _TS_QUERIES["cpp"] = ts.Query(_TS_LANGS["cpp"], cpp_q)
+
     # Kotlin
     kt_q = """
     (import (qualified_identifier) @kt_import)
@@ -117,6 +143,41 @@ def _ts_setup() -> None:
     (function_declaration (simple_identifier) @func_name)
     """
     _TS_QUERIES["swift"] = ts.Query(_TS_LANGS["swift"], sw_q)
+
+    # Java — captures the package declaration, every import (incl. static
+    # and wildcard), every type declaration, and every method/constructor.
+    # The Java analyzer further inspects each match to harvest spans,
+    # `extends`/`implements` lists, and annotations.
+    ja_q = """
+    (package_declaration (scoped_identifier) @ja_package)
+    (package_declaration (identifier) @ja_package)
+    (import_declaration (scoped_identifier) @ja_import)
+    (import_declaration (identifier) @ja_import)
+    (class_declaration name: (identifier) @class_name)
+    (interface_declaration name: (identifier) @class_name)
+    (enum_declaration name: (identifier) @class_name)
+    (annotation_type_declaration name: (identifier) @class_name)
+    (record_declaration name: (identifier) @class_name)
+    (method_declaration name: (identifier) @func_name)
+    (constructor_declaration name: (identifier) @func_name)
+    """
+    _TS_QUERIES["java"] = ts.Query(_TS_LANGS["java"], ja_q)
+
+    # Objective-C — the grammar exposes ``preproc_include`` (which also
+    # matches ``#import``), ``module_import`` for ``@import Module;``,
+    # ``class_interface``/``class_implementation``, ``protocol_declaration``,
+    # ``method_declaration``, ``method_definition``, and ``function_definition``.
+    # The analyzer walks the AST manually; this query exists for cheap
+    # consumers and keeps parity with the other languages.
+    objc_q = """
+    (preproc_include path: (string_literal) @objc_local_include)
+    (preproc_include path: (system_lib_string) @objc_system_include)
+    (module_import (identifier) @objc_module_import)
+    (class_interface) @objc_class_interface
+    (class_implementation) @objc_class_implementation
+    (protocol_declaration) @objc_protocol
+    """
+    _TS_QUERIES["objc"] = ts.Query(_TS_LANGS["objc"], objc_q)
 
 def _ts_grammar_for(path: str) -> str | None:
     p = PurePosixPath(path)
@@ -136,10 +197,23 @@ def _ts_grammar_for(path: str) -> str | None:
         return "go"
     if suffix in {".c", ".h"}:
         return "c"
+    if suffix in {".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".ipp", ".tpp"}:
+        return "cpp"
     if suffix in {".kt", ".kts"}:
         return "kotlin"
     if suffix == ".swift":
         return "swift"
+    if suffix == ".java":
+        return "java"
+    if suffix == ".m":
+        return "objc"
+    if suffix == ".mm":
+        # Objective-C++. The objc grammar parses the ObjC subset
+        # correctly; C++ method bodies inside @implementation may show
+        # parse_errors but the structural items (classes, methods,
+        # imports) are still recovered. A future stage may pair the
+        # cpp grammar for the C++ portions.
+        return "objc"
     return None
 
 def _strip_quotes(s: str) -> str:

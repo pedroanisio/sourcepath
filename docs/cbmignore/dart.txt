@@ -1,0 +1,49 @@
+# Default .cbmignore additions for Dart / Flutter projects.
+#
+# Copy/append these entries into your repo's .cbmignore before running
+# `python -m codebase_mapper`. They keep machine-generated outputs and
+# build artefacts out of the bundle — those files inflate concept counts
+# and embedding storage with low information density.
+#
+# The classifier already routes deterministic generator suffixes
+# (.g.dart, .freezed.dart, .mocks.dart, .gr.dart, .chopper.dart,
+# .config.dart, .drift.dart, .pb*.dart) to type_='generated' so the
+# chunker / embedder / LLM enricher skip them — but the inventory still
+# carries the files. Use these patterns to drop them from the inventory
+# entirely.
+
+# build_runner / freezed / json_serializable / mockito / drift / chopper
+**/*.g.dart
+**/*.freezed.dart
+**/*.mocks.dart
+**/*.gr.dart
+**/*.chopper.dart
+**/*.config.dart
+**/*.drift.dart
+
+# protoc + protobuf_dart
+**/*.pb.dart
+**/*.pbenum.dart
+**/*.pbjson.dart
+**/*.pbserver.dart
+
+# pub workspace caches and dart_tool sidecar
+.dart_tool/**
+.packages
+
+# Flutter build artefacts
+build/**
+
+# iOS / macOS native ancillary state
+ios/Pods/**
+macos/Pods/**
+ios/.symlinks/**
+
+# Android Gradle wrappers and caches
+android/.gradle/**
+android/build/**
+android/app/build/**
+
+# Generated Flutter plugin registries
+**/.flutter-plugins
+**/.flutter-plugins-dependencies

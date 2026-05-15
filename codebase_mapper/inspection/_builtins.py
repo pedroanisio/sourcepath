@@ -18,12 +18,19 @@ from ..shared_kernel.extensions import (
     register_language_analyzer, register_import_resolver,
 )
 from .languages.c import extract_c_ast_summary, resolve_c_includes
+from .languages.cpp import extract_cpp_ast_summary
 from .languages.dart import extract_dart_ast_summary, resolve_dart_imports
 from .languages.go import (
     extract_go_ast_summary, go_package_root, resolve_go_imports,
 )
+from .languages.java import (
+    extract_java_ast_summary, resolve_java_imports,
+)
 from .languages.kotlin import (
     extract_kotlin_ast_summary, resolve_kotlin_imports,
+)
+from .languages.objc import (
+    OBJC_LANGUAGE_TAGS, extract_objc_ast_summary, resolve_objc_includes,
 )
 from .languages.python import (
     extract_python_ast_summary, resolve_python_imports,
@@ -101,6 +108,36 @@ class GoAnalyzer:
         return extract_go_ast_summary(content, record.path)
 
 
+class JavaAnalyzer:
+    name = "lang_java"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "java" and TS_AVAILABLE
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_java_ast_summary(content, record.path)
+
+
+class ObjcAnalyzer:
+    """Handles both ``.m`` (objective-c) and ``.mm`` (objective-cpp).
+
+    tree-sitter-objc parses both dialects: for ``.mm`` files the ObjC
+    superstructure (``@interface``/``@implementation``/methods) is
+    recovered intact; the C++ method bodies may produce non-fatal
+    ``parse_errors_present`` diagnostics that we surface in
+    ``extraction_errors`` for downstream visibility.
+    """
+    name = "lang_objc"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language in OBJC_LANGUAGE_TAGS and TS_AVAILABLE
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_objc_ast_summary(content, record.path)
+
+
 class CAnalyzer:
     name = "lang_c"
 
@@ -110,6 +147,17 @@ class CAnalyzer:
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
         return extract_c_ast_summary(content, record.path)
+
+
+class CppAnalyzer:
+    name = "lang_cpp"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "cpp" and TS_AVAILABLE
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_cpp_ast_summary(content, record.path)
 
 
 class KotlinAnalyzer:
@@ -245,6 +293,22 @@ class CResolver:
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
+class CppResolver:
+    name = "resolve_cpp"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "cpp" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        # C++ #include resolution is structurally identical to C's;
+        # share the implementation. Future C++20 `import std;` /
+        # `import :module;` is out of scope for this v1.
+        in_repo, external = resolve_c_includes(
+            record.path, record.ast_summary, ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 class KotlinResolver:
     name = "resolve_kotlin"
 
@@ -262,6 +326,40 @@ class KotlinResolver:
             external=list(external),
             annotations={"prefix_matched": list(prefix_matched)},
         )
+
+
+class JavaResolver:
+    name = "resolve_java"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "java" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external, prefix_matched = resolve_java_imports(
+            record.path, record.ast_summary,
+            ctx.indices["host:java_fqn"],
+            ctx.indices["host:java_packages"],
+            ctx.indices["host:declared_pkgs"],
+        )
+        return ResolveResult(
+            in_repo=list(in_repo),
+            external=list(external),
+            annotations={"prefix_matched": list(prefix_matched)},
+        )
+
+
+class ObjcResolver:
+    name = "resolve_objc"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return (record.language in OBJC_LANGUAGE_TAGS
+                and record.ast_summary is not None)
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_objc_includes(
+            record.path, record.ast_summary, ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
 class SwiftResolver:
@@ -285,9 +383,14 @@ class DartResolver:
         return record.language == "dart" and record.ast_summary is not None
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        # Prefer the multi-package map; fall back to the legacy scalar so
+        # bundles built before Tier-1 promotion still resolve correctly.
+        packages = ctx.indices.get("host:dart_packages")
+        if not packages:
+            packages = ctx.indices.get("host:dart_pkg_name")
         in_repo, external = resolve_dart_imports(
             record.path, record.ast_summary,
-            ctx.indices["host:dart_pkg_name"], ctx.paths_set,
+            packages, ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -298,12 +401,14 @@ class DartResolver:
 
 
 _BUILTIN_ANALYZERS = (
-    CAnalyzer, DartAnalyzer, GoAnalyzer, KotlinAnalyzer, PythonAnalyzer,
-    RubyAnalyzer, RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
+    CAnalyzer, CppAnalyzer, DartAnalyzer, GoAnalyzer, JavaAnalyzer,
+    KotlinAnalyzer, ObjcAnalyzer, PythonAnalyzer, RubyAnalyzer,
+    RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
-    CResolver, DartResolver, GoResolver, KotlinResolver, PythonResolver,
-    RubyResolver, RustResolver, SwiftResolver, TsJsResolver,
+    CResolver, CppResolver, DartResolver, GoResolver, JavaResolver,
+    KotlinResolver, ObjcResolver, PythonResolver, RubyResolver,
+    RustResolver, SwiftResolver, TsJsResolver,
 )
 
 

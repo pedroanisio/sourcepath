@@ -1,0 +1,8 @@
+name: app
+description: Application package depending on sibling 'core'.
+version: 0.1.0
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  core:
+    path: ../core

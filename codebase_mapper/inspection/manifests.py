@@ -190,6 +190,56 @@ def parse_pubspec_yaml(content: bytes) -> list[str]:
                 pkgs.add(str(name).lower())
     return sorted(pkgs)
 
+def parse_pom_xml(content: bytes) -> list[str]:
+    """Extract dependency coordinates from a Maven pom.xml.
+
+    Returns ``["group:artifact", ...]`` (no versions). We parse using
+    ``xml.etree`` to avoid pulling in lxml; Maven POM XML is always
+    well-formed enough for this to work. ``<parent>`` / ``<plugin>``
+    coordinates and ``<dependencyManagement>`` entries are included so
+    the host can match imports against them.
+
+    Property substitution (``${project.groupId}``) is *not* performed;
+    coordinates containing placeholders are emitted verbatim. The
+    downstream prefix-matcher in resolve_java_imports tolerates this
+    (it just won't bind imports against placeholder-coords).
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    # Strip the default Maven namespace so XPath stays terse.
+    text = re.sub(r'\sxmlns="[^"]*"', "", text, count=1)
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return []
+    pkgs: set[str] = set()
+
+    def coord_from(node) -> str | None:
+        g = node.findtext("groupId")
+        a = node.findtext("artifactId")
+        if g and a:
+            return f"{g.strip()}:{a.strip()}".lower()
+        return None
+
+    for xpath in (
+        "./parent",
+        "./dependencies/dependency",
+        "./dependencyManagement/dependencies/dependency",
+        "./build/plugins/plugin",
+        "./build/pluginManagement/plugins/plugin",
+        "./profiles/profile/dependencies/dependency",
+        "./profiles/profile/build/plugins/plugin",
+    ):
+        for node in root.findall(xpath):
+            coord = coord_from(node)
+            if coord:
+                pkgs.add(coord)
+    return sorted(pkgs)
+
+
 def parse_build_gradle(content: bytes) -> list[str]:
     """Regex-extract dependencies from build.gradle (Groovy) or .gradle.kts.
 
@@ -268,6 +318,8 @@ def declared_dependencies(record: FileRecord, content: bytes) -> list[str]:
         return parse_go_mod(content)
     if name == "pubspec.yaml":
         return parse_pubspec_yaml(content)
+    if name == "pom.xml":
+        return parse_pom_xml(content)
     if name in ("build.gradle", "build.gradle.kts", "settings.gradle",
                 "settings.gradle.kts"):
         return parse_build_gradle(content)

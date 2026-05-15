@@ -94,6 +94,21 @@ def classify(path: str, content_head: bytes) -> str:
     if suffix == ".env":
         return "environment"
 
+    # Dart codegen — build_runner / freezed / json_serializable / mockito /
+    # auto_route / chopper / drift / retrofit / hive emit deterministic
+    # suffix patterns. Classifying as 'generated' (instead of source_code
+    # or test_code) makes them invisible to L2/L3/L4 by default — the
+    # chunker, embedder, and LLM enricher all skip type_='generated'.
+    # Must precede the test-code and source-code rules: a `foo.mocks.dart`
+    # under `test/` is still generated noise, not a hand-written test.
+    if suffix == ".dart":
+        for marker in (".g.dart", ".freezed.dart", ".mocks.dart",
+                       ".gr.dart", ".chopper.dart", ".config.dart",
+                       ".part.dart", ".drift.dart", ".pb.dart",
+                       ".pbenum.dart", ".pbjson.dart", ".pbserver.dart"):
+            if name.endswith(marker):
+                return "generated"
+
     # Test code — must precede source_code.
     if "tests" in parts or "test" in parts or "__tests__" in parts or "spec" in parts:
         if suffix in LANG_BY_EXT:
@@ -107,6 +122,32 @@ def classify(path: str, content_head: bytes) -> str:
     # Ruby: tests are often *_test.rb or *_spec.rb
     if re.fullmatch(r".*_(test|spec)\.rb", name):
         return "test_code"
+    # Dart: *_test.dart is the canonical Flutter/Dart test naming.
+    if re.fullmatch(r".*_test\.dart", name):
+        return "test_code"
+    # Java/Kotlin: FooTest.java / FooTests.java / FooIT.java (Integration
+    # Test) — JUnit/TestNG/Spock conventions. Restrict to CamelCase
+    # identifier endings so 'Latest.java' is NOT a test.
+    if suffix in {".java", ".kt", ".kts"}:
+        stem = p.stem
+        if re.fullmatch(r"[A-Z][A-Za-z0-9]+?(?:Test|Tests|IT)", stem):
+            return "test_code"
+    # C++: foo_test.cc / foo_test.cpp / FooTest.cc / FooTest.cpp
+    # (GoogleTest / Catch2 / Boost.Test). Restrict CamelCase form to
+    # avoid claiming 'Latest.cpp' as a test.
+    if suffix in {".cpp", ".cc", ".cxx", ".c++"}:
+        stem = p.stem
+        if re.fullmatch(r".*_test", stem) \
+           or re.fullmatch(r"[A-Z][A-Za-z0-9]+?(?:Test|Tests)", stem):
+            return "test_code"
+    # Objective-C / Objective-C++: FooTests.m / FooTest.m / FooSpec.m
+    # (XCTest / Specta / Kiwi conventions). Same Latest-safe CamelCase
+    # guard. Apple's convention is plural ``*Tests.m`` more often than
+    # singular; both are accepted.
+    if suffix in {".m", ".mm"}:
+        stem = p.stem
+        if re.fullmatch(r"[A-Z][A-Za-z0-9]+?(?:Test|Tests|Spec|Specs)", stem):
+            return "test_code"
     # Rust: tests/*.rs files are integration tests (cargo convention)
     if parts and "tests" in parts and suffix == ".rs":
         return "test_code"

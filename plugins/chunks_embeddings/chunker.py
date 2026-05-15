@@ -63,6 +63,14 @@ class ChunkExtractor:
             chunks = _chunk_tsjs(content, record.path)
         elif record.language == "rust":
             chunks = _chunk_rust(content, record.path)
+        elif record.language == "dart":
+            chunks = _chunk_dart(content, record)
+        elif record.language == "java":
+            chunks = _chunk_java(content, record)
+        elif record.language == "cpp":
+            chunks = _chunk_cpp(content, record)
+        elif record.language in ("objective-c", "objective-cpp"):
+            chunks = _chunk_objc(content, record)
         elif record.language is not None or record.type_ in {"documentation", "configuration", "test_code", "source_code"}:
             # whole-file chunk for any text file we recognize
             chunks = _whole_file_chunk(content, record.path)
@@ -426,4 +434,348 @@ def _chunk_rust(content: bytes, path: str) -> list[dict]:
 
     if not chunks:
         return _whole_file_chunk(content, path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Dart
+# ---------------------------------------------------------------------------
+
+
+# These declaration kinds become chunks. We map every Dart-side kind onto
+# one of the canonical chunk kinds the embedder understands. The mapping
+# preserves semantic distinction (method vs. function vs. getter/setter)
+# in the symbol name when needed.
+_DART_CHUNKABLE_KINDS = {
+    "class", "mixin", "enum", "extension", "typedef",
+    "function", "method", "constructor", "getter", "setter", "operator",
+}
+
+# Map Dart item kind → chunk kind. Getters/setters/operators/constructors
+# share the "method" chunk kind (they all live inside classes); the
+# original kind survives in the symbol name (e.g. "get balance").
+_DART_TO_CHUNK_KIND = {
+    "class": "class",
+    "mixin": "class",
+    "enum": "class",
+    "extension": "class",
+    "typedef": "class",
+    "function": "function",
+    "method": "method",
+    "constructor": "method",
+    "getter": "method",
+    "setter": "method",
+    "operator": "method",
+}
+
+
+def _dart_symbol_for(item: dict) -> str:
+    """Render the symbol name for a Dart chunk. Getters/setters get a
+    ``get `` / ``set `` prefix so they're distinguishable from a method
+    of the same name (Dart allows ``foo`` as method *and* ``get foo``).
+    """
+    kind = item["kind"]
+    name = item["name"]
+    if kind == "getter":
+        return f"get {name}"
+    if kind == "setter":
+        return f"set {name}"
+    return name
+
+
+def _chunk_dart(content: bytes, record: FileRecord) -> list[dict]:
+    """Build per-symbol chunks from the Dart analyzer's ``items`` array.
+
+    Why consume the analyzer's output instead of re-parsing here?
+
+      * Avoids duplicating Dart's gnarly grammar inside two modules.
+      * Guarantees the chunker and the symbol-xref resolver see *exactly*
+        the same set of declarations — they all read ``items``.
+      * Keeps the L2 plugin free of language-specific parsing logic,
+        matching the architecture's separation between inspection
+        (L1) and chunk extraction (L2).
+
+    Falls back to a whole-file chunk if the analyzer produced no
+    parseable items (e.g. a syntactically broken file).
+    """
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _DART_CHUNKABLE_KINDS:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        byte_start = item["byte_start"]
+        byte_end = item["byte_end"]
+        # The analyzer's byte spans are computed against the raw bytes;
+        # for the chunk's content_sha we hash the actual reconstructed
+        # text bytes — matches the convention used by _chunk_from_node.
+        chunks.append({
+            "kind": _DART_TO_CHUNK_KIND.get(kind, "method"),
+            "symbol": _dart_symbol_for(item),
+            "parent_symbol": item.get("parent"),
+            "byte_start": byte_start,
+            "byte_end": byte_end,
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        })
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Java
+# ---------------------------------------------------------------------------
+
+
+# Java item kinds → canonical chunk kind. Constructors share "method"
+# (they live inside a class); their original kind is recoverable from
+# the symbol name when needed (constructors share the class name).
+_JAVA_TO_CHUNK_KIND = {
+    "class": "class",
+    "interface": "class",
+    "enum": "class",
+    "annotation": "class",
+    "record": "class",
+    "method": "method",
+    "constructor": "method",
+}
+
+
+def _chunk_java(content: bytes, record: FileRecord) -> list[dict]:
+    """Build per-symbol chunks from the Java analyzer's ``items`` array.
+
+    Architecturally identical to ``_chunk_dart``: the analyzer is the
+    single source of truth for the AST shape; the chunker just translates
+    each item into the canonical chunk record. Inner classes (which carry
+    a ``parent`` pointing to the enclosing class) get their own chunks
+    and their methods get ``parent_symbol`` set to the inner class name.
+    """
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _JAVA_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append({
+            "kind": _JAVA_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        })
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# C++
+# ---------------------------------------------------------------------------
+
+
+# C++ item kinds → canonical chunk kind. Out-of-class method definitions
+# (``Dog::speak`` at file scope) and in-class method definitions are
+# both ``method``; the analyzer's ``parent`` field carries the enclosing
+# class either way.
+_CPP_TO_CHUNK_KIND = {
+    "class": "class",
+    "struct": "class",
+    "union": "class",
+    "enum": "class",
+    "function": "function",
+    "method": "method",
+    "constructor": "method",
+    "destructor": "method",
+}
+
+
+def _chunk_cpp(content: bytes, record: FileRecord) -> list[dict]:
+    """Build per-symbol chunks from the C++ analyzer's ``items`` array.
+
+    Items already carry byte/line spans and a (possibly empty)
+    ``namespace`` qualifier; the chunker stays language-agnostic by
+    not surfacing namespace in the symbol name — same posture as Java.
+
+    Declaration vs definition deduplication: a class header may
+    contain ``void foo();`` (declaration) and the same source file
+    may later contain ``void Class::foo() { … }`` (definition). Both
+    appear in ``items``; we keep only one chunk per
+    ``(name, parent, byte_span)`` tuple to avoid duplicates.
+    """
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    seen_ids: set[tuple[str, str | None, int, int]] = set()
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _CPP_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        key = (item["name"], item.get("parent"),
+               item["byte_start"], item["byte_end"])
+        if key in seen_ids:
+            continue
+        seen_ids.add(key)
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append({
+            "kind": _CPP_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        })
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Objective-C / Objective-C++
+# ---------------------------------------------------------------------------
+
+
+# ObjC item kinds → canonical chunk kind. Categories and protocols share
+# the ``class`` chunk kind (they're all top-level type declarations);
+# method declarations and definitions both become ``method`` chunks.
+_OBJC_TO_CHUNK_KIND = {
+    "class_interface": "class",
+    "class_implementation": "class",
+    "category": "class",
+    "category_impl": "class",
+    "protocol": "class",
+    "function": "function",
+    "method": "method",
+}
+
+
+def _chunk_objc(content: bytes, record: FileRecord) -> list[dict]:
+    """Build per-symbol chunks from the ObjC analyzer's ``items`` array.
+
+    Both the ``@interface`` declaration and the matching
+    ``@implementation`` definition produce chunks; consumers can
+    distinguish them by the analyzer's original ``kind`` if they care,
+    but at the chunk level both are simply ``class`` chunks. Method
+    chunks carry the *short* selector name as ``symbol`` (so
+    ``initWithName:`` becomes symbol ``initWithName``); the full
+    selector lives on the analyzer item for downstream xref binding.
+
+    Declaration vs definition deduplication: a method may appear once
+    in the interface header and once in the implementation. We key on
+    ``(name, parent, byte_span)`` so each appearance gets its own
+    chunk — they're at different byte offsets so the deduplication
+    only fires for accidental duplicates.
+    """
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    seen_ids: set[tuple[str, str | None, int, int]] = set()
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _OBJC_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        key = (item["name"], item.get("parent"),
+               item["byte_start"], item["byte_end"])
+        if key in seen_ids:
+            continue
+        seen_ids.add(key)
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append({
+            "kind": _OBJC_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        })
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
     return chunks
