@@ -1,0 +1,3484 @@
+# =============================================================================
+# software-project-plan.ttl
+# A SHACL/TTL ontology + shapes for software-project plans.
+# Version: 4.0.0  (TTL re-grounding of project_schema.yaml v2.2.0 +
+#                  project.ts v3.0.4 + all research findings)
+# Format: Turtle 1.1 (W3C Recommendation, 2014)
+# Validates:
+#   - As an OWL 2 ontology (Manchester/RDF/XML serialisations also valid)
+#   - As a SHACL shapes graph (W3C SHACL, 2017)
+#   - Against any RDF data graph claiming dct:conformsTo this ontology
+# =============================================================================
+#
+# DESIGN CHOICES (load-bearing):
+#
+#   1. ABSTRACTION BOUNDARY. The schema models the PLAN — declarations made
+#      at or before authoring. Runtime properties (current_version,
+#      archived_at, resolved_version, is_active) are not part of this
+#      ontology and are explicitly excluded by sh:closed shapes on the
+#      top-level entity. A sibling ontology (out of scope) would model the
+#      realised view.
+#
+#   2. FOUR ORTHOGONAL AXES. Every categorical vocabulary in this ontology
+#      is positioned in a four-axis space: Concern × Phase × Scope ×
+#      Externality. The axes follow the structure documented in the
+#      reversibility-tiers article and are individually grounded:
+#        - Concern   : ISO/IEC 25010:2023 (9 chars) + AWS WAF (6 pillars)
+#        - Phase     : ISO/IEC/IEEE 12207:2017 + ISO/IEC/IEEE 15288:2015
+#        - Scope     : ISO/IEC/IEEE 42010:2022 + Kruchten 4+1
+#        - Externality: weakly grounded; supported by Tofan/van Heesch/
+#                       Alves/Bezos. Acknowledged as the weakest axis.
+#
+#   3. REVERSIBILITY TIERS. Each categorical vocabulary carries a
+#      spp:tier annotation (T0 Foundational → T3 Tactical) consistent
+#      with the tier classification deliverable and the article model.
+#
+#   4. PROVENANCE FIRST. Every concept scheme links to its grounding
+#      sources via dct:source and spp:groundedIn. Sources are typed
+#      (prov:Entity) and tiered (T1 ISO/IEEE/RFC normative → T4
+#      practitioner literature).
+#
+#   5. ENUMS ARE SKOS CONCEPT SCHEMES, NOT OWL CLASSES. This permits
+#      multilingual labels, alternative labels, and revision over time
+#      without breaking validators. SHACL shapes use sh:in or
+#      "skos:inScheme = <scheme>" patterns to constrain valid values.
+#
+#   6. STATUS VERDICTS. Each scheme carries one of
+#      FORMALLY_GROUNDED / PARTIALLY_GROUNDED / PRACTITIONER_ONLY,
+#      auditable by the assertion pipeline.
+#
+# DISCLAIMER (per user preference). No information in this document
+# should be taken for granted. Any statement or premise not backed by a
+# real logical definition or verifiable reference may be invalid,
+# erroneous, or a hallucination. The cited standards (ISO 25010:2023,
+# 12207:2017, 14764:2022, 15288:2015, 42010:2022, AWS WAF, etc.) have
+# been verified against primary catalogues, but exact section numbers
+# and clause boundaries should be re-verified against the standards
+# themselves before formal use. The tier and axis assignments reflect
+# the schema authors' synthesis, not consensus standards.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Prefixes
+# -----------------------------------------------------------------------------
+@prefix spp:    <https://software-project-plan.org/v4/ontology#> .
+@prefix sppe:   <https://software-project-plan.org/v4/entity#> .
+@prefix sppc:   <https://software-project-plan.org/v4/concept/> .
+@prefix sppa:   <https://software-project-plan.org/v4/axis#> .
+@prefix sppt:   <https://software-project-plan.org/v4/tier#> .
+@prefix sppst:  <https://software-project-plan.org/v4/status#> .
+@prefix sppsrc: <https://software-project-plan.org/v4/source#> .
+@prefix sppsh:  <https://software-project-plan.org/v4/shape#> .
+
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct:    <http://purl.org/dc/terms/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix prov:   <http://www.w3.org/ns/prov#> .
+@prefix vann:   <http://purl.org/vocab/vann/> .
+@prefix foaf:   <http://xmlns.com/foaf/0.1/> .
+
+# =============================================================================
+# 1. ONTOLOGY METADATA
+# =============================================================================
+
+<https://software-project-plan.org/v4>
+    a owl:Ontology ;
+    owl:versionIRI <https://software-project-plan.org/v4.1.0> ;
+    owl:versionInfo "4.1.0" ;
+    dct:title "Software Project Plan Ontology"@en ;
+    dct:description """A SHACL/TTL ontology describing the categorical
+        decisions that constitute a software project plan, grounded in
+        ISO 25010:2023, ISO/IEC/IEEE 12207:2017, ISO/IEC/IEEE 14764:2022,
+        ISO/IEC/IEEE 15288:2015, ISO/IEC/IEEE 42010:2022, AWS
+        Well-Architected, OMG SEMAT Essence kernel, Kruchten's ontology
+        of architectural design decisions (2004), van Heesch et al.'s
+        forces viewpoint (2012), and Alves et al.'s technical-debt
+        taxonomy (2016). Each decision category is positioned in a
+        four-axis space (Concern × Phase × Scope × Externality) and
+        tagged with a reversibility tier (T0 Foundational → T3
+        Tactical)."""@en ;
+    dct:creator "Software-Project-Plan working group"@en ;
+    dct:issued "2026-05-15"^^xsd:date ;
+    dct:license <https://creativecommons.org/licenses/by/4.0/> ;
+    dct:conformsTo <https://www.w3.org/TR/shacl/> ;
+    dct:conformsTo <https://www.w3.org/TR/owl2-overview/> ;
+    vann:preferredNamespacePrefix "spp" ;
+    vann:preferredNamespaceUri "https://software-project-plan.org/v4/ontology#" ;
+    rdfs:comment """Disclaimer: Nothing in this ontology should be
+        taken for granted. Any statement or premise not backed by a
+        verifiable reference may be invalid, erroneous, or a
+        hallucination. Tier and axis assignments are a structured
+        synthesis, not consensus standards.
+
+        VALIDATION CONTRACT (added in v4.1.0):
+        Consumers MUST run SHACL validation with RDFS expansion
+        DISABLED. The SHACL shapes in §11 are self-sufficient: each
+        carries an explicit sh:targetClass and the closed shapes carry
+        sh:ignoredProperties for legitimate Dublin Core metadata.
+
+        Running pyshacl (or any SHACL engine) with inference='rdfs' on
+        this graph plus an instance graph will produce spurious
+        violations because:
+          (a) rdfs:domain spp:SoftwareProjectPlan on planName /
+              planVersion / spp:component / spp:decision causes any
+              sub-entity that mistakenly carries one of those
+              properties to be inferred as a SoftwareProjectPlan and
+              cascade-fail the closed-shape constraint with dozens of
+              missing-property violations;
+          (b) rdfs:domain spp:Categorical on spp:groundedIn (now
+              removed in v4.1.0) used to similarly promote framework
+              internal nodes (axes, meta-schemes) into ConceptSchemes.
+        The OWL-side domain declarations are kept for documentation
+        and reasoner audits (\"where is this property legal?\"), not
+        as runtime constraints. The SHACL closed shapes are the
+        runtime constraint surface."""@en .
+
+# =============================================================================
+# 2. AXES — the four-dimensional space of design decisions
+# =============================================================================
+
+spp:Axis a owl:Class ;
+    rdfs:label "Axis"@en ;
+    rdfs:comment "A dimension along which categorical design decisions vary."@en .
+
+spp:axisConcern a spp:Axis ;
+    rdfs:label "Concern axis"@en ;
+    rdfs:comment "What aspect of the system the decision affects."@en ;
+    spp:groundingStatus sppst:FRAMEWORK_INTERNAL ;
+    spp:groundedIn sppsrc:iso25010-2023 , sppsrc:aws-waf .
+
+spp:axisPhase a spp:Axis ;
+    rdfs:label "Phase axis"@en ;
+    rdfs:comment "When in the lifecycle the decision binds."@en ;
+    spp:groundingStatus sppst:FRAMEWORK_INTERNAL ;
+    spp:groundedIn sppsrc:iso12207-2017 , sppsrc:iso15288-2015 .
+
+spp:axisScope a spp:Axis ;
+    rdfs:label "Scope axis"@en ;
+    rdfs:comment "What part of the system the decision binds."@en ;
+    spp:groundingStatus sppst:FRAMEWORK_INTERNAL ;
+    spp:groundedIn sppsrc:iso42010-2022 , sppsrc:kruchten-1995-4plus1 .
+
+spp:axisExternality a spp:Axis ;
+    rdfs:label "Externality axis"@en ;
+    rdfs:comment """Who depends on the decision (and therefore how
+        reversible it is). Weakly grounded relative to the other three;
+        rests on Tofan 2014, van Heesch 2012, Alves 2016, and the Bezos
+        2015/2016 shareholder letters."""@en ;
+    spp:groundingQuality "weak"^^xsd:string ;
+    spp:groundingStatus sppst:FRAMEWORK_INTERNAL ;
+    spp:groundedIn sppsrc:bezos-2015 , sppsrc:tofan-2014 ,
+                   sppsrc:vanheesch-2012 .
+
+# =============================================================================
+# 3. REVERSIBILITY TIERS — T0 (Foundational) ... T3 (Tactical)
+# =============================================================================
+
+sppc:reversibility-tier a skos:ConceptScheme , spp:MetaScheme ;
+    dct:title "Reversibility Tier"@en ;
+    skos:hasTopConcept sppt:T0 , sppt:T1 , sppt:T2 , sppt:T3 ;
+    spp:axisPosition spp:axisExternality ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:bezos-2015 ;
+    rdfs:comment """A four-level refinement of Bezos's binary
+        one-way/two-way door distinction. Each tier names the typical
+        cost of reversing a decision."""@en .
+
+sppt:T0 a skos:Concept ;
+    skos:inScheme sppc:reversibility-tier ;
+    skos:prefLabel "T0 — Foundational"@en ;
+    skos:definition "Irreversible without a rewrite, a customer-breaking change, or a regulatory event."@en .
+
+sppt:T1 a skos:Concept ;
+    skos:inScheme sppc:reversibility-tier ;
+    skos:prefLabel "T1 — Structural"@en ;
+    skos:definition "Reversible only via a coordinated migration affecting external contracts or persisted data."@en .
+
+sppt:T2 a skos:Concept ;
+    skos:inScheme sppc:reversibility-tier ;
+    skos:prefLabel "T2 — Architectural"@en ;
+    skos:definition "Expensive internal refactor; customers unaffected."@en .
+
+sppt:T3 a skos:Concept ;
+    skos:inScheme sppc:reversibility-tier ;
+    skos:prefLabel "T3 — Tactical"@en ;
+    skos:definition "Localised, low blast radius; days of work or less."@en .
+
+# =============================================================================
+# 4. GROUNDING STATUS VERDICTS
+# =============================================================================
+
+spp:MetaScheme a owl:Class ;
+    rdfs:subClassOf skos:ConceptScheme ;
+    rdfs:label "Meta concept scheme"@en ;
+    rdfs:comment """A concept scheme that describes the ontology's own
+        vocabulary (e.g., reversibility tiers, grounding statuses, the
+        Visibility scheme itself). Meta-schemes are exempt from the
+        axisPosition / tier / groundedIn metadata invariant because
+        they describe the framework, not project decisions."""@en .
+
+sppc:grounding-status a skos:ConceptScheme , spp:MetaScheme ;
+    dct:title "Grounding status"@en ;
+    skos:hasTopConcept sppst:FORMALLY_GROUNDED ,
+                       sppst:PARTIALLY_GROUNDED ,
+                       sppst:PRACTITIONER_ONLY ,
+                       sppst:UNGROUNDED ,
+                       sppst:FRAMEWORK_INTERNAL .
+
+sppst:FORMALLY_GROUNDED a skos:Concept ;
+    skos:inScheme sppc:grounding-status ;
+    skos:prefLabel "FORMALLY_GROUNDED"@en ;
+    skos:definition "At least one Tier-1 or Tier-2 source directly grounds this category's existence."@en .
+
+sppst:PARTIALLY_GROUNDED a skos:Concept ;
+    skos:inScheme sppc:grounding-status ;
+    skos:prefLabel "PARTIALLY_GROUNDED"@en ;
+    skos:definition "Tier-2 or Tier-4 sources touch the concept but no Tier-1 standard endorses this exact partition."@en .
+
+sppst:PRACTITIONER_ONLY a skos:Concept ;
+    skos:inScheme sppc:grounding-status ;
+    skos:prefLabel "PRACTITIONER_ONLY"@en ;
+    skos:definition "Industry consensus only; no formal standard."@en .
+
+sppst:UNGROUNDED a skos:Concept ;
+    skos:inScheme sppc:grounding-status ;
+    skos:prefLabel "UNGROUNDED"@en ;
+    skos:definition "No source. A defect to remediate."@en .
+
+sppst:FRAMEWORK_INTERNAL a skos:Concept ;
+    skos:inScheme sppc:grounding-status ;
+    skos:prefLabel "FRAMEWORK_INTERNAL"@en ;
+    skos:definition """Introduced in v4.1.0 (P1 #9). Reserved for
+        nodes that describe the framework itself (axes, meta-schemes,
+        internal classification structures) rather than project-time
+        decisions. Such nodes are inappropriate targets for the
+        axisPosition / tier / groundedIn invariant — demanding that
+        an axis declare its own axisPosition is circular. The
+        ConceptSchemeMetadataShape's SPARQL target uses this verdict
+        as the primary exemption signal, so future framework-internal
+        classes can be exempted by annotation rather than by adding
+        another `FILTER NOT EXISTS` clause."""@en .
+
+# =============================================================================
+# 5. GROUNDING SOURCES — verified during research (Part 1 of the report)
+# =============================================================================
+
+spp:GroundingSource a owl:Class ;
+    rdfs:label "Grounding source"@en ;
+    rdfs:subClassOf prov:Entity .
+
+spp:SourceTier a owl:Class ;
+    rdfs:label "Source authority tier"@en ;
+    rdfs:comment """T1 = peer-reviewed paper or ISO/IEEE/IETF/OMG
+        standard. T2 = official documentation or vendor architecture
+        framework. T3 = verified industry dataset. T4 = high-quality
+        expert article or book by recognised authority. T5 = community
+        knowledge."""@en .
+
+# --- Tier-1 standards ---
+
+sppsrc:iso25010-2023 a spp:GroundingSource , prov:Entity ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC 25010:2023 — SQuaRE Product Quality Model"@en ;
+    dct:issued "2023-11"^^xsd:gYearMonth ;
+    dct:source <https://www.iso.org/standard/78176.html> ;
+    rdfs:comment "Edition 2 (Nov 2023); nine top-level characteristics: Functional Suitability, Performance Efficiency, Compatibility, Interaction Capability (renamed from Usability), Reliability, Security, Maintainability, Flexibility (renamed from Portability, with Scalability added), Safety (new)."@en .
+
+sppsrc:iso12207-2017 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC/IEEE 12207:2017 — Software life cycle processes"@en ;
+    dct:issued "2017"^^xsd:gYear ;
+    dct:source <https://www.iso.org/standard/63712.html> .
+
+sppsrc:iso14764-2022 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC/IEEE 14764:2022 — Software maintenance"@en ;
+    dct:issued "2022-01"^^xsd:gYearMonth ;
+    dct:source <https://www.iso.org/standard/80710.html> .
+
+sppsrc:iso15288-2015 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC/IEEE 15288:2015 — System life cycle processes"@en ;
+    dct:issued "2015"^^xsd:gYear ;
+    dct:source <https://www.iso.org/standard/63711.html> .
+
+sppsrc:iso42010-2022 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC/IEEE 42010:2022 — Architecture description"@en ;
+    dct:issued "2022"^^xsd:gYear ;
+    dct:source <https://www.iso.org/standard/74393.html> .
+
+sppsrc:iso25059-2023 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC 25059:2023 — Quality model for AI systems"@en ;
+    dct:issued "2023"^^xsd:gYear .
+
+sppsrc:iso21839-2019 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC/IEEE 21839:2019 — Systems of systems considerations"@en .
+
+sppsrc:iso31700-2023 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC 31700-1:2023 — Privacy by design for consumer goods and services"@en ;
+    dct:source <https://www.iso.org/standard/84977.html> .
+
+sppsrc:iso21031-2024 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC 21031:2024 — Software Carbon Intensity Specification"@en ;
+    dct:source <https://www.iso.org/standard/86612.html> .
+
+sppsrc:iso27701-2019 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC 27701:2019 — Privacy information management extension to ISO/IEC 27001"@en .
+
+sppsrc:wcag22 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "WCAG 2.2 — Web Content Accessibility Guidelines"@en ;
+    dct:issued "2023-10-05"^^xsd:date ;
+    dct:source <https://www.w3.org/TR/WCAG22/> .
+
+sppsrc:webauthn-2 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Web Authentication: An API for accessing Public Key Credentials Level 2"@en ;
+    dct:source <https://www.w3.org/TR/webauthn-2/> .
+
+sppsrc:rfc6749 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "IETF RFC 6749 — The OAuth 2.0 Authorization Framework"@en ;
+    dct:source <https://www.rfc-editor.org/rfc/rfc6749> .
+
+sppsrc:rfc7519 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "IETF RFC 7519 — JSON Web Token (JWT)"@en ;
+    dct:source <https://www.rfc-editor.org/rfc/rfc7519> .
+
+sppsrc:rfc8446 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "IETF RFC 8446 — TLS 1.3"@en ;
+    dct:source <https://www.rfc-editor.org/rfc/rfc8446> .
+
+sppsrc:rfc9111 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "IETF RFC 9111 — HTTP Caching"@en .
+
+sppsrc:oidc-core-1 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "OpenID Connect Core 1.0"@en ;
+    dct:source <https://openid.net/specs/openid-connect-core-1_0.html> .
+
+sppsrc:saml2 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "OASIS SAML 2.0"@en ;
+    dct:source <https://docs.oasis-open.org/security/saml/v2.0/> .
+
+sppsrc:nist-800-63b a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "NIST SP 800-63B — Authentication and Lifecycle Management"@en ;
+    dct:identifier "10.6028/NIST.SP.800-63b" .
+
+sppsrc:nist-800-160 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "NIST SP 800-160 Vol. 1 Rev. 1 — Engineering Trustworthy Secure Systems"@en .
+
+sppsrc:nist-800-218 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "NIST SP 800-218 — Secure Software Development Framework"@en .
+
+sppsrc:nist-privacy-framework a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "NIST Privacy Framework v1.0"@en .
+
+sppsrc:gdpr a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "GDPR — EU Regulation 2016/679"@en .
+
+sppsrc:eu-cra a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "EU Cyber Resilience Act — Regulation (EU) 2024/2847"@en .
+
+sppsrc:spdx-iso5962 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "SPDX Specification (ISO/IEC 5962:2021)"@en .
+
+# --- Tier-1 papers ---
+
+sppsrc:kruchten-2004 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Kruchten, P. (2004). An Ontology of Architectural Design Decisions in Software-Intensive Systems"@en ;
+    dct:source <https://philippe.kruchten.com/wp-content/uploads/2009/07/kruchten-2004-design-decisions.pdf> .
+
+sppsrc:kruchten-1995-4plus1 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Kruchten, P. (1995). Architectural blueprints — The 4+1 view model"@en ;
+    dct:identifier "10.1109/52.469759" .
+
+sppsrc:jansen-bosch-2005 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Jansen & Bosch (2005). Software architecture as a set of architectural design decisions"@en ;
+    dct:identifier "10.1109/WICSA.2005.61" .
+
+sppsrc:tyree-akerman-2005 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Tyree & Akerman (2005). Architecture Decisions: Demystifying Architecture"@en ;
+    dct:identifier "10.1109/MS.2005.27" .
+
+sppsrc:vanheesch-2012 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "van Heesch, Avgeriou, Hilliard (2012). A documentation framework for architecture decisions"@en ;
+    dct:identifier "10.1016/j.jss.2011.10.017" .
+
+sppsrc:vanheesch-2012-forces a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "van Heesch, Avgeriou, Hilliard (2012). Forces on Architecture Decisions — A Viewpoint"@en ;
+    dct:identifier "10.1109/WICSA-ECSA.212.18" .
+
+sppsrc:tofan-2014 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Tofan, Galster, Avgeriou, Schuitema (2014). Past and future of software architectural decisions — A systematic mapping study"@en ;
+    dct:identifier "10.1016/j.infsof.2014.03.009" .
+
+sppsrc:capilla-2016 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Capilla et al. (2016). 10 years of software architecture knowledge management"@en ;
+    dct:identifier "10.1016/j.jss.2015.08.054" .
+
+sppsrc:alves-2016 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Alves et al. (2016). Identification and management of technical debt: A systematic mapping study"@en ;
+    dct:identifier "10.1016/j.infsof.2015.10.008" ;
+    rdfs:comment "15-type technical-debt taxonomy verified in Part 1 of research report."@en .
+
+sppsrc:maier-1998 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Maier (1998). Architecting principles for systems-of-systems"@en ;
+    dct:identifier "10.1002/(SICI)1520-6858(1998)1:4<267::AID-SYS3>3.0.CO;2-D" .
+
+sppsrc:dahmann-2008 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Dahmann & Baldwin (2008). Adds Acknowledged SoS to Maier's three types"@en ;
+    dct:identifier "10.1109/SYSTEMS.2008.4518994" .
+
+sppsrc:jacobson-2012 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Jacobson et al. (2012). The Essence of Software Engineering: The SEMAT kernel"@en ;
+    dct:identifier "10.1145/2381996.2389616" .
+
+sppsrc:omg-essence a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "OMG Essence Specification v1.2"@en ;
+    dct:source <https://www.omg.org/spec/Essence/> .
+
+sppsrc:helland-2012 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Helland (2012). Idempotence Is Not a Medical Condition"@en ;
+    dct:identifier "10.1145/2160718.2160734" .
+
+sppsrc:hewitt-1973 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Hewitt, Bishop, Steiger (1973). A Universal Modular ACTOR Formalism"@en .
+
+sppsrc:hoare-1978 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Hoare (1978). Communicating sequential processes"@en ;
+    dct:identifier "10.1145/359576.359585" .
+
+sppsrc:lee-2006 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Lee (2006). The problem with threads"@en ;
+    dct:identifier "10.1109/MC.2006.180" .
+
+sppsrc:bezemer-zaidman-2010 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Bezemer & Zaidman (2010). Multi-tenant SaaS applications"@en ;
+    dct:identifier "10.1145/1862372.1862393" .
+
+sppsrc:kabbedijk-2015 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Kabbedijk et al. (2015). Defining multi-tenancy: a systematic mapping study"@en ;
+    dct:identifier "10.1016/j.jss.2014.10.034" .
+
+sppsrc:codd-1970 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Codd (1970). A relational model of data for large shared data banks"@en ;
+    dct:identifier "10.1145/362384.362685" .
+
+sppsrc:gilbert-lynch-2002 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Gilbert & Lynch (2002). Brewer's conjecture (CAP theorem)"@en ;
+    dct:identifier "10.1145/564585.564601" .
+
+sppsrc:abadi-2012-pacelc a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Abadi (2012). Consistency tradeoffs in modern distributed database system design (PACELC)"@en ;
+    dct:identifier "10.1109/MC.2012.33" .
+
+sppsrc:aghajani-2019 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Aghajani et al. (2019). Software documentation issues unveiled"@en ;
+    dct:identifier "10.1109/ICSE.2019.00122" .
+
+sppsrc:bird-zimmermann-2012 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Bird & Zimmermann (2012). Assessing the value of branches with what-if analysis"@en ;
+    dct:identifier "10.1145/2393596.2393648" .
+
+sppsrc:kalliamvakou-2016 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Kalliamvakou et al. (2016). In-depth study of the promises and perils of mining GitHub"@en ;
+    dct:identifier "10.1007/s10664-015-9393-5" .
+
+sppsrc:hilton-2016 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Hilton et al. (2016). Usage, costs, and benefits of CI in open-source projects"@en ;
+    dct:identifier "10.1145/2970276.2970358" .
+
+sppsrc:nishtala-2013 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Nishtala et al. (2013). Scaling Memcache at Facebook"@en .
+
+sppsrc:smith-1982 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Smith (1982). Cache memories"@en ;
+    dct:identifier "10.1145/356887.356892" .
+
+# --- Tier-2/T4 industry frameworks ---
+
+sppsrc:aws-waf a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "AWS Well-Architected Framework (six pillars)"@en ;
+    dct:source <https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html> .
+
+sppsrc:azure-waf a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Azure Well-Architected Framework (five pillars)"@en .
+
+sppsrc:gcp-arch a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Google Cloud Architecture Framework"@en .
+
+sppsrc:incose-handbook-v5 a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "INCOSE Systems Engineering Handbook v5 (2023)"@en .
+
+sppsrc:cncf-landscape a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "CNCF Cloud Native Landscape"@en .
+
+sppsrc:semver a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Semantic Versioning 2.0.0"@en ;
+    dct:source <https://semver.org/spec/v2.0.0.html> .
+
+sppsrc:cyclonedx a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "OWASP CycloneDX SBOM Specification"@en ;
+    dct:source <https://cyclonedx.org/> .
+
+sppsrc:ntia-sbom a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "NTIA (2021). The Minimum Elements for an SBOM"@en .
+
+sppsrc:eo-14028 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Executive Order 14028 — Improving the Nation's Cybersecurity"@en .
+
+sppsrc:gsf-green-principles a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Green Software Foundation — Principles of Green Software"@en .
+
+sppsrc:bezos-2015 a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Bezos, J. (2015). Amazon Shareholder Letter (one-way/two-way doors)"@en ;
+    dct:source <https://www.aboutamazon.com/news/company-news/2015-letter-to-shareholders> .
+
+sppsrc:driessen-2010 a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Driessen (2010). A successful Git branching model (gitflow)"@en ;
+    dct:source <https://nvie.com/posts/a-successful-git-branching-model/> .
+
+sppsrc:fowler-poeaa a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Fowler (2002). Patterns of Enterprise Application Architecture"@en .
+
+sppsrc:kleppmann-ddia a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Kleppmann (2017). Designing Data-Intensive Applications"@en .
+
+sppsrc:humble-farley-cd a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Humble & Farley (2010). Continuous Delivery"@en .
+
+sppsrc:google-sre a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Beyer et al. (2016). Site Reliability Engineering"@en .
+
+# --- Additional sources for exhaustive schemes (added in v4.1) ---
+
+sppsrc:omg-uml a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "OMG Unified Modeling Language (UML) 2.5.1"@en ;
+    dct:source <https://www.omg.org/spec/UML/2.5.1/> .
+
+sppsrc:archimate-3-2 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Open Group ArchiMate 3.2 Specification"@en ;
+    dct:source <https://pubs.opengroup.org/architecture/archimate3-doc/> .
+
+sppsrc:oci-runtime a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Open Container Initiative Runtime Specification"@en ;
+    dct:source <https://github.com/opencontainers/runtime-spec> .
+
+sppsrc:12factor a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "The Twelve-Factor App methodology (Wiggins 2011)"@en ;
+    dct:source <https://12factor.net/> .
+
+sppsrc:iso29119 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC/IEEE 29119 — Software testing"@en ;
+    dct:source <https://www.iso.org/standard/45142.html> .
+
+sppsrc:istqb a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "ISTQB Glossary of Testing Terms"@en ;
+    dct:source <https://glossary.istqb.org/> .
+
+sppsrc:owasp-wstg a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "OWASP Web Security Testing Guide v4.2"@en ;
+    dct:source <https://owasp.org/www-project-web-security-testing-guide/> .
+
+sppsrc:owasp-samm a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "OWASP Software Assurance Maturity Model v2.0"@en ;
+    dct:source <https://owasp.org/www-project-samm/> .
+
+sppsrc:owasp-asvs a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "OWASP Application Security Verification Standard v4.0"@en ;
+    dct:source <https://owasp.org/www-project-application-security-verification-standard/> .
+
+sppsrc:nist-800-207 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "NIST SP 800-207 — Zero Trust Architecture"@en ;
+    dct:identifier "10.6028/NIST.SP.800-207" .
+
+sppsrc:nist-800-53 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "NIST SP 800-53 Rev. 5 — Security and Privacy Controls"@en ;
+    dct:identifier "10.6028/NIST.SP.800-53r5" .
+
+sppsrc:slsa a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "SLSA — Supply-chain Levels for Software Artifacts (OpenSSF)"@en ;
+    dct:source <https://slsa.dev/> .
+
+sppsrc:sigstore a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Sigstore — software signing and verification (OpenSSF)"@en ;
+    dct:source <https://www.sigstore.dev/> .
+
+sppsrc:scrum-guide a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Scrum Guide (Schwaber & Sutherland 2020)"@en ;
+    dct:source <https://scrumguides.org/> .
+
+sppsrc:agile-manifesto a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Manifesto for Agile Software Development (Beck et al. 2001)"@en ;
+    dct:source <https://agilemanifesto.org/> .
+
+sppsrc:beck-2003-tdd a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Beck (2003). Test-Driven Development by Example. Addison-Wesley."@en .
+
+sppsrc:evans-2003-ddd a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Evans (2003). Domain-Driven Design. Addison-Wesley."@en .
+
+sppsrc:cucumber-bdd a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Cucumber — Behavior-driven development (Wynne, Hellesoy)"@en ;
+    dct:source <https://cucumber.io/docs/bdd/> .
+
+sppsrc:iso26514 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC/IEEE 26514:2022 — Software user documentation"@en ;
+    dct:source <https://www.iso.org/standard/76001.html> .
+
+sppsrc:diataxis a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Diátaxis — A framework for technical documentation (Procida)"@en ;
+    dct:source <https://diataxis.fr/> .
+
+sppsrc:nist-ai-rmf a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "NIST AI Risk Management Framework (NIST AI 100-1, 2023)"@en ;
+    dct:source <https://www.nist.gov/itl/ai-risk-management-framework> .
+
+sppsrc:finops-framework a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "FinOps Foundation — FinOps Framework"@en ;
+    dct:source <https://www.finops.org/framework/> .
+
+sppsrc:msft-arch-patterns a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Microsoft Azure Architecture Center — Cloud Design Patterns"@en ;
+    dct:source <https://learn.microsoft.com/en-us/azure/architecture/patterns/> .
+
+sppsrc:amqp-0-9-1 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "AMQP 0-9-1 Specification (RabbitMQ-canonical)"@en ;
+    dct:source <https://www.amqp.org/specification/0-9-1/> .
+
+sppsrc:apache-kafka a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Apache Kafka Documentation"@en ;
+    dct:source <https://kafka.apache.org/documentation/> .
+
+sppsrc:opentelemetry a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "OpenTelemetry Specification (CNCF Graduated)"@en ;
+    dct:source <https://opentelemetry.io/docs/specs/otel/> .
+
+sppsrc:nygard-adr a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Nygard (2011). Documenting Architecture Decisions"@en ;
+    dct:source <https://www.cognitect.com/blog/2011/11/15/documenting-architecture-decisions> .
+
+sppsrc:jia-harman-2011 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Jia & Harman (2011). An Analysis and Survey of the Development of Mutation Testing. IEEE TSE 37(5)"@en ;
+    dct:identifier "10.1109/TSE.2010.62" .
+
+sppsrc:claessen-hughes-2000 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Claessen & Hughes (2000). QuickCheck — Lightweight tool for random testing of Haskell programs. ICFP."@en ;
+    dct:identifier "10.1145/351240.351266" .
+
+sppsrc:iso27001 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "ISO/IEC 27001:2022 — Information security management systems"@en ;
+    dct:source <https://www.iso.org/standard/27001> .
+
+sppsrc:soc2 a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "AICPA SOC 2 — Trust Services Criteria"@en ;
+    dct:source <https://www.aicpa-cima.com/topic/audit-assurance/audit-and-assurance-greater-than-soc-2> .
+
+sppsrc:hipaa a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Health Insurance Portability and Accountability Act (US, 45 CFR Parts 160, 162, 164)"@en .
+
+sppsrc:pci-dss a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Payment Card Industry Data Security Standard v4.0"@en ;
+    dct:source <https://www.pcisecuritystandards.org/> .
+
+sppsrc:ccpa a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "California Consumer Privacy Act (Cal. Civ. Code §1798.100 et seq.)"@en .
+
+sppsrc:lgpd a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Lei Geral de Proteção de Dados Pessoais (Brazil Lei 13.709/2018)"@en .
+
+sppsrc:atam a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "Kazman et al. (2000). ATAM — Method for Architecture Evaluation (SEI/CMU)"@en ;
+    dct:identifier "10.1184/R1/6573374.v1" .
+
+sppsrc:hexagonal a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Cockburn (2005). Hexagonal Architecture (Ports & Adapters)"@en ;
+    dct:source <https://alistair.cockburn.us/hexagonal-architecture/> .
+
+sppsrc:azure-app-arch a spp:GroundingSource ;
+    spp:sourceTier "T2" ;
+    dct:title "Microsoft — Azure Application Architecture Fundamentals"@en ;
+    dct:source <https://learn.microsoft.com/en-us/azure/architecture/guide/> .
+
+sppsrc:rfc6455 a spp:GroundingSource ;
+    spp:sourceTier "T1" ;
+    dct:title "IETF RFC 6455 — The WebSocket Protocol"@en ;
+    dct:source <https://www.rfc-editor.org/rfc/rfc6455> .
+
+sppsrc:wiggins-12factor a spp:GroundingSource ;
+    spp:sourceTier "T4" ;
+    dct:title "Wiggins (2011). The Twelve-Factor App"@en ;
+    dct:source <https://12factor.net/> .
+
+# =============================================================================
+# 6. DECISION KIND — Kruchten 2004
+# =============================================================================
+
+sppc:decision-kind a skos:ConceptScheme ;
+    dct:title "Kruchten decision kinds"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:kruchten-2004 ;
+    # Naming exception (v4.1.0): concepts in this scheme use the full
+    # `decision-kind-*` prefix rather than the short two-letter form
+    # used by other schemes (e.g. `vis-public`, `ap-monolith`). The
+    # natural short form `dk-*` is already taken by dependency-kind
+    # (dk-runtime, dk-build, dk-dev, …). Renaming dependency-kind to
+    # free up `dk-` would be a breaking change for all existing
+    # consumers, so decision-kind retains its long form. The
+    # reversibility-tier scheme has its own `sppt:` namespace and is
+    # not affected.
+    skos:hasTopConcept sppc:decision-kind-existence ,
+                       sppc:decision-kind-property ,
+                       sppc:decision-kind-executive ,
+                       sppc:decision-kind-ban .
+
+sppc:decision-kind-existence a skos:Concept ;
+    skos:inScheme sppc:decision-kind ;
+    skos:prefLabel "Existence decision (ontocrise)"@en ;
+    skos:definition "Some element/artifact will exist."@en .
+
+sppc:decision-kind-property a skos:Concept ;
+    skos:inScheme sppc:decision-kind ;
+    skos:prefLabel "Property decision (diacrise)"@en ;
+    skos:definition "An enduring quality, trait, or guideline of the system."@en .
+
+sppc:decision-kind-executive a skos:Concept ;
+    skos:inScheme sppc:decision-kind ;
+    skos:prefLabel "Executive decision (pericrise)"@en ;
+    skos:definition "Process / organisation / methodology / technology decision enabling the design."@en .
+
+sppc:decision-kind-ban a skos:Concept ;
+    skos:inScheme sppc:decision-kind ;
+    skos:prefLabel "Ban (non-existence decision)"@en ;
+    skos:definition "Explicit choice that something will NOT exist."@en .
+
+# =============================================================================
+# 7. DECISION FORCES — van Heesch et al. 2012 forces viewpoint
+# =============================================================================
+
+sppc:decision-force a skos:ConceptScheme ;
+    dct:title "Decision force kind"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:vanheesch-2012-forces , sppsrc:iso42010-2022 ;
+    skos:hasTopConcept sppc:force-business ,
+        sppc:force-economic ,
+        sppc:force-organisational ,
+        sppc:force-regulatory ,
+        sppc:force-technical ,
+        sppc:force-user .
+
+sppc:force-business      a skos:Concept ; skos:inScheme sppc:decision-force ; skos:prefLabel "Business force"@en .
+sppc:force-technical     a skos:Concept ; skos:inScheme sppc:decision-force ; skos:prefLabel "Technical force"@en .
+sppc:force-regulatory    a skos:Concept ; skos:inScheme sppc:decision-force ; skos:prefLabel "Regulatory force"@en .
+sppc:force-organisational a skos:Concept ; skos:inScheme sppc:decision-force ; skos:prefLabel "Organisational force"@en .
+sppc:force-user          a skos:Concept ; skos:inScheme sppc:decision-force ; skos:prefLabel "User force"@en .
+sppc:force-economic      a skos:Concept ; skos:inScheme sppc:decision-force ; skos:prefLabel "Economic force"@en .
+
+# =============================================================================
+# 8. CATEGORICAL VOCABULARIES (the heart of the schema)
+# =============================================================================
+#
+# For each concept scheme:
+#   - dct:title
+#   - spp:axisPosition (axisConcern | axisPhase | axisScope | axisExternality)
+#   - spp:tier (sppt:T0 ... sppt:T3)
+#   - spp:groundingStatus (FORMALLY | PARTIALLY | PRACTITIONER_ONLY)
+#   - spp:groundedIn (one or more grounding sources)
+#   - skos:hasTopConcept for each value
+#
+# Concept values are minimal — skos:prefLabel only; further sub-characteristics
+# (skos:broader / skos:narrower) are not exhaustively elaborated here but the
+# pattern is set.
+# =============================================================================
+
+# --- 8.1 Tenancy (T0, ADDED per research) ---
+sppc:tenancy-model a skos:ConceptScheme ;
+    dct:title "Tenancy Model"@en ;
+    rdfs:comment "ADDED in v4.0 per research Part 3.1. Article §4 names tenancy as canonical Tier-0."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T0 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:bezemer-zaidman-2010 , sppsrc:kabbedijk-2015 ;
+    skos:hasTopConcept sppc:tenancy-fully-pooled ,
+        sppc:tenancy-shared-app-dedicated-db ,
+        sppc:tenancy-shared-app-shared-db-schema ,
+        sppc:tenancy-single .
+
+sppc:tenancy-single                      a skos:Concept ; skos:inScheme sppc:tenancy-model ; skos:prefLabel "Single-tenant"@en .
+sppc:tenancy-shared-app-dedicated-db     a skos:Concept ; skos:inScheme sppc:tenancy-model ; skos:prefLabel "Shared app, dedicated database per tenant"@en .
+sppc:tenancy-shared-app-shared-db-schema a skos:Concept ; skos:inScheme sppc:tenancy-model ; skos:prefLabel "Shared app, shared DB, separate schemas"@en .
+sppc:tenancy-fully-pooled                a skos:Concept ; skos:inScheme sppc:tenancy-model ; skos:prefLabel "Fully pooled (shared schema with tenant ID)"@en .
+
+# --- 8.2 Authentication Mechanism (T0/T1, ADDED) ---
+sppc:authentication-mechanism a skos:ConceptScheme ;
+    dct:title "Authentication Mechanism"@en ;
+    rdfs:comment "ADDED in v4.0 per research Part 3.2."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:rfc6749 , sppsrc:oidc-core-1 , sppsrc:saml2 ,
+                   sppsrc:rfc7519 , sppsrc:rfc8446 , sppsrc:webauthn-2 ,
+                   sppsrc:nist-800-63b ;
+    skos:hasTopConcept sppc:auth-api-key ,
+        sppc:auth-jwt-bearer ,
+        sppc:auth-mtls ,
+        sppc:auth-oauth2 ,
+        sppc:auth-oidc ,
+        sppc:auth-password ,
+        sppc:auth-saml2 ,
+        sppc:auth-session ,
+        sppc:auth-webauthn .
+
+sppc:auth-password   a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "Password (memorised secret)"@en .
+sppc:auth-oauth2     a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "OAuth 2.0"@en .
+sppc:auth-oidc       a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "OpenID Connect"@en .
+sppc:auth-saml2      a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "SAML 2.0"@en .
+sppc:auth-mtls       a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "Mutual TLS"@en .
+sppc:auth-jwt-bearer a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "JWT bearer"@en .
+sppc:auth-api-key    a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "API Key"@en .
+sppc:auth-session    a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "Session (cookie-based)"@en .
+sppc:auth-webauthn   a skos:Concept ; skos:inScheme sppc:authentication-mechanism ; skos:prefLabel "WebAuthn / FIDO2"@en .
+
+# --- 8.3 Idempotency Policy (T1, ADDED) ---
+sppc:idempotency-policy a skos:ConceptScheme ;
+    dct:title "Idempotency Policy"@en ;
+    rdfs:comment "ADDED in v4.0 per research Part 3.3."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:helland-2012 , sppsrc:kleppmann-ddia ;
+    skos:hasTopConcept sppc:idem-at-least-once ,
+        sppc:idem-at-most-once ,
+        sppc:idem-compensable ,
+        sppc:idem-exactly-once ,
+        sppc:idem-idempotent-by-key .
+
+sppc:idem-at-most-once         a skos:Concept ; skos:inScheme sppc:idempotency-policy ; skos:prefLabel "At-most-once"@en .
+sppc:idem-at-least-once        a skos:Concept ; skos:inScheme sppc:idempotency-policy ; skos:prefLabel "At-least-once"@en .
+sppc:idem-exactly-once         a skos:Concept ; skos:inScheme sppc:idempotency-policy ; skos:prefLabel "Exactly-once (via dedup + transactional log)"@en .
+sppc:idem-idempotent-by-key    a skos:Concept ; skos:inScheme sppc:idempotency-policy ; skos:prefLabel "Idempotent by key"@en .
+sppc:idem-compensable          a skos:Concept ; skos:inScheme sppc:idempotency-policy ; skos:prefLabel "Compensable transaction (Saga / TCC)"@en .
+
+# --- 8.4 Concurrency Model (T0, ADDED) ---
+sppc:concurrency-model a skos:ConceptScheme ;
+    dct:title "Concurrency Model"@en ;
+    rdfs:comment "ADDED in v4.0 per research Part 3.4."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T0 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:hewitt-1973 , sppsrc:hoare-1978 , sppsrc:lee-2006 ;
+    skos:hasTopConcept sppc:concurrency-actors ,
+        sppc:concurrency-async ,
+        sppc:concurrency-csp ,
+        sppc:concurrency-event-loop ,
+        sppc:concurrency-process ,
+        sppc:concurrency-stm ,
+        sppc:concurrency-threads .
+
+sppc:concurrency-threads         a skos:Concept ; skos:inScheme sppc:concurrency-model ; skos:prefLabel "Preemptive threads with locks"@en .
+sppc:concurrency-async           a skos:Concept ; skos:inScheme sppc:concurrency-model ; skos:prefLabel "Cooperative async / await"@en .
+sppc:concurrency-actors          a skos:Concept ; skos:inScheme sppc:concurrency-model ; skos:prefLabel "Actor model"@en .
+sppc:concurrency-csp             a skos:Concept ; skos:inScheme sppc:concurrency-model ; skos:prefLabel "CSP / channels"@en .
+sppc:concurrency-event-loop      a skos:Concept ; skos:inScheme sppc:concurrency-model ; skos:prefLabel "Single-threaded event loop (Reactor)"@en .
+sppc:concurrency-process         a skos:Concept ; skos:inScheme sppc:concurrency-model ; skos:prefLabel "Process-per-request"@en .
+sppc:concurrency-stm             a skos:Concept ; skos:inScheme sppc:concurrency-model ; skos:prefLabel "Software Transactional Memory"@en .
+
+# --- 8.5 Caching Strategy (T2, ADDED) ---
+sppc:caching-strategy a skos:ConceptScheme ;
+    dct:title "Caching Strategy"@en ;
+    rdfs:comment "ADDED in v4.0 per research Part 3.5."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:smith-1982 , sppsrc:nishtala-2013 , sppsrc:rfc9111 ;
+    skos:hasTopConcept sppc:cache-aside ,
+        sppc:cache-none ,
+        sppc:cache-read-through ,
+        sppc:cache-refresh-ahead ,
+        sppc:cache-write-around ,
+        sppc:cache-write-back ,
+        sppc:cache-write-through .
+
+sppc:cache-none           a skos:Concept ; skos:inScheme sppc:caching-strategy ; skos:prefLabel "No cache"@en .
+sppc:cache-aside          a skos:Concept ; skos:inScheme sppc:caching-strategy ; skos:prefLabel "Cache-aside (lazy loading)"@en .
+sppc:cache-read-through   a skos:Concept ; skos:inScheme sppc:caching-strategy ; skos:prefLabel "Read-through"@en .
+sppc:cache-write-through  a skos:Concept ; skos:inScheme sppc:caching-strategy ; skos:prefLabel "Write-through"@en .
+sppc:cache-write-back     a skos:Concept ; skos:inScheme sppc:caching-strategy ; skos:prefLabel "Write-behind / write-back"@en .
+sppc:cache-write-around   a skos:Concept ; skos:inScheme sppc:caching-strategy ; skos:prefLabel "Write-around"@en .
+sppc:cache-refresh-ahead  a skos:Concept ; skos:inScheme sppc:caching-strategy ; skos:prefLabel "Refresh-ahead"@en .
+
+# --- 8.6 ISO 25010:2023 Quality Characteristics (T0/T1 cross-cutting concerns) ---
+sppc:quality-characteristic a skos:ConceptScheme ;
+    dct:title "ISO/IEC 25010:2023 Quality Characteristics"@en ;
+    rdfs:comment "Nine top-level characteristics from 2023 edition. Renames from 2011 verified: Usability → Interaction Capability; Portability → Flexibility (with Scalability added); Maturity → Faultlessness; Safety added; Resistance added under Security."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso25010-2023 ;
+    skos:hasTopConcept sppc:qc-compatibility ,
+        sppc:qc-flexibility ,
+        sppc:qc-functional-suitability ,
+        sppc:qc-interaction-capability ,
+        sppc:qc-maintainability ,
+        sppc:qc-performance-efficiency ,
+        sppc:qc-reliability ,
+        sppc:qc-safety ,
+        sppc:qc-security .
+
+sppc:qc-functional-suitability    a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Functional Suitability"@en .
+sppc:qc-performance-efficiency    a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Performance Efficiency"@en .
+sppc:qc-compatibility             a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Compatibility"@en .
+sppc:qc-interaction-capability    a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Interaction Capability"@en ;
+    skos:altLabel "Usability (deprecated 25010:2011 label)"@en .
+sppc:qc-reliability               a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Reliability"@en .
+sppc:qc-security                  a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Security"@en .
+sppc:qc-maintainability           a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Maintainability"@en .
+sppc:qc-flexibility               a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Flexibility"@en ;
+    skos:altLabel "Portability (deprecated 25010:2011 label)"@en .
+sppc:qc-safety                    a skos:Concept ; skos:inScheme sppc:quality-characteristic ; skos:prefLabel "Safety"@en .
+
+# --- 8.7 AWS Operational Excellence Areas (T2) ---
+sppc:operational-excellence-area a skos:ConceptScheme ;
+    dct:title "AWS Well-Architected Operational Excellence Areas"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:aws-waf ;
+    skos:hasTopConcept sppc:oe-evolve ,
+        sppc:oe-operate ,
+        sppc:oe-organization ,
+        sppc:oe-prepare .
+
+sppc:oe-organization a skos:Concept ; skos:inScheme sppc:operational-excellence-area ; skos:prefLabel "Organization"@en .
+sppc:oe-prepare      a skos:Concept ; skos:inScheme sppc:operational-excellence-area ; skos:prefLabel "Prepare"@en .
+sppc:oe-operate      a skos:Concept ; skos:inScheme sppc:operational-excellence-area ; skos:prefLabel "Operate"@en .
+sppc:oe-evolve       a skos:Concept ; skos:inScheme sppc:operational-excellence-area ; skos:prefLabel "Evolve"@en .
+
+# --- 8.8 SEMAT Essence — Requirements Alpha States (CORRECTED per research) ---
+sppc:requirements-alpha-state a skos:ConceptScheme ;
+    dct:title "SEMAT Essence Requirements Alpha States"@en ;
+    rdfs:comment "Canonical Essence state names per Jacobson et al. 2012 / OMG Essence 1.2. The v3 schema used non-canonical RUP-style names (Inception/Design); corrected here."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:req-acceptable ,
+        sppc:req-addressed ,
+        sppc:req-bounded ,
+        sppc:req-coherent ,
+        sppc:req-conceived ,
+        sppc:req-fulfilled .
+
+sppc:req-conceived  a skos:Concept ; skos:inScheme sppc:requirements-alpha-state ; skos:prefLabel "Conceived"@en .
+sppc:req-bounded    a skos:Concept ; skos:inScheme sppc:requirements-alpha-state ; skos:prefLabel "Bounded"@en .
+sppc:req-coherent   a skos:Concept ; skos:inScheme sppc:requirements-alpha-state ; skos:prefLabel "Coherent"@en .
+sppc:req-acceptable a skos:Concept ; skos:inScheme sppc:requirements-alpha-state ; skos:prefLabel "Acceptable"@en .
+sppc:req-addressed  a skos:Concept ; skos:inScheme sppc:requirements-alpha-state ; skos:prefLabel "Addressed"@en .
+sppc:req-fulfilled  a skos:Concept ; skos:inScheme sppc:requirements-alpha-state ; skos:prefLabel "Fulfilled"@en .
+
+# --- 8.9 SEMAT Essence — Software System Alpha States (CORRECTED) ---
+sppc:software-system-alpha-state a skos:ConceptScheme ;
+    dct:title "SEMAT Essence Software System Alpha States"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:sys-architecture-selected ,
+        sppc:sys-demonstrable ,
+        sppc:sys-operational ,
+        sppc:sys-ready ,
+        sppc:sys-retired ,
+        sppc:sys-usable .
+
+sppc:sys-architecture-selected a skos:Concept ; skos:inScheme sppc:software-system-alpha-state ; skos:prefLabel "Architecture Selected"@en .
+sppc:sys-demonstrable          a skos:Concept ; skos:inScheme sppc:software-system-alpha-state ; skos:prefLabel "Demonstrable"@en .
+sppc:sys-usable                a skos:Concept ; skos:inScheme sppc:software-system-alpha-state ; skos:prefLabel "Usable"@en .
+sppc:sys-ready                 a skos:Concept ; skos:inScheme sppc:software-system-alpha-state ; skos:prefLabel "Ready"@en .
+sppc:sys-operational           a skos:Concept ; skos:inScheme sppc:software-system-alpha-state ; skos:prefLabel "Operational"@en .
+sppc:sys-retired               a skos:Concept ; skos:inScheme sppc:software-system-alpha-state ; skos:prefLabel "Retired"@en .
+
+# --- 8.10 ISO 14764:2022 Maintenance Type ---
+sppc:maintenance-type a skos:ConceptScheme ;
+    dct:title "Software Maintenance Type"@en ;
+    rdfs:comment "Four-category core per ISO/IEC/IEEE 14764:2022. Emergency is a recognised urgency-variant of corrective per Lientz & Swanson tradition, NOT a peer category in the standard."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso14764-2022 ;
+    skos:hasTopConcept sppc:maint-adaptive ,
+        sppc:maint-corrective ,
+        sppc:maint-emergency ,
+        sppc:maint-perfective ,
+        sppc:maint-preventive .
+
+sppc:maint-corrective  a skos:Concept ; skos:inScheme sppc:maintenance-type ; skos:prefLabel "Corrective"@en .
+sppc:maint-adaptive    a skos:Concept ; skos:inScheme sppc:maintenance-type ; skos:prefLabel "Adaptive"@en .
+sppc:maint-perfective  a skos:Concept ; skos:inScheme sppc:maintenance-type ; skos:prefLabel "Perfective"@en .
+sppc:maint-preventive  a skos:Concept ; skos:inScheme sppc:maintenance-type ; skos:prefLabel "Preventive"@en .
+sppc:maint-emergency   a skos:Concept ; skos:inScheme sppc:maintenance-type ; skos:prefLabel "Emergency (urgent variant of corrective)"@en ;
+    skos:broader sppc:maint-corrective .
+
+# --- 8.11 System-of-Systems Type (Maier/Dahmann/ISO 21839) ---
+sppc:system-of-systems-type a skos:ConceptScheme ;
+    dct:title "System-of-Systems Type"@en ;
+    rdfs:comment "Maier 1998 (3 types) + Dahmann 2008 (added Acknowledged); ratified in ISO/IEC/IEEE 21839:2019."@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:maier-1998 , sppsrc:dahmann-2008 , sppsrc:iso21839-2019 ;
+    skos:hasTopConcept sppc:sos-acknowledged ,
+        sppc:sos-collaborative ,
+        sppc:sos-directed ,
+        sppc:sos-virtual .
+
+sppc:sos-directed     a skos:Concept ; skos:inScheme sppc:system-of-systems-type ; skos:prefLabel "Directed"@en .
+sppc:sos-acknowledged a skos:Concept ; skos:inScheme sppc:system-of-systems-type ; skos:prefLabel "Acknowledged"@en .
+sppc:sos-collaborative a skos:Concept ; skos:inScheme sppc:system-of-systems-type ; skos:prefLabel "Collaborative"@en .
+sppc:sos-virtual      a skos:Concept ; skos:inScheme sppc:system-of-systems-type ; skos:prefLabel "Virtual"@en .
+
+# --- 8.12 Technical Debt Type (Alves 2016, 15-type — CORRECTED to add TestAutomation) ---
+sppc:technical-debt-type a skos:ConceptScheme ;
+    dct:title "Technical Debt Type"@en ;
+    rdfs:comment "15-type taxonomy from Alves et al. 2016. v3 schema had 14; TestAutomation added in v4 to match the canonical list."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:alves-2016 ;
+    skos:hasTopConcept sppc:td-architecture ,
+        sppc:td-build ,
+        sppc:td-code ,
+        sppc:td-defect ,
+        sppc:td-design ,
+        sppc:td-documentation ,
+        sppc:td-infrastructure ,
+        sppc:td-people ,
+        sppc:td-process ,
+        sppc:td-requirements ,
+        sppc:td-service ,
+        sppc:td-test ,
+        sppc:td-test-automation ,
+        sppc:td-usability ,
+        sppc:td-versioning .
+
+sppc:td-code            a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Code debt"@en .
+sppc:td-architecture    a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Architecture debt"@en .
+sppc:td-design          a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Design debt"@en .
+sppc:td-test            a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Test debt"@en .
+sppc:td-test-automation a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Test automation debt"@en .
+sppc:td-documentation   a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Documentation debt"@en .
+sppc:td-build           a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Build debt"@en .
+sppc:td-defect          a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Defect debt"@en .
+sppc:td-infrastructure  a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Infrastructure debt"@en .
+sppc:td-people          a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "People debt"@en .
+sppc:td-process         a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Process debt"@en .
+sppc:td-requirements    a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Requirements debt"@en .
+sppc:td-service         a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Service debt"@en .
+sppc:td-versioning      a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Versioning debt"@en .
+sppc:td-usability       a skos:Concept ; skos:inScheme sppc:technical-debt-type ; skos:prefLabel "Usability debt"@en .
+
+# --- 8.13 Architecture Pattern ---
+sppc:architecture-pattern a skos:ConceptScheme ;
+    dct:title "Architecture Pattern"@en ;
+    rdfs:comment "ISO 42010 establishes pattern as a concept; Fowler PoEAA enumerates the de-facto practitioner catalogue."@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso42010-2022 , sppsrc:fowler-poeaa ;
+    skos:hasTopConcept sppc:ap-event-driven ,
+        sppc:ap-hexagonal ,
+        sppc:ap-layered ,
+        sppc:ap-microservices ,
+        sppc:ap-monolith ,
+        sppc:ap-pipes-filters ,
+        sppc:ap-serverless .
+
+sppc:ap-monolith       a skos:Concept ; skos:inScheme sppc:architecture-pattern ; skos:prefLabel "Monolith"@en .
+sppc:ap-microservices  a skos:Concept ; skos:inScheme sppc:architecture-pattern ; skos:prefLabel "Microservices"@en .
+sppc:ap-hexagonal      a skos:Concept ; skos:inScheme sppc:architecture-pattern ; skos:prefLabel "Hexagonal / Ports and Adapters"@en .
+sppc:ap-layered        a skos:Concept ; skos:inScheme sppc:architecture-pattern ; skos:prefLabel "Layered"@en .
+sppc:ap-event-driven   a skos:Concept ; skos:inScheme sppc:architecture-pattern ; skos:prefLabel "Event-driven"@en .
+sppc:ap-pipes-filters  a skos:Concept ; skos:inScheme sppc:architecture-pattern ; skos:prefLabel "Pipes and Filters"@en .
+sppc:ap-serverless     a skos:Concept ; skos:inScheme sppc:architecture-pattern ; skos:prefLabel "Serverless"@en .
+
+# --- 8.14 Data Model (CORRECTED: separates storage paradigm + consistency) ---
+sppc:data-storage-paradigm a skos:ConceptScheme ;
+    dct:title "Data Storage Paradigm"@en ;
+    rdfs:comment "SPLIT in v4 from the v2/v3 DataModel enum that conflated storage paradigm with consistency model."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:codd-1970 , sppsrc:kleppmann-ddia ;
+    skos:hasTopConcept sppc:dsp-document ,
+        sppc:dsp-graph ,
+        sppc:dsp-key-value ,
+        sppc:dsp-relational ,
+        sppc:dsp-search-index ,
+        sppc:dsp-time-series ,
+        sppc:dsp-wide-column .
+
+sppc:dsp-relational a skos:Concept ; skos:inScheme sppc:data-storage-paradigm ; skos:prefLabel "Relational"@en .
+sppc:dsp-document   a skos:Concept ; skos:inScheme sppc:data-storage-paradigm ; skos:prefLabel "Document"@en .
+sppc:dsp-key-value  a skos:Concept ; skos:inScheme sppc:data-storage-paradigm ; skos:prefLabel "Key-value"@en .
+sppc:dsp-wide-column a skos:Concept ; skos:inScheme sppc:data-storage-paradigm ; skos:prefLabel "Wide-column"@en .
+sppc:dsp-graph      a skos:Concept ; skos:inScheme sppc:data-storage-paradigm ; skos:prefLabel "Graph"@en .
+sppc:dsp-time-series a skos:Concept ; skos:inScheme sppc:data-storage-paradigm ; skos:prefLabel "Time-series"@en .
+sppc:dsp-search-index a skos:Concept ; skos:inScheme sppc:data-storage-paradigm ; skos:prefLabel "Search index"@en .
+
+sppc:consistency-model a skos:ConceptScheme ;
+    dct:title "Consistency Model"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:gilbert-lynch-2002 , sppsrc:abadi-2012-pacelc , sppsrc:kleppmann-ddia ;
+    skos:hasTopConcept sppc:cm-causal ,
+        sppc:cm-eventual ,
+        sppc:cm-read-your-writes ,
+        sppc:cm-sequential ,
+        sppc:cm-strong .
+
+sppc:cm-strong          a skos:Concept ; skos:inScheme sppc:consistency-model ; skos:prefLabel "Strong / linearisable"@en .
+sppc:cm-sequential      a skos:Concept ; skos:inScheme sppc:consistency-model ; skos:prefLabel "Sequential"@en .
+sppc:cm-causal          a skos:Concept ; skos:inScheme sppc:consistency-model ; skos:prefLabel "Causal"@en .
+sppc:cm-eventual        a skos:Concept ; skos:inScheme sppc:consistency-model ; skos:prefLabel "Eventual"@en .
+sppc:cm-read-your-writes a skos:Concept ; skos:inScheme sppc:consistency-model ; skos:prefLabel "Read-your-writes"@en .
+
+# --- 8.15 API Specification (T1, formally grounded — each value has a spec) ---
+sppc:api-specification a skos:ConceptScheme ;
+    dct:title "API Specification"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso42010-2022 ;
+    skos:hasTopConcept sppc:api-asyncapi ,
+        sppc:api-graphql ,
+        sppc:api-grpc ,
+        sppc:api-jsonrpc ,
+        sppc:api-openapi ,
+        sppc:api-websocket .
+
+sppc:api-openapi   a skos:Concept ; skos:inScheme sppc:api-specification ; skos:prefLabel "OpenAPI"@en .
+sppc:api-graphql   a skos:Concept ; skos:inScheme sppc:api-specification ; skos:prefLabel "GraphQL"@en .
+sppc:api-grpc      a skos:Concept ; skos:inScheme sppc:api-specification ; skos:prefLabel "gRPC"@en .
+sppc:api-asyncapi  a skos:Concept ; skos:inScheme sppc:api-specification ; skos:prefLabel "AsyncAPI"@en .
+sppc:api-jsonrpc   a skos:Concept ; skos:inScheme sppc:api-specification ; skos:prefLabel "JSON-RPC 2.0"@en .
+sppc:api-websocket a skos:Concept ; skos:inScheme sppc:api-specification ; skos:prefLabel "WebSocket (RFC 6455)"@en .
+
+# --- 8.16 Versioning Scheme ---
+sppc:versioning-scheme a skos:ConceptScheme ;
+    dct:title "Versioning Scheme"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:semver ;
+    skos:hasTopConcept sppc:ver-calver ,
+        sppc:ver-hash ,
+        sppc:ver-monotonic ,
+        sppc:ver-none ,
+        sppc:ver-semver .
+
+sppc:ver-semver   a skos:Concept ; skos:inScheme sppc:versioning-scheme ; skos:prefLabel "Semantic versioning"@en .
+sppc:ver-calver   a skos:Concept ; skos:inScheme sppc:versioning-scheme ; skos:prefLabel "Calendar versioning"@en .
+sppc:ver-monotonic a skos:Concept ; skos:inScheme sppc:versioning-scheme ; skos:prefLabel "Monotonic / build-number"@en .
+sppc:ver-hash     a skos:Concept ; skos:inScheme sppc:versioning-scheme ; skos:prefLabel "Hash / content-addressed"@en .
+sppc:ver-none     a skos:Concept ; skos:inScheme sppc:versioning-scheme ; skos:prefLabel "No versioning"@en .
+
+# --- 8.17 SBOM Format ---
+sppc:sbom-format a skos:ConceptScheme ;
+    dct:title "SBOM Format"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:spdx-iso5962 , sppsrc:cyclonedx , sppsrc:ntia-sbom ;
+    skos:hasTopConcept sppc:sbom-cyclonedx ,
+        sppc:sbom-spdx ,
+        sppc:sbom-swid .
+
+sppc:sbom-spdx      a skos:Concept ; skos:inScheme sppc:sbom-format ; skos:prefLabel "SPDX (ISO/IEC 5962:2021)"@en .
+sppc:sbom-cyclonedx a skos:Concept ; skos:inScheme sppc:sbom-format ; skos:prefLabel "CycloneDX"@en .
+sppc:sbom-swid      a skos:Concept ; skos:inScheme sppc:sbom-format ; skos:prefLabel "SWID Tags (ISO/IEC 19770-2)"@en .
+
+# --- 8.18 SBOM Policy (ADDED) ---
+sppc:sbom-policy a skos:ConceptScheme ;
+    dct:title "SBOM Policy Posture"@en ;
+    rdfs:comment "ADDED in v4 per research Part 4.5. Driven by NTIA 2021, EO 14028 (US), EU CRA 2024."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:ntia-sbom , sppsrc:eo-14028 , sppsrc:eu-cra ;
+    skos:hasTopConcept sppc:sbom-policy-attested ,
+        sppc:sbom-policy-customer ,
+        sppc:sbom-policy-internal ,
+        sppc:sbom-policy-none ,
+        sppc:sbom-policy-published .
+
+sppc:sbom-policy-none      a skos:Concept ; skos:inScheme sppc:sbom-policy ; skos:prefLabel "Not produced"@en .
+sppc:sbom-policy-internal  a skos:Concept ; skos:inScheme sppc:sbom-policy ; skos:prefLabel "Produced for internal use"@en .
+sppc:sbom-policy-customer  a skos:Concept ; skos:inScheme sppc:sbom-policy ; skos:prefLabel "Produced for customers on request"@en .
+sppc:sbom-policy-published a skos:Concept ; skos:inScheme sppc:sbom-policy ; skos:prefLabel "Published with every release"@en .
+sppc:sbom-policy-attested  a skos:Concept ; skos:inScheme sppc:sbom-policy ; skos:prefLabel "Published + signed / attested"@en .
+
+# --- 8.19 Privacy Posture (ADDED) ---
+sppc:privacy-posture a skos:ConceptScheme ;
+    dct:title "Privacy Posture"@en ;
+    rdfs:comment "ADDED in v4 per research Part 4.1. Grounded in ISO 31700-1:2023 + ISO 27701 + NIST Privacy Framework + GDPR Article 25."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T0 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso31700-2023 , sppsrc:iso27701-2019 ,
+                   sppsrc:nist-privacy-framework , sppsrc:gdpr ;
+    skos:hasTopConcept sppc:priv-acknowledged ,
+        sppc:priv-by-design ,
+        sppc:priv-measured-attested ,
+        sppc:priv-not-considered .
+
+sppc:priv-not-considered     a skos:Concept ; skos:inScheme sppc:privacy-posture ; skos:prefLabel "Not considered"@en .
+sppc:priv-acknowledged       a skos:Concept ; skos:inScheme sppc:privacy-posture ; skos:prefLabel "Acknowledged"@en .
+sppc:priv-by-design          a skos:Concept ; skos:inScheme sppc:privacy-posture ; skos:prefLabel "Engineered (Privacy by Design)"@en .
+sppc:priv-measured-attested  a skos:Concept ; skos:inScheme sppc:privacy-posture ; skos:prefLabel "Measured / attested"@en .
+
+# --- 8.20 Accessibility Posture (ADDED) ---
+sppc:accessibility-posture a skos:ConceptScheme ;
+    dct:title "Accessibility Posture"@en ;
+    rdfs:comment "ADDED in v4 per research Part 4.2. WCAG 2.2 (W3C Rec 2023) + ISO/IEC 40500 + EN 301 549."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T0 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:wcag22 ;
+    skos:hasTopConcept sppc:a11y-en-301549 ,
+        sppc:a11y-none ,
+        sppc:a11y-wcag22-a ,
+        sppc:a11y-wcag22-aa ,
+        sppc:a11y-wcag22-aaa .
+
+sppc:a11y-none           a skos:Concept ; skos:inScheme sppc:accessibility-posture ; skos:prefLabel "Not considered"@en .
+sppc:a11y-wcag22-a       a skos:Concept ; skos:inScheme sppc:accessibility-posture ; skos:prefLabel "WCAG 2.2 Level A"@en .
+sppc:a11y-wcag22-aa      a skos:Concept ; skos:inScheme sppc:accessibility-posture ; skos:prefLabel "WCAG 2.2 Level AA"@en .
+sppc:a11y-wcag22-aaa     a skos:Concept ; skos:inScheme sppc:accessibility-posture ; skos:prefLabel "WCAG 2.2 Level AAA"@en .
+sppc:a11y-en-301549      a skos:Concept ; skos:inScheme sppc:accessibility-posture ; skos:prefLabel "EN 301 549 conformant"@en .
+
+# --- 8.21 Sustainability Posture (already present in v3; refined here) ---
+sppc:sustainability-posture a skos:ConceptScheme ;
+    dct:title "Sustainability Posture"@en ;
+    rdfs:comment "Driven by GSF / ISO 21031:2024 SCI metric and AWS WAF Sustainability pillar."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso21031-2024 , sppsrc:gsf-green-principles , sppsrc:aws-waf ;
+    skos:hasTopConcept sppc:sus-carbon-aware ,
+        sppc:sus-not-considered ,
+        sppc:sus-sci-budgeted ,
+        sppc:sus-sci-tracked .
+
+sppc:sus-not-considered  a skos:Concept ; skos:inScheme sppc:sustainability-posture ; skos:prefLabel "Not considered"@en .
+sppc:sus-carbon-aware    a skos:Concept ; skos:inScheme sppc:sustainability-posture ; skos:prefLabel "Carbon-aware scheduling"@en .
+sppc:sus-sci-tracked     a skos:Concept ; skos:inScheme sppc:sustainability-posture ; skos:prefLabel "SCI metric tracked"@en .
+sppc:sus-sci-budgeted    a skos:Concept ; skos:inScheme sppc:sustainability-posture ; skos:prefLabel "SCI budgeted as a quality goal"@en .
+
+# --- 8.22 Branching Strategy (was PRACTITIONER_ONLY; now PARTIALLY_GROUNDED) ---
+sppc:branching-strategy a skos:ConceptScheme ;
+    dct:title "Branching Strategy"@en ;
+    rdfs:comment "Driessen 2010 (gitflow) is the canonical artifact; Bird & Zimmermann 2012 + Hilton 2016 + Forsgren/Humble/Kim 2018 provide empirical grounding for trunk-based dev."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T3 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:driessen-2010 , sppsrc:bird-zimmermann-2012 , sppsrc:hilton-2016 ;
+    skos:hasTopConcept sppc:br-gitflow ,
+        sppc:br-github-flow ,
+        sppc:br-gitlab-flow ,
+        sppc:br-release-branches ,
+        sppc:br-trunk .
+
+sppc:br-trunk        a skos:Concept ; skos:inScheme sppc:branching-strategy ; skos:prefLabel "Trunk-based"@en .
+sppc:br-gitflow      a skos:Concept ; skos:inScheme sppc:branching-strategy ; skos:prefLabel "gitflow (Driessen 2010)"@en .
+sppc:br-github-flow  a skos:Concept ; skos:inScheme sppc:branching-strategy ; skos:prefLabel "GitHub flow"@en .
+sppc:br-gitlab-flow  a skos:Concept ; skos:inScheme sppc:branching-strategy ; skos:prefLabel "GitLab flow"@en .
+sppc:br-release-branches a skos:Concept ; skos:inScheme sppc:branching-strategy ; skos:prefLabel "Release branches"@en .
+
+# --- 8.23 Deployment Strategy ---
+sppc:deployment-strategy a skos:ConceptScheme ;
+    dct:title "Deployment Strategy"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:humble-farley-cd , sppsrc:aws-waf ;
+    skos:hasTopConcept sppc:dep-blue-green ,
+        sppc:dep-canary ,
+        sppc:dep-dark-launch ,
+        sppc:dep-feature-toggle ,
+        sppc:dep-recreate ,
+        sppc:dep-rolling .
+
+sppc:dep-recreate    a skos:Concept ; skos:inScheme sppc:deployment-strategy ; skos:prefLabel "Recreate"@en .
+sppc:dep-rolling     a skos:Concept ; skos:inScheme sppc:deployment-strategy ; skos:prefLabel "Rolling"@en .
+sppc:dep-blue-green  a skos:Concept ; skos:inScheme sppc:deployment-strategy ; skos:prefLabel "Blue-green"@en .
+sppc:dep-canary      a skos:Concept ; skos:inScheme sppc:deployment-strategy ; skos:prefLabel "Canary"@en .
+sppc:dep-dark-launch a skos:Concept ; skos:inScheme sppc:deployment-strategy ; skos:prefLabel "Dark launch"@en .
+sppc:dep-feature-toggle a skos:Concept ; skos:inScheme sppc:deployment-strategy ; skos:prefLabel "Feature toggle"@en .
+
+# --- 8.24 Rollback Policy ---
+sppc:rollback-policy a skos:ConceptScheme ;
+    dct:title "Rollback Policy"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:humble-farley-cd , sppsrc:google-sre ;
+    skos:hasTopConcept sppc:rb-automatic ,
+        sppc:rb-forward-only ,
+        sppc:rb-immutable ,
+        sppc:rb-manual .
+
+sppc:rb-automatic    a skos:Concept ; skos:inScheme sppc:rollback-policy ; skos:prefLabel "Automatic on failure signal"@en .
+sppc:rb-manual       a skos:Concept ; skos:inScheme sppc:rollback-policy ; skos:prefLabel "Manual"@en .
+sppc:rb-forward-only a skos:Concept ; skos:inScheme sppc:rollback-policy ; skos:prefLabel "Forward-only (no rollback)"@en .
+sppc:rb-immutable    a skos:Concept ; skos:inScheme sppc:rollback-policy ; skos:prefLabel "Immutable + replace"@en .
+
+# --- 8.25 Visibility ---
+sppc:visibility a skos:ConceptScheme ;
+    dct:title "Visibility"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PRACTITIONER_ONLY ;
+    rdfs:comment "Practitioner consensus; language-spec visibility modifiers (JLS §6.6, Rust Reference) are artifact-level analogues."@en ;
+    skos:hasTopConcept sppc:vis-internal ,
+        sppc:vis-open-source ,
+        sppc:vis-private ,
+        sppc:vis-public .
+
+sppc:vis-private     a skos:Concept ; skos:inScheme sppc:visibility ; skos:prefLabel "Private"@en .
+sppc:vis-internal    a skos:Concept ; skos:inScheme sppc:visibility ; skos:prefLabel "Internal"@en .
+sppc:vis-public      a skos:Concept ; skos:inScheme sppc:visibility ; skos:prefLabel "Public"@en .
+sppc:vis-open-source a skos:Concept ; skos:inScheme sppc:visibility ; skos:prefLabel "Open-source"@en .
+
+# =============================================================================
+# 8.26 — 8.66  EXHAUSTIVE EXPANSION (v4.1)
+# Every remaining v3.0.4 enum now has a SKOS scheme with axis, tier, status,
+# grounding sources, and concept values. Inserted in v4.1 per the
+# "exhaustive expansion" request.
+# =============================================================================
+
+# --- 8.26 ProjectKind (T0) ---
+sppc:project-kind a skos:ConceptScheme ;
+    dct:title "Project Kind"@en ;
+    rdfs:comment "What the project fundamentally is. T0: changes here imply a different artefact entirely. SEMAT Essence notes that project kinds are NOT universal; this enum is practitioner consensus."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T0 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:pk-application ,
+        sppc:pk-cli ,
+        sppc:pk-daemon ,
+        sppc:pk-dataset ,
+        sppc:pk-documentation ,
+        sppc:pk-framework ,
+        sppc:pk-infra-module ,
+        sppc:pk-library ,
+        sppc:pk-mobile-app ,
+        sppc:pk-model ,
+        sppc:pk-plugin ,
+        sppc:pk-sdk ,
+        sppc:pk-service ,
+        sppc:pk-web-app .
+
+sppc:pk-application      a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Application"@en .
+sppc:pk-library          a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Library"@en .
+sppc:pk-service          a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Service"@en .
+sppc:pk-framework        a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Framework"@en .
+sppc:pk-cli              a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "CLI tool"@en .
+sppc:pk-plugin           a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Plugin / extension"@en .
+sppc:pk-sdk              a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "SDK"@en .
+sppc:pk-daemon           a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Daemon / background process"@en .
+sppc:pk-mobile-app       a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Mobile application"@en .
+sppc:pk-web-app          a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Web application"@en .
+sppc:pk-dataset          a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Dataset"@en .
+sppc:pk-model            a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Machine-learning model"@en .
+sppc:pk-infra-module     a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Infrastructure module"@en .
+sppc:pk-documentation    a skos:Concept ; skos:inScheme sppc:project-kind ; skos:prefLabel "Documentation project"@en .
+
+# --- 8.27 RuntimePlatform (T1) ---
+sppc:runtime-platform a skos:ConceptScheme ;
+    dct:title "Runtime Platform"@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence ;
+    rdfs:comment "Each value has a vendor-canonical source (nodejs.org, python.org, oracle.com/java, etc.); the set itself is curated practitioner consensus."@en ;
+    skos:hasTopConcept sppc:rt-browser ,
+        sppc:rt-bun ,
+        sppc:rt-c ,
+        sppc:rt-cpp ,
+        sppc:rt-deno ,
+        sppc:rt-dotnet ,
+        sppc:rt-elixir ,
+        sppc:rt-erlang ,
+        sppc:rt-go ,
+        sppc:rt-jvm ,
+        sppc:rt-nodejs ,
+        sppc:rt-php ,
+        sppc:rt-python ,
+        sppc:rt-ruby ,
+        sppc:rt-rust ,
+        sppc:rt-swift ,
+        sppc:rt-wasm .
+
+sppc:rt-nodejs    a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Node.js"@en .
+sppc:rt-deno      a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Deno"@en .
+sppc:rt-bun       a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Bun"@en .
+sppc:rt-python    a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Python (CPython)"@en .
+sppc:rt-jvm       a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "JVM (Java, Kotlin, Scala)"@en .
+sppc:rt-dotnet    a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel ".NET"@en .
+sppc:rt-go        a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Go"@en .
+sppc:rt-rust      a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Rust"@en .
+sppc:rt-ruby      a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Ruby"@en .
+sppc:rt-php       a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "PHP"@en .
+sppc:rt-swift     a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Swift"@en .
+sppc:rt-erlang    a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Erlang / BEAM"@en .
+sppc:rt-elixir    a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Elixir"@en .
+sppc:rt-c         a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "C"@en .
+sppc:rt-cpp       a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "C++"@en .
+sppc:rt-browser   a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "Browser (ECMAScript)"@en .
+sppc:rt-wasm      a skos:Concept ; skos:inScheme sppc:runtime-platform ; skos:prefLabel "WebAssembly"@en .
+
+# --- 8.28 DependencyKind (T2) ---
+sppc:dependency-kind a skos:ConceptScheme ;
+    dct:title "Dependency Kind"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:semver ;
+    rdfs:comment "Package-manager conventions converge on this tripartition (runtime/build/dev) plus modifiers (peer, optional, test, bundled). Per npm package.json, PEP 631, Cargo manifest, Maven POM."@en ;
+    skos:hasTopConcept sppc:dk-build ,
+        sppc:dk-bundled ,
+        sppc:dk-dev ,
+        sppc:dk-optional ,
+        sppc:dk-peer ,
+        sppc:dk-runtime ,
+        sppc:dk-test .
+
+sppc:dk-runtime  a skos:Concept ; skos:inScheme sppc:dependency-kind ; skos:prefLabel "Runtime"@en .
+sppc:dk-build    a skos:Concept ; skos:inScheme sppc:dependency-kind ; skos:prefLabel "Build"@en .
+sppc:dk-dev      a skos:Concept ; skos:inScheme sppc:dependency-kind ; skos:prefLabel "Development"@en .
+sppc:dk-test     a skos:Concept ; skos:inScheme sppc:dependency-kind ; skos:prefLabel "Test"@en .
+sppc:dk-peer     a skos:Concept ; skos:inScheme sppc:dependency-kind ; skos:prefLabel "Peer"@en .
+sppc:dk-optional a skos:Concept ; skos:inScheme sppc:dependency-kind ; skos:prefLabel "Optional"@en .
+sppc:dk-bundled  a skos:Concept ; skos:inScheme sppc:dependency-kind ; skos:prefLabel "Bundled / vendored"@en .
+
+# --- 8.29 ComponentOwnership (T2, UML 2.5.1) ---
+sppc:component-ownership a skos:ConceptScheme ;
+    dct:title "Component Ownership"@en ;
+    rdfs:comment "Canonical UML association strengths: composition (lifecycle-dependent), aggregation (whole-part weak), association (general relation)."@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-uml , sppsrc:archimate-3-2 ;
+    skos:hasTopConcept sppc:co-aggregation ,
+        sppc:co-association ,
+        sppc:co-composition .
+
+sppc:co-composition  a skos:Concept ; skos:inScheme sppc:component-ownership ; skos:prefLabel "Composition (UML black diamond)"@en .
+sppc:co-aggregation  a skos:Concept ; skos:inScheme sppc:component-ownership ; skos:prefLabel "Aggregation (UML white diamond)"@en .
+sppc:co-association  a skos:Concept ; skos:inScheme sppc:component-ownership ; skos:prefLabel "Association"@en .
+
+# --- 8.30 PlannedEnvironmentKind (T1) ---
+sppc:planned-environment-kind a skos:ConceptScheme ;
+    dct:title "Planned Environment Kind"@en ;
+    rdfs:comment "Twelve-Factor App §10 (dev/prod parity) implicitly defines this axis. No formal standard enumerates environments."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:12factor ;
+    skos:hasTopConcept sppc:pe-demo ,
+        sppc:pe-dev ,
+        sppc:pe-dr ,
+        sppc:pe-local ,
+        sppc:pe-preview ,
+        sppc:pe-prod ,
+        sppc:pe-qa ,
+        sppc:pe-sandbox ,
+        sppc:pe-staging ,
+        sppc:pe-test .
+
+sppc:pe-local     a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Local"@en .
+sppc:pe-dev       a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Development"@en .
+sppc:pe-test      a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Test / CI"@en .
+sppc:pe-qa        a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "QA"@en .
+sppc:pe-staging   a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Staging"@en .
+sppc:pe-preview   a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Preview / ephemeral"@en .
+sppc:pe-demo      a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Demo"@en .
+sppc:pe-sandbox   a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Sandbox"@en .
+sppc:pe-prod      a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Production"@en .
+sppc:pe-dr        a skos:Concept ; skos:inScheme sppc:planned-environment-kind ; skos:prefLabel "Disaster recovery"@en .
+
+# --- 8.31 PlannedLinkRelation (T2, ArchiMate 3.2) ---
+sppc:planned-link-relation a skos:ConceptScheme ;
+    dct:title "Planned Link Relation"@en ;
+    rdfs:comment "ArchiMate 3.2 relations subset. Models declared (plan-level) inter-component relationships."@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:archimate-3-2 , sppsrc:omg-uml ;
+    skos:hasTopConcept sppc:pl-depends-on ,
+        sppc:pl-extends ,
+        sppc:pl-flows-to ,
+        sppc:pl-implements ,
+        sppc:pl-realizes ,
+        sppc:pl-replaces ,
+        sppc:pl-triggers ,
+        sppc:pl-uses .
+
+sppc:pl-depends-on  a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Depends on"@en .
+sppc:pl-uses        a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Uses"@en .
+sppc:pl-realizes    a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Realizes"@en .
+sppc:pl-implements  a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Implements"@en .
+sppc:pl-extends     a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Extends"@en .
+sppc:pl-replaces    a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Replaces"@en .
+sppc:pl-triggers    a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Triggers"@en .
+sppc:pl-flows-to    a skos:Concept ; skos:inScheme sppc:planned-link-relation ; skos:prefLabel "Flow-to (data flow)"@en .
+
+# --- 8.32 RuntimeRelation (T1) ---
+sppc:runtime-relation a skos:ConceptScheme ;
+    dct:title "Runtime Relation"@en ;
+    rdfs:comment "Runtime call / messaging relations. Grounded in UML communication and ArchiMate technology relations; messaging-related values trace to AMQP / Kafka semantics."@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-uml , sppsrc:archimate-3-2 , sppsrc:amqp-0-9-1 ;
+    skos:hasTopConcept sppc:rr-async-message ,
+        sppc:rr-batch-read ,
+        sppc:rr-batch-write ,
+        sppc:rr-event-publish ,
+        sppc:rr-event-subscribe ,
+        sppc:rr-shared-state ,
+        sppc:rr-stream-consume ,
+        sppc:rr-stream-produce ,
+        sppc:rr-sync-call .
+
+sppc:rr-sync-call         a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Synchronous call"@en .
+sppc:rr-async-message     a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Asynchronous message"@en .
+sppc:rr-event-publish     a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Event publish"@en .
+sppc:rr-event-subscribe   a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Event subscribe"@en .
+sppc:rr-stream-consume    a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Stream consume"@en .
+sppc:rr-stream-produce    a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Stream produce"@en .
+sppc:rr-batch-read        a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Batch read"@en .
+sppc:rr-batch-write       a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Batch write"@en .
+sppc:rr-shared-state      a skos:Concept ; skos:inScheme sppc:runtime-relation ; skos:prefLabel "Shared state"@en .
+
+# --- 8.33 DataRelationCardinality (T1, UML) ---
+sppc:data-relation-cardinality a skos:ConceptScheme ;
+    dct:title "Data Relation Cardinality"@en ;
+    rdfs:comment "UML association multiplicities. The 1:1 / 1:N / N:M tripartition is canonical and formally defined."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-uml , sppsrc:codd-1970 ;
+    skos:hasTopConcept sppc:dc-many-to-many ,
+        sppc:dc-one-to-many ,
+        sppc:dc-one-to-one ,
+        sppc:dc-zero-or-one ,
+        sppc:dc-zero-to-many .
+
+sppc:dc-one-to-one        a skos:Concept ; skos:inScheme sppc:data-relation-cardinality ; skos:prefLabel "1:1"@en .
+sppc:dc-one-to-many       a skos:Concept ; skos:inScheme sppc:data-relation-cardinality ; skos:prefLabel "1:N"@en .
+sppc:dc-many-to-many      a skos:Concept ; skos:inScheme sppc:data-relation-cardinality ; skos:prefLabel "N:M"@en .
+sppc:dc-zero-or-one       a skos:Concept ; skos:inScheme sppc:data-relation-cardinality ; skos:prefLabel "0..1 (optional)"@en .
+sppc:dc-zero-to-many      a skos:Concept ; skos:inScheme sppc:data-relation-cardinality ; skos:prefLabel "0..* (optional collection)"@en .
+
+# --- 8.34 ModuleRole (T2) ---
+sppc:module-role a skos:ConceptScheme ;
+    dct:title "Module Role"@en ;
+    rdfs:comment "Component roles from DDD layered architecture and hexagonal architecture. No single canonical enumeration; practitioner pattern."@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:evans-2003-ddd , sppsrc:hexagonal , sppsrc:jansen-bosch-2005 ;
+    skos:hasTopConcept sppc:mr-adapter ,
+        sppc:mr-api ,
+        sppc:mr-application ,
+        sppc:mr-auth ,
+        sppc:mr-config ,
+        sppc:mr-domain ,
+        sppc:mr-infrastructure ,
+        sppc:mr-messaging ,
+        sppc:mr-persistence ,
+        sppc:mr-port ,
+        sppc:mr-presentation ,
+        sppc:mr-utility .
+
+sppc:mr-domain         a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Domain"@en .
+sppc:mr-application    a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Application"@en .
+sppc:mr-infrastructure a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Infrastructure"@en .
+sppc:mr-presentation   a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Presentation / UI"@en .
+sppc:mr-api            a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "API / interface layer"@en .
+sppc:mr-adapter        a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Adapter (hexagonal)"@en .
+sppc:mr-port           a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Port (hexagonal)"@en .
+sppc:mr-persistence    a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Persistence"@en .
+sppc:mr-messaging      a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Messaging"@en .
+sppc:mr-auth           a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Authentication / Authorization"@en .
+sppc:mr-config         a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Configuration"@en .
+sppc:mr-utility        a skos:Concept ; skos:inScheme sppc:module-role ; skos:prefLabel "Utility / shared"@en .
+
+# --- 8.35 CiCdProvider (T2) ---
+sppc:ci-cd-provider a skos:ConceptScheme ;
+    dct:title "CI/CD Provider"@en ;
+    rdfs:comment "Vendor catalog. CNCF landscape catalogs open-source providers; commercial providers are vendor-canonical only."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PRACTITIONER_ONLY ;
+    spp:groundedIn sppsrc:cncf-landscape , sppsrc:hilton-2016 ;
+    skos:hasTopConcept sppc:cicd-argocd ,
+        sppc:cicd-aws-codepipeline ,
+        sppc:cicd-azure-pipelines ,
+        sppc:cicd-buildkite ,
+        sppc:cicd-circleci ,
+        sppc:cicd-drone ,
+        sppc:cicd-gcp-cloud-build ,
+        sppc:cicd-github-actions ,
+        sppc:cicd-gitlab-ci ,
+        sppc:cicd-jenkins ,
+        sppc:cicd-teamcity ,
+        sppc:cicd-tekton .
+
+sppc:cicd-github-actions   a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "GitHub Actions"@en .
+sppc:cicd-gitlab-ci        a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "GitLab CI"@en .
+sppc:cicd-jenkins          a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "Jenkins"@en .
+sppc:cicd-circleci         a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "CircleCI"@en .
+sppc:cicd-azure-pipelines  a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "Azure Pipelines"@en .
+sppc:cicd-buildkite        a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "Buildkite"@en .
+sppc:cicd-drone            a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "Drone"@en .
+sppc:cicd-teamcity         a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "TeamCity"@en .
+sppc:cicd-aws-codepipeline a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "AWS CodePipeline"@en .
+sppc:cicd-gcp-cloud-build  a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "Google Cloud Build"@en .
+sppc:cicd-argocd           a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "Argo CD"@en .
+sppc:cicd-tekton           a skos:Concept ; skos:inScheme sppc:ci-cd-provider ; skos:prefLabel "Tekton"@en .
+
+# --- 8.36 BuildTool (T2) ---
+sppc:build-tool a skos:ConceptScheme ;
+    dct:title "Build Tool"@en ;
+    rdfs:comment "Vendor docs only. No standard. Listed for vocabulary completeness."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PRACTITIONER_ONLY ;
+    skos:hasTopConcept sppc:bt-bazel ,
+        sppc:bt-buck ,
+        sppc:bt-cargo ,
+        sppc:bt-cmake ,
+        sppc:bt-esbuild ,
+        sppc:bt-gradle ,
+        sppc:bt-hatch ,
+        sppc:bt-make ,
+        sppc:bt-maven ,
+        sppc:bt-msbuild ,
+        sppc:bt-npm ,
+        sppc:bt-pip ,
+        sppc:bt-pnpm ,
+        sppc:bt-poetry ,
+        sppc:bt-vite ,
+        sppc:bt-webpack ,
+        sppc:bt-yarn .
+
+sppc:bt-gradle    a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Gradle"@en .
+sppc:bt-maven     a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Maven"@en .
+sppc:bt-cargo     a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Cargo"@en .
+sppc:bt-npm       a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "npm"@en .
+sppc:bt-yarn      a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Yarn"@en .
+sppc:bt-pnpm      a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "pnpm"@en .
+sppc:bt-pip       a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "pip"@en .
+sppc:bt-poetry    a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Poetry"@en .
+sppc:bt-hatch     a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Hatch"@en .
+sppc:bt-bazel     a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Bazel"@en .
+sppc:bt-buck      a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Buck"@en .
+sppc:bt-make      a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "make"@en .
+sppc:bt-cmake     a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "CMake"@en .
+sppc:bt-msbuild   a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "MSBuild"@en .
+sppc:bt-webpack   a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Webpack"@en .
+sppc:bt-vite      a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "Vite"@en .
+sppc:bt-esbuild   a skos:Concept ; skos:inScheme sppc:build-tool ; skos:prefLabel "esbuild"@en .
+
+# --- 8.37 ContainerTool (T2, OCI-grounded) ---
+sppc:container-tool a skos:ConceptScheme ;
+    dct:title "Container Tool"@en ;
+    rdfs:comment "OCI Runtime Spec is the T1 anchor for the concept; specific tools are vendor-canonical."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:oci-runtime , sppsrc:cncf-landscape ;
+    skos:hasTopConcept sppc:ct-buildah ,
+        sppc:ct-containerd ,
+        sppc:ct-cri-o ,
+        sppc:ct-docker ,
+        sppc:ct-kaniko ,
+        sppc:ct-podman ,
+        sppc:ct-skopeo .
+
+sppc:ct-docker      a skos:Concept ; skos:inScheme sppc:container-tool ; skos:prefLabel "Docker"@en .
+sppc:ct-podman      a skos:Concept ; skos:inScheme sppc:container-tool ; skos:prefLabel "Podman"@en .
+sppc:ct-containerd  a skos:Concept ; skos:inScheme sppc:container-tool ; skos:prefLabel "containerd"@en .
+sppc:ct-cri-o       a skos:Concept ; skos:inScheme sppc:container-tool ; skos:prefLabel "CRI-O"@en .
+sppc:ct-buildah     a skos:Concept ; skos:inScheme sppc:container-tool ; skos:prefLabel "Buildah"@en .
+sppc:ct-kaniko      a skos:Concept ; skos:inScheme sppc:container-tool ; skos:prefLabel "Kaniko"@en .
+sppc:ct-skopeo      a skos:Concept ; skos:inScheme sppc:container-tool ; skos:prefLabel "Skopeo"@en .
+
+# --- 8.38 InfrastructureTool (T2) ---
+sppc:infrastructure-tool a skos:ConceptScheme ;
+    dct:title "Infrastructure as Code Tool"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:cncf-landscape ;
+    skos:hasTopConcept sppc:it-ansible ,
+        sppc:it-arm ,
+        sppc:it-chef ,
+        sppc:it-cloudformation ,
+        sppc:it-crossplane ,
+        sppc:it-helm ,
+        sppc:it-kustomize ,
+        sppc:it-opentofu ,
+        sppc:it-pulumi ,
+        sppc:it-puppet ,
+        sppc:it-terraform .
+
+sppc:it-terraform     a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Terraform"@en .
+sppc:it-opentofu      a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "OpenTofu"@en .
+sppc:it-pulumi        a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Pulumi"@en .
+sppc:it-cloudformation a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "AWS CloudFormation"@en .
+sppc:it-arm           a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Azure Resource Manager / Bicep"@en .
+sppc:it-ansible       a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Ansible"@en .
+sppc:it-chef          a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Chef"@en .
+sppc:it-puppet        a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Puppet"@en .
+sppc:it-helm          a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Helm"@en .
+sppc:it-kustomize     a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Kustomize"@en .
+sppc:it-crossplane    a skos:Concept ; skos:inScheme sppc:infrastructure-tool ; skos:prefLabel "Crossplane"@en .
+
+# --- 8.39 PlatformEngineeringPattern (T2) ---
+sppc:platform-engineering-pattern a skos:ConceptScheme ;
+    dct:title "Platform Engineering Pattern"@en ;
+    rdfs:comment "Emerging field. Backstage docs, ThoughtWorks Tech Radar, GitOps Working Group are de-facto sources."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PRACTITIONER_ONLY ;
+    spp:groundedIn sppsrc:cncf-landscape ;
+    skos:hasTopConcept sppc:pep-capability ,
+        sppc:pep-gitops ,
+        sppc:pep-golden-paths ,
+        sppc:pep-idp ,
+        sppc:pep-paved-roads ,
+        sppc:pep-self-service ,
+        sppc:pep-svc-catalog .
+
+sppc:pep-idp           a skos:Concept ; skos:inScheme sppc:platform-engineering-pattern ; skos:prefLabel "Internal Developer Platform (IDP)"@en .
+sppc:pep-golden-paths  a skos:Concept ; skos:inScheme sppc:platform-engineering-pattern ; skos:prefLabel "Golden paths"@en .
+sppc:pep-paved-roads   a skos:Concept ; skos:inScheme sppc:platform-engineering-pattern ; skos:prefLabel "Paved roads"@en .
+sppc:pep-svc-catalog   a skos:Concept ; skos:inScheme sppc:platform-engineering-pattern ; skos:prefLabel "Service catalog (e.g., Backstage)"@en .
+sppc:pep-self-service  a skos:Concept ; skos:inScheme sppc:platform-engineering-pattern ; skos:prefLabel "Self-service portal"@en .
+sppc:pep-capability    a skos:Concept ; skos:inScheme sppc:platform-engineering-pattern ; skos:prefLabel "Capability platform"@en .
+sppc:pep-gitops        a skos:Concept ; skos:inScheme sppc:platform-engineering-pattern ; skos:prefLabel "GitOps"@en .
+
+# --- 8.40 CloudTopology (T1) ---
+sppc:cloud-topology a skos:ConceptScheme ;
+    dct:title "Cloud Topology"@en ;
+    spp:axisPosition spp:axisScope ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:aws-waf , sppsrc:azure-waf , sppsrc:gcp-arch ;
+    skos:hasTopConcept sppc:cloud-edge ,
+        sppc:cloud-hybrid ,
+        sppc:cloud-multi-cloud ,
+        sppc:cloud-multi-region-active ,
+        sppc:cloud-multi-region-passive ,
+        sppc:cloud-on-prem ,
+        sppc:cloud-serverless ,
+        sppc:cloud-single-region .
+
+sppc:cloud-single-region          a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "Single region"@en .
+sppc:cloud-multi-region-passive   a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "Multi-region active-passive"@en .
+sppc:cloud-multi-region-active    a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "Multi-region active-active"@en .
+sppc:cloud-multi-cloud            a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "Multi-cloud"@en .
+sppc:cloud-hybrid                 a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "Hybrid cloud + on-premise"@en .
+sppc:cloud-on-prem                a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "On-premise only"@en .
+sppc:cloud-edge                   a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "Edge / distributed"@en .
+sppc:cloud-serverless             a skos:Concept ; skos:inScheme sppc:cloud-topology ; skos:prefLabel "Serverless-first"@en .
+
+# --- 8.41 MonitoringPlatform (T2) ---
+sppc:monitoring-platform a skos:ConceptScheme ;
+    dct:title "Monitoring Platform"@en ;
+    rdfs:comment "Vendor catalog. OpenTelemetry is the T1 standard for the wire protocol; tools vary."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:opentelemetry , sppsrc:cncf-landscape ;
+    skos:hasTopConcept sppc:mon-azure-monitor ,
+        sppc:mon-cloudwatch ,
+        sppc:mon-datadog ,
+        sppc:mon-dynatrace ,
+        sppc:mon-elastic ,
+        sppc:mon-grafana ,
+        sppc:mon-honeycomb ,
+        sppc:mon-new-relic ,
+        sppc:mon-prometheus ,
+        sppc:mon-sentry ,
+        sppc:mon-splunk ,
+        sppc:mon-stackdriver .
+
+sppc:mon-prometheus  a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Prometheus"@en .
+sppc:mon-grafana     a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Grafana"@en .
+sppc:mon-datadog     a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Datadog"@en .
+sppc:mon-new-relic   a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "New Relic"@en .
+sppc:mon-dynatrace   a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Dynatrace"@en .
+sppc:mon-splunk      a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Splunk"@en .
+sppc:mon-elastic     a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Elastic / ELK"@en .
+sppc:mon-honeycomb   a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Honeycomb"@en .
+sppc:mon-cloudwatch  a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "AWS CloudWatch"@en .
+sppc:mon-stackdriver a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Google Cloud Operations"@en .
+sppc:mon-azure-monitor a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Azure Monitor"@en .
+sppc:mon-sentry      a skos:Concept ; skos:inScheme sppc:monitoring-platform ; skos:prefLabel "Sentry"@en .
+
+# --- 8.42 ObservabilityPractice (T1) ---
+sppc:observability-practice a skos:ConceptScheme ;
+    dct:title "Observability Practice"@en ;
+    rdfs:comment "SLO/SLI/SLA framing originates in Google SRE Book; OpenTelemetry is T1 standard for the wire protocol; RED/USE are practitioner heuristics."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:google-sre , sppsrc:opentelemetry ;
+    skos:hasTopConcept sppc:obs-error-budget ,
+        sppc:obs-golden-signals ,
+        sppc:obs-logs ,
+        sppc:obs-metrics ,
+        sppc:obs-profiling ,
+        sppc:obs-red-method ,
+        sppc:obs-slo-sli-sla ,
+        sppc:obs-traces ,
+        sppc:obs-use-method .
+
+sppc:obs-metrics         a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "Metrics"@en .
+sppc:obs-logs            a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "Structured logs"@en .
+sppc:obs-traces          a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "Distributed traces"@en .
+sppc:obs-profiling       a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "Continuous profiling"@en .
+sppc:obs-slo-sli-sla     a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "SLO / SLI / SLA"@en .
+sppc:obs-error-budget    a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "Error budgets"@en .
+sppc:obs-red-method      a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "RED method (Rate, Errors, Duration)"@en .
+sppc:obs-use-method      a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "USE method (Utilisation, Saturation, Errors)"@en .
+sppc:obs-golden-signals  a skos:Concept ; skos:inScheme sppc:observability-practice ; skos:prefLabel "Four golden signals (Latency, Traffic, Errors, Saturation)"@en .
+
+# --- 8.43 TestMethodology (T2, ISO 29119) ---
+sppc:test-methodology a skos:ConceptScheme ;
+    dct:title "Test Methodology"@en ;
+    rdfs:comment "ISO/IEC/IEEE 29119 is the T1 testing standard; ISTQB is the practitioner glossary; SWEBOK v4 Testing KA covers this."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso29119 , sppsrc:istqb , sppsrc:beck-2003-tdd ;
+    skos:hasTopConcept sppc:tm-atdd ,
+        sppc:tm-bdd ,
+        sppc:tm-exploratory ,
+        sppc:tm-model-based ,
+        sppc:tm-scripted ,
+        sppc:tm-spec-example ,
+        sppc:tm-tdd .
+
+sppc:tm-tdd         a skos:Concept ; skos:inScheme sppc:test-methodology ; skos:prefLabel "Test-Driven Development"@en .
+sppc:tm-bdd         a skos:Concept ; skos:inScheme sppc:test-methodology ; skos:prefLabel "Behavior-Driven Development"@en .
+sppc:tm-atdd        a skos:Concept ; skos:inScheme sppc:test-methodology ; skos:prefLabel "Acceptance-Test-Driven Development"@en .
+sppc:tm-spec-example a skos:Concept ; skos:inScheme sppc:test-methodology ; skos:prefLabel "Specification by Example"@en .
+sppc:tm-exploratory a skos:Concept ; skos:inScheme sppc:test-methodology ; skos:prefLabel "Exploratory testing"@en .
+sppc:tm-scripted    a skos:Concept ; skos:inScheme sppc:test-methodology ; skos:prefLabel "Scripted testing"@en .
+sppc:tm-model-based a skos:Concept ; skos:inScheme sppc:test-methodology ; skos:prefLabel "Model-based testing"@en .
+
+# --- 8.44 TestCategory (T2) ---
+sppc:test-category a skos:ConceptScheme ;
+    dct:title "Test Category"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso29119 , sppsrc:istqb ;
+    skos:hasTopConcept sppc:tc-acceptance ,
+        sppc:tc-accessibility ,
+        sppc:tc-chaos ,
+        sppc:tc-contract ,
+        sppc:tc-e2e ,
+        sppc:tc-integration ,
+        sppc:tc-load ,
+        sppc:tc-performance ,
+        sppc:tc-regression ,
+        sppc:tc-security ,
+        sppc:tc-smoke ,
+        sppc:tc-soak ,
+        sppc:tc-stress ,
+        sppc:tc-unit ,
+        sppc:tc-usability .
+
+sppc:tc-unit          a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Unit"@en .
+sppc:tc-integration   a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Integration"@en .
+sppc:tc-contract      a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Contract"@en .
+sppc:tc-e2e           a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "End-to-end"@en .
+sppc:tc-acceptance    a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Acceptance"@en .
+sppc:tc-smoke         a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Smoke"@en .
+sppc:tc-regression    a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Regression"@en .
+sppc:tc-performance   a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Performance"@en .
+sppc:tc-load          a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Load"@en .
+sppc:tc-stress        a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Stress"@en .
+sppc:tc-soak          a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Soak / endurance"@en .
+sppc:tc-security      a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Security"@en .
+sppc:tc-accessibility a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Accessibility"@en .
+sppc:tc-usability     a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Usability"@en .
+sppc:tc-chaos         a skos:Concept ; skos:inScheme sppc:test-category ; skos:prefLabel "Chaos / resilience"@en .
+
+# --- 8.45 TestTechnique (T2) ---
+sppc:test-technique a skos:ConceptScheme ;
+    dct:title "Test Technique"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso29119 , sppsrc:jia-harman-2011 , sppsrc:claessen-hughes-2000 ;
+    skos:hasTopConcept sppc:tt-boundary-value ,
+        sppc:tt-decision-table ,
+        sppc:tt-equivalence-partitioning ,
+        sppc:tt-fuzz ,
+        sppc:tt-mutation ,
+        sppc:tt-pairwise ,
+        sppc:tt-property-based ,
+        sppc:tt-snapshot ,
+        sppc:tt-state-transition .
+
+sppc:tt-equivalence-partitioning a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Equivalence partitioning"@en .
+sppc:tt-boundary-value          a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Boundary value analysis"@en .
+sppc:tt-decision-table          a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Decision table"@en .
+sppc:tt-state-transition        a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "State transition"@en .
+sppc:tt-pairwise                a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Pairwise / combinatorial"@en .
+sppc:tt-mutation                a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Mutation testing"@en .
+sppc:tt-property-based          a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Property-based testing"@en .
+sppc:tt-fuzz                    a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Fuzz testing"@en .
+sppc:tt-snapshot                a skos:Concept ; skos:inScheme sppc:test-technique ; skos:prefLabel "Snapshot / golden master"@en .
+
+# --- 8.46 SecurityTestingPractice (T2) ---
+sppc:security-testing-practice a skos:ConceptScheme ;
+    dct:title "Security Testing Practice"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:nist-800-218 , sppsrc:owasp-wstg , sppsrc:owasp-samm , sppsrc:owasp-asvs ;
+    skos:hasTopConcept sppc:sec-container-scan ,
+        sppc:sec-dast ,
+        sppc:sec-iac-scan ,
+        sppc:sec-iast ,
+        sppc:sec-pen-test ,
+        sppc:sec-red-team ,
+        sppc:sec-sast ,
+        sppc:sec-sca ,
+        sppc:sec-secret-scan ,
+        sppc:sec-threat-model .
+
+sppc:sec-sast         a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "SAST (static analysis)"@en .
+sppc:sec-dast         a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "DAST (dynamic analysis)"@en .
+sppc:sec-iast         a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "IAST (interactive)"@en .
+sppc:sec-sca          a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "SCA (software composition analysis)"@en .
+sppc:sec-secret-scan  a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "Secret scanning"@en .
+sppc:sec-container-scan a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "Container image scanning"@en .
+sppc:sec-iac-scan     a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "Infrastructure-as-Code scanning"@en .
+sppc:sec-pen-test     a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "Penetration testing"@en .
+sppc:sec-red-team     a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "Red team exercise"@en .
+sppc:sec-threat-model a skos:Concept ; skos:inScheme sppc:security-testing-practice ; skos:prefLabel "Threat modeling"@en .
+
+# --- 8.47 SecurityModel (T1) ---
+sppc:security-model a skos:ConceptScheme ;
+    dct:title "Security Model"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:nist-800-207 , sppsrc:nist-800-53 , sppsrc:nist-800-160 ;
+    skos:hasTopConcept sppc:sm-abac ,
+        sppc:sm-capability ,
+        sppc:sm-defense-depth ,
+        sppc:sm-least-privilege ,
+        sppc:sm-mac ,
+        sppc:sm-perimeter ,
+        sppc:sm-rbac ,
+        sppc:sm-zero-trust .
+
+sppc:sm-zero-trust      a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Zero Trust (NIST SP 800-207)"@en .
+sppc:sm-defense-depth   a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Defense in depth"@en .
+sppc:sm-least-privilege a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Principle of least privilege"@en .
+sppc:sm-rbac            a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Role-based access control (RBAC)"@en .
+sppc:sm-abac            a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Attribute-based access control (ABAC)"@en .
+sppc:sm-mac             a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Mandatory access control (MAC)"@en .
+sppc:sm-perimeter       a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Perimeter-based (legacy)"@en .
+sppc:sm-capability      a skos:Concept ; skos:inScheme sppc:security-model ; skos:prefLabel "Capability-based"@en .
+
+# --- 8.48 SupplyChainSecurityPractice (T1) ---
+sppc:supply-chain-security-practice a skos:ConceptScheme ;
+    dct:title "Supply Chain Security Practice"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:nist-800-218 , sppsrc:slsa , sppsrc:sigstore , sppsrc:spdx-iso5962 ;
+    skos:hasTopConcept sppc:scs-code-signing ,
+        sppc:scs-dep-pinning ,
+        sppc:scs-dep-verification ,
+        sppc:scs-provenance ,
+        sppc:scs-reproducible ,
+        sppc:scs-sbom-gen ,
+        sppc:scs-sigstore-sign ,
+        sppc:scs-slsa-attestation .
+
+sppc:scs-sbom-gen          a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "SBOM generation"@en .
+sppc:scs-slsa-attestation  a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "SLSA provenance attestation"@en .
+sppc:scs-sigstore-sign     a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "Sigstore signing"@en .
+sppc:scs-dep-pinning       a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "Dependency pinning"@en .
+sppc:scs-dep-verification  a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "Dependency verification (checksums)"@en .
+sppc:scs-reproducible      a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "Reproducible builds"@en .
+sppc:scs-code-signing      a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "Code signing"@en .
+sppc:scs-provenance        a skos:Concept ; skos:inScheme sppc:supply-chain-security-practice ; skos:prefLabel "Build-provenance tracking"@en .
+
+# --- 8.49 PrivacyCompliancePractice (T0) ---
+sppc:privacy-compliance-practice a skos:ConceptScheme ;
+    dct:title "Privacy Compliance Practice"@en ;
+    rdfs:comment "Specific regimes (GDPR/CCPA/HIPAA/etc.). Distinct from privacy-posture which is degree-of-engineering. Tier-0: regulatory binding."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T0 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:gdpr , sppsrc:ccpa , sppsrc:hipaa , sppsrc:iso31700-2023 , sppsrc:iso27701-2019 , sppsrc:lgpd , sppsrc:pci-dss ;
+    skos:hasTopConcept sppc:pcp-ccpa ,
+        sppc:pcp-consent ,
+        sppc:pcp-gdpr ,
+        sppc:pcp-hipaa ,
+        sppc:pcp-lgpd ,
+        sppc:pcp-min ,
+        sppc:pcp-pci-dss ,
+        sppc:pcp-pipeda ,
+        sppc:pcp-residency ,
+        sppc:pcp-rte .
+
+sppc:pcp-gdpr     a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "GDPR conformance"@en .
+sppc:pcp-ccpa     a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "CCPA / CPRA conformance"@en .
+sppc:pcp-hipaa    a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "HIPAA conformance"@en .
+sppc:pcp-lgpd     a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "LGPD conformance (Brazil)"@en .
+sppc:pcp-pci-dss  a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "PCI-DSS conformance"@en .
+sppc:pcp-pipeda   a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "PIPEDA conformance (Canada)"@en .
+sppc:pcp-residency a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "Data residency controls"@en .
+sppc:pcp-rte      a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "Right-to-erasure implementation"@en .
+sppc:pcp-min      a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "Data minimisation"@en .
+sppc:pcp-consent  a skos:Concept ; skos:inScheme sppc:privacy-compliance-practice ; skos:prefLabel "Consent management"@en .
+
+# --- 8.50 ProcessMethodology (T2) ---
+sppc:process-methodology a skos:ConceptScheme ;
+    dct:title "Process Methodology"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:scrum-guide , sppsrc:agile-manifesto , sppsrc:omg-essence ;
+    skos:hasTopConcept sppc:proc-dual-track ,
+        sppc:proc-kanban ,
+        sppc:proc-lean ,
+        sppc:proc-less ,
+        sppc:proc-safe ,
+        sppc:proc-scrum ,
+        sppc:proc-scrumban ,
+        sppc:proc-shape-up ,
+        sppc:proc-waterfall ,
+        sppc:proc-xp .
+
+sppc:proc-scrum        a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Scrum"@en .
+sppc:proc-kanban       a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Kanban"@en .
+sppc:proc-xp           a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Extreme Programming (XP)"@en .
+sppc:proc-scrumban     a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Scrumban"@en .
+sppc:proc-safe         a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Scaled Agile Framework (SAFe)"@en .
+sppc:proc-less         a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "LeSS (Large-Scale Scrum)"@en .
+sppc:proc-waterfall    a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Waterfall"@en .
+sppc:proc-lean         a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Lean software development"@en .
+sppc:proc-shape-up     a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Shape Up (Basecamp)"@en .
+sppc:proc-dual-track   a skos:Concept ; skos:inScheme sppc:process-methodology ; skos:prefLabel "Dual-track agile"@en .
+
+# --- 8.51 EngineeringPractice (T2) ---
+sppc:engineering-practice a skos:ConceptScheme ;
+    dct:title "Engineering Practice"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:nist-800-218 , sppsrc:beck-2003-tdd , sppsrc:cucumber-bdd , sppsrc:evans-2003-ddd ;
+    skos:hasTopConcept sppc:ep-bdd ,
+        sppc:ep-cd ,
+        sppc:ep-ci ,
+        sppc:ep-clean-arch ,
+        sppc:ep-code-review ,
+        sppc:ep-ddd ,
+        sppc:ep-mob ,
+        sppc:ep-pair ,
+        sppc:ep-refactoring ,
+        sppc:ep-tdd ,
+        sppc:ep-trunk-based .
+
+sppc:ep-tdd            a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "TDD"@en .
+sppc:ep-bdd            a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "BDD"@en .
+sppc:ep-ddd            a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "DDD"@en .
+sppc:ep-pair           a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Pair programming"@en .
+sppc:ep-mob            a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Mob programming"@en .
+sppc:ep-code-review    a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Code review"@en .
+sppc:ep-ci             a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Continuous integration"@en .
+sppc:ep-cd             a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Continuous delivery"@en .
+sppc:ep-trunk-based    a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Trunk-based development"@en .
+sppc:ep-refactoring    a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Continuous refactoring"@en .
+sppc:ep-clean-arch     a skos:Concept ; skos:inScheme sppc:engineering-practice ; skos:prefLabel "Clean architecture"@en .
+
+# --- 8.52 ComplianceLevel (T0) ---
+sppc:compliance-level a skos:ConceptScheme ;
+    dct:title "Compliance Level"@en ;
+    rdfs:comment "Verdict-states for an audit. Regime-agnostic; specific regime named via privacy-compliance-practice."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T0 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso27001 , sppsrc:soc2 ;
+    skos:hasTopConcept sppc:cl-certified ,
+        sppc:cl-continuous ,
+        sppc:cl-external ,
+        sppc:cl-internal ,
+        sppc:cl-na ,
+        sppc:cl-self .
+
+sppc:cl-na           a skos:Concept ; skos:inScheme sppc:compliance-level ; skos:prefLabel "Not applicable"@en .
+sppc:cl-self         a skos:Concept ; skos:inScheme sppc:compliance-level ; skos:prefLabel "Self-attested"@en .
+sppc:cl-internal     a skos:Concept ; skos:inScheme sppc:compliance-level ; skos:prefLabel "Internally audited"@en .
+sppc:cl-external     a skos:Concept ; skos:inScheme sppc:compliance-level ; skos:prefLabel "Externally audited"@en .
+sppc:cl-certified    a skos:Concept ; skos:inScheme sppc:compliance-level ; skos:prefLabel "Certified"@en .
+sppc:cl-continuous   a skos:Concept ; skos:inScheme sppc:compliance-level ; skos:prefLabel "Continuously monitored"@en .
+
+# --- 8.53 DocumentationApproach (T3) ---
+sppc:documentation-approach a skos:ConceptScheme ;
+    dct:title "Documentation Approach"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T3 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:iso26514 , sppsrc:diataxis , sppsrc:aghajani-2019 ;
+    skos:hasTopConcept sppc:da-api-spec-driven ,
+        sppc:da-diataxis ,
+        sppc:da-docs-as-code ,
+        sppc:da-docs-site ,
+        sppc:da-in-code-only ,
+        sppc:da-readme-only ,
+        sppc:da-tutorial-driven ,
+        sppc:da-wiki .
+
+sppc:da-readme-only       a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "README-only"@en .
+sppc:da-wiki              a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "Wiki"@en .
+sppc:da-docs-site         a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "Dedicated docs site"@en .
+sppc:da-diataxis          a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "Diátaxis-structured"@en .
+sppc:da-docs-as-code      a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "Docs-as-code"@en .
+sppc:da-in-code-only      a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "In-code comments only"@en .
+sppc:da-api-spec-driven   a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "API-spec-driven (OpenAPI portal)"@en .
+sppc:da-tutorial-driven   a skos:Concept ; skos:inScheme sppc:documentation-approach ; skos:prefLabel "Tutorial / how-to driven"@en .
+
+# --- 8.54 AiMlPosture (T1) ---
+sppc:ai-ml-posture a skos:ConceptScheme ;
+    dct:title "AI / ML Posture"@en ;
+    rdfs:comment "NIST AI RMF is the T1 anchor. Field is rapidly evolving; no canonical enumeration of postures yet."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:nist-ai-rmf , sppsrc:iso25059-2023 ;
+    skos:hasTopConcept sppc:ai-agentic ,
+        sppc:ai-embeds ,
+        sppc:ai-feature ,
+        sppc:ai-foundation ,
+        sppc:ai-none ,
+        sppc:ai-trains .
+
+sppc:ai-none          a skos:Concept ; skos:inScheme sppc:ai-ml-posture ; skos:prefLabel "No AI/ML"@en .
+sppc:ai-feature       a skos:Concept ; skos:inScheme sppc:ai-ml-posture ; skos:prefLabel "Uses AI features (third-party)"@en .
+sppc:ai-embeds        a skos:Concept ; skos:inScheme sppc:ai-ml-posture ; skos:prefLabel "Embeds third-party models"@en .
+sppc:ai-trains        a skos:Concept ; skos:inScheme sppc:ai-ml-posture ; skos:prefLabel "Trains custom models"@en .
+sppc:ai-foundation    a skos:Concept ; skos:inScheme sppc:ai-ml-posture ; skos:prefLabel "Deploys foundation models"@en .
+sppc:ai-agentic       a skos:Concept ; skos:inScheme sppc:ai-ml-posture ; skos:prefLabel "Agentic system"@en .
+
+# --- 8.55 FinOpsPosture (T2) ---
+sppc:finops-posture a skos:ConceptScheme ;
+    dct:title "FinOps Posture"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:finops-framework ;
+    skos:hasTopConcept sppc:fo-allocation ,
+        sppc:fo-mature ,
+        sppc:fo-not-tracked ,
+        sppc:fo-optimization ,
+        sppc:fo-unit-economics ,
+        sppc:fo-visibility .
+
+sppc:fo-not-tracked     a skos:Concept ; skos:inScheme sppc:finops-posture ; skos:prefLabel "Not tracked"@en .
+sppc:fo-visibility      a skos:Concept ; skos:inScheme sppc:finops-posture ; skos:prefLabel "Cost visibility"@en .
+sppc:fo-allocation      a skos:Concept ; skos:inScheme sppc:finops-posture ; skos:prefLabel "Cost allocation"@en .
+sppc:fo-optimization    a skos:Concept ; skos:inScheme sppc:finops-posture ; skos:prefLabel "Cost optimization (Inform→Optimize→Operate)"@en .
+sppc:fo-unit-economics  a skos:Concept ; skos:inScheme sppc:finops-posture ; skos:prefLabel "Unit economics"@en .
+sppc:fo-mature          a skos:Concept ; skos:inScheme sppc:finops-posture ; skos:prefLabel "Mature FinOps practice"@en .
+
+# --- 8.56 DataStreamingPattern (T1) ---
+sppc:data-streaming-pattern a skos:ConceptScheme ;
+    dct:title "Data Streaming Pattern"@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:fowler-poeaa , sppsrc:msft-arch-patterns , sppsrc:kleppmann-ddia ;
+    skos:hasTopConcept sppc:dsp-cdc ,
+        sppc:dsp-cqrs ,
+        sppc:dsp-event-sourcing ,
+        sppc:dsp-kappa-arch ,
+        sppc:dsp-lambda-arch ,
+        sppc:dsp-log-aggregation ,
+        sppc:dsp-stream-proc .
+
+sppc:dsp-event-sourcing  a skos:Concept ; skos:inScheme sppc:data-streaming-pattern ; skos:prefLabel "Event sourcing"@en .
+sppc:dsp-cqrs            a skos:Concept ; skos:inScheme sppc:data-streaming-pattern ; skos:prefLabel "CQRS"@en .
+sppc:dsp-cdc             a skos:Concept ; skos:inScheme sppc:data-streaming-pattern ; skos:prefLabel "Change Data Capture"@en .
+sppc:dsp-log-aggregation a skos:Concept ; skos:inScheme sppc:data-streaming-pattern ; skos:prefLabel "Log aggregation"@en .
+sppc:dsp-stream-proc     a skos:Concept ; skos:inScheme sppc:data-streaming-pattern ; skos:prefLabel "Stream processing"@en .
+sppc:dsp-lambda-arch     a skos:Concept ; skos:inScheme sppc:data-streaming-pattern ; skos:prefLabel "Lambda architecture"@en .
+sppc:dsp-kappa-arch      a skos:Concept ; skos:inScheme sppc:data-streaming-pattern ; skos:prefLabel "Kappa architecture"@en .
+
+# --- 8.57 MessagingPlatform (T2) ---
+sppc:messaging-platform a skos:ConceptScheme ;
+    dct:title "Messaging Platform"@en ;
+    rdfs:comment "AMQP is the T1 wire protocol for RabbitMQ; Kafka has its own protocol (T2 vendor)."@en ;
+    spp:axisPosition spp:axisConcern ;
+    spp:tier sppt:T2 ;
+    spp:groundingStatus sppst:PARTIALLY_GROUNDED ;
+    spp:groundedIn sppsrc:amqp-0-9-1 , sppsrc:apache-kafka ;
+    skos:hasTopConcept sppc:mp-eventbridge ,
+        sppc:mp-kafka ,
+        sppc:mp-nats ,
+        sppc:mp-pubsub ,
+        sppc:mp-pulsar ,
+        sppc:mp-rabbitmq ,
+        sppc:mp-redis-streams ,
+        sppc:mp-service-bus ,
+        sppc:mp-sns ,
+        sppc:mp-sqs .
+
+sppc:mp-kafka          a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "Apache Kafka"@en .
+sppc:mp-rabbitmq       a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "RabbitMQ (AMQP)"@en .
+sppc:mp-nats           a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "NATS"@en .
+sppc:mp-pulsar         a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "Apache Pulsar"@en .
+sppc:mp-sqs            a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "AWS SQS"@en .
+sppc:mp-sns            a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "AWS SNS"@en .
+sppc:mp-eventbridge    a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "AWS EventBridge"@en .
+sppc:mp-service-bus    a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "Azure Service Bus"@en .
+sppc:mp-pubsub         a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "Google Cloud Pub/Sub"@en .
+sppc:mp-redis-streams  a skos:Concept ; skos:inScheme sppc:messaging-platform ; skos:prefLabel "Redis Streams"@en .
+
+# =============================================================================
+# ADR meta-vocabulary (8.58 – 8.61)
+# =============================================================================
+
+# --- 8.58 ArchitecturalDecisionStatus (META) ---
+sppc:architectural-decision-status a skos:ConceptScheme , spp:MetaScheme ;
+    dct:title "Architectural Decision Status"@en ;
+    rdfs:comment "ADR lifecycle states. Combines Kruchten 2004 decision lifecycle + Nygard 2011 ADR template."@en ;
+    spp:groundedIn sppsrc:kruchten-2004 , sppsrc:nygard-adr , sppsrc:iso42010-2022 ;
+    skos:hasTopConcept sppc:ads-accepted ,
+        sppc:ads-challenged ,
+        sppc:ads-deprecated ,
+        sppc:ads-proposed ,
+        sppc:ads-rejected ,
+        sppc:ads-superseded .
+
+sppc:ads-proposed   a skos:Concept ; skos:inScheme sppc:architectural-decision-status ; skos:prefLabel "Proposed"@en .
+sppc:ads-accepted   a skos:Concept ; skos:inScheme sppc:architectural-decision-status ; skos:prefLabel "Accepted"@en .
+sppc:ads-rejected   a skos:Concept ; skos:inScheme sppc:architectural-decision-status ; skos:prefLabel "Rejected"@en .
+sppc:ads-deprecated a skos:Concept ; skos:inScheme sppc:architectural-decision-status ; skos:prefLabel "Deprecated"@en .
+sppc:ads-superseded a skos:Concept ; skos:inScheme sppc:architectural-decision-status ; skos:prefLabel "Superseded"@en .
+sppc:ads-challenged a skos:Concept ; skos:inScheme sppc:architectural-decision-status ; skos:prefLabel "Challenged"@en .
+
+# --- 8.59 DecisionOptionStatus (META, Tyree & Akerman 2005) ---
+# Reserved vocabulary. No SHACL property shape currently references
+# this scheme; a future spp:DecisionOption sub-entity (alternatives
+# considered alongside the selected option, per van Heesch 2012's
+# "Forces" viewpoint and Tyree & Akerman 2005's option-status field)
+# will plug into it. The vocabulary is kept in place rather than
+# inlined or removed so that the eventual extension is purely
+# additive and does not require a vocabulary migration.
+sppc:decision-option-status a skos:ConceptScheme , spp:MetaScheme ;
+    dct:title "Decision Option Status"@en ;
+    spp:groundedIn sppsrc:tyree-akerman-2005 ;
+    skos:hasTopConcept sppc:dos-considered ,
+        sppc:dos-proposed ,
+        sppc:dos-rejected ,
+        sppc:dos-selected .
+
+sppc:dos-proposed   a skos:Concept ; skos:inScheme sppc:decision-option-status ; skos:prefLabel "Proposed"@en .
+sppc:dos-considered a skos:Concept ; skos:inScheme sppc:decision-option-status ; skos:prefLabel "Considered"@en .
+sppc:dos-selected   a skos:Concept ; skos:inScheme sppc:decision-option-status ; skos:prefLabel "Selected"@en .
+sppc:dos-rejected   a skos:Concept ; skos:inScheme sppc:decision-option-status ; skos:prefLabel "Rejected"@en .
+
+# --- 8.60 DecisionTargetKind (META, Kruchten 2004 informed) ---
+sppc:decision-target-kind a skos:ConceptScheme , spp:MetaScheme ;
+    dct:title "Decision Target Kind"@en ;
+    rdfs:comment "What the decision binds. Inspired by Kruchten existence/property/executive scope levels."@en ;
+    spp:groundedIn sppsrc:kruchten-2004 , sppsrc:iso42010-2022 ;
+    skos:hasTopConcept sppc:dtk-class ,
+        sppc:dtk-component ,
+        sppc:dtk-data-model ,
+        sppc:dtk-deployment ,
+        sppc:dtk-infrastructure ,
+        sppc:dtk-interface ,
+        sppc:dtk-module ,
+        sppc:dtk-process ,
+        sppc:dtk-protocol ,
+        sppc:dtk-subsystem ,
+        sppc:dtk-system .
+
+sppc:dtk-system         a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "System"@en .
+sppc:dtk-subsystem      a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Subsystem"@en .
+sppc:dtk-component      a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Component"@en .
+sppc:dtk-module         a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Module / package"@en .
+sppc:dtk-class          a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Class / type"@en .
+sppc:dtk-interface      a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Interface / API"@en .
+sppc:dtk-protocol       a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Protocol / wire format"@en .
+sppc:dtk-data-model     a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Data model"@en .
+sppc:dtk-process        a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Process / methodology"@en .
+sppc:dtk-deployment     a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Deployment unit"@en .
+sppc:dtk-infrastructure a skos:Concept ; skos:inScheme sppc:decision-target-kind ; skos:prefLabel "Infrastructure"@en .
+
+# --- 8.61 DecisionConsequenceKind (META, Kruchten 2004 + ATAM) ---
+sppc:decision-consequence-kind a skos:ConceptScheme , spp:MetaScheme ;
+    dct:title "Decision Consequence Kind"@en ;
+    rdfs:comment "What is affected by the decision (the trade-offs). Aligns with ATAM (Kazman 2000) sensitivity points + ISO 25010 characteristics."@en ;
+    spp:groundedIn sppsrc:kruchten-2004 , sppsrc:atam , sppsrc:iso25010-2023 ;
+    skos:hasTopConcept sppc:dck-availability ,
+        sppc:dck-cost ,
+        sppc:dck-latency ,
+        sppc:dck-maintainability ,
+        sppc:dck-op-complexity ,
+        sppc:dck-performance ,
+        sppc:dck-privacy ,
+        sppc:dck-safety ,
+        sppc:dck-scalability ,
+        sppc:dck-security ,
+        sppc:dck-throughput ,
+        sppc:dck-vendor-lockin .
+
+sppc:dck-performance    a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Performance"@en .
+sppc:dck-security       a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Security"@en .
+sppc:dck-cost           a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Cost"@en .
+sppc:dck-maintainability a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Maintainability"@en .
+sppc:dck-scalability    a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Scalability"@en .
+sppc:dck-availability   a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Availability"@en .
+sppc:dck-latency        a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Latency"@en .
+sppc:dck-throughput     a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Throughput"@en .
+sppc:dck-op-complexity  a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Operational complexity"@en .
+sppc:dck-vendor-lockin  a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Vendor lock-in"@en .
+sppc:dck-privacy        a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Privacy"@en .
+sppc:dck-safety         a skos:Concept ; skos:inScheme sppc:decision-consequence-kind ; skos:prefLabel "Safety"@en .
+
+# =============================================================================
+# SEMAT Essence Alpha state schemes (8.62 – 8.66)
+# All canonical per Jacobson et al. 2012 / OMG Essence 1.2.
+# =============================================================================
+
+# --- 8.62 StakeholderAlphaState ---
+sppc:stakeholder-alpha-state a skos:ConceptScheme ;
+    dct:title "SEMAT Essence Stakeholders Alpha States"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:stk-in-agreement ,
+        sppc:stk-involved ,
+        sppc:stk-recognized ,
+        sppc:stk-represented ,
+        sppc:stk-satisfied-for-deployment ,
+        sppc:stk-satisfied-in-use .
+
+sppc:stk-recognized                a skos:Concept ; skos:inScheme sppc:stakeholder-alpha-state ; skos:prefLabel "Recognized"@en .
+sppc:stk-represented               a skos:Concept ; skos:inScheme sppc:stakeholder-alpha-state ; skos:prefLabel "Represented"@en .
+sppc:stk-involved                  a skos:Concept ; skos:inScheme sppc:stakeholder-alpha-state ; skos:prefLabel "Involved"@en .
+sppc:stk-in-agreement              a skos:Concept ; skos:inScheme sppc:stakeholder-alpha-state ; skos:prefLabel "In Agreement"@en .
+sppc:stk-satisfied-for-deployment  a skos:Concept ; skos:inScheme sppc:stakeholder-alpha-state ; skos:prefLabel "Satisfied for Deployment"@en .
+sppc:stk-satisfied-in-use          a skos:Concept ; skos:inScheme sppc:stakeholder-alpha-state ; skos:prefLabel "Satisfied in Use"@en .
+
+# --- 8.63 OpportunityAlphaState ---
+sppc:opportunity-alpha-state a skos:ConceptScheme ;
+    dct:title "SEMAT Essence Opportunity Alpha States"@en ;
+    rdfs:comment "Replaces the v3.0.4 InceptionAlphaState (which used non-canonical RUP-style names)."@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:opp-addressed ,
+        sppc:opp-benefit-accrued ,
+        sppc:opp-identified ,
+        sppc:opp-solution-needed ,
+        sppc:opp-value-established ,
+        sppc:opp-viable .
+
+sppc:opp-identified         a skos:Concept ; skos:inScheme sppc:opportunity-alpha-state ; skos:prefLabel "Identified"@en .
+sppc:opp-solution-needed    a skos:Concept ; skos:inScheme sppc:opportunity-alpha-state ; skos:prefLabel "Solution Needed"@en .
+sppc:opp-value-established  a skos:Concept ; skos:inScheme sppc:opportunity-alpha-state ; skos:prefLabel "Value Established"@en .
+sppc:opp-viable             a skos:Concept ; skos:inScheme sppc:opportunity-alpha-state ; skos:prefLabel "Viable"@en .
+sppc:opp-addressed          a skos:Concept ; skos:inScheme sppc:opportunity-alpha-state ; skos:prefLabel "Addressed"@en .
+sppc:opp-benefit-accrued    a skos:Concept ; skos:inScheme sppc:opportunity-alpha-state ; skos:prefLabel "Benefit Accrued"@en .
+
+# --- 8.64 TeamAlphaState ---
+sppc:team-alpha-state a skos:ConceptScheme ;
+    dct:title "SEMAT Essence Team Alpha States"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:team-adjourned ,
+        sppc:team-collaborating ,
+        sppc:team-formed ,
+        sppc:team-performing ,
+        sppc:team-seeded .
+
+sppc:team-seeded        a skos:Concept ; skos:inScheme sppc:team-alpha-state ; skos:prefLabel "Seeded"@en .
+sppc:team-formed        a skos:Concept ; skos:inScheme sppc:team-alpha-state ; skos:prefLabel "Formed"@en .
+sppc:team-collaborating a skos:Concept ; skos:inScheme sppc:team-alpha-state ; skos:prefLabel "Collaborating"@en .
+sppc:team-performing    a skos:Concept ; skos:inScheme sppc:team-alpha-state ; skos:prefLabel "Performing"@en .
+sppc:team-adjourned     a skos:Concept ; skos:inScheme sppc:team-alpha-state ; skos:prefLabel "Adjourned"@en .
+
+# --- 8.65 WayOfWorkingAlphaState ---
+sppc:way-of-working-alpha-state a skos:ConceptScheme ;
+    dct:title "SEMAT Essence Way of Working Alpha States"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:wow-foundation-established ,
+        sppc:wow-in-place ,
+        sppc:wow-in-use ,
+        sppc:wow-principles-established ,
+        sppc:wow-retired ,
+        sppc:wow-working-well .
+
+sppc:wow-principles-established  a skos:Concept ; skos:inScheme sppc:way-of-working-alpha-state ; skos:prefLabel "Principles Established"@en .
+sppc:wow-foundation-established  a skos:Concept ; skos:inScheme sppc:way-of-working-alpha-state ; skos:prefLabel "Foundation Established"@en .
+sppc:wow-in-use                  a skos:Concept ; skos:inScheme sppc:way-of-working-alpha-state ; skos:prefLabel "In Use"@en .
+sppc:wow-in-place                a skos:Concept ; skos:inScheme sppc:way-of-working-alpha-state ; skos:prefLabel "In Place"@en .
+sppc:wow-working-well            a skos:Concept ; skos:inScheme sppc:way-of-working-alpha-state ; skos:prefLabel "Working Well"@en .
+sppc:wow-retired                 a skos:Concept ; skos:inScheme sppc:way-of-working-alpha-state ; skos:prefLabel "Retired"@en .
+
+# --- 8.66 WorkAlphaState ---
+sppc:work-alpha-state a skos:ConceptScheme ;
+    dct:title "SEMAT Essence Work Alpha States"@en ;
+    spp:axisPosition spp:axisPhase ;
+    spp:tier sppt:T1 ;
+    spp:groundingStatus sppst:FORMALLY_GROUNDED ;
+    spp:groundedIn sppsrc:omg-essence , sppsrc:jacobson-2012 ;
+    skos:hasTopConcept sppc:work-closed ,
+        sppc:work-concluded ,
+        sppc:work-initiated ,
+        sppc:work-prepared ,
+        sppc:work-started ,
+        sppc:work-under-control .
+
+sppc:work-initiated     a skos:Concept ; skos:inScheme sppc:work-alpha-state ; skos:prefLabel "Initiated"@en .
+sppc:work-prepared      a skos:Concept ; skos:inScheme sppc:work-alpha-state ; skos:prefLabel "Prepared"@en .
+sppc:work-started       a skos:Concept ; skos:inScheme sppc:work-alpha-state ; skos:prefLabel "Started"@en .
+sppc:work-under-control a skos:Concept ; skos:inScheme sppc:work-alpha-state ; skos:prefLabel "Under Control"@en .
+sppc:work-concluded     a skos:Concept ; skos:inScheme sppc:work-alpha-state ; skos:prefLabel "Concluded"@en .
+sppc:work-closed        a skos:Concept ; skos:inScheme sppc:work-alpha-state ; skos:prefLabel "Closed"@en .
+
+
+# =============================================================================
+# 9. CORE ENTITY CLASSES
+# =============================================================================
+
+spp:SoftwareProjectPlan a owl:Class ;
+    rdfs:label "Software Project Plan"@en ;
+    rdfs:comment "A plan-time view of a software project. Excludes runtime facts."@en .
+
+spp:Component a owl:Class ;
+    rdfs:label "Component"@en ;
+    rdfs:comment "A constituent module of a project as DECLARED in the plan."@en .
+
+spp:Dependency a owl:Class ;
+    rdfs:label "Dependency"@en ;
+    rdfs:comment "A declared external dependency. Excludes resolved_version (runtime)."@en .
+
+spp:PlannedEnvironment a owl:Class ;
+    rdfs:label "Planned Environment"@en ;
+    rdfs:comment "An environment declared in the plan. Excludes is_active (runtime)."@en .
+
+spp:PlannedLink a owl:Class ;
+    rdfs:label "Planned Link"@en ;
+    rdfs:comment "A declared relationship between components."@en .
+
+spp:ArchitecturalDecision a owl:Class ;
+    rdfs:label "Architectural Decision"@en ;
+    rdfs:comment "A first-class ADR per ISO/IEC/IEEE 42010:2022 §7.4."@en ;
+    rdfs:subClassOf prov:Entity .
+
+spp:Categorical a owl:Class ;
+    rdfs:label "Categorical vocabulary"@en ;
+    rdfs:comment """A concept scheme that contributes a categorical
+        decision vocabulary to the plan. Subclass of skos:ConceptScheme.
+        Distinguished from spp:MetaScheme, which describes the framework
+        itself rather than a plan-time decision."""@en ;
+    rdfs:subClassOf skos:ConceptScheme .
+
+# =============================================================================
+# 10. PROPERTIES
+# =============================================================================
+
+# --- Object properties ---
+
+spp:groundedIn a owl:ObjectProperty ;
+    rdfs:label "grounded in"@en ;
+    rdfs:range spp:GroundingSource .
+    # v4.1.0: dropped rdfs:domain spp:Categorical. Axes
+    # (spp:axisConcern, axisPhase, axisScope, axisExternality) cite
+    # sources via spp:groundedIn but are spp:Axis instances, not
+    # spp:Categorical. The previous domain falsely promoted them to
+    # skos:ConceptScheme under RDFS expansion and required a SPARQL
+    # filter exemption in ConceptSchemeMetadataShape to suppress the
+    # cascade. Removing the domain assertion eliminates the cause; the
+    # SPARQL exemption is retained as defence-in-depth.
+
+spp:tier a owl:ObjectProperty ;
+    rdfs:label "reversibility tier"@en ;
+    rdfs:range skos:Concept .
+
+spp:axisPosition a owl:ObjectProperty ;
+    rdfs:label "axis position"@en ;
+    rdfs:range spp:Axis .
+
+spp:groundingStatus a owl:ObjectProperty ;
+    rdfs:label "grounding status"@en ;
+    rdfs:range skos:Concept .
+
+spp:component a owl:ObjectProperty ;
+    rdfs:label "has component"@en ;
+    rdfs:domain spp:SoftwareProjectPlan ;
+    rdfs:range spp:Component .
+
+spp:decision a owl:ObjectProperty ;
+    rdfs:label "has decision"@en ;
+    rdfs:domain spp:SoftwareProjectPlan ;
+    rdfs:range spp:ArchitecturalDecision .
+
+spp:declaredDependency a owl:ObjectProperty ;
+    rdfs:label "declared dependency"@en ;
+    rdfs:domain spp:Component ;
+    rdfs:range spp:Dependency .
+
+# B4: every plan-level categorical property below carries
+# rdfs:domain spp:SoftwareProjectPlan so SHACL/OWL reasoners can
+# locate where the property applies. Sub-entity-scoped properties
+# carry their narrower domain explicitly.
+spp:tenancyModel a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:concurrencyModel a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:authenticationMechanism a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:idempotencyPolicy a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:cachingStrategy a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:privacyPosture a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:accessibilityPosture a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:sustainabilityPosture a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:sbomPolicy a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:architecturePattern a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:dataStorageParadigm a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:consistencyModel a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:apiSpecification a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:versioningScheme a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:deploymentStrategy a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:rollbackPolicy a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:branchingStrategy a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:visibility a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:sosType a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:decisionKind a owl:ObjectProperty ; rdfs:domain spp:ArchitecturalDecision ; rdfs:range skos:Concept .
+spp:decisionForce a owl:ObjectProperty ; rdfs:domain spp:ArchitecturalDecision ; rdfs:range skos:Concept .
+spp:reversibilityClass a owl:ObjectProperty ; rdfs:domain spp:ArchitecturalDecision ; rdfs:range skos:Concept .
+spp:technicalDebtType a owl:ObjectProperty ; rdfs:domain spp:ArchitecturalDecision ; rdfs:range skos:Concept .
+
+# --- Object properties added in v4.1 for the exhaustive scheme set ---
+spp:projectKind a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:runtimePlatform a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:dependencyKind a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:Dependency .
+spp:componentOwnership a owl:ObjectProperty ; rdfs:domain spp:Component ; rdfs:range skos:Concept .
+spp:plannedEnvironmentKind a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:PlannedEnvironment .
+spp:plannedLinkRelation a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:PlannedLink .
+spp:runtimeRelation a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:PlannedLink .
+spp:dataRelationCardinality a owl:ObjectProperty ; rdfs:domain spp:PlannedLink ; rdfs:range skos:Concept .
+spp:moduleRole a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:Component .
+spp:ciCdProvider a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:buildTool a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:containerTool a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:infrastructureTool a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:platformEngineeringPattern a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:cloudTopology a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:monitoringPlatform a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:observabilityPractice a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:testMethodology a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:testCategory a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:testTechnique a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:securityTestingPractice a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:securityModel a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:supplyChainSecurityPractice a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:privacyCompliancePractice a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:processMethodology a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:engineeringPractice a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:complianceLevel a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:documentationApproach a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:aiMlPosture a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:finOpsPosture a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:dataStreamingPattern a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:messagingPlatform a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+
+# --- ADR meta-vocab properties ---
+spp:decisionStatus a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:ArchitecturalDecision .
+spp:decisionOptionStatus a owl:ObjectProperty ; rdfs:domain spp:ArchitecturalDecision ; rdfs:range skos:Concept .
+spp:decisionTargetKind a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:ArchitecturalDecision .
+spp:decisionConsequenceKind a owl:ObjectProperty ; rdfs:range skos:Concept ;
+    rdfs:domain spp:ArchitecturalDecision .
+
+# --- SEMAT Alpha state tracking properties ---
+spp:stakeholderAlphaState a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:opportunityAlphaState a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:requirementsAlphaState a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:softwareSystemAlphaState a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:teamAlphaState a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:wayOfWorkingAlphaState a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:workAlphaState a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+
+# --- Additional plan-level properties ---
+spp:qualityCharacteristic a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:operationalExcellenceArea a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+spp:maintenanceType a owl:ObjectProperty ; rdfs:domain spp:SoftwareProjectPlan ; rdfs:range skos:Concept .
+
+# --- PlannedEnvironment and PlannedLink composition properties ---
+spp:plannedEnvironment a owl:ObjectProperty ;
+    rdfs:domain spp:SoftwareProjectPlan ;
+    rdfs:range spp:PlannedEnvironment .
+spp:plannedLink a owl:ObjectProperty ;
+    rdfs:domain spp:SoftwareProjectPlan ;
+    rdfs:range spp:PlannedLink .
+
+# --- PlannedLink endpoint properties (B2) ---
+# A PlannedLink declares a directed relationship between two components.
+# Without source/target, a link instance is structurally meaningless.
+spp:linkSource a owl:ObjectProperty ;
+    rdfs:label "link source component"@en ;
+    rdfs:domain spp:PlannedLink ;
+    rdfs:range spp:Component .
+spp:linkTarget a owl:ObjectProperty ;
+    rdfs:label "link target component"@en ;
+    rdfs:domain spp:PlannedLink ;
+    rdfs:range spp:Component .
+
+# --- Datatype properties ---
+
+spp:planName a owl:DatatypeProperty ;
+    rdfs:label "plan name"@en ;
+    rdfs:domain spp:SoftwareProjectPlan ;
+    rdfs:range xsd:string .
+spp:planVersion a owl:DatatypeProperty ;
+    rdfs:label "plan version"@en ;
+    rdfs:domain spp:SoftwareProjectPlan ;
+    rdfs:range xsd:string .
+
+# --- Sub-entity identifier properties (B1) ---
+# Distinct names for each sub-entity; conflating them with spp:planName
+# (the plan's own name) was a category error.
+spp:componentName a owl:DatatypeProperty ;
+    rdfs:label "component name"@en ;
+    rdfs:domain spp:Component ;
+    rdfs:range xsd:string .
+spp:dependencyName a owl:DatatypeProperty ;
+    rdfs:label "dependency name"@en ;
+    rdfs:domain spp:Dependency ;
+    rdfs:range xsd:string .
+spp:environmentName a owl:DatatypeProperty ;
+    rdfs:label "environment name"@en ;
+    rdfs:domain spp:PlannedEnvironment ;
+    rdfs:range xsd:string .
+
+spp:sourceTier a owl:DatatypeProperty ; rdfs:range xsd:string .
+spp:groundingQuality a owl:DatatypeProperty ; rdfs:range xsd:string .
+
+# Runtime properties — DEFINED here only to be EXPLICITLY EXCLUDED
+# from plan shapes via sh:closed. Their definition is required for
+# the disjoint-with assertion below.
+
+spp:currentVersion a owl:DatatypeProperty ;
+    rdfs:label "current version (RUNTIME — excluded from plan)"@en .
+
+spp:archivedAt a owl:DatatypeProperty ;
+    rdfs:label "archived at (RUNTIME — excluded from plan)"@en .
+
+spp:resolvedVersion a owl:DatatypeProperty ;
+    rdfs:label "resolved dependency version (RUNTIME — excluded from plan)"@en .
+
+spp:isActive a owl:DatatypeProperty ;
+    rdfs:label "is active (RUNTIME — excluded from plan)"@en .
+
+# =============================================================================
+# 11. SHACL SHAPES — validation rules
+# =============================================================================
+
+# --- 11.1 Project plan shape (closed; enforces abstraction boundary) ---
+
+sppsh:SoftwareProjectPlanShape a sh:NodeShape ;
+    sh:targetClass spp:SoftwareProjectPlan ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type rdfs:label rdfs:comment
+                           dct:title dct:description dct:created
+                           dct:modified dct:conformsTo dct:identifier
+                           dct:hasVersion dct:creator dct:license
+                           dct:issued ) ;
+    rdfs:comment """Closed shape: any property of a plan that is not
+        listed here will produce a SHACL Violation. This is how the
+        ontology enforces the plan/runtime abstraction boundary —
+        properties like spp:currentVersion, spp:archivedAt, etc., are
+        deliberately absent from this shape's sh:property list and will
+        be rejected by validators."""@en ;
+
+    sh:property [
+        sh:path spp:planName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:severity sh:Violation ;
+        sh:message "A plan must have exactly one planName."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:planVersion ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+    ] ;
+    sh:property [
+        sh:path spp:visibility ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:visibility ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:tenancyModel ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:tenancy-model ] ] ;
+        sh:severity sh:Warning ;
+        sh:message "Tenancy model is a Tier-0 decision; declare it explicitly."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:concurrencyModel ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:concurrency-model ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:authenticationMechanism ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:authentication-mechanism ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:idempotencyPolicy ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:idempotency-policy ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:cachingStrategy ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:caching-strategy ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:privacyPosture ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:privacy-posture ] ] ;
+        sh:severity sh:Warning ;
+        sh:message "Privacy posture is regulatory-bearing (GDPR, ISO 31700); declare it explicitly."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:accessibilityPosture ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:accessibility-posture ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:sustainabilityPosture ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:sustainability-posture ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:sbomPolicy ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:sbom-policy ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:architecturePattern ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:architecture-pattern ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:dataStorageParadigm ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:data-storage-paradigm ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:consistencyModel ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:consistency-model ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:apiSpecification ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:api-specification ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:versioningScheme ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:versioning-scheme ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:deploymentStrategy ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:deployment-strategy ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:rollbackPolicy ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:rollback-policy ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:branchingStrategy ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:branching-strategy ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:sosType ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:system-of-systems-type ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:component ;
+        sh:class spp:Component ;
+        sh:minCount 1 ;
+        sh:message "A plan must declare at least one component."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:decision ;
+        sh:class spp:ArchitecturalDecision ;
+    ] ;
+    # --- Composition properties added in v4.1 ---
+    sh:property [
+        sh:path spp:plannedEnvironment ;
+        sh:class spp:PlannedEnvironment ;
+    ] ;
+    sh:property [
+        sh:path spp:plannedLink ;
+        sh:class spp:PlannedLink ;
+    ] ;
+    # --- Plan-level categorical properties added in v4.1 ---
+    sh:property [
+        sh:path spp:projectKind ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:project-kind ] ] ;
+        sh:severity sh:Warning ;
+        sh:message "Project kind is Tier-0; declare it explicitly."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:runtimePlatform ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:runtime-platform ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:cloudTopology ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:cloud-topology ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:ciCdProvider ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:ci-cd-provider ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:buildTool ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:build-tool ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:containerTool ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:container-tool ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:infrastructureTool ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:infrastructure-tool ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:platformEngineeringPattern ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:platform-engineering-pattern ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:monitoringPlatform ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:monitoring-platform ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:observabilityPractice ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:observability-practice ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:testMethodology ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:test-methodology ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:testCategory ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:test-category ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:testTechnique ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:test-technique ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:securityTestingPractice ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:security-testing-practice ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:securityModel ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:security-model ] ] ;
+        sh:severity sh:Warning ;
+        sh:message "Security model is Tier-1; declare it explicitly (Zero Trust, least-privilege, etc.)."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:supplyChainSecurityPractice ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:supply-chain-security-practice ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:privacyCompliancePractice ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:privacy-compliance-practice ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:processMethodology ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:process-methodology ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:engineeringPractice ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:engineering-practice ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:complianceLevel ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:compliance-level ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:documentationApproach ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:documentation-approach ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:aiMlPosture ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:ai-ml-posture ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:finOpsPosture ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:finops-posture ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:dataStreamingPattern ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:data-streaming-pattern ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:messagingPlatform ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:messaging-platform ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:qualityCharacteristic ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:quality-characteristic ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:operationalExcellenceArea ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:operational-excellence-area ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:maintenanceType ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:maintenance-type ] ] ;
+    ] ;
+    # --- SEMAT Alpha state properties ---
+    sh:property [
+        sh:path spp:stakeholderAlphaState ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:stakeholder-alpha-state ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:opportunityAlphaState ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:opportunity-alpha-state ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:requirementsAlphaState ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:requirements-alpha-state ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:softwareSystemAlphaState ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:software-system-alpha-state ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:teamAlphaState ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:team-alpha-state ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:wayOfWorkingAlphaState ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:way-of-working-alpha-state ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:workAlphaState ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:work-alpha-state ] ] ;
+    ] .
+
+# --- 11.1.c PlannedEnvironment shape ---
+sppsh:PlannedEnvironmentShape a sh:NodeShape ;
+    sh:targetClass spp:PlannedEnvironment ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type rdfs:label rdfs:comment
+                           dct:title dct:description dct:conformsTo
+                           dct:identifier ) ;
+    sh:property [
+        sh:path spp:environmentName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "A planned environment must have exactly one environmentName."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:plannedEnvironmentKind ;
+        sh:class skos:Concept ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:planned-environment-kind ] ] ;
+        sh:message "Every planned environment must declare its kind."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:isActive ;
+        sh:maxCount 0 ;
+        sh:severity sh:Violation ;
+        sh:message "isActive is a runtime fact; it does not belong in a plan."@en ;
+    ] .
+
+# --- 11.1.d PlannedLink shape ---
+sppsh:PlannedLinkShape a sh:NodeShape ;
+    sh:targetClass spp:PlannedLink ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type rdfs:label rdfs:comment
+                           dct:title dct:description dct:conformsTo
+                           dct:identifier ) ;
+    sh:property [
+        sh:path spp:linkSource ;
+        sh:class spp:Component ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "A planned link must declare exactly one source component."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:linkTarget ;
+        sh:class spp:Component ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "A planned link must declare exactly one target component."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:plannedLinkRelation ;
+        sh:class skos:Concept ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:planned-link-relation ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:runtimeRelation ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:runtime-relation ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:dataRelationCardinality ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:data-relation-cardinality ] ] ;
+    ] .
+
+# --- 11.1.f Extended ArchitecturalDecision shape — adds status, target, consequences ---
+sppsh:ArchitecturalDecisionExtendedShape a sh:NodeShape ;
+    sh:targetClass spp:ArchitecturalDecision ;
+    sh:property [
+        sh:path spp:decisionStatus ;
+        sh:class skos:Concept ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:architectural-decision-status ] ] ;
+        sh:message "Every ADR must have exactly one lifecycle status (proposed / accepted / rejected / deprecated / superseded / challenged)."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:decisionTargetKind ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:decision-target-kind ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:decisionConsequenceKind ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:decision-consequence-kind ] ] ;
+    ] .
+
+# --- 11.2 Component shape (closed; excludes runtime fields) ---
+
+sppsh:ComponentShape a sh:NodeShape ;
+    sh:targetClass spp:Component ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type rdfs:label rdfs:comment
+                           dct:title dct:description dct:conformsTo
+                           dct:identifier ) ;
+    sh:property [
+        sh:path spp:componentName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "A component must have exactly one componentName."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:declaredDependency ;
+        sh:class spp:Dependency ;
+    ] ;
+    sh:property [
+        sh:path spp:moduleRole ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:module-role ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:componentOwnership ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:component-ownership ] ] ;
+    ] ;
+    # Explicit anti-runtime guards:
+    sh:property [
+        sh:path spp:currentVersion ;
+        sh:maxCount 0 ;
+        sh:severity sh:Violation ;
+        sh:message "currentVersion is a runtime fact; it does not belong in a plan."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:archivedAt ;
+        sh:maxCount 0 ;
+        sh:severity sh:Violation ;
+        sh:message "archivedAt is a runtime fact; it does not belong in a plan."@en ;
+    ] .
+
+# --- 11.3 Dependency shape (excludes resolved_version) ---
+
+sppsh:DependencyShape a sh:NodeShape ;
+    sh:targetClass spp:Dependency ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type rdfs:label rdfs:comment
+                           dct:title dct:description dct:conformsTo
+                           dct:identifier ) ;
+    sh:property [
+        sh:path spp:dependencyName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:message "A dependency must have exactly one dependencyName."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:dependencyKind ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:dependency-kind ] ] ;
+        sh:severity sh:Warning ;
+        sh:message "Every declared dependency should specify its kind."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:resolvedVersion ;
+        sh:maxCount 0 ;
+        sh:severity sh:Violation ;
+        sh:message "resolvedVersion is computed by a resolver at build time, not declared in a plan."@en ;
+    ] .
+
+# --- 11.4 Architectural decision shape ---
+
+sppsh:ArchitecturalDecisionShape a sh:NodeShape ;
+    sh:targetClass spp:ArchitecturalDecision ;
+    sh:property [
+        sh:path spp:decisionKind ;
+        sh:class skos:Concept ;
+        sh:minCount 1 ; sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:decision-kind ] ] ;
+        sh:message "Every architectural decision must be classified by Kruchten kind (existence / property / executive / ban)."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:decisionForce ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:decision-force ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:reversibilityClass ;
+        sh:class skos:Concept ;
+        sh:maxCount 1 ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:reversibility-tier ] ] ;
+    ] ;
+    sh:property [
+        sh:path spp:technicalDebtType ;
+        sh:class skos:Concept ;
+        sh:node [ sh:property [ sh:path skos:inScheme ; sh:hasValue sppc:technical-debt-type ] ] ;
+    ] .
+
+# --- 11.5 Reusable "in concept scheme" sub-shapes ---
+
+# --- Sub-shapes added in v4.1 for the exhaustive scheme set ---
+# --- 11.6 Concept-scheme metadata invariants ---
+# Every concept scheme in this ontology must declare axis, tier, status,
+# and at least one grounding source. The shape below enforces this.
+
+sppsh:ConceptSchemeMetadataShape a sh:NodeShape ;
+    sh:target [
+        a sh:SPARQLTarget ;
+        sh:select """
+            PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+            PREFIX spp:  <https://software-project-plan.org/v4/ontology#>
+            PREFIX sppst: <https://software-project-plan.org/v4/status#>
+            SELECT ?this WHERE {
+                ?this rdf:type skos:ConceptScheme .
+                # Primary exemption (v4.1.0): framework-internal nodes
+                # declare their status explicitly. New framework-internal
+                # classes (e.g. a future spp:Lens) need only carry
+                # spp:groundingStatus sppst:FRAMEWORK_INTERNAL to be
+                # exempted; no SPARQL change required.
+                FILTER NOT EXISTS { ?this spp:groundingStatus sppst:FRAMEWORK_INTERNAL . }
+                # Legacy exemptions (kept as defence-in-depth for any
+                # framework-internal node that has not yet been
+                # annotated with the FRAMEWORK_INTERNAL status):
+                FILTER NOT EXISTS { ?this rdf:type spp:MetaScheme . }
+                FILTER NOT EXISTS { ?this rdf:type spp:Axis . }
+            }
+        """ ;
+    ] ;
+    rdfs:comment """Applies to all project-decision concept schemes;
+        framework-internal nodes (meta-schemes, axes, future internal
+        classes) are exempted.
+
+        v4.1.0: primary exemption signal is spp:groundingStatus
+        sppst:FRAMEWORK_INTERNAL, declared by the node itself. The
+        class-based exemptions (NOT EXISTS for spp:MetaScheme /
+        spp:Axis) are retained as defence-in-depth so that a partially
+        annotated graph still validates correctly. Future
+        framework-internal classes should be annotated rather than
+        added to the SPARQL filter."""@en ;
+    sh:property [
+        sh:path spp:axisPosition ;
+        sh:minCount 1 ;
+        sh:severity sh:Warning ;
+        sh:message "Every scheme should declare an axisPosition."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:tier ;
+        sh:minCount 1 ;
+        sh:severity sh:Warning ;
+        sh:message "Every scheme should declare a reversibility tier."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:groundingStatus ;
+        sh:minCount 1 ;
+        sh:severity sh:Warning ;
+        sh:message "Every scheme should declare a grounding status."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:groundedIn ;
+        sh:severity sh:Info ;
+        sh:message "Schemes with grounding status PRACTITIONER_ONLY may have zero formal sources; FORMALLY/PARTIALLY_GROUNDED schemes should cite at least one."@en ;
+    ] .
+
+# --- 11.7 Cross-shape semantic rule: a plan with public visibility
+#         MUST declare a privacy posture and an SBOM policy ---
+
+sppsh:PublicallyReadablePlanRequiresPrivacyAndSbomShape a sh:NodeShape ;
+    # v4.1.0 (P1 #4): widened target from vis-public ONLY to
+    # vis-public OR vis-open-source. Open-source repositories are
+    # publicly readable by anyone who can read GitHub/GitLab/etc.;
+    # the privacy + SBOM declaration matters at least as much as
+    # for closed-source public plans. Distinguishing them at the
+    # rule level was a category error.
+    sh:target [
+        a sh:SPARQLTarget ;
+        sh:select """
+            PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            PREFIX spp:  <https://software-project-plan.org/v4/ontology#>
+            PREFIX sppc: <https://software-project-plan.org/v4/concept/>
+            SELECT ?this WHERE {
+                ?this rdf:type spp:SoftwareProjectPlan .
+                ?this spp:visibility ?vis .
+                FILTER (?vis IN (sppc:vis-public, sppc:vis-open-source))
+            }
+        """ ;
+    ] ;
+    sh:property [
+        sh:path spp:privacyPosture ;
+        sh:minCount 1 ;
+        sh:severity sh:Violation ;
+        sh:message "A plan with public or open-source visibility MUST declare privacyPosture."@en ;
+    ] ;
+    sh:property [
+        sh:path spp:sbomPolicy ;
+        sh:minCount 1 ;
+        sh:severity sh:Violation ;
+        sh:message "A plan with public or open-source visibility MUST declare sbomPolicy."@en ;
+    ] .
+
+# Backward-compatibility alias: the old IRI for this shape continues
+# to resolve to the new one via owl:sameAs, so any external SHACL
+# graph that imported the v4.0.0 shape by name keeps working.
+sppsh:PublicPlanRequiresPrivacyAndSbomShape
+    owl:sameAs sppsh:PublicallyReadablePlanRequiresPrivacyAndSbomShape .
+
+# =============================================================================
+# 12. ABSTRACTION-BOUNDARY OWL DISJOINTNESS
+# =============================================================================
+# The runtime properties listed above are declared owl:DatatypeProperty in
+# §10 only so that we can reference them. Here we make their incompatibility
+# with the plan explicit at the OWL level too (in addition to the SHACL
+# anti-runtime guards in §11.2 and §11.3).
+
+spp:currentVersion owl:propertyDisjointWith spp:planVersion .
