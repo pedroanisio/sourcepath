@@ -20,8 +20,37 @@ from codebase_mapper.shared_kernel.extensions import reset_registries
 from codebase_mapper.inspection.repo_source import resolve_repo_source
 
 
+EXAMPLES = """\
+examples:
+  # Full bundle (L1+L2+xrefs) from a local repo, deterministic backend:
+  python3 scripts/run_xrefs.py --repo /path/to/repo --out _tmp/repo --backend hash
+
+  # Add typed concepts (L3):
+  python3 scripts/run_xrefs.py --repo /path/to/repo --out _tmp/repo --backend sbert --concepts
+
+  # Semantic backend + LLM enrichment (L4, implies --concepts; needs Ollama):
+  python3 scripts/run_xrefs.py --repo /path/to/repo --out _tmp/repo --backend sbert --llm-enrich
+
+  # Clone and analyze a remote Git/GitHub URL:
+  python3 scripts/run_xrefs.py --repo https://github.com/OWNER/REPO.git --out _tmp/repo --backend sbert --concepts
+
+  # Pin to a specific commit, tag, or branch:
+  python3 scripts/run_xrefs.py --repo /path/to/repo --state v1.2.0 --out _tmp/repo-v1.2.0 --backend hash --concepts
+
+  # Drop vendored/generated paths (repeatable; merged with <repo>/.cbmignore):
+  python3 scripts/run_xrefs.py --repo /path/to/repo --out _tmp/repo --backend hash \\
+    --exclude 'node_modules/**' --exclude 'vendor/**'
+
+See docs/analyze.md for the full guide.
+"""
+
+
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__)
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=EXAMPLES,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("--repo", required=True,
                    help="Local repository path or Git URL, including GitHub URLs.")
     p.add_argument("--out", type=Path, required=True)
