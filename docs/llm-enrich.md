@@ -1,3 +1,13 @@
+---
+disclaimer:
+  notice: >-
+    No information within this document should be taken for granted.
+    Any statement or premise not backed by a real logical definition
+    or verifiable reference may be invalid, erroneous, or a hallucination.
+  generated_by: "GPT-5 Codex"
+  date: "2026-05-22"
+---
+
 # L4 LLM enrichment
 
 > User-facing overview (install Ollama, run the pipeline, opt out):
@@ -6,7 +16,7 @@
 > enrichment kinds, writing typed SPARQL against the L4 graph, or
 > debugging a SHACL failure.
 >
-> See also: [docs/llm-enrich-plan.md](llm-enrich-plan.md) — the
+> See also: [docs/archive/llm-enrich-plan.md](archive/llm-enrich-plan.md) — the
 > 10-step implementation plan (now shipped, kept as the
 > architectural-commitment record), and
 > [docs/llm-baseline-results.md](llm-baseline-results.md) — the
@@ -312,7 +322,7 @@ regeneration script.
 | `plugins/llm_enrich/artifact.py` | `LlmArtifact` — emits `enrichments.jsonl` |
 | `plugins/llm_enrich/prompts.py` | `PROMPT_REGISTRY`, `PromptTemplate`, `verify_registry()` |
 | `plugins/llm_enrich/prompts/*.v1.txt` | versioned prompts |
-| `codebase_mapper/constants.py` | `CBML4`, `CBML4_NS` |
+| `codebase_mapper/shared_kernel/constants.py` | `CBML4`, `CBML4_NS` |
 | `scripts/run_l4.py` | full L1+L2+L3+L4 entry point |
 | `scripts/run_l3.py` | `--llm-enrich` short-form opt-in |
 | `scripts/run_xrefs.py` | `--llm-enrich` (implies `--concepts`) |
@@ -324,6 +334,5 @@ regeneration script.
 | `tests/fixtures/llm_cache/` | committed cache fixture for CI determinism |
 | `tests/fixtures/llm_cache/regenerate.py` | rebuilds the fixture (requires Ollama) |
 | `tests/verify_llm_enrich_ci_determinism.py` | CI-runnable determinism verifier |
-| `docs/llm-enrich-plan.md` | the 10-step plan (now shipped) |
-| `docs/llm-enrich-poc.md` | the 1-day proof-of-concept doc |
+| `docs/archive/llm-enrich-plan.md` | the 10-step plan (now shipped) |
 | `docs/llm-baseline-results.md` | the 5-model benchmark + recommendation |

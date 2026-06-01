@@ -1,3 +1,13 @@
+---
+disclaimer:
+  notice: >-
+    No information within this document should be taken for granted.
+    Any statement or premise not backed by a real logical definition
+    or verifiable reference may be invalid, erroneous, or a hallucination.
+  generated_by: "GPT-5 Codex"
+  date: "2026-05-22"
+---
+
 # Installing the cbm-mcp Server
 
 The `cbm-mcp` server exposes a codebase-mapper output bundle to MCP clients
@@ -36,14 +46,15 @@ source .venv/bin/activate
 
 ```bash
 pip install -e .
-# HTTP transport / MCP server deps
-pip install -e ./frontend
+# HTTP backend + MCP server deps
+pip install -r frontend/backend/requirements.txt
+pip install -r frontend/mcp_server/requirements.txt
 ```
 
 Verify the module loads:
 
 ```bash
-python -m frontend.mcp_server --help
+python3 -c "import frontend.mcp_server; print('frontend.mcp_server ok')"
 ```
 
 ---
@@ -76,7 +87,7 @@ export CBM_WATCH_INTERVAL=30   # seconds; manifest-mtime poll for push updates
 ### Option A — stdio (recommended for Claude Code / Desktop)
 
 ```bash
-python -m frontend.mcp_server
+python3 -m frontend.mcp_server
 ```
 
 JSON-RPC over stdin/stdout. Logs go to stderr; stdout is reserved for protocol

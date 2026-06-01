@@ -1,10 +1,8 @@
 # LLM enrichment via local Ollama — implementation plan
 
-> Status: design. No code on disk yet. Reviewers, push back on the
-> architectural commitments below before any step lands — Step 1
-> freezes them. A companion proof-of-concept doc lives at
-> [docs/llm-enrich-poc.md](llm-enrich-poc.md) — start there if you want
-> a 1-day spike before committing to the full plan.
+> **Archive status:** Historical implementation plan. The L4 enrichment layer
+> has shipped; use [../llm-enrich.md](../llm-enrich.md) for the active
+> maintainer reference. This file is retained only as architectural provenance.
 
 Today every layer in a cbm bundle is mechanically derived: parse the
 source, walk the AST, run cooccurrence, attach the controlled

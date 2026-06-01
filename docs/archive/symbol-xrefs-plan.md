@@ -1,8 +1,8 @@
 # Symbol-level xref edges — implementation plan
 
-> Status: design. No code on disk yet. Reviewers, push back on the
-> architectural commitments below before any step lands — Step 1 freezes
-> them.
+> **Archive status:** Historical implementation plan. The symbol-xref layer now
+> exists under `plugins/symbol_xrefs/`, with backend and verifier coverage. This
+> file is retained only as architectural provenance.
 
 Today `cbm:imports` is a file→file edge. Peer tools (SCIP, Kythe, Stack
 Graphs) operate at the *symbol* level: this call goes to that function,

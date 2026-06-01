@@ -9,7 +9,7 @@ The §3.10 audit scored "Dependency management" at B because:
       infrastructure libraries into a domain layer;
 
   (b) the shared-kernel carve completed without legacy compatibility
-      shims at `codebase_mapper/constants.py` and `codebase_mapper/
+      shims at `codebase_mapper/shared_kernel/constants.py` and `codebase_mapper/
       extensions.py`, so any new `from codebase_mapper.constants import …`
       line silently breaks until import-time;
 
@@ -58,7 +58,7 @@ Exit codes:
     1  one or more contracts violated (details on stderr)
 
 This script encodes the bounded-context invariants documented in the
-DDD plan (see docs/cbm-inspection-report.md §3.1, §3.2, §3.3). New
+DDD archive snapshot (see docs/archive/cbm-inspection-report.md §3.1, §3.2, §3.3). New
 violations regress §3.10's score from B → C.
 """
 from __future__ import annotations

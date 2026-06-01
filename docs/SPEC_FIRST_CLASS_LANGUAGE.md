@@ -33,7 +33,7 @@ RFC 2119 keywords (MUST / SHOULD / MAY) apply throughout.
 
 ### 0.1 Languages targeted for promotion
 
-Per [docs/FEATURE_REPORT.md §13](FEATURE_REPORT.md#13-flutter-repo-ingestion--predicted-issues), the following currently-partial languages are scheduled for promotion to first-class:
+Per the archived [feature report §13](archive/FEATURE_REPORT.md#13-flutter-repo-ingestion--predicted-issues), the following formerly partial languages were scheduled for promotion to first-class:
 
 | Language        | Current state                                              | Promotion priority |
 | --------------- | ---------------------------------------------------------- | ------------------ |
@@ -307,7 +307,7 @@ A first-class language MUST have:
   promoted.
 * **C2.12.2** The bundle's `repository_summary` already exposes a
   language histogram; no doc change needed there.
-* **C2.12.3** [docs/FEATURE_REPORT.md §13](FEATURE_REPORT.md#13-flutter-repo-ingestion--predicted-issues)
+* **C2.12.3** [archived feature report §13](archive/FEATURE_REPORT.md#13-flutter-repo-ingestion--predicted-issues)
   SHOULD be regenerated against the post-promotion bundle to
   confirm gaps are closed.
 

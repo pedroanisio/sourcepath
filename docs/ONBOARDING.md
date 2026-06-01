@@ -12,7 +12,7 @@ disclaimer:
 
 ## Disclaimer
 
-This work is subject to the methodological caveats and commitments described in [@DISCLAIMER.md](./DISCLAIMER.md).
+This work is subject to the methodological caveats and commitments described in [@DISCLAIMER.md](../DISCLAIMER.md).
 > No statement or premise not backed by a real logical definition or verifiable reference should be taken for granted.
 
 > **Provenance.** Every claim in this document is grounded in the CBM bundle
@@ -56,7 +56,7 @@ least one of them. Internalize them and you can read the codebase.
 - **Frequency:** 230 occurrences across 36 files (highest non-meta concept).
 - **Alt-labels (selected):** `Bundle`, `BundleInfo`, `_emit_bundle`, `_orient_bundle`, `_load_bundle_cached`, `_select_bundle`, `_validate_bundle_name`, `chain_bundle`, `enriched_bundle`, `host_only_bundle`, `prewarm_default_bundle`, `useBundleVersion`.
 - **Top co-occurring concepts:** `test (22)`, `file (15)`, `main (13)`, `concept (12)`, `verify (12)`, `backend (11)`.
-- **Anchors (live files):** [codebase_mapper/emit_bundle.py](codebase_mapper/emit_bundle.py), [frontend/backend/app.py](frontend/backend/app.py), [frontend/backend/tests/conftest.py](frontend/backend/tests/conftest.py).
+- **Anchors (live files):** [codebase_mapper/emission/application/emit_bundle.py](../codebase_mapper/emission/application/emit_bundle.py), [frontend/backend/app.py](../frontend/backend/app.py), [frontend/backend/tests/conftest.py](../frontend/backend/tests/conftest.py).
 
 **Mental model.** A bundle is a directory on disk:
 
@@ -71,12 +71,12 @@ _tmp/<repo-name>/
 └── llm/                   # llm_enrich sidecar (when --llm-enrich)
 ```
 
-`Bundle` (a Pydantic-ish data class in [`frontend/backend/app.py`](frontend/backend/app.py)) is the in-memory cache key. `bundle_name` is the unique handle; **never** trust paths, always trust `bundle_name`. Bundle selection / resolution / cache invalidation is centralized in:
+`Bundle` (a Pydantic-ish data class in [`frontend/backend/app.py`](../frontend/backend/app.py)) is the in-memory cache key. `bundle_name` is the unique handle; **never** trust paths, always trust `bundle_name`. Bundle selection / resolution / cache invalidation is centralized in:
 
-- `_resolve_bundle_path` ([app.py:498-532](frontend/backend/app.py#L498-L532))
-- `_load_bundle_cached` ([app.py:535-537](frontend/backend/app.py#L535-L537))
-- `_clear_bundle_cache` ([app.py:545-546](frontend/backend/app.py#L545-L546))
-- `_select_bundle` ([handlers.py:452-458](frontend/mcp_server/handlers.py#L452-L458))
+- `_resolve_bundle_path` ([app.py:498-532](../frontend/backend/app.py#L498-L532))
+- `_load_bundle_cached` ([app.py:535-537](../frontend/backend/app.py#L535-L537))
+- `_clear_bundle_cache` ([app.py:545-546](../frontend/backend/app.py#L545-L546))
+- `_select_bundle` ([handlers.py:452-458](../frontend/mcp_server/handlers.py#L452-L458))
 
 If you're touching anything bundle-shaped, **start here**.
 
@@ -88,7 +88,7 @@ If you're touching anything bundle-shaped, **start here**.
 - **Frequency:** 143 occurrences across 22 files. **1361 chunks** total in the example bundle.
 - **Alt-labels (selected):** `ChunkDetail`, `_ConceptChunk`, `_FileChunk`, `_chunk_python`, `_chunk_rust`, `_chunk_tsjs`, `_chunk_id`, `_whole_file_chunk`, `chunk_iri`, `chunks_embeddings`.
 - **Top co-occurring concepts:** `file (10)`, `symbol (9)`, `xref (9)`, `list (8)`, `bundle (7)`, `id (7)`, `chunk_embedding (6)`.
-- **Anchors:** [plugins/chunks_embeddings/chunker.py](plugins/chunks_embeddings/chunker.py), [frontend/backend/app.py](frontend/backend/app.py), [frontend/mcp_server/handlers.py](frontend/mcp_server/handlers.py).
+- **Anchors:** [plugins/chunks_embeddings/chunker.py](../plugins/chunks_embeddings/chunker.py), [frontend/backend/app.py](../frontend/backend/app.py), [frontend/mcp_server/handlers.py](../frontend/mcp_server/handlers.py).
 
 **Identity.** A chunk is identified two ways:
 
@@ -96,7 +96,7 @@ If you're touching anything bundle-shaped, **start here**.
 2. **URI** — `https://codebase-mapper.example.org/cbm/instance#chunk/<path>%23<kind>%3A<symbol>%3AL<begin>-L<end>` — use for cross-tool references.
 
 If you're computing a chunk identity yourself, you almost certainly want
-`_chunk_id` / `_chunk_id_to_uri` ([app.py:305-312](frontend/backend/app.py#L305-L312)). Do not roll your own.
+`_chunk_id` / `_chunk_id_to_uri` ([app.py:305-312](../frontend/backend/app.py#L305-L312)). Do not roll your own.
 
 ### 2.3 `concept` — the unit of vocabulary
 
@@ -107,7 +107,7 @@ If you're computing a chunk identity yourself, you almost certainly want
 - **Frequency:** 135 occurrences across 29 files. **1898 concepts** in the example bundle.
 - **Alt-labels:** `ConceptAggregator`, `ConceptDetail`, `ConceptGraph`, `_ConceptChunk`, `_concept_iri`, `_concept_neighborhood`, `concept_iri`, `_pick_typed_concept`, `_pick_untyped_concept`.
 - **Top co-occurring concepts:** `file (13)`, `test (13)`, `bundle (12)`, `graph (11)`, `kind (10)`, `unknown (9)`.
-- **Anchors:** [plugins/concept_graph/concepts.py](plugins/concept_graph/concepts.py), [plugins/concept_graph/splitter.py](plugins/concept_graph/splitter.py), [codebase_mapper/vocab/](codebase_mapper/vocab/).
+- **Anchors:** [plugins/concept_graph/concepts.py](../plugins/concept_graph/concepts.py), [plugins/concept_graph/splitter.py](../plugins/concept_graph/splitter.py), [codebase_mapper/emission/infrastructure/vocab/](../codebase_mapper/emission/infrastructure/vocab/).
 
 **Read this twice.** The vocabulary is **mostly untyped**: of the top-30
 concepts, only `import_statement` carries a curated `kind`. Concepts without a
@@ -115,7 +115,7 @@ concepts, only `import_statement` carries a curated `kind`. Concepts without a
 you wire UI or LLM logic on top of `skos:related` edges, treat them as **soft
 hints**, not contracts.
 
-The curated subset lives in [`codebase_mapper/vocab/software_primitives.yaml`](codebase_mapper/vocab/software_primitives.yaml) (3.8 KB). Extend that file rather than hard-coding kinds in callers.
+The curated subset lives in [`codebase_mapper/emission/infrastructure/vocab/software_primitives.yaml`](../codebase_mapper/emission/infrastructure/vocab/software_primitives.yaml) (3.8 KB). Extend that file rather than hard-coding kinds in callers.
 
 ### 2.4 `import_statement` — the only typed primitive you'll meet on day one
 
@@ -123,16 +123,16 @@ The curated subset lives in [`codebase_mapper/vocab/software_primitives.yaml`](c
 >  an import edge in any of the supported languages."*
 
 - **Frequency:** 56 occurrences across 19 files. **Kind:** `structural-primitive`. **Broader:** `code_structure`.
-- **Anchors:** [codebase_mapper/extensions.py](codebase_mapper/extensions.py) (the `ImportResolver` Protocol), [codebase_mapper/languages/](codebase_mapper/languages/) (per-language resolvers), [plugins/symbol_xrefs/](plugins/symbol_xrefs/) (cross-file symbol resolution).
+- **Anchors:** [codebase_mapper/shared_kernel/extensions.py](../codebase_mapper/shared_kernel/extensions.py) (the `ImportResolver` Protocol), [codebase_mapper/inspection/languages/](../codebase_mapper/inspection/languages/) (per-language resolvers), [plugins/symbol_xrefs/](../plugins/symbol_xrefs/) (cross-file symbol resolution).
 - **Top co-occurring concepts:** `resolve (14)`, `language (10)`, `summary (10)`, `ast (9)`, `extract (9)`.
 
 **Why it matters.** `import_statement` is the **first-class extension point**
 of the whole project. Adding a new language means implementing an
 `ImportResolver`. The `ImportResolver` Protocol is at
-[`extensions.py:132-146`](codebase_mapper/extensions.py#L132-L146).
+[`extensions.py`](../codebase_mapper/shared_kernel/extensions.py).
 
 > ⚠ **Known limitation.** The current import-edge extractor does not see:
-> - `.proto` `import "…"` statements (all 5 protos appear orphaned — see `cbm-inspection-report.md` §R-orphans).
+> - `.proto` `import "…"` statements (all 5 protos appeared orphaned in the archived snapshot report; re-check with the live bundle before acting).
 > - Dynamic Python imports (`importlib.import_module(...)`) — at least one production module (`frontend/mcp_server/sparql.py`) is reachable only via dynamic discovery and shows zero `imports_in` edges.
 >
 > Treat the import graph as authoritative for **static** edges only.
@@ -167,9 +167,9 @@ of the whole project. Adding a new language means implementing an
 
 **Conway-style read.** The repo splits into four producer/consumer pairs:
 
-1. **Pipeline (producer) ↔ Bundle (artifact)** — `codebase_mapper/pipeline.py` produces, everyone else consumes.
+1. **Pipeline (producer) ↔ Bundle (artifact)** — `codebase_mapper/inspection/pipeline.py` produces, everyone else consumes.
 2. **Plugins (producer) ↔ Sidecar files (artifact)** — each plugin writes a small artifact (`<plugin>/artifact.py`) and an RDF graph fragment (`<plugin>/graph_writer.py`).
-3. **Backend / MCP server (consumer) ↔ HTTP/JSON-RPC (interface)** — both read bundles and expose them through different transports. They share data models in [`codebase_mapper/models.py`](codebase_mapper/models.py).
+3. **Backend / MCP server (consumer) ↔ HTTP/JSON-RPC (interface)** — both read bundles and expose them through different transports. They share data models in [`codebase_mapper/inspection/models.py`](../codebase_mapper/inspection/models.py).
 4. **UI (consumer) ↔ HTTP (interface)** — Vite/React via `frontend/ui/src/api.ts`.
 
 ---
@@ -181,11 +181,11 @@ order:
 
 | Phase / script | Produces | Anchor |
 |---|---|---|
-| **L1 host** ([`scripts/run_l2.py`](scripts/run_l2.py)) | File inventory, import edges, AST summaries, manifests, lockfiles | [`codebase_mapper/pipeline.py`](codebase_mapper/pipeline.py) |
-| **L2 chunks+embeddings** ([`scripts/run_l2.py`](scripts/run_l2.py)) | Per-function/class/file chunks with NIF spans + MiniLM vectors | [`plugins/chunks_embeddings/`](plugins/chunks_embeddings/) |
-| **L3 concept_graph** ([`scripts/run_l3.py`](scripts/run_l3.py)) | SKOS concepts from identifier splitting + co-occurrence | [`plugins/concept_graph/`](plugins/concept_graph/) |
-| **Symbol xrefs** ([`scripts/run_xrefs.py`](scripts/run_xrefs.py)) | Cross-references resolved per language | [`plugins/symbol_xrefs/`](plugins/symbol_xrefs/) |
-| **L4 llm_enrich** ([`scripts/run_l4.py`](scripts/run_l4.py)) | `llm_summary` / `llm_description` triples + sidecar JSON | [`plugins/llm_enrich/`](plugins/llm_enrich/) |
+| **L1 host** ([`scripts/run_l2.py`](../scripts/run_l2.py)) | File inventory, import edges, AST summaries, manifests, lockfiles | [`codebase_mapper/inspection/pipeline.py`](../codebase_mapper/inspection/pipeline.py) |
+| **L2 chunks+embeddings** ([`scripts/run_l2.py`](../scripts/run_l2.py)) | Per-function/class/file chunks with NIF spans + MiniLM vectors | [`plugins/chunks_embeddings/`](../plugins/chunks_embeddings/) |
+| **L3 concept_graph** ([`scripts/run_l3.py`](../scripts/run_l3.py)) | SKOS concepts from identifier splitting + co-occurrence | [`plugins/concept_graph/`](../plugins/concept_graph/) |
+| **Symbol xrefs** ([`scripts/run_xrefs.py`](../scripts/run_xrefs.py)) | Cross-references resolved per language | [`plugins/symbol_xrefs/`](../plugins/symbol_xrefs/) |
+| **L4 llm_enrich** ([`scripts/run_l4.py`](../scripts/run_l4.py)) | `llm_summary` / `llm_description` triples + sidecar JSON | [`plugins/llm_enrich/`](../plugins/llm_enrich/) |
 
 > **Sequencing matters.** L4 enrichment reads central files chosen by L1
 > import-degree, so it depends on L1. L3 concept_graph depends on L1 file
@@ -206,7 +206,7 @@ plugins/<name>/
 └── <domain-modules>.py
 ```
 
-The extension API is in [`codebase_mapper/extensions.py`](codebase_mapper/extensions.py)
+The extension API is in [`codebase_mapper/shared_kernel/extensions.py`](../codebase_mapper/shared_kernel/extensions.py)
 — 11.6 KB, 20 inbound importers. It exposes **7 extension points**; only 4
 plugins ship today. If you're adding a plugin, your `__init__.py` must hook
 into one of those slots; do not bypass `extensions.py`.
@@ -214,11 +214,11 @@ into one of those slots; do not bypass `extensions.py`.
 **The PALS's-LAW boundary.** The `llm_enrich` plugin is unique: it produces
 **untrusted, model-generated text** (`llm_summary`, `llm_description`). Every
 consumer of those fields MUST treat them as derived-and-unverified data, per
-[`CLAUDE.md`](CLAUDE.md) §LLM-Output-Verification. The current consumers are:
+[`CLAUDE.md`](../CLAUDE.md) §LLM-Output-Verification. The current consumers are:
 
-- [`frontend/ui/src/components/LlmEnrichmentCard.tsx`](frontend/ui/src/components/LlmEnrichmentCard.tsx) (UI badge)
-- `_llm_payload` ([handlers.py:537-552](frontend/mcp_server/handlers.py#L537-L552))
-- `_repository_summary` ([handlers.py:284-440](frontend/mcp_server/handlers.py#L284-L440)) — surfaces it in `central_files[].llm_summary`
+- [`frontend/ui/src/components/LlmEnrichmentCard.tsx`](../frontend/ui/src/components/LlmEnrichmentCard.tsx) (UI badge)
+- `_llm_payload` ([handlers.py:537-552](../frontend/mcp_server/handlers.py#L537-L552))
+- `_repository_summary` ([handlers.py:284-440](../frontend/mcp_server/handlers.py#L284-L440)) — surfaces it in `central_files[].llm_summary`
 
 When you wire a new consumer, **carry the provenance object through unchanged**
 (`{model, prompt_sha, target_sha, generated_at}`) and render it visibly.
@@ -238,12 +238,12 @@ When you wire a new consumer, **carry the provenance object through unchanged**
 | **NIF span** | `beginIndex` / `endIndex` byte offsets from the W3C NIF (NLP Interchange Format) standard, applied to source code. |
 | **Phase** | A pipeline stage tagged with `cbm:hasPhase`. Strict ordering is enforced. |
 | **Entry point** | A file with `kind=python_main` / `python_cli` / `python_app`. Per `repository_summary.entry_points`. |
-| **Import resolver** | Per-language Protocol implementation that resolves a raw import string to a `FileRef`. Lives in `codebase_mapper/languages/<lang>.py`. |
+| **Import resolver** | Per-language Protocol implementation that resolves a raw import string to a `FileRef`. Lives in `codebase_mapper/inspection/languages/<lang>.py`. |
 | **Symbol xref** | Cross-file edge between a usage site and a definition site, resolved by `plugins/symbol_xrefs/<lang>_resolver.py`. |
 | **SHACL** | The W3C constraint language used to validate the bundle's RDF. `shacl_conforms: true` is a green-light invariant. |
-| **PALS's LAW** | The project's architectural rule: LLM output is untrusted by default; absence of verification is a design defect. See [`CLAUDE.md`](CLAUDE.md). |
+| **PALS's LAW** | The project's architectural rule: LLM output is untrusted by default; absence of verification is a design defect. See [`CLAUDE.md`](../CLAUDE.md). |
 | **Sidecar** | A JSONL or JSON file inside the bundle that supplements RDF (e.g. `rust_items.jsonl`, `llm/*.json`). |
-| **Round-trip** | Reconstructing source files from `inventory.ttl + blobs/` and verifying byte-equality. See [`codebase_mapper/reconstruct.py`](codebase_mapper/reconstruct.py). |
+| **Round-trip** | Reconstructing source files from `inventory.ttl + blobs/` and verifying byte-equality. See [`codebase_mapper/reconstruct.py`](../codebase_mapper/emission/application/reconstruct.py). |
 
 ---
 
@@ -253,18 +253,18 @@ Follow this order, then peel off into whichever sub-system owns your task.
 
 | Step | Read | Why |
 |---:|---|---|
-| 1 | [`README.md`](README.md) | High-level intent + install. |
-| 2 | [`CLAUDE.md`](CLAUDE.md) | The rules — especially PALS's LAW (§LLM Output Verification). |
-| 3 | [`DISCLAIMER.md`](DISCLAIMER.md) | Epistemic commitments — applies to every doc and PR description. |
-| 4 | [`PURPOSE.md`](PURPOSE.md) | The "why" — never propose changes that conflict with it. |
-| 5 | [`docs/vocabulary.md`](docs/vocabulary.md) | The L3 controlled vocab — read before you touch concepts. |
-| 6 | [`docs/analyze.md`](docs/analyze.md) | How to run the pipeline locally. |
-| 7 | [`codebase_mapper/models.py`](codebase_mapper/models.py) | The data shapes. Small, central, 28 inbound importers. |
-| 8 | [`codebase_mapper/constants.py`](codebase_mapper/constants.py) | Namespaces, refkinds, phase vocab. 24 inbound importers. |
-| 9 | [`codebase_mapper/extensions.py`](codebase_mapper/extensions.py) | The plugin contract. 20 inbound importers. |
-| 10 | [`codebase_mapper/pipeline.py`](codebase_mapper/pipeline.py) | The orchestrator. |
-| 11 | [`frontend/mcp_server/handlers.py`](frontend/mcp_server/handlers.py) | The user-facing tool surface — your read-only window into the bundle. |
-| 12 | [`docs/regenerate.md`](docs/regenerate.md), [`docs/symbol-xrefs-plan.md`](docs/symbol-xrefs-plan.md), [`docs/llm-enrich.md`](docs/llm-enrich.md) | Per-subsystem deep dives. |
+| 1 | [`README.md`](../README.md) | High-level intent + install. |
+| 2 | [`CLAUDE.md`](../CLAUDE.md) | The rules — especially PALS's LAW (§LLM Output Verification). |
+| 3 | [`DISCLAIMER.md`](../DISCLAIMER.md) | Epistemic commitments — applies to every doc and PR description. |
+| 4 | [`PURPOSE.md`](../PURPOSE.md) | The "why" — never propose changes that conflict with it. |
+| 5 | [`docs/vocabulary.md`](vocabulary.md) | The L3 controlled vocab — read before you touch concepts. |
+| 6 | [`docs/analyze.md`](analyze.md) | How to run the pipeline locally. |
+| 7 | [`codebase_mapper/inspection/models.py`](../codebase_mapper/inspection/models.py) | The data shapes. |
+| 8 | [`codebase_mapper/shared_kernel/constants.py`](../codebase_mapper/shared_kernel/constants.py) | Namespaces, refkinds, phase vocab. |
+| 9 | [`codebase_mapper/shared_kernel/extensions.py`](../codebase_mapper/shared_kernel/extensions.py) | The plugin contract. |
+| 10 | [`codebase_mapper/inspection/pipeline.py`](../codebase_mapper/inspection/pipeline.py) | The orchestrator. |
+| 11 | [`frontend/mcp_server/handlers.py`](../frontend/mcp_server/handlers.py) | The user-facing tool surface — your read-only window into the bundle. |
+| 12 | [`docs/regenerate.md`](regenerate.md), [`docs/archive/symbol-xrefs-plan.md`](archive/symbol-xrefs-plan.md), [`docs/llm-enrich.md`](llm-enrich.md) | Per-subsystem deep dives. |
 
 By step 11 you can usefully open a PR.
 
@@ -291,13 +291,13 @@ These are non-negotiable. They're enforced by tests and reviewers.
 
 | Gotcha | Why it happens | What to do |
 |---|---|---|
-| `imports_of` returns `[]` for a file you can clearly see is imported | Dynamic import, `.proto`, or `.d.ts` ambient type | Cross-check with `grep` before deleting "orphan" code (see `cbm-inspection-report.md` §dead-code) |
-| Concept has no `kind` even though it's clearly structural | Vocabulary is sparsely curated (only `import_statement` has a kind in top-30) | Extend `vocab/software_primitives.yaml`, don't hard-code in callers |
-| `tests_edges` count looks too low (15 for 77 test files) | Heuristic in [`codebase_mapper/tests_edges.py`](codebase_mapper/tests_edges.py) is conservative | Either extend the heuristic or accept the under-count; never compensate downstream |
-| `frontend/backend/app.py` is 46.7 KB and intimidating | Genuine monolith — known refactor target | Don't add a 25th class to it; create a new module first |
+| `imports_of` returns `[]` for a file you can clearly see is imported | Dynamic import, `.proto`, or `.d.ts` ambient type | Cross-check with `grep` before deleting "orphan" code |
+| Concept has no `kind` even though it's clearly structural | Vocabulary is intentionally sparse | Extend `emission/infrastructure/vocab/software_primitives.yaml`, don't hard-code in callers |
+| `tests_edges` count looks too low | Heuristic in [`codebase_mapper/inspection/tests_edges.py`](../codebase_mapper/inspection/tests_edges.py) is conservative | Either extend the heuristic or accept the under-count; never compensate downstream |
+| `frontend/backend/app.py` is large and intimidating | Genuine monolith — known refactor target | Prefer adding focused modules under `frontend/backend/serving/` before expanding it |
 | LLM summary contradicts the code | LLM hallucination — expected per PALS's LAW | The code is the ground truth. File an issue if the summary is misleading. |
 | Two requirements files (`requirements.txt` + `requirements-sbert.txt`) | sbert is an opt-in backend | Edit `pyproject.toml` first; mirror to the requirements files |
-| `_repository_summary` surfaces `llm_summary` in `central_files` | Cross-feature contract — see [`test_repository_summary_central_files_carry_llm_summary`](frontend/mcp_server/tests/test_llm_enrich_surface.py) | If you change either side, update the test in the same PR |
+| `_repository_summary` surfaces `llm_summary` in `central_files` | Cross-feature contract — see [`test_repository_summary_central_files_carry_llm_summary`](../frontend/mcp_server/tests/test_llm_enrich_surface.py) | If you change either side, update the test in the same PR |
 
 ---
 
@@ -328,9 +328,9 @@ learn the codebase. Run these against the bundle for `code-base-mapper`.
 ## 11. Where to ask for help
 
 - **Code-level questions:** open an issue tagged `area/<plugin-or-subsystem>`.
-- **Architecture questions:** point to [`PURPOSE.md`](PURPOSE.md) and start a discussion before opening a PR.
-- **PALS's-LAW audit questions:** ping anyone who's edited [`plugins/llm_enrich/`](plugins/llm_enrich/) in the last 30 days.
-- **Vocabulary changes:** open a PR against [`codebase_mapper/vocab/software_primitives.yaml`](codebase_mapper/vocab/software_primitives.yaml) with at least one new concept fully typed.
+- **Architecture questions:** point to [`PURPOSE.md`](../PURPOSE.md) and start a discussion before opening a PR.
+- **PALS's-LAW audit questions:** ping anyone who's edited [`plugins/llm_enrich/`](../plugins/llm_enrich/) in the last 30 days.
+- **Vocabulary changes:** open a PR against [`codebase_mapper/emission/infrastructure/vocab/software_primitives.yaml`](../codebase_mapper/emission/infrastructure/vocab/software_primitives.yaml) with at least one new concept fully typed.
 
 Welcome.
 
@@ -347,5 +347,5 @@ Welcome.
 | 6 | distilled from §1–5 + `docs/vocabulary.md` |
 | 7 | `list_files type=documentation`, `imported_by` to confirm centrality |
 | 8 | `CLAUDE.md` §-by-§ + `bundle_summary.shacl_conforms` |
-| 9 | `imported_by` + `imports_of` cross-checks; `cbm-inspection-report.md` orphan audit |
+| 9 | `imported_by` + `imports_of` cross-checks; archived snapshot report used only as provenance |
 | 10 | `ToolSearch select:mcp__cbm__*` |

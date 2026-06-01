@@ -4,7 +4,7 @@
 The L4 absorption's back-compat anchor: a bundle built with the L4
 plugin registered must be byte-identical to one built without it,
 *as long as no enrichment kind is opted into yet*. Step 1 of the plan
-[docs/llm-enrich-plan.md] commits to this; later steps preserve it on
+[docs/archive/llm-enrich-plan.md] commits to this; later steps preserve it on
 runs that explicitly disable L4.
 
 Specifically:

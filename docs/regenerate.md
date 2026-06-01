@@ -1,3 +1,13 @@
+---
+disclaimer:
+  notice: >-
+    No information within this document should be taken for granted.
+    Any statement or premise not backed by a real logical definition
+    or verifiable reference may be invalid, erroneous, or a hallucination.
+  generated_by: "GPT-5 Codex"
+  date: "2026-05-22"
+---
+
 # Regenerate
 
 > User-facing overview (fidelity table, CLI invocation, what's lost, size
@@ -21,10 +31,10 @@ Everything else is enumerated in the report and skipped.
 
 1. The pipeline calls a per-language `LanguageAnalyzer.extract(content, path)`
    which returns `(ast_summary: dict | None, errors: list[str])`.
-   See [`codebase_mapper/pipeline.py`](../codebase_mapper/pipeline.py).
-2. `ast_summary` is stored on the [`FileRecord`](../codebase_mapper/models.py)
+   See [`codebase_mapper/inspection/pipeline.py`](../codebase_mapper/inspection/pipeline.py).
+2. `ast_summary` is stored on the [`FileRecord`](../codebase_mapper/inspection/models.py)
    as a Python dict.
-3. [`build_inventory_graph`](../codebase_mapper/rdf_emit.py) JSON-encodes it
+3. [`RdflibEmitter`](../codebase_mapper/emission/infrastructure/rdf/rdflib_emitter.py) JSON-encodes it
    (`json.dumps(..., sort_keys=True)`) and writes it as a plain string
    literal at `cbm:astSummary`:
 
@@ -32,7 +42,7 @@ Everything else is enumerated in the report and skipped.
    cbmi:file/foo.py
        cbm:astSummary "{\"ast_json\": ..., \"language\": \"python\", ...}" .
    ```
-4. [`regenerate`](../codebase_mapper/regenerate.py) walks every `cbm:File`,
+4. [`regenerate`](../codebase_mapper/emission/application/regenerate.py) walks every `cbm:File`,
    reads `cbm:language` and `cbm:astSummary`, looks up the regenerator in
    `_REGENERATORS`, and writes the returned source under `out_dir/<path>`.
 
@@ -72,7 +82,7 @@ But every implementation must:
 - Be JSON-serializable by `json.dumps(..., sort_keys=True)`. Wrap any
   non-JSON values (bytes, complex, NaN, Ellipsis, tuples) in tagged
   dicts and invert them in the regenerator. See `_ast_to_jsonable` /
-  `_jsonable_to_ast` in [`languages/python.py`](../codebase_mapper/languages/python.py)
+  `_jsonable_to_ast` in [`inspection/languages/python.py`](../codebase_mapper/inspection/languages/python.py)
   for the canonical pattern.
 - Stay independent of source positions where possible. Storing line/column
   ranges blows up the literal size and is rarely needed for regenerate.
@@ -80,9 +90,9 @@ But every implementation must:
 #### Pattern A: semantic regenerate (Python-style)
 
 Store a JSON-encoded full AST. On regenerate, materialize the AST and call
-the language's `unparse`. Example: [`extract_python_ast_summary`](../codebase_mapper/languages/python.py)
+the language's `unparse`. Example: [`extract_python_ast_summary`](../codebase_mapper/inspection/languages/python.py)
 emits `{"ast_json": <serialized ast.Module>, ...}` and
-[`regenerate_python_source`](../codebase_mapper/languages/python.py) calls
+[`regenerate_python_source`](../codebase_mapper/inspection/languages/python.py) calls
 `ast.unparse` on it.
 
 This is small and easy when the standard library (or a library like
@@ -95,7 +105,7 @@ Store the full CST with every leaf's text plus interstitial gaps, plus any
 bytes before the root node's `start_byte` (`header`) and after `end_byte`
 (`footer`). On regenerate, walk the tree pre-order and concatenate every
 string / `text` field. Example: `_ts_node_to_jsonable` →
-`regenerate_tsjs_source` in [`languages/tsjs.py`](../codebase_mapper/languages/tsjs.py).
+`regenerate_tsjs_source` in [`inspection/languages/tsjs.py`](../codebase_mapper/inspection/languages/tsjs.py).
 
 This is byte-perfect for valid UTF-8 input but expensive: in measured runs,
 TS/JS `ast_summary` JSON is ~12.5× the source size. Track the cost via
@@ -127,7 +137,7 @@ Hard requirements:
 
 ### 4. Register the callable
 
-In [`codebase_mapper/regenerate.py`](../codebase_mapper/regenerate.py), add
+In [`codebase_mapper/emission/application/regenerate.py`](../codebase_mapper/emission/application/regenerate.py), add
 your callable to `_REGENERATORS`, keyed by the `cbm:language` literal that
 your extractor produces (the same string stored in
 `FileRecord.language`):
@@ -184,7 +194,7 @@ gate for this feature.
 ### 6. Update size accounting (only if Pattern B)
 
 If you store a full CST, also bump
-[`emit_bundle.py`](../codebase_mapper/emit_bundle.py) to count it. The
+[`emit_bundle.py`](../codebase_mapper/emission/application/emit_bundle.py) to count it. The
 existing branch:
 
 ```python
@@ -326,11 +336,11 @@ before assuming the cost is acceptable for your scale.
 
 | Stage | Concern | Files |
 |---|---|---|
-| 1 | Deep AST capture (`items[]`) | `codebase_mapper/languages/rust.py::_walk_rust_decl_list` |
+| 1 | Deep AST capture (`items[]`) | `codebase_mapper/inspection/languages/rust.py::_walk_rust_decl_list` |
 | 2 | Symbol-xref resolver | `plugins/symbol_xrefs/rust_resolver.py` |
 | 3 | Test-edge use-analysis + inline `#[test]` count | `codebase_mapper/tests_edges.py` |
 | 4 | Queryable attribute surface | `rust_items.jsonl` sidecar; `items_by_attribute` MCP tool |
-| 5 | `self::` / `super::` use-path resolution | `codebase_mapper/languages/rust.py::_file_module_path` |
-| 6 | Byte-identical regenerate | `codebase_mapper/languages/rust.py::regenerate_rust_source` |
-| 7 | `ast_full_bodies_rust` counter | `codebase_mapper/emit_bundle.py` |
+| 5 | `self::` / `super::` use-path resolution | `codebase_mapper/inspection/languages/rust.py::_file_module_path` |
+| 6 | Byte-identical regenerate | `codebase_mapper/inspection/languages/rust.py::regenerate_rust_source` |
+| 7 | `ast_full_bodies_rust` counter | `codebase_mapper/emission/application/emit_bundle.py` |
 | 8 | This document |

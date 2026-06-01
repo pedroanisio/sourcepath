@@ -1,5 +1,10 @@
 # frontend
 
+## Disclaimer
+
+This work is subject to the methodological caveats and commitments described in [@DISCLAIMER.md](../DISCLAIMER.md).
+> No statement or premise not backed by a real logical definition or verifiable reference should be taken for granted.
+
 React + FastAPI visualizer for codebase-mapper output bundles in `_tmp/`.
 
 ## Layout
@@ -15,26 +20,19 @@ frontend/
 ## Tests
 
 ```bash
-# backend: 28 cases via fastapi.testclient, gates at ≥90% coverage
+# backend: fastapi.testclient suite, coverage-gated by pytest.ini
 .venv/bin/python -m pytest frontend/backend/tests/
 
-# mcp server: 357 cases (schemas, handlers, stdio + HTTP transport,
-# resources, prompts, subscriptions, OAuth, hardening, SPARQL),
-# gates at ≥90% coverage
+# mcp server: schemas, handlers, stdio + HTTP transport, resources, prompts,
+# subscriptions, OAuth, hardening, SPARQL; coverage-gated by pytest.ini
 .venv/bin/python -m pytest frontend/mcp_server/tests/
 
-# ui: 37 cases via vitest + RTL with mocked /api/*, gates at ≥90% coverage
+# ui: vitest + RTL with mocked /api/*; coverage-gated by package config
 cd frontend/ui && npm test -- --coverage
 ```
 
-Both suites enforce **≥90% coverage** (statements, branches, functions,
-lines) and fail when the threshold drops. Current state:
-
-| Layer | Tests | Statements | Branches | Functions | Lines |
-|---|---|---|---|---|---|
-| backend (`app.py`) | 28 | 98% | n/a | n/a | 98% |
-| mcp_server (`*.py`) | 357 | 95% | n/a | n/a | 95% |
-| ui (`src/**/*.tsx`) | 37 | 100% | 92% | 92% | 100% |
+Coverage thresholds live in each test configuration. Avoid hand-maintaining
+test counts in this README; use the test runner output as the source of truth.
 
 The backend tests auto-skip if `_tmp/usl-ng-core-map/run_manifest.json` is
 missing (override the path with `CBM_OUTPUT_DIR=...`). Thresholds are

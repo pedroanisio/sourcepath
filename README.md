@@ -1,5 +1,10 @@
 # codebase_mapper
 
+## Disclaimer
+
+This work is subject to the methodological caveats and commitments described in [@DISCLAIMER.md](./DISCLAIMER.md).
+> No statement or premise not backed by a real logical definition or verifiable reference should be taken for granted.
+
 Maps source code repositories into RDF graphs (turtle + JSON sidecars). The
 host classifies files, extracts per-language AST summaries, resolves imports,
 and infers tests/dependency edges. The pipeline runs through a registry of
@@ -10,16 +15,19 @@ concept graph on top.
 
 ```
 codebase_mapper/        host package
-├── languages/          per-language AST extractors and import resolvers
-├── extensions.py       seven extension protocols + registries
-├── pipeline.py         map_codebase() — drives the registries end-to-end
-├── rdf_emit.py         inventory + ontology + SHACL graph builders
+├── inspection/         classification, repo sourcing, AST extraction, imports
+│   ├── languages/      per-language analyzers and import resolvers
+│   └── pipeline.py     map_codebase() — drives inspection registries
+├── emission/           bundle emission, reconstruction, regeneration
+│   ├── application/    use-case services such as emit_bundle and regenerate
+│   └── infrastructure/ RDF, storage, and controlled-vocabulary adapters
+├── shared_kernel/      extension protocols, registries, constants, namespaces
 ├── cli.py, __main__.py CLI entry point
 └── ...
 plugins/
 ├── chunks_embeddings/  source chunks + sentence-transformer/hash embeddings
 ├── concept_graph/      identifier splitting + canonical concept set + SKOS
-├── symbol_xrefs/       symbol-level xref edges (cbmxr:Edge) — Phase 1 scaffold
+├── symbol_xrefs/       symbol-level xref edges (cbmxr:Edge)
 └── llm_enrich/         L4 LLM-authored annotations (cbml4:* triples) — opt-in
 scripts/
 ├── run_l2.py           host + chunks_embeddings registered
@@ -29,15 +37,16 @@ scripts/
 frontend/
 ├── backend/            FastAPI service that reads an output bundle and serves
 │                       summary/graph/chunk/concept JSON to the UI
+├── mcp_server/         read-only MCP tools/resources/prompts over bundles
 └── ui/                 React UI (scaffold, in progress)
 tests/
 ├── verify_l2.py        chunks_embeddings contract suite
 ├── verify_l3.py        concept_graph contract + cross-layer (with/without L2)
-├── verify_xrefs.py     symbol_xrefs schema/vocab/sidecar (Phase 1)
+├── verify_xrefs.py     symbol_xrefs schema/vocab/sidecar
 ├── verify_llm_enrich*.py  L4 llm_enrich contract suite (9 verifiers: basic,
 │                       cache, prompts, file_summary, RDF, aggregator,
 │                       determinism, offline, CLI, CI-determinism)
-└── verify_xsd_fixture.py  static/schemas/ classifier coverage
+└── verify_drift_p*.py  documentation and contract drift guards
 static/
 ├── schemas/            vendored industry-standard XSDs (IEEE 12207/29148,
 │                       IEC 5055, EIC, DDD v3, C4, AST, python-metacode,
@@ -149,9 +158,23 @@ docs/_build/**
 ## Visualize
 
 `frontend/backend` is a FastAPI service that reads an output bundle and exposes
-JSON endpoints (`/api/summary`, `/api/file-graph`, `/api/concept-graph`,
-`/api/chunks`, `POST /api/chunks/search`, `/api/concept/{name}`,
-`/api/chunk-blob/{sha}`).
+JSON endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/bundles` | List discoverable bundles and the selected bundle. |
+| `GET /api/summary` | Manifest counts, language/type breakdown, embedding backend. |
+| `GET /api/file-graph` | Top files by import-degree and their import edges. |
+| `GET /api/symbol-graph` | Symbol-level xref graph. |
+| `GET /api/concept-graph` | Concept cooccurrence graph. |
+| `GET /api/chunks` | Browse or lexically search chunks. |
+| `POST /api/chunks/search` | Semantic nearest neighbors or lexical fallback. |
+| `GET /api/chunk-blob/{sha}` | Raw chunk text blob. |
+| `GET /api/concept/{name}` | Concept detail. |
+| `GET /api/file/{path}` | File detail. |
+| `GET /api/impact/{path}` | File impact graph. |
+| `GET /api/chunk/{idx}` | Chunk detail. |
+| `GET /api/healthz` | Health check. |
 
 ```bash
 # Point at any output dir containing run_manifest.json + inventory.ttl +
@@ -338,7 +361,13 @@ extension procedure, and file map, see
 ```bash
 python tests/verify_roundtrip.py            # blob-based byte-perfect roundtrip
 python tests/verify_regenerate.py           # TTL+AST regenerate (Python semantic + TS/JS byte)
+python tests/verify_cpp.py                  # C++ classifier/analyzer/xref coverage
+python tests/verify_dart.py                 # Dart analyzer/xref/generated-file coverage
+python tests/verify_dependency_hygiene.py   # dependency hygiene regression guard
+python tests/verify_doc_hygiene.py         # README disclaimer + active Markdown local links
 python tests/verify_excludes.py             # --exclude flag + .cbmignore behavior
+python tests/verify_java.py                 # Java analyzer/xref coverage
+python tests/verify_objc.py                 # Objective-C / Objective-C++ coverage
 python tests/verify_repo_source.py          # local path + Git URL --repo handling
 python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
@@ -408,13 +437,9 @@ In-flight design work lives under [docs/](docs/):
 - [docs/llm-enrich.md](docs/llm-enrich.md) — L4 LLM enrichment layer:
   RDF predicates, SHACL shapes, cache layout, prompt versioning,
   extension procedure, file map.
-- [docs/llm-enrich-plan.md](docs/llm-enrich-plan.md) — the 10-step
-  implementation plan for L4 (now shipped; kept as the architectural-
-  commitment record).
-- [docs/llm-enrich-poc.md](docs/llm-enrich-poc.md) — the 1-day
-  proof-of-concept doc (run before committing to the plan).
 - [docs/llm-baseline-results.md](docs/llm-baseline-results.md) — the
   5-model benchmark that selected qwen2.5-coder:7b as the default.
-- [docs/symbol-xrefs-plan.md](docs/symbol-xrefs-plan.md) — proposed
-  symbol-level xref edge layer (SCIP / Stack Graphs analogue), broken
-  into 10 shippable steps. Design only; no code yet.
+
+Historical implementation plans and generated snapshot reports live under
+[docs/archive/](docs/archive/). They are provenance records, not active
+implementation guidance.

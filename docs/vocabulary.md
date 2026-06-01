@@ -1,3 +1,13 @@
+---
+disclaimer:
+  notice: >-
+    No information within this document should be taken for granted.
+    Any statement or premise not backed by a real logical definition
+    or verifiable reference may be invalid, erroneous, or a hallucination.
+  generated_by: "GPT-5 Codex"
+  date: "2026-05-22"
+---
+
 # L3 Controlled Vocabulary
 
 > User-facing overview (run the pipeline, opt out, override): [README.md
@@ -58,7 +68,7 @@ shape definitions live in
 ## Source of truth
 
 The bundled vocabulary is a single YAML file:
-[`codebase_mapper/vocab/software_primitives.yaml`](../codebase_mapper/vocab/software_primitives.yaml).
+[`codebase_mapper/emission/infrastructure/vocab/software_primitives.yaml`](../codebase_mapper/emission/infrastructure/vocab/software_primitives.yaml).
 Shape:
 
 ```yaml
@@ -82,7 +92,7 @@ broader:
 ```
 
 The loader is in
-[`codebase_mapper/vocab/loader.py`](../codebase_mapper/vocab/loader.py).
+[`codebase_mapper/emission/infrastructure/vocab/loader.py`](../codebase_mapper/emission/infrastructure/vocab/loader.py).
 `load_vocabulary(path)` validates the doc and returns a `Vocabulary`
 with two indices: `terms: dict[str, VocabTerm]` keyed by canonical
 name, and `by_alias: dict[str, str]` mapping every alias and canonical
@@ -193,7 +203,7 @@ flows through the pipeline.
 - **Renaming a term** requires adding the old name as an alias of the
   new canonical, so existing chunks/files still resolve to the term.
 - **Adding a new `kind` literal** is a coordinated change: extend the
-  closed set in `codebase_mapper/vocab/loader.py:_CONCEPT_KINDS`,
+  closed set in `codebase_mapper/emission/infrastructure/vocab/loader.py:_CONCEPT_KINDS`,
   `plugins/concept_graph/graph_writer.py:CONCEPT_KIND_LITERALS`, and
   the SHACL `sh:in` constraint. A verifier
   (`tests/verify_vocab_emission.py::test_kind_literal_set_matches_loader`)
@@ -216,8 +226,8 @@ existing one when the behavior stays within a layer.
 
 | Path | Role |
 |---|---|
-| `codebase_mapper/vocab/software_primitives.yaml` | bundled vocabulary |
-| `codebase_mapper/vocab/loader.py` | `Vocabulary`, `VocabTerm`, `load_vocabulary`, `builtin_vocabulary` |
+| `codebase_mapper/emission/infrastructure/vocab/software_primitives.yaml` | bundled vocabulary |
+| `codebase_mapper/emission/infrastructure/vocab/loader.py` | `Vocabulary`, `VocabTerm`, `load_vocabulary`, `builtin_vocabulary` |
 | `plugins/concept_graph/concepts.py` | `ConceptAggregator`, vocab resolution, `canonicalize(token, vocab)` |
 | `plugins/concept_graph/graph_writer.py` | new triples + SHACL shapes |
 | `plugins/concept_graph/artifact.py` | `concepts.json` sidecar carries `kind`/`broader` |

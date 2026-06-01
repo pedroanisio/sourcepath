@@ -18,7 +18,7 @@ Findings covered:
       Asserts every `--flag` referenced in a README example invocation
       is actually defined in the corresponding script's parser.
   #19 `LANG_BY_EXT` ↔ language strings consumed by analyzers.
-      AST-parses `codebase_mapper/_builtins.py`, extracts the language
+      AST-parses `codebase_mapper/inspection/_builtins.py`, extracts the language
       literals checked by every `*Analyzer.matches`, asserts each is
       a value present in `LANG_BY_EXT`.
   #21 Plugin-name sort prefixes ↔ extension registry naming convention.
@@ -223,7 +223,7 @@ def check_readme_cli_flags() -> None:
 
 
 def _analyzer_languages_from_builtins() -> set[str]:
-    """Parse `_builtins.py` with AST and pull every language literal
+    """Parse `inspection/_builtins.py` with AST and pull every language literal
     checked in `*Analyzer.matches`. Captures both:
 
         return record.language == "python"
@@ -231,7 +231,7 @@ def _analyzer_languages_from_builtins() -> set[str]:
 
     plus boolean-AND combinations.
     """
-    src = (REPO_ROOT / "codebase_mapper/_builtins.py").read_text()
+    src = (REPO_ROOT / "codebase_mapper/inspection/_builtins.py").read_text()
     tree = ast.parse(src)
     out: set[str] = set()
 

@@ -1,5 +1,10 @@
 # cbm-mcp — MCP server for codebase-mapper bundles
 
+## Disclaimer
+
+This work is subject to the methodological caveats and commitments described in [@DISCLAIMER.md](../../DISCLAIMER.md).
+> No statement or premise not backed by a real logical definition or verifiable reference should be taken for granted.
+
 Read-only MCP server that exposes a codebase-mapper output bundle as
 tools, resources, and prompts. Same handlers, two transports (stdio
 and streamable HTTP); pluggable auth (pre-shared key or JWT OAuth);
@@ -17,7 +22,7 @@ CBM_MCP_TOKEN=secret \
 # clients hit POST http://host/mcp/  with  Authorization: Bearer secret
 ```
 
-## Tool surface (15 tools)
+## Tool surface (18 tools)
 
 All read-only. Discoverable via `tools/list`; the description for each
 includes a "when to use" hint.
@@ -26,8 +31,10 @@ includes a "when to use" hint.
 |---|---|
 | `orient_bundle` | First call after connecting. Bundle metadata + layer cheat sheet + suggested first-five-calls. |
 | `bundle_summary` | Manifest counts, language/type histogram, embeddings backend. |
+| `repository_summary` | Repository-level summary, key files/concepts, and dependency/test coverage hint. |
 | `list_bundles` / `select_bundle` | Multi-bundle session control. |
 | `list_files` | Filter files by language / type / dir prefix; ranked by import-degree. |
+| `items_by_attribute` | Attribute-index lookup over files/chunks/concepts. |
 | `file_detail` | Path → metadata + imports both ways + tests + chunks + concepts. |
 | `file_impact` | Transitive dependency closure for a file up to `depth` hops. |
 | `imports_of` / `imported_by` | One-hop slices. Cheap. |
@@ -35,6 +42,7 @@ includes a "when to use" hint.
 | `semantic_neighbors` | Cosine NN if bundle has sbert vectors; lexical fallback otherwise. |
 | `concept_detail` | SKOS concept: frequency, alt-labels, cooccurrence, files, chunks. |
 | `concept_neighborhood` | k-hop cooccurrence walk (bounded `depth ≤ 3`). |
+| `sparql` | Read-only SPARQL escape hatch, disabled unless `CBM_ENABLE_SPARQL=1`. |
 
 ## Resources (`resources/list` + `resources/read`)
 

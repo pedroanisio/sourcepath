@@ -1,7 +1,17 @@
+---
+disclaimer:
+  notice: >-
+    No information within this document should be taken for granted.
+    Any statement or premise not backed by a real logical definition
+    or verifiable reference may be invalid, erroneous, or a hallucination.
+  generated_by: "GPT-5 Codex"
+  date: "2026-05-22"
+---
+
 # LLM baseline benchmark — model selection for L4 enrichment
 
 > Status: POC result. Branch `poc/llm-baseline`. Companion to
-> [llm-enrich-plan.md](llm-enrich-plan.md) and [llm-enrich-poc.md](llm-enrich-poc.md).
+> [archive/llm-enrich-plan.md](archive/llm-enrich-plan.md).
 > The single-model spike confirmed the plan's three hypotheses hold for
 > `llama3.1:8b`. This benchmark widens that to 5 candidate models and
 > recommends a default for Step 8 of the plan.
@@ -70,9 +80,8 @@ qwen2.5-coder:7b           0.90s       2.88/3           1     3.58s       3.00/3
 qwen2.5:7b                 0.95s       2.88/3           1     3.61s       3.00/3     4/4        no
 ```
 
-Raw rows are in [_tmp/llm_baseline_results.jsonl](../_tmp/llm_baseline_results.jsonl);
-per-model summary in
-[_tmp/llm_baseline_results.summary.json](../_tmp/llm_baseline_results.summary.json).
+Raw rows were generated on the POC branch and were not retained in the active
+checkout. The table above is the preserved benchmark summary.
 
 ## Reading the numbers
 
@@ -136,8 +145,8 @@ cache eliminates the call entirely on hit. The "first-call drift" is
 only relevant on cache miss, and on cache miss the first call *is*
 the source of truth.
 
-This is exactly the "warm-cache determinism" framing the plan
-([llm-enrich-plan.md § Architectural commitments § 5](llm-enrich-plan.md))
+This is exactly the "warm-cache determinism" framing the archived plan
+([archive/llm-enrich-plan.md § Architectural commitments § 5](archive/llm-enrich-plan.md))
 already commits to. **The plan does not need rewriting.**
 
 ## Recommendation
@@ -183,7 +192,7 @@ prior recommendation should be updated.
 ## Plan impact
 
 The benchmark recommends two **concrete amendments** to
-[llm-enrich-plan.md](llm-enrich-plan.md):
+[archive/llm-enrich-plan.md](archive/llm-enrich-plan.md):
 
 1. **Step 8 default model** changes from `llama3.1:8b` to
    `qwen2.5-coder:7b`. The flag remains
@@ -215,11 +224,14 @@ The plan's three architectural commitments that were under test
 - **Heuristic ≠ human review.** The doc's pass bar was manual
   scoring; this benchmark adds automated heuristics. They correlate
   with the manual read on the outputs we spot-checked, but a real
-  ship decision should include 30 minutes of human review of the
-  top-2 models' outputs in
-  [_tmp/llm_baseline_results.jsonl](../_tmp/llm_baseline_results.jsonl).
+  ship decision should include 30 minutes of human review of retained
+  benchmark outputs. Those raw outputs were gitignored on the POC branch and
+  are not present in the active checkout.
 
 ## Reproducibility
+
+The original harness and raw output files lived on the `poc/llm-baseline`
+branch and are not part of the active checkout.
 
 ```bash
 git checkout poc/llm-baseline

@@ -313,10 +313,10 @@ def check_ast_schema_versions() -> None:
     for name, ver, mod_path in (
         ("PY_AST_SCHEMA_VERSION",
          PY_AST_SCHEMA_VERSION,
-         "codebase_mapper/languages/python.py"),
+         "codebase_mapper/inspection/languages/python.py"),
         ("RUST_AST_SCHEMA_VERSION",
          RUST_AST_SCHEMA_VERSION,
-         "codebase_mapper/languages/rust.py"),
+         "codebase_mapper/inspection/languages/rust.py"),
     ):
         check(
             f"{name} is a positive int",

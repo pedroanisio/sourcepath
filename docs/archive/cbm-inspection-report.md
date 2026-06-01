@@ -10,9 +10,13 @@ disclaimer:
 
 # Code Base Mapper — Inspection Report
 
+> **Archive status:** Generated snapshot report for an older bundle/layout.
+> Paths and counts below are historical and are not active documentation for the
+> current checkout.
+
 ## Disclaimer
 
-This work is subject to the methodological caveats and commitments described in [@DISCLAIMER.md](./DISCLAIMER.md).
+This work is subject to the methodological caveats and commitments described in [@DISCLAIMER.md](../../DISCLAIMER.md).
 > No statement or premise not backed by a real logical definition or verifiable reference should be taken for granted.
 
 ---
