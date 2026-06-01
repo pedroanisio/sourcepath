@@ -27,22 +27,40 @@ from frontend.mcp_server.server import build_server
 
 
 def test_default_timeout_is_5s():
-    assert timeout_for("imports_of") == DEFAULT_TIMEOUT_SECONDS
+    # Base budget for a load tool when no bundle resolves (no size allowance).
+    assert timeout_for("imports_of", bundle="__no_such_bundle__") == DEFAULT_TIMEOUT_SECONDS
 
 
 def test_semantic_neighbors_gets_longer_budget():
-    assert timeout_for("semantic_neighbors") > DEFAULT_TIMEOUT_SECONDS
+    assert timeout_for("semantic_neighbors", bundle="__no_such_bundle__") > DEFAULT_TIMEOUT_SECONDS
     assert TIMEOUTS["semantic_neighbors"] == 10.0
 
 
 def test_env_override_takes_priority(monkeypatch):
     monkeypatch.setenv("CBM_MCP_TIMEOUT_FILE_DETAIL", "2.5")
-    assert timeout_for("file_detail") == 2.5
+    # An explicit override is an absolute cap — no size allowance is added.
+    assert timeout_for("file_detail", bundle="__no_such_bundle__") == 2.5
 
 
 def test_env_override_invalid_value_ignored(monkeypatch):
     monkeypatch.setenv("CBM_MCP_TIMEOUT_FILE_DETAIL", "garbage")
-    assert timeout_for("file_detail") == DEFAULT_TIMEOUT_SECONDS
+    assert timeout_for("file_detail", bundle="__no_such_bundle__") == DEFAULT_TIMEOUT_SECONDS
+
+
+def test_no_load_tools_get_no_size_allowance(bundle_name):
+    # select_bundle / list_bundles never parse a graph: bare default, even for
+    # a real (potentially large) bundle.
+    assert timeout_for("select_bundle", bundle=bundle_name) == DEFAULT_TIMEOUT_SECONDS
+    assert timeout_for("list_bundles", bundle=bundle_name) == DEFAULT_TIMEOUT_SECONDS
+
+
+def test_load_tool_budget_widens_for_real_bundle(bundle_name):
+    # A graph-loading tool gets at least the base budget, widened by the
+    # cold-load allowance for the resolved bundle — never narrowed.
+    base = timeout_for("file_detail", bundle="__no_such_bundle__")
+    widened = timeout_for("file_detail", bundle=bundle_name)
+    assert base == DEFAULT_TIMEOUT_SECONDS
+    assert widened >= base
 
 
 # --------------------------------------------------------------------------

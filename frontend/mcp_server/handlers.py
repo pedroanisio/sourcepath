@@ -469,8 +469,13 @@ def _list_bundles(args: dict[str, Any], default: str | None) -> dict[str, Any]:
 def _select_bundle(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     name = args["bundle"]
     validate_bundle_name(name)
-    # Resolve to confirm it exists; raises NOT_FOUND if not.
-    _get_bundle(name)
+    # Confirm the bundle exists via a cheap manifest check — selecting must not
+    # trigger a multi-second RDF parse just to validate (that timed out the
+    # budget on large repos). The graph loads lazily on the first real query.
+    try:
+        backend_bundle_data.ensure_bundle_exists(name)
+    except HTTPException as e:
+        _raise_mapped_http_error(e)
     return {"selected": name}
 
 

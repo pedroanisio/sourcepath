@@ -49,6 +49,9 @@ TIMEOUTS: dict[str, float] = {
     "sparql": 10.0,
 }
 
+# Tools that never load a bundle graph, so they get no size-scaled allowance.
+NO_LOAD_TOOLS: frozenset[str] = frozenset({"list_bundles", "select_bundle"})
+
 
 def _env_override(tool: str) -> float | None:
     """Allow per-tool override via ``CBM_MCP_TIMEOUT_<TOOL_NAME>`` env vars."""
@@ -62,12 +65,38 @@ def _env_override(tool: str) -> float | None:
         return None
 
 
-def timeout_for(tool: str) -> float:
-    """Resolve a budget for ``tool``: env override > table > default."""
+def _cold_load_allowance(bundle: str | None) -> float:
+    """Size-scaled extra budget for a tool that may cold-load ``bundle``.
+
+    Imported lazily to avoid a backend import cycle, and defensively guarded:
+    a budget hint must never be the reason a call fails.
+    """
+    try:
+        from frontend.backend.serving.application.bundle_data import (
+            cold_load_allowance_seconds,
+        )
+
+        return cold_load_allowance_seconds(bundle)
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
+def timeout_for(tool: str, *, bundle: str | None = None) -> float:
+    """Resolve a budget for ``tool``: env override > table > default.
+
+    An explicit env override is treated as an absolute cap. Otherwise the base
+    budget is widened by a size-scaled cold-load allowance for graph-loading
+    tools, so a one-time parse on a large repository is not guillotined by a
+    budget tuned for warm queries. The allowance is a ceiling, not a delay:
+    warm calls return just as fast.
+    """
     override = _env_override(tool)
     if override is not None:
         return override
-    return TIMEOUTS.get(tool, DEFAULT_TIMEOUT_SECONDS)
+    base = TIMEOUTS.get(tool, DEFAULT_TIMEOUT_SECONDS)
+    if tool not in NO_LOAD_TOOLS:
+        base += _cold_load_allowance(bundle)
+    return base
 
 
 # --------------------------------------------------------------------------
@@ -179,7 +208,8 @@ async def dispatch_with_budget(
     is emitted — the transport layer maps it to the protocol error.
     """
     if timeout is None:
-        timeout = timeout_for(tool)
+        bundle = (args or {}).get("bundle") or bundle_default
+        timeout = timeout_for(tool, bundle=bundle)
     started = time.perf_counter()
     status = "ok"
     error: str | None = None

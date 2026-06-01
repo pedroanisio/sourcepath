@@ -61,6 +61,287 @@ def _resolve_file_type_uri(uri: str) -> str:
     return uri.rsplit("/", 1)[-1]
 
 
+def _str_or_none(value: Any) -> str | None:
+    return str(value) if value is not None else None
+
+
+def _int_or_none(value: Any) -> int | None:
+    return int(value) if value is not None else None
+
+
+# A projection is the fixed set of structures the serving layer needs out of
+# the RDF graph: files, import/test edges, chunks, and chunk→concept links.
+# Returned as a tuple in the order the Bundle constructor consumes them.
+Projection = tuple
+
+
+def _assemble_projection(
+    files: list[dict[str, Any]],
+    file_by_uri: dict[str, dict[str, Any]],
+    import_edges: list[tuple[str, str]],
+    test_edges: list[tuple[str, str]],
+    raw_chunks: list[dict[str, Any]],
+    lexicalizes: list[tuple[str, str]],
+) -> Projection:
+    """Resolve raw triple-level edges into the path/index-keyed structures the
+    serving layer queries.
+
+    Both the JSON-LD and the rdflib extraction paths funnel through here, so
+    chunk ordering, index assignment, and edge resolution are byte-identical
+    regardless of which parser produced the raw triples — the only thing that
+    differs between paths is the iteration order of multiset-equal adjacency
+    lists, which every consumer sorts or counts before observing.
+    """
+    files.sort(key=lambda r: r["path"])
+
+    imports: list[tuple[str, str]] = []
+    imports_out: dict[str, list[str]] = {}
+    imports_in: dict[str, list[str]] = {}
+    for s_uri, o_uri in import_edges:
+        s_path = file_by_uri.get(s_uri, {}).get("path")
+        o_path = file_by_uri.get(o_uri, {}).get("path")
+        if s_path and o_path:
+            imports.append((s_path, o_path))
+            imports_out.setdefault(s_path, []).append(o_path)
+            imports_in.setdefault(o_path, []).append(s_path)
+
+    tests: list[tuple[str, str]] = []
+    tests_for_subject: dict[str, list[str]] = {}
+    subjects_for_test: dict[str, list[str]] = {}
+    for s_uri, o_uri in test_edges:
+        test_path = file_by_uri.get(s_uri, {}).get("path")
+        subject_path = file_by_uri.get(o_uri, {}).get("path")
+        if test_path and subject_path:
+            tests.append((test_path, subject_path))
+            tests_for_subject.setdefault(subject_path, []).append(test_path)
+            subjects_for_test.setdefault(test_path, []).append(subject_path)
+
+    chunks: list[dict[str, Any]] = []
+    for rc in raw_chunks:
+        in_file_uri = rc.get("in_file_uri")
+        chunks.append(
+            {
+                "uri": rc["uri"],
+                "symbol": rc["symbol"],
+                "kind": rc["kind"],
+                "file": file_by_uri.get(in_file_uri, {}).get("path") if in_file_uri else None,
+                "beginLine": rc["beginLine"],
+                "endLine": rc["endLine"],
+                "embeddingRow": rc["embeddingRow"],
+                "contentSha256": rc["contentSha256"],
+            }
+        )
+    chunks.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0))
+    chunk_uri_to_idx: dict[str, int] = {}
+    chunks_by_file: dict[str, list[int]] = {}
+    for i, c in enumerate(chunks):
+        c["idx"] = i
+        chunk_uri_to_idx[c["uri"]] = i
+        if c["file"]:
+            chunks_by_file.setdefault(c["file"], []).append(i)
+
+    chunk_concepts: dict[int, list[str]] = {}
+    concept_chunks: dict[str, list[int]] = {}
+    for s_uri, o_uri in lexicalizes:
+        idx = chunk_uri_to_idx.get(s_uri)
+        if idx is None:
+            continue
+        name = _concept_name_from_uri(o_uri)
+        if not name:
+            continue
+        chunk_concepts.setdefault(idx, []).append(name)
+        concept_chunks.setdefault(name, []).append(idx)
+
+    return (
+        files,
+        imports,
+        imports_out,
+        imports_in,
+        tests,
+        tests_for_subject,
+        subjects_for_test,
+        chunks,
+        chunk_uri_to_idx,
+        chunks_by_file,
+        chunk_concepts,
+        concept_chunks,
+    )
+
+
+def _project_from_jsonld(jsonld_path: Path) -> Projection:
+    """Fast path: project the graph straight from the compacted JSON-LD node
+    list using the C-backed ``json`` parser.
+
+    The JSON-LD artifact carries the same triples as ``inventory.ttl`` but the
+    stdlib parser is ~28x faster than rdflib's pure-Python Turtle tokenizer
+    (0.2s vs 5s on a 46MB bundle), keeping cold loads well inside the per-tool
+    wall-clock budget on large repositories.
+    """
+    data = json.loads(jsonld_path.read_text())
+    ctx = {k: v for k, v in (data.get("@context") or {}).items() if isinstance(v, str)}
+    graph = data.get("@graph") or []
+
+    def expand(curie: str) -> str:
+        if not isinstance(curie, str) or curie.startswith("http"):
+            return curie
+        prefix, sep, local = curie.partition(":")
+        if sep and prefix in ctx:
+            return ctx[prefix] + local
+        return curie
+
+    def node_types(node: dict[str, Any]) -> list[str]:
+        t = node.get("@type")
+        if isinstance(t, list):
+            return t
+        return [t] if t else []
+
+    def literal(value: Any) -> Any:
+        # JSON-LD typed literals are ``{"@type": ..., "@value": ...}``; plain
+        # scalars (ints, strings) are emitted bare.
+        if isinstance(value, dict):
+            return value.get("@value")
+        return value
+
+    def id_refs(value: Any) -> list[str]:
+        if value is None:
+            return []
+        items = value if isinstance(value, list) else [value]
+        out: list[str] = []
+        for it in items:
+            if isinstance(it, dict) and "@id" in it:
+                out.append(expand(it["@id"]))
+            elif isinstance(it, str):
+                out.append(expand(it))
+        return out
+
+    files: list[dict[str, Any]] = []
+    file_by_uri: dict[str, dict[str, Any]] = {}
+    import_edges: list[tuple[str, str]] = []
+    test_edges: list[tuple[str, str]] = []
+    raw_chunks: list[dict[str, Any]] = []
+    lexicalizes: list[tuple[str, str]] = []
+
+    for node in graph:
+        nid = node.get("@id")
+        if nid is None:
+            continue
+        uri = expand(nid)
+        types = node_types(node)
+
+        if "cbm:File" in types:
+            ftype_uri = None
+            for type_uri in id_refs(node.get("cbm:type")):
+                if "cbm/type" in type_uri:
+                    ftype_uri = _resolve_file_type_uri(type_uri)
+                    break
+            size_b = literal(node.get("cbm:sizeBytes"))
+            sha = literal(node.get("cbm:contentSha256"))
+            lang_lit = literal(node.get("cbm:language"))
+            rec = {
+                "uri": uri,
+                "path": str(node["cbm:path"]) if "cbm:path" in node else str(None),
+                "language": str(lang_lit) if lang_lit else None,
+                "type": ftype_uri,
+                "size": int(size_b) if size_b is not None else None,
+                "contentSha256": str(sha) if sha is not None else None,
+            }
+            files.append(rec)
+            file_by_uri[uri] = rec
+
+        if "cbml2:Chunk" in types:
+            in_file = id_refs(node.get("cbml2:inFile"))
+            raw_chunks.append(
+                {
+                    "uri": uri,
+                    "symbol": _str_or_none(node.get("cbml2:symbol")),
+                    "kind": _str_or_none(node.get("cbml2:kind")),
+                    "in_file_uri": in_file[0] if in_file else None,
+                    "beginLine": _int_or_none(literal(node.get("cbml2:beginLine"))),
+                    "endLine": _int_or_none(literal(node.get("cbml2:endLine"))),
+                    "embeddingRow": _int_or_none(literal(node.get("cbml2:embeddingRow"))),
+                    "contentSha256": _str_or_none(literal(node.get("cbml2:contentSha256"))),
+                }
+            )
+
+        for o_uri in id_refs(node.get("cbm:imports")):
+            import_edges.append((uri, o_uri))
+        for o_uri in id_refs(node.get("cbm:tests")):
+            test_edges.append((uri, o_uri))
+        for o_uri in id_refs(node.get("cbml3:lexicalizes")):
+            lexicalizes.append((uri, o_uri))
+
+    return _assemble_projection(
+        files, file_by_uri, import_edges, test_edges, raw_chunks, lexicalizes
+    )
+
+
+def _project_from_rdflib(ttl_path: Path) -> Projection:
+    """Fallback path: parse ``inventory.ttl`` with rdflib.
+
+    Used only when the JSON-LD artifact is absent (older bundles). Produces an
+    identical projection to :func:`_project_from_jsonld` for the same data.
+    """
+    g = Graph()
+    g.parse(ttl_path, format="turtle")
+
+    files: list[dict[str, Any]] = []
+    file_by_uri: dict[str, dict[str, Any]] = {}
+    for f in g.subjects(RDF.type, CBM.File):
+        ftype_uri = None
+        for t in g.objects(f, CBM.type):
+            su = str(t)
+            if "cbm/type" in su:
+                ftype_uri = _resolve_file_type_uri(su)
+                break
+        size_b = g.value(f, CBM.sizeBytes)
+        sha = g.value(f, CBM.contentSha256)
+        lang_lit = g.value(f, CBM.language)
+        rec = {
+            "uri": str(f),
+            "path": str(g.value(f, CBM.path)),
+            "language": str(lang_lit) if lang_lit else None,
+            "type": ftype_uri,
+            "size": int(size_b) if size_b is not None else None,
+            "contentSha256": str(sha) if sha is not None else None,
+        }
+        files.append(rec)
+        file_by_uri[str(f)] = rec
+
+    import_edges = [(str(s), str(o)) for s, o in g.subject_objects(CBM.imports)]
+    test_edges = [(str(s), str(o)) for s, o in g.subject_objects(CBM.tests)]
+
+    raw_chunks: list[dict[str, Any]] = []
+    for c in g.subjects(RDF.type, CBML2.Chunk):
+        in_file = g.value(c, CBML2.inFile)
+        raw_chunks.append(
+            {
+                "uri": str(c),
+                "symbol": _str_or_none(g.value(c, CBML2.symbol)),
+                "kind": _str_or_none(g.value(c, CBML2.kind)),
+                "in_file_uri": str(in_file) if in_file is not None else None,
+                "beginLine": _int_or_none(g.value(c, CBML2.beginLine)),
+                "endLine": _int_or_none(g.value(c, CBML2.endLine)),
+                "embeddingRow": _int_or_none(g.value(c, CBML2.embeddingRow)),
+                "contentSha256": _str_or_none(g.value(c, CBML2.contentSha256)),
+            }
+        )
+
+    lexicalizes = [(str(s), str(o)) for s, o in g.subject_objects(CBML3.lexicalizes)]
+
+    return _assemble_projection(
+        files, file_by_uri, import_edges, test_edges, raw_chunks, lexicalizes
+    )
+
+
+def _load_graph_projection(output_dir: Path) -> Projection:
+    """Project the inventory graph, preferring the fast JSON-LD parser and
+    falling back to rdflib only when the JSON-LD artifact is unavailable."""
+    jsonld_path = output_dir / "inventory.jsonld"
+    if jsonld_path.exists():
+        return _project_from_jsonld(jsonld_path)
+    return _project_from_rdflib(output_dir / "inventory.ttl")
+
+
 def load_bundle(output_dir: Path) -> Bundle:
     if not output_dir.exists():
         raise FileNotFoundError(f"output dir not found: {output_dir}")
@@ -91,98 +372,20 @@ def load_bundle(output_dir: Path) -> Bundle:
             npz["vectors"] if "vectors" in npz.files else npz[npz.files[0]]
         )
 
-    g = Graph()
-    g.parse(output_dir / "inventory.ttl", format="turtle")
-
-    files: list[dict[str, Any]] = []
-    file_by_uri: dict[str, dict[str, Any]] = {}
-    for f in g.subjects(RDF.type, CBM.File):
-        path = str(g.value(f, CBM.path))
-        ftype_uri = None
-        for t in g.objects(f, CBM.type):
-            su = str(t)
-            if "cbm/type" in su:
-                ftype_uri = _resolve_file_type_uri(su)
-                break
-        size_b = g.value(f, CBM.sizeBytes)
-        sha = g.value(f, CBM.contentSha256)
-        lang_lit = g.value(f, CBM.language)
-        rec = {
-            "uri": str(f),
-            "path": path,
-            "language": str(lang_lit) if lang_lit else None,
-            "type": ftype_uri,
-            "size": int(size_b) if size_b is not None else None,
-            "contentSha256": str(sha) if sha is not None else None,
-        }
-        files.append(rec)
-        file_by_uri[str(f)] = rec
-
-    files.sort(key=lambda r: r["path"])
-
-    imports: list[tuple[str, str]] = []
-    imports_out: dict[str, list[str]] = {}
-    imports_in: dict[str, list[str]] = {}
-    for s, o in g.subject_objects(CBM.imports):
-        s_path = file_by_uri.get(str(s), {}).get("path")
-        o_path = file_by_uri.get(str(o), {}).get("path")
-        if s_path and o_path:
-            imports.append((s_path, o_path))
-            imports_out.setdefault(s_path, []).append(o_path)
-            imports_in.setdefault(o_path, []).append(s_path)
-
-    tests: list[tuple[str, str]] = []
-    tests_for_subject: dict[str, list[str]] = {}
-    subjects_for_test: dict[str, list[str]] = {}
-    for s, o in g.subject_objects(CBM.tests):
-        test_path = file_by_uri.get(str(s), {}).get("path")
-        subject_path = file_by_uri.get(str(o), {}).get("path")
-        if test_path and subject_path:
-            tests.append((test_path, subject_path))
-            tests_for_subject.setdefault(subject_path, []).append(test_path)
-            subjects_for_test.setdefault(test_path, []).append(subject_path)
-
-    chunks: list[dict[str, Any]] = []
-    chunk_uri_to_idx: dict[str, int] = {}
-    for c in g.subjects(RDF.type, CBML2.Chunk):
-        sym = g.value(c, CBML2.symbol)
-        kind = g.value(c, CBML2.kind)
-        in_file = g.value(c, CBML2.inFile)
-        begin_line = g.value(c, CBML2.beginLine)
-        end_line = g.value(c, CBML2.endLine)
-        emb_row = g.value(c, CBML2.embeddingRow)
-        sha = g.value(c, CBML2.contentSha256)
-        chunks.append(
-            {
-                "uri": str(c),
-                "symbol": str(sym) if sym is not None else None,
-                "kind": str(kind) if kind is not None else None,
-                "file": file_by_uri.get(str(in_file), {}).get("path") if in_file else None,
-                "beginLine": int(begin_line) if begin_line is not None else None,
-                "endLine": int(end_line) if end_line is not None else None,
-                "embeddingRow": int(emb_row) if emb_row is not None else None,
-                "contentSha256": str(sha) if sha is not None else None,
-            }
-        )
-    chunks.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0))
-    chunks_by_file: dict[str, list[int]] = {}
-    for i, c in enumerate(chunks):
-        c["idx"] = i
-        chunk_uri_to_idx[c["uri"]] = i
-        if c["file"]:
-            chunks_by_file.setdefault(c["file"], []).append(i)
-
-    chunk_concepts: dict[int, list[str]] = {}
-    concept_chunks: dict[str, list[int]] = {}
-    for s, o in g.subject_objects(CBML3.lexicalizes):
-        idx = chunk_uri_to_idx.get(str(s))
-        if idx is None:
-            continue
-        name = _concept_name_from_uri(str(o))
-        if not name:
-            continue
-        chunk_concepts.setdefault(idx, []).append(name)
-        concept_chunks.setdefault(name, []).append(idx)
+    (
+        files,
+        imports,
+        imports_out,
+        imports_in,
+        tests,
+        tests_for_subject,
+        subjects_for_test,
+        chunks,
+        chunk_uri_to_idx,
+        chunks_by_file,
+        chunk_concepts,
+        concept_chunks,
+    ) = _load_graph_projection(output_dir)
 
     cooccur: dict[str, list[tuple[str, int]]] = {}
     for entry in concepts.get("cooccurrence", []) or []:
@@ -455,6 +658,45 @@ def _load_bundle_cached(path_str: str) -> Bundle:
 def get_bundle(name: str | None = None) -> Bundle:
     path = _resolve_bundle_path(name)
     return _load_bundle_cached(str(path))
+
+
+def ensure_bundle_exists(name: str | None = None) -> str:
+    """Validate that a bundle is resolvable *without* parsing its graph.
+
+    ``select_bundle`` only needs to confirm the bundle exists before stashing
+    the choice in session state; forcing a full ``load_bundle`` (a multi-second
+    RDF parse on large repositories) just to validate is wasteful and was the
+    direct cause of ``select_bundle`` timing out. Resolution is a cheap
+    manifest-existence check. Returns the resolved bundle directory name and
+    raises ``HTTPException`` (404/400) when the bundle is missing or invalid.
+    """
+    return _resolve_bundle_path(name).name
+
+
+def cold_load_allowance_seconds(name: str | None = None) -> float:
+    """Extra wall-clock budget to grant a tool that may trigger a cold bundle
+    load, scaled to the size of the graph artifact it will parse.
+
+    The steady-state per-tool budget is tuned for warm, in-memory queries. A
+    one-time cold load of a large repository legitimately needs more headroom,
+    and a single fixed ceiling cannot serve both a 16-file repo and a
+    16,000-file one. This returns a size-derived allowance (0.0 when the
+    bundle can't be resolved) that callers add to the base budget — a ceiling,
+    never a delay, so warm calls are unaffected.
+    """
+    try:
+        path = _resolve_bundle_path(name)
+    except Exception:  # noqa: BLE001 — budget hint must never raise
+        return 0.0
+    jsonld = path / "inventory.jsonld"
+    if jsonld.exists():
+        # Fast stdlib JSON path: ~0.4s for 46MB observed; 0.05s/MB is generous.
+        return (jsonld.stat().st_size / 1_000_000) * 0.05
+    ttl = path / "inventory.ttl"
+    if ttl.exists():
+        # rdflib Turtle fallback is ~10x slower; budget accordingly.
+        return (ttl.stat().st_size / 1_000_000) * 0.2
+    return 0.0
 
 
 def _clear_bundle_cache() -> None:
