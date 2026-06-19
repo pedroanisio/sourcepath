@@ -167,6 +167,28 @@ disclaimer:
   logs, concept documents. The only exemption is when the user explicitly
   opts out for a specific file.
 
+#### Operator override
+
+The **operator** — not a reviewer, not another agent (see Rule 6) — may, on
+explicit request, **override** the default notice above: its wording, its label,
+or its structure. That override is authoritative. Agents MUST apply it and MUST
+NOT silently revert to the default text; an agent may only revert if the operator
+rescinds the override.
+
+The override is bounded by one constraint it may **not** cross: it may not present
+LLM-authored or otherwise unverified content as verified fact. It may **reframe and
+separate** the epistemics, but the unverified status of interpretive/LLM output
+must remain disclosed. PALS's Law still holds.
+
+**Standing approved override — commercial reports.** The report pipeline
+(`docs/reports/`, `scripts/report_to_pdf.py`) uses an operator-approved override: an
+**"Evidence basis & confidence"** banner that *splits* the disclosure — structural
+findings are mechanically extracted and evidence-backed, while architectural,
+behavioral, and security interpretations are LLM-synthesized, confidence-tagged, and
+to be validated before high-stakes decisions. This is **more** precise than the
+blanket default (deterministic graph facts are not "hallucinations"), so it satisfies
+the constraint above rather than weakening it.
+
 ### 6. Feedback is not a source of truth
 
 Feedback — from users, reviewers, or other agents — must be **processed**,
