@@ -6,6 +6,7 @@ walltime safety net via dispatch_with_budget.
 from __future__ import annotations
 
 import pytest
+from mcp.shared.memory import create_connected_server_and_client_session
 
 from frontend.mcp_server import (
     INVALID_ARGUMENT,
@@ -20,6 +21,14 @@ from frontend.mcp_server import (
     run_sparql,
     sparql_is_enabled,
     validate_out,
+)
+from frontend.mcp_server.handlers import HANDLERS
+from frontend.mcp_server.server import build_server
+
+# A trivial, bundle-discriminating query: counts file nodes in the graph.
+_COUNT_FILES_QUERY = (
+    "PREFIX cbm: <https://codebase-mapper.example.org/cbm#> "
+    "SELECT (COUNT(?f) AS ?n) WHERE { ?f cbm:path ?p }"
 )
 
 
@@ -227,6 +236,93 @@ def test_sparql_description_warns_about_gating():
     desc = DESCRIPTIONS["sparql"]
     assert "CBM_ENABLE_SPARQL" in desc
     assert "DANGER" in desc or "disabled" in desc
+
+
+# --------------------------------------------------------------------------
+# Bundle resolution — sparql must honor the session-selected bundle, exactly
+# like every other tool. Guards against regression of the precedence
+# (explicit `bundle` arg > session selection > server default) where a fresh
+# server session silently falls back to the alphabetical default bundle.
+# --------------------------------------------------------------------------
+
+
+def test_sparql_handler_forwards_resolved_bundle(monkeypatch):
+    """Unit-level: the sparql handler resolves the bundle with the same
+    precedence as other tools and forwards it to ``run_sparql``. Does not hit
+    a real bundle — ``run_sparql`` is captured."""
+    import frontend.mcp_server.sparql as sparql_mod
+
+    seen: list[str | None] = []
+
+    def fake_run_sparql(query, *, bundle_default=None):
+        seen.append(bundle_default)
+        return {
+            "columns": [],
+            "rows": [],
+            "row_count": 0,
+            "truncated": False,
+            "query_form": "SELECT",
+            "ask_result": None,
+        }
+
+    monkeypatch.setattr(sparql_mod, "run_sparql", fake_run_sparql)
+    handler = HANDLERS["sparql"]
+
+    # No explicit bundle → falls through to the session-selected default.
+    handler({"query": "SELECT * WHERE { ?s ?p ?o }"}, "session-bundle")
+    # Explicit bundle arg overrides the session selection.
+    handler({"query": "SELECT * WHERE { ?s ?p ?o }", "bundle": "explicit-bundle"}, "session-bundle")
+    # No selection anywhere → None (run_sparql then resolves the server default).
+    handler({"query": "SELECT * WHERE { ?s ?p ?o }"}, None)
+
+    assert seen == ["session-bundle", "explicit-bundle", None]
+
+
+@pytest.mark.anyio
+async def test_sparql_routes_to_session_selected_bundle(enabled, bundle_name):
+    """End-to-end: select_bundle then a no-arg sparql query must target the
+    selected bundle (not the server default), and an explicit ``bundle`` arg
+    must override the session selection. Needs >=2 bundles to discriminate."""
+    from frontend.backend.serving.application import bundles as bundles_app
+
+    names = [b["name"] for b in bundles_app.list_bundles_response()["bundles"]]
+    others = [n for n in names if n != bundle_name]
+    if not others:
+        pytest.skip("need >=2 bundles to prove selection actually routes")
+    other = others[0]
+
+    server, session = build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        await client.initialize()
+        # Select `other`; query with NO explicit bundle → must route to `other`.
+        await client.call_tool("select_bundle", {"bundle": other})
+        routed = await client.call_tool("sparql", {"query": _COUNT_FILES_QUERY})
+        # Explicit bundle arg must win over the session selection.
+        overridden = await client.call_tool(
+            "sparql", {"query": _COUNT_FILES_QUERY, "bundle": bundle_name}
+        )
+        # Ground truth: query each bundle explicitly.
+        truth_other = await client.call_tool(
+            "sparql", {"query": _COUNT_FILES_QUERY, "bundle": other}
+        )
+        truth_default = await client.call_tool(
+            "sparql", {"query": _COUNT_FILES_QUERY, "bundle": bundle_name}
+        )
+
+    assert session.selected_bundle == other
+    for r in (routed, overridden, truth_other, truth_default):
+        assert r.isError is False
+
+    routed_rows = routed.structuredContent["rows"]
+    overridden_rows = overridden.structuredContent["rows"]
+    # Session selection is honored: no-arg query matches explicit `other`.
+    assert routed_rows == truth_other.structuredContent["rows"]
+    # Explicit arg overrides the session: matches explicit default bundle.
+    assert overridden_rows == truth_default.structuredContent["rows"]
+    # When the two bundles differ in size, the routing is genuinely
+    # discriminating — proves sparql did not just hit one fixed default.
+    if truth_other.structuredContent["rows"] != truth_default.structuredContent["rows"]:
+        assert routed_rows != overridden_rows
 
 
 # --------------------------------------------------------------------------
