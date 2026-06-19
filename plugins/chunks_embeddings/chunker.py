@@ -68,6 +68,8 @@ class ChunkExtractor:
             chunks = _chunk_dart(content, record)
         elif record.language == "java":
             chunks = _chunk_java(content, record)
+        elif record.language == "go":
+            chunks = _chunk_go(content, record)
         elif record.language == "cpp":
             chunks = _chunk_cpp(content, record)
         elif record.language in ("objective-c", "objective-cpp"):
@@ -603,6 +605,67 @@ def _chunk_java(content: bytes, record: FileRecord) -> list[dict]:
         chunk_bytes = chunk_text.encode("utf-8")
         chunks.append({
             "kind": _JAVA_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        })
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Go
+# ---------------------------------------------------------------------------
+
+
+_GO_TO_CHUNK_KIND = {
+    "function": "function",
+    "method": "method",
+    "struct": "class",
+    "interface": "class",
+    "type": "class",
+}
+
+
+def _chunk_go(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-symbol chunks from the Go analyzer's ``items`` array — one chunk per
+    top-level func / method / struct / interface / type. Methods carry
+    ``parent_symbol`` = the receiver type. Same items-based shape as
+    ``_chunk_java``."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _GO_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append({
+            "kind": _GO_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
             "byte_start": item["byte_start"],

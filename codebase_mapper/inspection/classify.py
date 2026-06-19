@@ -136,6 +136,9 @@ def classify(path: str, content_head: bytes) -> str:
     # Dart: *_test.dart is the canonical Flutter/Dart test naming.
     if re.fullmatch(r".*_test\.dart", name):
         return "test_code"
+    # Go: *_test.go is the canonical Go test naming.
+    if re.fullmatch(r".*_test\.go", name):
+        return "test_code"
     # Java/Kotlin: FooTest.java / FooTests.java / FooIT.java (Integration
     # Test) — JUnit/TestNG/Spock conventions. Restrict to CamelCase
     # identifier endings so 'Latest.java' is NOT a test.

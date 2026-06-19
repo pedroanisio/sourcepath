@@ -10,6 +10,67 @@ from typing import Callable
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _TS_QUERIES, _strip_quotes, _ts_setup
 from ...ts_setup import TS_AVAILABLE, ts
+from ._treewalk import find_named_descendant, iter_named_pre_order
+
+
+def _node_text(node, content: bytes) -> str:
+    return content[node.start_byte:node.end_byte].decode("utf-8", "replace")
+
+
+def _go_item(kind: str, name: str, parent: str | None, node) -> dict:
+    return {
+        "kind": kind,
+        "name": name,
+        "parent": parent,
+        "line_start": node.start_point[0] + 1,
+        "line_end": node.end_point[0] + 1,
+        "byte_start": node.start_byte,
+        "byte_end": node.end_byte,
+    }
+
+
+def _collect_go_items(root, content: bytes) -> list[dict]:
+    """One item per top-level func / method / struct / interface / type, with
+    byte+line spans (powers L2 chunking + the symbol surface).
+
+    Iterative pre-order (see ``_treewalk``): prune at the declaration kinds so
+    function/method bodies aren't descended into — top-level only, and safe on
+    deeply-nested files. Methods carry ``parent`` = the receiver type name
+    (``*T`` and ``T`` receivers both map to ``T``).
+    """
+    decl_kinds = ("function_declaration", "method_declaration", "type_declaration")
+    items: list[dict] = []
+    for node in iter_named_pre_order(root, descend=lambda n: n.type not in decl_kinds):
+        nt = node.type
+        if nt == "function_declaration":
+            name_node = node.child_by_field_name("name")
+            if name_node is not None:
+                items.append(_go_item("function", _node_text(name_node, content), None, node))
+        elif nt == "method_declaration":
+            name_node = node.child_by_field_name("name")
+            recv = node.child_by_field_name("receiver")
+            parent = None
+            if recv is not None:
+                tid = find_named_descendant(recv, {"type_identifier"})
+                if tid is not None:
+                    parent = _node_text(tid, content)
+            if name_node is not None:
+                items.append(_go_item("method", _node_text(name_node, content), parent, node))
+        elif nt == "type_declaration":
+            for spec in node.children:
+                if not (spec.is_named and spec.type == "type_spec"):
+                    continue
+                name_node = spec.child_by_field_name("name")
+                type_node = spec.child_by_field_name("type")
+                if name_node is None:
+                    continue
+                kind = "type"
+                if type_node is not None and type_node.type == "struct_type":
+                    kind = "struct"
+                elif type_node is not None and type_node.type == "interface_type":
+                    kind = "interface"
+                items.append(_go_item(kind, _node_text(name_node, content), None, spec))
+    return items
 
 
 def extract_go_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[str]]:
@@ -37,11 +98,15 @@ def extract_go_ast_summary(content: bytes, path: str) -> tuple[dict | None, list
             elif cap == "class_name":
                 classes.append(text)
     imports.sort(key=lambda x: (x["lineno"], x["source"]))
+    items = _collect_go_items(tree.root_node, content)
+    items.sort(key=lambda x: (x["line_start"], x["kind"],
+                              x.get("parent") or "", x["name"]))
     return {
         "language": "go",
         "imports": imports,
         "top_level_functions": sorted(set(funcs)),
         "top_level_classes": sorted(set(classes)),
+        "items": items,
     }, errors
 
 def detect_go_module(records: list[FileRecord], read: Callable[[str], bytes]) -> dict | None:
