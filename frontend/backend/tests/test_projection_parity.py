@@ -9,6 +9,7 @@ fast it loads (PALS's Law: the derived output is verified, not trusted).
 """
 from __future__ import annotations
 
+import json
 from collections import Counter
 from pathlib import Path
 
@@ -72,6 +73,44 @@ def test_projection_paths_are_equivalent(jsonld_projection, rdflib_projection):
     # chunk_concepts is keyed by int chunk index.
     assert set(j_cc) == set(r_cc)
     assert all(Counter(j_cc[k]) == Counter(r_cc[k]) for k in j_cc)
+
+
+def test_jsonld_projection_tolerates_list_valued_literals(tmp_path: Path):
+    """Regression: a chunk node carrying a *repeated* predicate (JSON-LD
+    collapses repeats into a list) must not crash the projector.
+
+    Reproduces the production failure on the ``octavia`` bundle, where 4 chunk
+    nodes had a list-valued ``cbml2:embeddingRow`` (e.g. ``[3088, 3089]``). The
+    old ``literal()`` passed the list straight to ``int()``, raising
+    ``TypeError: int() argument ... not 'list'`` during ``get_bundle`` — which
+    took down *every* bundle-reading tool (repository_summary, orient_bundle,
+    list_files) with an opaque internal_error. PALS's Law: the projection must
+    treat generator output as untrusted and degrade gracefully, never abort.
+    """
+    doc = {
+        "@context": {"cbm": "https://cbm.example/", "cbml2": "https://cbm.example/l2/"},
+        "@graph": [
+            {
+                "@id": "cbmi:chunk/dup",
+                "@type": "cbml2:Chunk",
+                "cbml2:symbol": "ColorSpace.isDefaultDecode",
+                "cbml2:kind": "method",
+                "cbml2:beginLine": 21,
+                "cbml2:endLine": 21,
+                "cbml2:embeddingRow": [3088, 3089],
+                "cbml2:contentSha256": ["sha-a", "sha-b"],
+            }
+        ],
+    }
+    jsonld = tmp_path / "inventory.jsonld"
+    jsonld.write_text(json.dumps(doc))
+
+    projection = bd._project_from_jsonld(jsonld)  # must not raise
+    chunks = projection[7]
+    assert len(chunks) == 1
+    # List-valued literals collapse to the first element (deterministic).
+    assert chunks[0]["embeddingRow"] == 3088
+    assert chunks[0]["contentSha256"] == "sha-a"
 
 
 def test_jsonld_path_is_faster(bundle_dir: Path):

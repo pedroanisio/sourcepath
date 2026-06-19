@@ -197,7 +197,12 @@ def _project_from_jsonld(jsonld_path: Path) -> Projection:
 
     def literal(value: Any) -> Any:
         # JSON-LD typed literals are ``{"@type": ..., "@value": ...}``; plain
-        # scalars (ints, strings) are emitted bare.
+        # scalars (ints, strings) are emitted bare. A *repeated* predicate is
+        # collapsed by JSON-LD into a list — take the first element so a single
+        # malformed node (e.g. a chunk with two ``embeddingRow`` values) cannot
+        # abort the whole projection (PALS's Law: untrusted generator output).
+        if isinstance(value, list):
+            value = value[0] if value else None
         if isinstance(value, dict):
             return value.get("@value")
         return value
