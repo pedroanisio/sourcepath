@@ -33,3 +33,7 @@ frontend/ui/node_modules/
 .env
 *.env.local
 .agent-tasks/
+_site/
+.claude/settings.json
+_delete/chromium/
+docs/reports/

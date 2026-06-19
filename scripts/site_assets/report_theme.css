@@ -1,0 +1,188 @@
+/*
+ * report_theme.css — print-optimized "Field Atlas (light)" theme for
+ * codebase-mapper analysis reports rendered by scripts/report_to_pdf.py.
+ *
+ * House identity is shared with the static site generator:
+ *   - display face : Fraunces (variable serif)
+ *   - mono face    : IBM Plex Mono
+ *   - brass accent : the surveyor's-brass hue
+ *   - callout hues : mapped to the project's provenance taxonomy
+ *                    (mechanical=teal, inferred=amber, llm=terracotta).
+ *
+ * Font url()s resolve relative to THIS file (scripts/site_assets/), so the
+ * converter must load it via weasyprint CSS(filename=...) — not inline — for
+ * the bundled fonts to be found. This makes output byte-stable across hosts.
+ */
+
+/* ---- bundled fonts (deterministic rendering) ---- */
+@font-face{font-family:"Fraunces";font-style:normal;font-weight:100 900;
+  src:url("fonts/fraunces-variable.woff2") format("woff2-variations")}
+@font-face{font-family:"Fraunces";font-style:italic;font-weight:100 900;
+  src:url("fonts/fraunces-variable-italic.woff2") format("woff2-variations")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;
+  src:url("fonts/ibm-plex-mono-400.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;
+  src:url("fonts/ibm-plex-mono-500.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:600;
+  src:url("fonts/ibm-plex-mono-600.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:italic;font-weight:400;
+  src:url("fonts/ibm-plex-mono-400-italic.woff2") format("woff2")}
+
+:root{
+  --font-display:"Fraunces","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --font-body:"Iowan Old Style","Charter",Georgia,"Times New Roman",serif;
+
+  /* Field Atlas, daylit: graphite ink on warm paper, surveyor's brass */
+  --paper:#ffffff; --paper-2:#faf8f2;
+  --ink:#1b1f24; --muted:#5d646b; --faint:#8a9097;
+  --line:#e2ddd0; --line-2:#cbc4b2;
+  --accent:#a9772a;            /* brass, darkened for contrast on white */
+  --accent-soft:#f6edda;
+
+  /* provenance taxonomy → callout semantics */
+  --mech:#2f7d6e;  --mech-bg:#eaf5f1;  --mech-line:#bcdcd3;  /* info / verified */
+  --inf:#9a6b15;   --inf-bg:#fbf3df;   --inf-line:#ecd9a8;   /* caution */
+  --llm:#b1442a;   --llm-bg:#fbe9e3;   --llm-line:#eec3b6;   /* risk / advisory */
+
+  --code-bg:#f4f2ea;
+}
+
+/* ---- page geometry ---- */
+@page{
+  size:A4;
+  margin:18mm 17mm 20mm 17mm;
+}
+
+/* ---- base ---- */
+*{box-sizing:border-box}
+body{
+  margin:0; font-family:var(--font-body); color:var(--ink);
+  font-size:10pt; line-height:1.52;
+  -weasy-hyphens:none;
+}
+p{margin:.45em 0}
+a{color:var(--accent); text-decoration:none}
+strong{color:#0f1216; font-weight:600}
+em{color:#3a3f45}
+hr{border:none; border-top:1px solid var(--line); margin:1.3em 0}
+ul,ol{margin:.45em 0; padding-left:1.4em}
+li{margin:.18em 0}
+
+/* ---- headings (display face) ---- */
+h1,h2,h3,h4{font-family:var(--font-display); color:#14303f; font-weight:600;
+  line-height:1.18; break-after:avoid}
+h1{font-size:23pt; margin:0 0 2pt; letter-spacing:.005em}
+h2{font-size:14pt; margin:1.5em 0 .5em; padding-bottom:3px;
+  border-bottom:1.5px solid var(--line)}
+h3{font-size:11.5pt; color:#1c4a5e; margin:1.15em 0 .35em}
+h4{font-family:var(--font-mono); font-size:8pt; text-transform:uppercase;
+  letter-spacing:.12em; color:var(--accent); margin:1em 0 .3em}
+h1 code,h2 code,h3 code{white-space:normal; background:none; padding:0;
+  color:inherit; font-size:.86em}
+
+/* ---- code ---- */
+code{font-family:var(--font-mono); font-size:8.6pt; background:var(--code-bg);
+  padding:.5px 4px; border-radius:3px; color:#8a3a52}
+pre{background:var(--paper-2); border:1px solid var(--line);
+  border-left:3px solid var(--accent); border-radius:4px;
+  padding:9px 12px; font-size:8.2pt; line-height:1.42;
+  white-space:pre-wrap; word-wrap:break-word; break-inside:avoid; margin:.7em 0}
+pre code{background:none; color:#2b3138; padding:0; font-size:inherit}
+
+/* ---- tables (light, restrained rules) ---- */
+table{border-collapse:collapse; width:100%; margin:.7em 0; font-size:8.8pt;
+  break-inside:avoid; font-family:var(--font-mono)}
+caption{caption-side:bottom; color:var(--faint); font-size:8pt; padding-top:4px}
+th,td{padding:4px 8px; text-align:left; vertical-align:top;
+  border-bottom:1px solid var(--line)}
+thead th{font-family:var(--font-display); font-size:9pt; color:#14303f;
+  border-bottom:1.5px solid var(--line-2); background:var(--paper-2)}
+tbody tr:nth-child(even) td{background:#fbfaf6}
+
+/* ---- blockquote ---- */
+blockquote{margin:.9em 0; padding:.5em 1em; color:#43484e;
+  font-family:var(--font-display); font-style:italic;
+  border-left:3px solid var(--accent); background:rgba(169,119,42,.045);
+  break-inside:avoid}
+blockquote p{margin:.2em 0}
+
+/* ---- masthead (the report header line) ---- */
+.doc-head{margin:0 0 1.1em}
+.doc-title{margin:0}
+.doc-subtitle{font-family:var(--font-display); font-style:italic;
+  font-size:12pt; color:var(--muted); margin:.15em 0 .55em}
+.accent-rule{height:2px; background:var(--accent); border:0; margin:.2em 0 .7em;
+  width:100%}
+.masthead{font-family:var(--font-mono); font-size:8pt; color:var(--muted);
+  line-height:1.7}
+.masthead .mh-label{color:var(--faint)}
+.masthead .mh-val{color:var(--ink)}
+.masthead .mh-sep{color:var(--line-2); padding:0 .35em}
+
+/* ---- verdict hero ---- */
+.verdict{display:flex; gap:16px; align-items:stretch;
+  border:1.5px solid var(--line-2); border-radius:6px;
+  padding:12px 16px; margin:1.1em 0 1.3em; break-inside:avoid;
+  background:linear-gradient(180deg,#fff,var(--paper-2))}
+.verdict-score{flex:0 0 92px; text-align:center; border-right:1px solid var(--line);
+  padding-right:14px; display:flex; flex-direction:column; justify-content:center}
+.verdict-score .vs-num{font-family:var(--font-display); font-weight:600;
+  font-size:34pt; line-height:.95; color:var(--accent)}
+.verdict-score .vs-max{font-family:var(--font-mono); font-size:8pt; color:var(--faint)}
+.verdict-score .vs-grade{font-family:var(--font-mono); font-size:10pt; font-weight:600;
+  color:#14303f; margin-top:5px}
+.verdict-body{flex:1; font-size:9.6pt; line-height:1.5; align-self:center}
+.verdict-body p:first-child{margin-top:0}
+.verdict-body p:last-child{margin-bottom:0}
+
+/* ---- callouts (provenance-coded) ---- */
+.callout{border-radius:5px; padding:9px 13px; margin:.9em 0; font-size:8.9pt;
+  line-height:1.48; break-inside:avoid; border:1px solid; border-left-width:4px}
+.callout .callout-title{font-family:var(--font-display); font-weight:600;
+  font-size:9.6pt; margin:0 0 .25em}
+.callout p{margin:.25em 0}
+.callout p:last-child{margin-bottom:0}
+.callout.info,.callout.note{background:var(--mech-bg); border-color:var(--mech-line);
+  border-left-color:var(--mech)}
+.callout.info .callout-title,.callout.note .callout-title{color:var(--mech)}
+.callout.caution{background:var(--inf-bg); border-color:var(--inf-line);
+  border-left-color:var(--inf)}
+.callout.caution .callout-title{color:var(--inf)}
+.callout.risk{background:var(--llm-bg); border-color:var(--llm-line);
+  border-left-color:var(--llm)}
+.callout.risk .callout-title{color:var(--llm)}
+
+/* ---- inline confidence tag (in headings) ---- */
+.confidence{font-family:var(--font-mono); font-size:7pt; font-weight:500;
+  text-transform:uppercase; letter-spacing:.09em; vertical-align:middle;
+  padding:1px 6px; border-radius:8px; margin-left:8px}
+.conf-high{color:#1f6a4f; background:#e6f3ec; border:1px solid #bfe0cd}
+.conf-medium{color:#8a5a12; background:#fbf1d9; border:1px solid #ecd6a0}
+.conf-low{color:#9c3a22; background:#fbe6df; border:1px solid #eebcab}
+
+/* ---- charts (SVG, emitted by report_to_pdf.py) ---- */
+.chart{margin:12px 0 16px; break-inside:avoid; text-align:center}
+.chart svg{width:100%; height:auto; max-width:100%}
+.chart-title{font-family:var(--font-display); font-weight:600; font-size:10pt;
+  color:#14303f; margin:0 0 4px; text-align:left}
+.chart-cap{font-family:var(--font-mono); font-size:7.4pt; color:var(--faint);
+  margin-top:4px; text-align:left}
+
+/* ---- metric strip ---- */
+.metric-grid{display:flex; flex-wrap:wrap; gap:7px; margin:12px 0 16px}
+.metric{flex:1 1 96px; border:1px solid var(--line); border-top:2px solid var(--accent);
+  border-radius:4px; padding:7px 10px; background:var(--paper-2)}
+.metric .m-num{display:block; font-family:var(--font-display); font-weight:600;
+  font-size:15pt; line-height:1.05; color:#14303f}
+.metric .m-lbl{font-family:var(--font-mono); font-size:6.8pt; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--muted)}
+
+/* ---- evidence-basis / methodology note (professional, not a warning) ---- */
+.disclaimer{border:1px solid var(--line); background:var(--paper-2);
+  border-left:3px solid var(--accent); border-radius:5px; padding:9px 13px;
+  margin:0 0 1.2em; font-size:8pt; color:#4a4f55; break-inside:avoid}
+.disclaimer .lbl{font-family:var(--font-mono); font-weight:600; color:var(--accent);
+  letter-spacing:.04em; text-transform:uppercase; font-size:7.4pt}
+.disclaimer .prov{margin-top:5px; color:var(--faint); font-size:7.4pt;
+  font-family:var(--font-mono)}

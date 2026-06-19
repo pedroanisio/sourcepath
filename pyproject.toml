@@ -39,6 +39,10 @@ codebase-mapper = "codebase_mapper.cli:main"
 dev = [
     "import-linter",
 ]
+site = [
+    "markdown-it-py",
+    "Pygments",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
