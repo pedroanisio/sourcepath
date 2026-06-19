@@ -109,6 +109,17 @@ def classify(path: str, content_head: bytes) -> str:
             if name.endswith(marker):
                 return "generated"
 
+    # Minified web bundles — vendored libraries / build output committed to the
+    # repo (e.g. public/pdf.worker.min.mjs, ~1.3 MB of pdf.js). A single such
+    # blob otherwise classifies as source_code (its .js/.mjs suffix is a known
+    # language) and yields thousands of chunks that dominate the concept graph
+    # and bloat the semantic index. Classifying as 'generated' makes it invisible
+    # to L2/L3/L4 (chunker, embedder, and LLM enricher all skip type_='generated').
+    # Must precede the test-code and source-code rules: 'jquery.min.js' under a
+    # tests/ directory is build output, not a hand-written test.
+    if re.fullmatch(r".*\.min\.(js|cjs|mjs|css)", name, re.IGNORECASE):
+        return "generated"
+
     # Test code — must precede source_code.
     if "tests" in parts or "test" in parts or "__tests__" in parts or "spec" in parts:
         if suffix in LANG_BY_EXT:
