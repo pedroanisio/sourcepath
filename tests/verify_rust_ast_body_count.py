@@ -35,7 +35,7 @@ from types import SimpleNamespace
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUST_FIXTURES = REPO_ROOT / "tests" / "fixtures" / "rust"
-EMIT_BUNDLE_PATH = REPO_ROOT / "codebase_mapper" / "emit_bundle.py"
+EMIT_BUNDLE_PATH = REPO_ROOT / "codebase_mapper" / "emission" / "application" / "emit_bundle.py"
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -154,6 +154,7 @@ def test_bundle_summary_surfaces_counter() -> None:
     """The bundle_summary MCP tool passes ``counts`` through directly,
     so a Stage-6+ bundle's counter shows up in the tool's response."""
     from frontend.mcp_server import handlers as h
+    from frontend.backend.serving.application import summary as summary_app
 
     mock_bundle = SimpleNamespace(
         output_dir=Path("/tmp/mock"),
@@ -175,12 +176,12 @@ def test_bundle_summary_surfaces_counter() -> None:
         embeddings_meta={"n_chunks": 0},
         concepts={"concepts": {}},
     )
-    original = h._get_bundle
-    h._get_bundle = lambda name: mock_bundle
+    original = summary_app.get_bundle
+    summary_app.get_bundle = lambda name=None: mock_bundle
     try:
         result = h.HANDLERS["bundle_summary"]({}, None)
     finally:
-        h._get_bundle = original
+        summary_app.get_bundle = original
     assert result["counts"].get("ast_full_bodies_rust") == 3, (
         f"bundle_summary did not surface ast_full_bodies_rust=3; "
         f"got {result['counts'].get('ast_full_bodies_rust')!r}"
@@ -193,6 +194,7 @@ def test_bundle_summary_handles_pre_stage6_bundle() -> None:
     absence (not synthesize a zero), so consumers can distinguish
     'old bundle' from 'new bundle with zero Rust files'."""
     from frontend.mcp_server import handlers as h
+    from frontend.backend.serving.application import summary as summary_app
 
     pre_stage6 = SimpleNamespace(
         output_dir=Path("/tmp/mock"),
@@ -209,12 +211,12 @@ def test_bundle_summary_handles_pre_stage6_bundle() -> None:
         embeddings_meta={"n_chunks": 0},
         concepts={"concepts": {}},
     )
-    original = h._get_bundle
-    h._get_bundle = lambda name: pre_stage6
+    original = summary_app.get_bundle
+    summary_app.get_bundle = lambda name=None: pre_stage6
     try:
         result = h.HANDLERS["bundle_summary"]({}, None)
     finally:
-        h._get_bundle = original
+        summary_app.get_bundle = original
     # The output schema's counts is freeform additionalProperties; the
     # key just shouldn't appear when the manifest doesn't have it.
     assert "ast_full_bodies_rust" not in result["counts"], (
