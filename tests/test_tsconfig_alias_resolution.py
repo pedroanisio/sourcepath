@@ -26,6 +26,7 @@ import json
 from types import SimpleNamespace
 
 from codebase_mapper.inspection.languages.tsjs import (
+    _strip_jsonc_comments,
     find_governing_tsconfig,
     load_tsconfigs,
     resolve_tsjs_import,
@@ -193,6 +194,61 @@ def test_unresolvable_alias_returns_none():
         resolve_tsjs_import("src/app.ts", "@/does/not/exist", paths_set, tsconfigs)
         is None
     )
+
+
+def test_comment_like_sequences_in_strings_do_not_break_paths():
+    """The octavia bug: a tsconfig whose string *values* contain comment-like
+    sequences must still parse. ``"@/*"`` in ``paths`` contains ``/*`` and
+    ``"**/*.ts"`` in ``include`` contains ``*/``; a string-naive comment
+    stripper treats the ``/*`` as the start of a block comment and runs to that
+    ``*/``, deleting ``paths`` entirely and silently disabling alias resolution.
+    """
+    files = {
+        "tsconfig.json": json.dumps(
+            {
+                "compilerOptions": {
+                    "moduleResolution": "bundler",
+                    "paths": {"@/*": ["./*"]},
+                },
+                "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "types/**/*.d.ts"],
+                "exclude": ["node_modules"],
+            }
+        ),
+        "components/responsive-layout.tsx": "export const L = () => null;",
+        "app/add-content/page.tsx": "import { L } from '@/components/responsive-layout';",
+    }
+    tsconfigs, paths_set = _world(files)
+    cfg = find_governing_tsconfig("app/add-content/page.tsx", tsconfigs)
+    assert cfg is not None and cfg["paths"], "paths must survive comment stripping"
+    assert (
+        resolve_tsjs_import(
+            "app/add-content/page.tsx",
+            "@/components/responsive-layout",
+            paths_set,
+            tsconfigs,
+        )
+        == "components/responsive-layout.tsx"
+    )
+
+
+def test_strip_jsonc_only_strips_real_comments():
+    """``_strip_jsonc_comments`` must remove genuine ``//`` and ``/* */``
+    comments and trailing commas, but never touch comment-like sequences that
+    appear inside string literals (globs, URLs)."""
+    src = (
+        "{\n"
+        "  // a real line comment\n"
+        '  "paths": {"@/*": ["./*"]}, /* a real block comment */\n'
+        '  "url": "https://example.com/a//b",\n'
+        '  "globs": ["**/*.ts", "**/*.tsx"],\n'
+        '  "trailing": 1,\n'
+        "}\n"
+    )
+    parsed = json.loads(_strip_jsonc_comments(src))
+    assert parsed["paths"] == {"@/*": ["./*"]}
+    assert parsed["url"] == "https://example.com/a//b"
+    assert parsed["globs"] == ["**/*.ts", "**/*.tsx"]
+    assert parsed["trailing"] == 1
 
 
 def test_relative_import_unaffected_by_changes():

@@ -148,13 +148,54 @@ TSJS_INDEX_CANDIDATES = ("index.ts", "index.tsx", "index.js", "index.jsx",
                          "index.mjs", "index.cjs")
 
 def _strip_jsonc_comments(text: str) -> str:
-    # Drop // line comments and /* */ block comments. Naive but adequate for
-    # tsconfig.json and biome.jsonc.
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-    text = re.sub(r"(?<!:)//[^\n]*", "", text)
-    # Drop trailing commas (jsonc allows them).
-    text = re.sub(r",(\s*[}\]])", r"\1", text)
-    return text
+    """Strip ``//`` line and ``/* */`` block comments from JSONC, then drop
+    trailing commas.
+
+    String-aware: comment-like sequences *inside* string literals are preserved.
+    A regex that ignores strings corrupts any tsconfig whose ``paths`` /
+    ``include`` values contain ``/*``, ``*/`` or ``//`` — e.g. ``"@/*"`` (a
+    ``/*``) followed by ``"**/*.ts"`` (a ``*/``) makes the naive block-comment
+    pattern eat everything between them, silently deleting ``paths`` and
+    disabling alias resolution.
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    in_str = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:  # keep the escape pair intact
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+            i += 1
+            continue
+        if c == '"':
+            in_str = True
+            out.append(c)
+            i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "/":  # line comment
+            i += 2
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and text[i + 1] == "*":  # block comment
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2  # consume the closing */
+            continue
+        out.append(c)
+        i += 1
+    # Drop trailing commas (jsonc allows them). Safe to run over the result:
+    # a comma inside a string would need to be followed by whitespace then a
+    # closing brace/bracket within the same string, which JSON config values
+    # never contain.
+    return re.sub(r",(\s*[}\]])", r"\1", "".join(out))
 
 def _normalize_posix(parts) -> str:
     """Collapse '.' and '..' segments in a POSIX path's parts into a string."""
