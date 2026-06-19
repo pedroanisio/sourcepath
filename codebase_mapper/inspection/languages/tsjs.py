@@ -156,42 +156,140 @@ def _strip_jsonc_comments(text: str) -> str:
     text = re.sub(r",(\s*[}\]])", r"\1", text)
     return text
 
-def load_tsconfigs(records: list[FileRecord], read: Callable[[str], bytes]) -> dict[str, dict]:
-    """For each tsconfig.json file, return its parsed content keyed by path.
+def _normalize_posix(parts) -> str:
+    """Collapse '.' and '..' segments in a POSIX path's parts into a string."""
+    norm: list[str] = []
+    for part in parts:
+        if part == "..":
+            if norm and norm[-1] != "..":
+                norm.pop()
+            else:
+                norm.append(part)
+        elif part not in ("", "."):
+            norm.append(part)
+    return "/".join(norm)
 
-    Each value carries: baseUrl (relative to the tsconfig's directory),
-    paths (dict of alias-pattern -> [replacement, ...]), tsconfig_dir (the
-    directory the tsconfig lives in, POSIX-relative to repo root).
+
+def _resolve_extends_path(cfg_dir: str, ext: str, available: set[str]) -> str | None:
+    """Resolve a tsconfig ``extends`` target to a repo-relative file path.
+
+    Only relative/absolute path forms are resolvable. A bare package specifier
+    (e.g. ``@tsconfig/node18/tsconfig.json``, ``@vue/tsconfig``) lives under
+    ``node_modules`` — untracked — so it returns None. TypeScript appends
+    ``.json`` when the target has no extension and treats a directory as
+    ``<dir>/tsconfig.json``; both fallbacks are tried.
     """
+    if not (ext.startswith("./") or ext.startswith("../") or ext.startswith("/")):
+        return None
+    raw = (PurePosixPath(cfg_dir) / ext) if cfg_dir else PurePosixPath(ext)
+    cand = _normalize_posix(raw.parts)
+    for c in (cand, cand + ".json", cand + "/tsconfig.json"):
+        if c in available:
+            return c
+    return None
+
+
+def _read_tsconfig_options(
+    path: str,
+    read: Callable[[str], bytes],
+    available: set[str],
+    seen: frozenset[str] = frozenset(),
+) -> dict:
+    """Return a config's effective ``{baseUrl, paths}`` with ``extends`` merged.
+
+    ``extends`` parents are resolved first so the inheriting config wins on
+    conflict; both the string and the TS-5.0 array form are supported, and
+    cyclic chains are broken via ``seen``. baseUrl/paths are interpreted
+    relative to the *inheriting* config's directory — correct for the dominant
+    case of co-located configs (Vite's ``tsconfig.json`` + ``tsconfig.app.json``,
+    a monorepo package root and its ``tsconfig.base.json``). Cross-directory
+    ``extends`` that *redefines* ``paths`` is a known limitation.
+    """
+    if path in seen:
+        return {"baseUrl": None, "paths": {}}
+    try:
+        data = json.loads(_strip_jsonc_comments(read(path).decode("utf-8")))
+    except Exception:
+        return {"baseUrl": None, "paths": {}}
+
+    base_url: str | None = None
+    paths: dict = {}
+
+    cfg_dir = str(PurePosixPath(path).parent)
+    if cfg_dir == ".":
+        cfg_dir = ""
+    ext = data.get("extends")
+    ext_list = [ext] if isinstance(ext, str) else (ext if isinstance(ext, list) else [])
+    for raw in ext_list:
+        if not isinstance(raw, str) or not raw:
+            continue
+        target = _resolve_extends_path(cfg_dir, raw, available)
+        if target is None:
+            continue
+        inherited = _read_tsconfig_options(target, read, available, seen | {path})
+        if inherited.get("baseUrl") is not None:
+            base_url = inherited["baseUrl"]
+        if inherited.get("paths"):
+            paths = {**paths, **inherited["paths"]}
+
+    co = data.get("compilerOptions") or {}
+    if co.get("baseUrl") is not None:
+        base_url = co.get("baseUrl")
+    if co.get("paths"):
+        paths = {**paths, **co["paths"]}
+    return {"baseUrl": base_url, "paths": paths}
+
+
+def load_tsconfigs(records: list[FileRecord], read: Callable[[str], bytes]) -> dict[str, dict]:
+    """For each tsconfig/jsconfig file, return its effective config keyed by path.
+
+    Recognizes any ``tsconfig*.json`` (``tsconfig.json``, ``tsconfig.base.json``,
+    ``tsconfig.app.json``, ``tsconfig.node.json``, ...) and ``jsconfig.json``,
+    and follows ``extends`` chains. This matters because the default Vite scaffold
+    puts ``compilerOptions.paths`` in a referenced ``tsconfig.app.json`` while the
+    root ``tsconfig.json`` is a paths-less solution file — reading only the root
+    would silently lose every ``@/...`` alias.
+
+    Each value carries: baseUrl (relative to the config's directory), paths
+    (dict of alias-pattern -> [replacement, ...]), tsconfig_dir (the directory
+    the config lives in, POSIX-relative to repo root).
+    """
+    available = {r.path for r in records}
     out: dict[str, dict] = {}
     for r in records:
-        if r.path == "tsconfig.json" or r.path.endswith("/tsconfig.json") or \
-           r.path == "tsconfig.base.json" or r.path.endswith("/tsconfig.base.json"):
-            try:
-                data = json.loads(_strip_jsonc_comments(read(r.path).decode("utf-8")))
-            except Exception:
-                continue
-            co = data.get("compilerOptions") or {}
-            base_url = co.get("baseUrl") or "."
-            paths = co.get("paths") or {}
-            tsconfig_dir = str(PurePosixPath(r.path).parent)
-            if tsconfig_dir == ".":
-                tsconfig_dir = ""
-            out[r.path] = {
-                "baseUrl": base_url, "paths": paths, "tsconfig_dir": tsconfig_dir,
-            }
+        base = PurePosixPath(r.path).name
+        if not (base == "jsconfig.json"
+                or (base.startswith("tsconfig") and base.endswith(".json"))):
+            continue
+        opts = _read_tsconfig_options(r.path, read, available)
+        tsconfig_dir = str(PurePosixPath(r.path).parent)
+        if tsconfig_dir == ".":
+            tsconfig_dir = ""
+        out[r.path] = {
+            "baseUrl": opts.get("baseUrl") or ".",
+            "paths": opts.get("paths") or {},
+            "tsconfig_dir": tsconfig_dir,
+        }
     return out
 
 def find_governing_tsconfig(src_path: str, tsconfigs: dict[str, dict]) -> dict | None:
-    """Return the nearest tsconfig (by directory depth) governing src_path."""
+    """Return the config governing src_path: the deepest by directory, and among
+    equal-depth configs the one that actually declares ``paths``.
+
+    The tie-break stops a paths-less root ``tsconfig.json`` from shadowing a
+    sibling ``tsconfig.app.json`` (or ``tsconfig.base.json``) that carries the
+    aliases — the exact Vite layout that otherwise left aliases unresolved.
+    """
     src_dir = str(PurePosixPath(src_path).parent)
-    best, best_depth = None, -1
+    best: dict | None = None
+    best_key: tuple[int, int] = (-1, -1)
     for cfg in tsconfigs.values():
         d = cfg["tsconfig_dir"]
         if d == "" or src_dir == d or src_dir.startswith(d + "/"):
             depth = len(PurePosixPath(d).parts) if d else 0
-            if depth > best_depth:
-                best, best_depth = cfg, depth
+            key = (depth, 1 if cfg.get("paths") else 0)
+            if key > best_key:
+                best, best_key = cfg, key
     return best
 
 def _resolve_tsjs_target(target: str, paths_set: set[str]) -> str | None:
