@@ -18,6 +18,9 @@ from ..shared_kernel.extensions import (
     register_language_analyzer, register_import_resolver,
 )
 from .languages.c import extract_c_ast_summary, resolve_c_includes
+from .languages.clojure import (
+    extract_clojure_ast_summary, resolve_clojure_imports,
+)
 from .languages.cpp import extract_cpp_ast_summary
 from .languages.dart import extract_dart_ast_summary, resolve_dart_imports
 from .languages.go import (
@@ -191,6 +194,18 @@ class DartAnalyzer:
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
         return extract_dart_ast_summary(content, record.path)
+
+
+class ClojureAnalyzer:
+    name = "lang_clojure"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        # Pure-Python s-expr reader (no tree-sitter), like the Python analyzer.
+        return record.language == "clojure"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_clojure_ast_summary(content, record.path)
 
 
 # ---------------------------------------------------------------------------
@@ -395,19 +410,32 @@ class DartResolver:
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
+class ClojureResolver:
+    name = "resolve_clojure"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "clojure" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_clojure_imports(
+            record.path, record.ast_summary, ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
 
 _BUILTIN_ANALYZERS = (
-    CAnalyzer, CppAnalyzer, DartAnalyzer, GoAnalyzer, JavaAnalyzer,
-    KotlinAnalyzer, ObjcAnalyzer, PythonAnalyzer, RubyAnalyzer,
+    CAnalyzer, ClojureAnalyzer, CppAnalyzer, DartAnalyzer, GoAnalyzer,
+    JavaAnalyzer, KotlinAnalyzer, ObjcAnalyzer, PythonAnalyzer, RubyAnalyzer,
     RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
-    CResolver, CppResolver, DartResolver, GoResolver, JavaResolver,
-    KotlinResolver, ObjcResolver, PythonResolver, RubyResolver,
+    CResolver, ClojureResolver, CppResolver, DartResolver, GoResolver,
+    JavaResolver, KotlinResolver, ObjcResolver, PythonResolver, RubyResolver,
     RustResolver, SwiftResolver, TsJsResolver,
 )
 

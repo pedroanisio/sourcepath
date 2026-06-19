@@ -55,6 +55,7 @@ LANG_VERIFIERS := \
 	$(TESTS_DIR)/verify_dart.py \
 	$(TESTS_DIR)/verify_java.py \
 	$(TESTS_DIR)/verify_go.py \
+	$(TESTS_DIR)/verify_clojure.py \
 	$(TESTS_DIR)/verify_objc.py \
 	$(TESTS_DIR)/verify_xsd_fixture.py \
 	$(TESTS_DIR)/verify_proto_fixture.py

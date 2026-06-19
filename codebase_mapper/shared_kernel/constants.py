@@ -80,6 +80,7 @@ LANG_BY_EXT = {
     ".cs": "csharp", ".php": "php",
     ".swift": "swift",
     ".dart": "dart",
+    ".clj": "clojure", ".cljs": "clojure", ".cljc": "clojure", ".cljr": "clojure",
     ".proto": "protobuf",
     ".nix": "nix",
     ".frag": "glsl", ".vert": "glsl", ".comp": "glsl", ".geom": "glsl",
