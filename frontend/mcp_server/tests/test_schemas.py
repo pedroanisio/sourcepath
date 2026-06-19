@@ -257,6 +257,7 @@ VALID_OUTPUTS: dict[str, dict] = {
         "file": {"path": "src/app.py"},
         "imports_out": ["src/lib.py"],
         "imports_in": [],
+        "external_imports": ["react"],
         "chunks": [{"idx": 0}],
         "concepts": ["schema"],
     },

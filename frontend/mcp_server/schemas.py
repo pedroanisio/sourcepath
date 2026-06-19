@@ -753,11 +753,15 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
     "file_detail": {
         "type": "object",
         "additionalProperties": False,
-        "required": ["file", "imports_out", "imports_in", "chunks", "concepts"],
+        "required": ["file", "imports_out", "imports_in", "external_imports", "chunks", "concepts"],
         "properties": {
             "file": _FILE_RECORD,
             "imports_out": {"type": "array", "items": {"type": "string"}},
             "imports_in": {"type": "array", "items": {"type": "string"}},
+            # External + workspace package imports (cbm:importsExternal),
+            # e.g. "react" or a monorepo sibling "@scope/pkg" — distinct from
+            # the internal file->file imports_out / imports_in.
+            "external_imports": {"type": "array", "items": {"type": "string"}},
             "tests": {"type": "array", "items": {"type": "string"}},
             "tested_subjects": {"type": "array", "items": {"type": "string"}},
             "chunks": {"type": "array", "items": _CHUNK_ROW},

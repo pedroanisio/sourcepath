@@ -48,11 +48,11 @@ def rdflib_projection(bundle_dir: Path):
 def test_projection_paths_are_equivalent(jsonld_projection, rdflib_projection):
     (
         j_files, j_imports, j_io, j_ii, j_tests, j_tfs, j_sft,
-        j_chunks, j_cidx, j_cbf, j_cc, j_concept_chunks,
+        j_chunks, j_cidx, j_cbf, j_cc, j_concept_chunks, j_ext,
     ) = jsonld_projection
     (
         r_files, r_imports, r_io, r_ii, r_tests, r_tfs, r_sft,
-        r_chunks, r_cidx, r_cbf, r_cc, r_concept_chunks,
+        r_chunks, r_cidx, r_cbf, r_cc, r_concept_chunks, r_ext,
     ) = rdflib_projection
 
     # Deterministically ordered structures must be byte-identical.
@@ -73,6 +73,8 @@ def test_projection_paths_are_equivalent(jsonld_projection, rdflib_projection):
     # chunk_concepts is keyed by int chunk index.
     assert set(j_cc) == set(r_cc)
     assert all(Counter(j_cc[k]) == Counter(r_cc[k]) for k in j_cc)
+    # external imports (file -> package specifiers) are path-keyed, sorted-unique.
+    assert j_ext == r_ext
 
 
 def test_jsonld_projection_tolerates_list_valued_literals(tmp_path: Path):

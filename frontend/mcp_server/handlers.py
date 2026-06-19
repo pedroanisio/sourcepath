@@ -194,8 +194,21 @@ def _orient_bundle(args: dict[str, Any], default: str | None) -> dict[str, Any]:
     layers = [
         {
             "name": "L1 host",
-            "purpose": "Files, languages, types, imports, dependency manifests, AST summaries.",
-            "key_predicates": ["cbm:path", "cbm:imports", "cbm:hasPhase", "cbm:tests"],
+            "purpose": (
+                "Files, languages, types, imports, dependency manifests, AST "
+                "summaries. Internal file->file edges are cbm:imports; "
+                "cross-package and third-party imports are cbm:importsExternal "
+                "(file -> #pkg/<specifier> node) — in a monorepo, workspace "
+                "siblings (e.g. @scope/pkg) land here, so the cross-package "
+                "graph is in cbm:importsExternal + cbm:packageName, not "
+                "cbm:imports. declared/pinned deps are cbm:declaresDependency / "
+                "cbm:pinsDependency."
+            ),
+            "key_predicates": [
+                "cbm:path", "cbm:imports", "cbm:importsExternal",
+                "cbm:declaresDependency", "cbm:pinsDependency",
+                "cbm:packageName", "cbm:hasPhase", "cbm:tests",
+            ],
         },
         {
             "name": "L2 chunks_embeddings",
@@ -532,6 +545,7 @@ def _file_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]:
         "file": _file_record(payload["file"]),
         "imports_out": payload["imports_out"],
         "imports_in": payload["imports_in"],
+        "external_imports": payload["external_imports"],
         "tests": sorted(b.tests_for_subject.get(path, [])),
         "tested_subjects": sorted(b.subjects_for_test.get(path, [])),
         "chunks": [_bundle_chunk_row(b, row) for row in payload["chunks"]],

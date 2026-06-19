@@ -90,6 +90,28 @@ def test_select_bundle_404_on_unknown(bundle_name):
 # orient + bundle_summary
 # --------------------------------------------------------------------------
 
+def test_orient_bundle_advertises_dependency_predicates(live_bundle, bundle_name):
+    """#1: cross-package / external dependency edges live under
+    ``cbm:importsExternal`` (workspace + third-party imports),
+    ``cbm:declaresDependency`` and ``cbm:packageName``. orient_bundle's L1
+    schema hint must advertise them — otherwise an analyst following the hint
+    has no pointer to where the cross-package dependency graph is stored and
+    wrongly concludes it cannot be extracted."""
+    p = dispatch("orient_bundle", {"bundle": bundle_name})
+    l1 = next(l for l in p["schema_hint"]["layers"] if l["name"] == "L1 host")
+    preds = set(l1["key_predicates"])
+    assert {"cbm:importsExternal", "cbm:declaresDependency", "cbm:packageName"} <= preds, preds
+
+
+def test_file_detail_surfaces_external_imports(live_bundle, representative_file):
+    """#2: file_detail must expose a file's external/workspace imports, not only
+    its internal file->file edges. The list may be empty for a given file, but
+    the field must always be present (and conform to the output schema)."""
+    payload = dispatch("file_detail", {"path": representative_file})
+    assert "external_imports" in payload, payload.keys()
+    assert isinstance(payload["external_imports"], list)
+
+
 def test_orient_bundle_includes_cheatsheet_and_suggested_calls(live_bundle, bundle_name):
     p = dispatch("orient_bundle", {"bundle": bundle_name})
     assert p["bundle"]["name"] == bundle_name

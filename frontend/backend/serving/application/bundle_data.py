@@ -36,6 +36,7 @@ class Bundle:
     imports: list[tuple[str, str]]
     imports_out: dict[str, list[str]]
     imports_in: dict[str, list[str]]
+    external_imports: dict[str, list[str]]
     tests: list[tuple[str, str]]
     tests_for_subject: dict[str, list[str]]
     subjects_for_test: dict[str, list[str]]
@@ -69,6 +70,16 @@ def _int_or_none(value: Any) -> int | None:
     return int(value) if value is not None else None
 
 
+def _pkg_specifier_from_uri(uri: str) -> str:
+    """Recover a package specifier from its package IRI.
+
+    External imports are emitted as ``<CBMI_NS>pkg/<url-quoted-specifier>``
+    (e.g. ``.../pkg/@faststore%2Fui``); decode the tail back to ``@faststore/ui``.
+    """
+    frag = uri.split("pkg/", 1)[-1]
+    return urllib.parse.unquote(frag)
+
+
 # A projection is the fixed set of structures the serving layer needs out of
 # the RDF graph: files, import/test edges, chunks, and chunk→concept links.
 # Returned as a tuple in the order the Bundle constructor consumes them.
@@ -82,6 +93,7 @@ def _assemble_projection(
     test_edges: list[tuple[str, str]],
     raw_chunks: list[dict[str, Any]],
     lexicalizes: list[tuple[str, str]],
+    external_edges: list[tuple[str, str]] | None = None,
 ) -> Projection:
     """Resolve raw triple-level edges into the path/index-keyed structures the
     serving layer queries.
@@ -140,6 +152,17 @@ def _assemble_projection(
         if c["file"]:
             chunks_by_file.setdefault(c["file"], []).append(i)
 
+    # External (workspace + third-party) imports: file path -> sorted unique
+    # package specifiers. Kept separate from the internal file->file graph so
+    # a file's cross-package / npm dependencies are visible, not dropped.
+    external_imports: dict[str, list[str]] = {}
+    for s_uri, pkg in (external_edges or []):
+        s_path = file_by_uri.get(s_uri, {}).get("path")
+        if s_path and pkg:
+            external_imports.setdefault(s_path, []).append(pkg)
+    for p in external_imports:
+        external_imports[p] = sorted(set(external_imports[p]))
+
     chunk_concepts: dict[int, list[str]] = {}
     concept_chunks: dict[str, list[int]] = {}
     for s_uri, o_uri in lexicalizes:
@@ -165,6 +188,7 @@ def _assemble_projection(
         chunks_by_file,
         chunk_concepts,
         concept_chunks,
+        external_imports,
     )
 
 
@@ -223,6 +247,7 @@ def _project_from_jsonld(jsonld_path: Path) -> Projection:
     file_by_uri: dict[str, dict[str, Any]] = {}
     import_edges: list[tuple[str, str]] = []
     test_edges: list[tuple[str, str]] = []
+    external_edges: list[tuple[str, str]] = []
     raw_chunks: list[dict[str, Any]] = []
     lexicalizes: list[tuple[str, str]] = []
 
@@ -270,13 +295,16 @@ def _project_from_jsonld(jsonld_path: Path) -> Projection:
 
         for o_uri in id_refs(node.get("cbm:imports")):
             import_edges.append((uri, o_uri))
+        for o_uri in id_refs(node.get("cbm:importsExternal")):
+            external_edges.append((uri, _pkg_specifier_from_uri(o_uri)))
         for o_uri in id_refs(node.get("cbm:tests")):
             test_edges.append((uri, o_uri))
         for o_uri in id_refs(node.get("cbml3:lexicalizes")):
             lexicalizes.append((uri, o_uri))
 
     return _assemble_projection(
-        files, file_by_uri, import_edges, test_edges, raw_chunks, lexicalizes
+        files, file_by_uri, import_edges, test_edges, raw_chunks, lexicalizes,
+        external_edges,
     )
 
 
@@ -313,6 +341,10 @@ def _project_from_rdflib(ttl_path: Path) -> Projection:
         file_by_uri[str(f)] = rec
 
     import_edges = [(str(s), str(o)) for s, o in g.subject_objects(CBM.imports)]
+    external_edges = [
+        (str(s), _pkg_specifier_from_uri(str(o)))
+        for s, o in g.subject_objects(CBM.importsExternal)
+    ]
     test_edges = [(str(s), str(o)) for s, o in g.subject_objects(CBM.tests)]
 
     raw_chunks: list[dict[str, Any]] = []
@@ -334,7 +366,8 @@ def _project_from_rdflib(ttl_path: Path) -> Projection:
     lexicalizes = [(str(s), str(o)) for s, o in g.subject_objects(CBML3.lexicalizes)]
 
     return _assemble_projection(
-        files, file_by_uri, import_edges, test_edges, raw_chunks, lexicalizes
+        files, file_by_uri, import_edges, test_edges, raw_chunks, lexicalizes,
+        external_edges,
     )
 
 
@@ -390,6 +423,7 @@ def load_bundle(output_dir: Path) -> Bundle:
         chunks_by_file,
         chunk_concepts,
         concept_chunks,
+        external_imports,
     ) = _load_graph_projection(output_dir)
 
     cooccur: dict[str, list[tuple[str, int]]] = {}
@@ -423,6 +457,7 @@ def load_bundle(output_dir: Path) -> Bundle:
         imports=imports,
         imports_out=imports_out,
         imports_in=imports_in,
+        external_imports=external_imports,
         tests=tests,
         tests_for_subject=tests_for_subject,
         subjects_for_test=subjects_for_test,
