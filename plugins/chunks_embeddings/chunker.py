@@ -3,8 +3,9 @@
 Strategy:
   - Python: re-parse with `ast`, emit one chunk per top-level FunctionDef /
     AsyncFunctionDef / ClassDef, and one chunk per method inside classes
-    (one nesting level). Bytes ranges come from `ast.get_source_segment`-
-    equivalent line-based slicing.
+    (one nesting level). Byte ranges come from each node's own
+    (lineno, col_offset)..(end_lineno, end_col_offset) span — not whole-line
+    slicing — so single-line definitions stay distinct.
   - TypeScript / JavaScript: re-parse with tree-sitter, emit one chunk per
     top-level ``function_declaration`` / ``class_declaration`` /
     ``lexical_declaration`` containing an arrow or function expression, and
@@ -116,20 +117,19 @@ def _chunk_python(content: bytes, path: str) -> list[dict]:
         # Fall back to whole-file chunk so the file still gets some L2 coverage.
         return _whole_file_chunk(content, path)
 
-    src_lines = text.splitlines(keepends=True)
     line_byte_starts = _line_byte_starts(content)
 
     chunks: list[dict] = []
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            chunks.append(_chunk_from_node(node, "function", None, src_lines, line_byte_starts))
+            chunks.append(_chunk_from_node(node, "function", None, content, line_byte_starts))
         elif isinstance(node, ast.ClassDef):
-            class_chunk = _chunk_from_node(node, "class", None, src_lines, line_byte_starts)
+            class_chunk = _chunk_from_node(node, "class", None, content, line_byte_starts)
             chunks.append(class_chunk)
             # also emit method-level chunks
             for inner in node.body:
                 if isinstance(inner, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    chunks.append(_chunk_from_node(inner, "method", node.name, src_lines, line_byte_starts))
+                    chunks.append(_chunk_from_node(inner, "method", node.name, content, line_byte_starts))
 
     # If nothing chunkable at top level, emit a whole-file chunk so embedding
     # coverage is uniform.
@@ -147,21 +147,37 @@ def _line_byte_starts(content: bytes) -> list[int]:
     return starts
 
 
+def _pos_to_byte(line_byte_starts: list[int], line: int, col: int) -> int:
+    """Absolute byte offset of a (1-indexed line, column) position.
+
+    Python's ``ast`` reports ``col_offset`` / ``end_col_offset`` as UTF-8 byte
+    offsets within the line, so adding them to the line's start byte yields an
+    exact absolute byte offset — correct even for multibyte source.
+    """
+    base = line_byte_starts[line] if line < len(line_byte_starts) else line_byte_starts[-1]
+    return base + col
+
+
 def _chunk_from_node(node: ast.AST, kind: str, parent: str | None,
-                     src_lines: list[str], line_byte_starts: list[int]) -> dict:
-    # decorator_list[0].lineno is earlier than node.lineno when decorators present
+                     content: bytes, line_byte_starts: list[int]) -> dict:
+    # Span the node's *own* byte range, not the whole line(s) it sits on — a
+    # single-line definition must not absorb its neighbours (defect D1). The
+    # decorator list, when present, extends the start upward to cover ``@deco``.
     decorators = getattr(node, "decorator_list", []) or []
     if decorators:
-        line_start = min(d.lineno for d in decorators)
+        first = min(decorators, key=lambda d: (d.lineno, d.col_offset))
+        line_start = first.lineno
+        # col_offset points just past the ``@``; step back one byte to include it.
+        start_col = max(0, first.col_offset - 1)
     else:
         line_start = node.lineno
+        start_col = node.col_offset
     line_end = node.end_lineno or node.lineno
-    text = "".join(src_lines[line_start - 1: line_end])
-    chunk_bytes = text.encode("utf-8")
-    byte_start = line_byte_starts[line_start] if line_start < len(line_byte_starts) else 0
-    # Compute byte_end from line_end + length of last line; safer to use
-    # byte_start + len(chunk_bytes) which is exact given the slicing above.
-    byte_end = byte_start + len(chunk_bytes)
+    end_col = node.end_col_offset if node.end_col_offset is not None else 0
+    byte_start = _pos_to_byte(line_byte_starts, line_start, start_col)
+    byte_end = _pos_to_byte(line_byte_starts, line_end, end_col)
+    chunk_bytes = content[byte_start:byte_end]
+    text = chunk_bytes.decode("utf-8", "replace")
     name = getattr(node, "name", "<unknown>")
     return {
         "kind": kind,
@@ -205,42 +221,36 @@ def _chunk_tsjs(content: bytes, path: str) -> list[dict]:
     if grammar not in ("typescript", "javascript", "tsx"):
         return _whole_file_chunk(content, path)
     try:
-        text = content.decode("utf-8")
+        content.decode("utf-8")  # guard: skip files we can't decode as UTF-8
     except UnicodeDecodeError:
         return []
 
     _ts_setup()
     parser = ts.Parser(_TS_LANGS[grammar])
     tree = parser.parse(content)
-    src_lines = text.splitlines(keepends=True)
-    line_byte_starts = _line_byte_starts(content)
 
     chunks: list[dict] = []
     for node in tree.root_node.children:
         # Unwrap `export ...` / `export default ...` so the inner decl is
         # what we chunk; the chunk's byte range still covers the export
-        # keyword via `target` below.
+        # keyword via `node` below.
         inner = _tsjs_unwrap_export(node)
         if inner.type == "function_declaration":
             name = _tsjs_named_child_text(inner, "identifier", content)
             if name:
-                chunks.append(_chunk_from_ts_node(node, "function", None, name,
-                                                  src_lines, line_byte_starts))
+                chunks.append(_chunk_from_ts_node(node, "function", None, name, content))
         elif inner.type == "class_declaration":
             name = _tsjs_class_name(inner, content)
             if not name:
                 continue
-            chunks.append(_chunk_from_ts_node(node, "class", None, name,
-                                              src_lines, line_byte_starts))
+            chunks.append(_chunk_from_ts_node(node, "class", None, name, content))
             for method in _tsjs_iter_methods(inner):
                 m_name = _tsjs_named_child_text(method, "property_identifier", content)
                 if m_name:
-                    chunks.append(_chunk_from_ts_node(method, "method", name, m_name,
-                                                      src_lines, line_byte_starts))
+                    chunks.append(_chunk_from_ts_node(method, "method", name, m_name, content))
         elif inner.type in ("lexical_declaration", "variable_declaration"):
             for name in _tsjs_decl_function_bindings(inner, content):
-                chunks.append(_chunk_from_ts_node(node, "function", None, name,
-                                                  src_lines, line_byte_starts))
+                chunks.append(_chunk_from_ts_node(node, "function", None, name, content))
 
     if not chunks:
         return _whole_file_chunk(content, path)
@@ -309,22 +319,23 @@ def _tsjs_decl_function_bindings(decl_node, content: bytes) -> list[str]:
 
 
 def _chunk_from_ts_node(node, kind: str, parent: str | None, name: str,
-                        src_lines: list[str], line_byte_starts: list[int]) -> dict:
-    # Tree-sitter's points are zero-indexed; chunks expose 1-indexed lines.
-    line_start = node.start_point[0] + 1
-    line_end = node.end_point[0] + 1
-    text = "".join(src_lines[line_start - 1: line_end])
-    chunk_bytes = text.encode("utf-8")
-    byte_start = line_byte_starts[line_start] if line_start < len(line_byte_starts) else 0
-    byte_end = byte_start + len(chunk_bytes)
+                        content: bytes) -> dict:
+    # Span the node's own byte range — tree-sitter exposes exact byte offsets,
+    # so a minified single-line file yields one distinct chunk per symbol
+    # rather than N copies of the whole line (defect D1).
+    byte_start = node.start_byte
+    byte_end = node.end_byte
+    chunk_bytes = content[byte_start:byte_end]
+    text = chunk_bytes.decode("utf-8", "replace")
     return {
         "kind": kind,
         "symbol": name,
         "parent_symbol": parent,
         "byte_start": byte_start,
         "byte_end": byte_end,
-        "line_start": line_start,
-        "line_end": line_end,
+        # Tree-sitter's points are zero-indexed; chunks expose 1-indexed lines.
+        "line_start": node.start_point[0] + 1,
+        "line_end": node.end_point[0] + 1,
         "text": text,
         "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
     }
@@ -378,15 +389,13 @@ def _chunk_rust(content: bytes, path: str) -> list[dict]:
     if not TS_AVAILABLE:
         return _whole_file_chunk(content, path)
     try:
-        text = content.decode("utf-8")
+        content.decode("utf-8")  # guard: skip files we can't decode as UTF-8
     except UnicodeDecodeError:
         return []
 
     _ts_setup()
     parser = ts.Parser(_TS_LANGS["rust"])
     tree = parser.parse(content)
-    src_lines = text.splitlines(keepends=True)
-    line_byte_starts = _line_byte_starts(content)
 
     chunks: list[dict] = []
     for node in tree.root_node.children:
@@ -396,41 +405,35 @@ def _chunk_rust(content: bytes, path: str) -> list[dict]:
         if t == "function_item":
             name = _rust_chunk_name(node, content)
             if name:
-                chunks.append(_chunk_from_ts_node(node, "function", None, name,
-                                                  src_lines, line_byte_starts))
+                chunks.append(_chunk_from_ts_node(node, "function", None, name, content))
         elif t in ("struct_item", "enum_item", "union_item"):
             name = _rust_chunk_name(node, content)
             if name:
-                chunks.append(_chunk_from_ts_node(node, "class", None, name,
-                                                  src_lines, line_byte_starts))
+                chunks.append(_chunk_from_ts_node(node, "class", None, name, content))
         elif t == "trait_item":
             name = _rust_chunk_name(node, content)
             if not name:
                 continue
-            chunks.append(_chunk_from_ts_node(node, "class", None, name,
-                                              src_lines, line_byte_starts))
+            chunks.append(_chunk_from_ts_node(node, "class", None, name, content))
             body = _rust_decl_list(node)
             if body is not None:
                 for m in body.children:
                     if m.is_named and m.type in ("function_item", "function_signature_item"):
                         m_name = _rust_chunk_name(m, content)
                         if m_name:
-                            chunks.append(_chunk_from_ts_node(m, "method", name, m_name,
-                                                              src_lines, line_byte_starts))
+                            chunks.append(_chunk_from_ts_node(m, "method", name, m_name, content))
         elif t == "impl_item":
             impl_name = _rust_chunk_name(node, content)
             if not impl_name:
                 continue
-            chunks.append(_chunk_from_ts_node(node, "class", None, impl_name,
-                                              src_lines, line_byte_starts))
+            chunks.append(_chunk_from_ts_node(node, "class", None, impl_name, content))
             body = _rust_decl_list(node)
             if body is not None:
                 for m in body.children:
                     if m.is_named and m.type == "function_item":
                         m_name = _rust_chunk_name(m, content)
                         if m_name:
-                            chunks.append(_chunk_from_ts_node(m, "method", impl_name, m_name,
-                                                              src_lines, line_byte_starts))
+                            chunks.append(_chunk_from_ts_node(m, "method", impl_name, m_name, content))
 
     if not chunks:
         return _whole_file_chunk(content, path)

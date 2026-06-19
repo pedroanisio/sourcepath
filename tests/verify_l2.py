@@ -237,10 +237,19 @@ def main(argv: list[str] | None = None) -> int:
 
         # --- 8. Semantic sanity (sbert backend only — hash is meaningless) ---
         if args.backend == "sbert" and len(chunks) >= 4:
+            # chunk_ids carry a trailing ``:b<byte_start>-<byte_end>`` span
+            # (injective id, defect D2); match on the stable line-range prefix.
             id_to_row = {str(ids[i]): i for i in range(len(ids))}
-            auth = id_to_row.get("app.py#method:User.authenticate:L13-L18")
-            cls = id_to_row.get("app.py#class:User:L7-L18")
-            rdme = id_to_row.get("README.md#file:<file>:L1-L1")
+
+            def row_for(prefix: str) -> int | None:
+                for cid, i in id_to_row.items():
+                    if cid.startswith(prefix):
+                        return i
+                return None
+
+            auth = row_for("app.py#method:User.authenticate:L13-L18")
+            cls = row_for("app.py#class:User:L7-L18")
+            rdme = row_for("README.md#file:<file>:L1-L1")
             if None in (auth, cls, rdme):
                 check("semantic: have expected chunk ids", False,
                       f"missing one of auth/cls/rdme")

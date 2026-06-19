@@ -473,13 +473,16 @@ def _add_chunk(g: Graph, chunk_id: str = "demo#hello.py#hi") -> URIRef:
 
 
 def _symbol_from_chunk_id(chunk_id: str) -> str:
-    """Parse the L2 chunk_id ``path#kind:symbol:L<a>-L<b>`` → ``symbol``.
+    """Parse the L2 chunk_id ``path#kind:symbol:L<a>-L<b>:b<bs>-<be>`` → ``symbol``.
 
-    Method chunks encode the parent as ``parent.symbol``; returned as-is.
+    Method chunks encode the parent as ``parent.symbol``; returned as-is. The
+    symbol precedes the ``:L`` line-range marker, so split there — that ignores
+    both the line range and the trailing ``:b<start>-<end>`` byte span (a code
+    identifier never contains ``:``).
     """
     _path, _hash, rest = chunk_id.partition("#")
     _kind, _colon, rest = rest.partition(":")
-    symbol, _colon, _lines = rest.rpartition(":")
+    symbol, _sep, _span = rest.partition(":L")
     return symbol
 
 

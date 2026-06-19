@@ -11,17 +11,25 @@ Writes to:   ctx.indices["l2_10_chunks"] (the same chunks, with a stable
                 "backend": {"name": ..., "dimension": ..., "normalized": bool},
              }
 
-The chunk_id is `<file_path>#<kind>:<symbol>:L<line_start>-L<line_end>`.
+The chunk_id is
+`<file_path>#<kind>:<symbol>:L<line_start>-L<line_end>:b<byte_start>-<byte_end>`.
 For nested symbols (methods), parent is included: `...#method:UserService.foo:...`.
+The trailing byte span makes the id injective: two symbols that share a
+(kind, symbol, line range) — common in minified single-line files — differ in
+their byte span and so get distinct ids instead of colliding into one node.
 """
 from __future__ import annotations
 
+import logging
 from typing import cast
 
 import numpy as np
 
 from codebase_mapper.shared_kernel.extensions import PipelineCtx
 from .backends import EmbeddingBackend
+
+
+logger = logging.getLogger("cbm.l2.embedder")
 
 
 # Embedding truncation — most code-aware models choke past their context
@@ -39,13 +47,29 @@ class EmbeddingComputer:
 
     def run(self, ctx: PipelineCtx) -> dict:
         chunks_map = cast(dict, ctx.scratch.get("chunks", {}))
-        # Build a deterministic flat list.
+        # Build a deterministic flat list, deduplicating by chunk_id. After D1
+        # an injective chunk_id (D2) only collides when two chunks are the same
+        # span — i.e. byte-identical content — so keeping the first is correct.
+        # PALS's Law (no silent caps): every drop is logged, not swallowed.
         flat: list[tuple[str, dict]] = []
+        seen: set[str] = set()
+        dropped = 0
         for path in sorted(chunks_map.keys()):
             for c in sorted(chunks_map[path],
-                            key=lambda x: (x["line_start"], x["kind"], x["symbol"])):
+                            key=lambda x: (x["line_start"], x["kind"], x["symbol"],
+                                           x.get("byte_start", 0), x.get("byte_end", 0))):
                 chunk_id = _chunk_id(path, c)
+                if chunk_id in seen:
+                    dropped += 1
+                    logger.warning("dropping duplicate chunk_id %s", chunk_id)
+                    continue
+                seen.add(chunk_id)
                 flat.append((chunk_id, dict(c, path=path, chunk_id=chunk_id)))
+        if dropped:
+            logger.warning(
+                "embedder dropped %d duplicate chunk(s) of %d total",
+                dropped, dropped + len(flat),
+            )
 
         if not flat:
             ctx.indices["l2_10_chunks"] = []
@@ -94,4 +118,8 @@ def _chunk_id(path: str, c: dict) -> str:
     sym = c["symbol"]
     if c.get("parent_symbol"):
         sym = f"{c['parent_symbol']}.{sym}"
-    return f"{path}#{c['kind']}:{sym}:L{c['line_start']}-L{c['line_end']}"
+    return (
+        f"{path}#{c['kind']}:{sym}"
+        f":L{c['line_start']}-L{c['line_end']}"
+        f":b{c['byte_start']}-{c['byte_end']}"
+    )
