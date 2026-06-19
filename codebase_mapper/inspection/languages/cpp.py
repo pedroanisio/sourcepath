@@ -40,6 +40,7 @@ from pathlib import PurePosixPath
 
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _ts_setup, TS_AVAILABLE, ts
+from ._treewalk import find_named_descendant, iter_named_pre_order
 
 
 _TYPE_NODE_TYPES = {
@@ -63,20 +64,17 @@ def _find_first(node, kind: str):
 
 
 def _find_descendant(node, kinds: set[str]):
-    if node.type in kinds:
-        return node
-    for ch in node.children:
-        if ch.is_named:
-            r = _find_descendant(ch, kinds)
-            if r is not None:
-                return r
-    return None
+    # Iterative (see _treewalk): same pre-order, root-inclusive first-match
+    # semantics, but safe on deeply-nested subtrees.
+    return find_named_descendant(node, kinds)
 
 
 def _collect_includes(root, content: bytes) -> list[dict]:
     out: list[dict] = []
-    # preproc_include is at translation-unit level (not nested in funcs).
-    def visit(node):
+    # Iterative pre-order (see _treewalk): this walk descends into function
+    # bodies, so a deeply-nested file would overflow a recursive visitor. Prune
+    # at preproc_include (no nested includes), matching the old early ``return``.
+    for node in iter_named_pre_order(root, descend=lambda n: n.type != "preproc_include"):
         if node.type == "preproc_include":
             path_node = node.child_by_field_name("path")
             if path_node is not None:
@@ -96,12 +94,6 @@ def _collect_includes(root, content: bytes) -> list[dict]:
                         "source": inner,
                         "lineno": node.start_point[0] + 1,
                     })
-            return
-        for ch in node.children:
-            if ch.is_named:
-                visit(ch)
-
-    visit(root)
     out.sort(key=lambda x: (x["lineno"], x["source"]))
     return out
 

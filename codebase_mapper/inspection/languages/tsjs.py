@@ -11,48 +11,17 @@ from typing import Callable
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _TS_QUERIES, _strip_quotes, _ts_setup
 from ...ts_setup import TS_AVAILABLE, ts
+from ._treewalk import node_to_jsonable, regenerate_cst_text
 
 
 TSJS_AST_SCHEMA_VERSION = 1
 
 
-def _ts_node_to_jsonable(node, content: bytes):
-    """Serialize a tree-sitter Node to a JSON-safe structure with full byte coverage.
-
-    Encoding (chosen for compactness — JSON dicts have a high per-token tax):
-      * Anonymous leaves whose ``type == text`` (keywords like ``function``,
-        punctuation like ``;``) collapse to a **bare string**.
-      * Named leaves (identifiers, strings, numbers) become
-        ``{"type": ..., "text": ...}``.
-      * Interstitial gaps between siblings (whitespace, line breaks) are
-        emitted as **bare strings** in the children list.
-      * Internal nodes are ``{"type": ..., "children": [...]}``.
-
-    Walking the result pre-order and concatenating every string / ``text``
-    field reproduces the original bytes exactly (for valid UTF-8 input).
-    """
-    children = node.children
-    if not children:
-        text = content[node.start_byte:node.end_byte].decode("utf-8")
-        # Anonymous leaf whose label equals its source — round-trip needs
-        # only the text, so drop the redundant type.
-        if not node.is_named and node.type == text:
-            return text
-        return {"type": node.type, "text": text}
-    out_children: list = []
-    cursor = node.start_byte
-    for child in children:
-        if child.start_byte > cursor:
-            gap = content[cursor:child.start_byte].decode("utf-8")
-            if gap:
-                out_children.append(gap)
-        out_children.append(_ts_node_to_jsonable(child, content))
-        cursor = child.end_byte
-    if cursor < node.end_byte:
-        gap = content[cursor:node.end_byte].decode("utf-8")
-        if gap:
-            out_children.append(gap)
-    return {"type": node.type, "children": out_children}
+# The CST serializer is the iterative ``node_to_jsonable`` from ``_treewalk``
+# (no recursion-depth ceiling on deeply-nested files), kept under the historical
+# private name for any caller that imports it. Its encoding is byte-identical to
+# the prior recursive serializer.
+_ts_node_to_jsonable = node_to_jsonable
 
 
 def regenerate_tsjs_source(summary: dict) -> str:
@@ -64,22 +33,12 @@ def regenerate_tsjs_source(summary: dict) -> str:
     """
     if summary.get("cst_json") is None:
         raise ValueError("summary missing 'cst_json' (schema_version < 1 or extraction failed)")
-    parts: list[str] = []
-
-    def walk(node) -> None:
-        if isinstance(node, str):
-            parts.append(node)
-            return
-        if "text" in node:
-            parts.append(node["text"])
-            return
-        for c in node.get("children", ()):
-            walk(c)
-
-    parts.append(summary.get("header", "") or "")
-    walk(summary["cst_json"])
-    parts.append(summary.get("footer", "") or "")
-    return "".join(parts)
+    # Iterative concatenation (see _treewalk): header + CST body + footer.
+    return (
+        (summary.get("header", "") or "")
+        + regenerate_cst_text(summary["cst_json"])
+        + (summary.get("footer", "") or "")
+    )
 
 
 def extract_tsjs_ast_summary(content: bytes, path: str, grammar: str) -> tuple[dict | None, list[str]]:

@@ -37,6 +37,7 @@ from pathlib import PurePosixPath
 
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _ts_setup, TS_AVAILABLE, ts
+from ._treewalk import find_named_descendant, iter_named_pre_order
 
 
 # Objective-C dialect tags we accept. Both share the same grammar and
@@ -56,14 +57,9 @@ def _find_first(node, kind: str):
 
 
 def _find_descendant(node, kinds: set[str]):
-    if node.type in kinds:
-        return node
-    for ch in node.children:
-        if ch.is_named:
-            r = _find_descendant(ch, kinds)
-            if r is not None:
-                return r
-    return None
+    # Iterative (see _treewalk): a recursive search overflows on deeply-nested
+    # subtrees. Same pre-order, root-inclusive first-match semantics.
+    return find_named_descendant(node, kinds)
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +70,13 @@ def _find_descendant(node, kinds: set[str]):
 def _collect_imports(root, content: bytes) -> list[dict]:
     out: list[dict] = []
 
-    def visit(node):
+    # Iterative pre-order (see _treewalk): this walk descends into function
+    # bodies, so a deeply-nested file would overflow a recursive visitor. Prune
+    # at import nodes — they have no nested imports — matching the recursive
+    # visitor's early ``return``.
+    for node in iter_named_pre_order(
+        root, descend=lambda n: n.type not in ("preproc_include", "module_import"),
+    ):
         nt = node.type
         if nt == "preproc_include":
             path_node = node.child_by_field_name("path")
@@ -94,14 +96,10 @@ def _collect_imports(root, content: bytes) -> list[dict]:
                         "source": inner,
                         "lineno": node.start_point[0] + 1,
                     })
-            return
-        if nt == "module_import":
-            # `@import Foundation;` / `@import UIKit.UIView;`
-            # The grammar exposes the dotted-or-bare identifier as
-            # children. Collect the full text minus `@import` and `;`.
-            text = _node_text(node, content)
-            # Strip `@import` prefix and trailing `;`.
-            t = text.strip()
+        elif nt == "module_import":
+            # `@import Foundation;` / `@import UIKit.UIView;` — text minus the
+            # `@import` prefix and trailing `;`.
+            t = _node_text(node, content).strip()
             if t.startswith("@import"):
                 t = t[len("@import"):].strip()
             if t.endswith(";"):
@@ -112,12 +110,6 @@ def _collect_imports(root, content: bytes) -> list[dict]:
                     "source": t,
                     "lineno": node.start_point[0] + 1,
                 })
-            return
-        for ch in node.children:
-            if ch.is_named:
-                visit(ch)
-
-    visit(root)
     out.sort(key=lambda x: (x["lineno"], x["source"]))
     return out
 
@@ -245,7 +237,12 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
     """Walk the translation_unit, emitting one item per type / method /
     protocol / function."""
 
-    def visit(node):
+    terminal = ("class_interface", "class_implementation",
+                "protocol_declaration", "function_definition")
+    # Iterative pre-order (see _treewalk): prune at the terminal declaration
+    # kinds — each is handled and never descended into, matching the recursive
+    # visitor's early ``return``.
+    for node in iter_named_pre_order(root, descend=lambda n: n.type not in terminal):
         nt = node.type
         if nt == "class_interface":
             name, superclass, protocols, category = _class_interface_name(node, content)
@@ -269,8 +266,7 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                 # Walk methods inside the interface body.
                 _emit_class_methods(node, content, item_name, items,
                                     decl_only=True)
-            return
-        if nt == "class_implementation":
+        elif nt == "class_implementation":
             name, _su, _pr, category = _class_interface_name(node, content)
             if name is not None:
                 item_kind = "category_impl" if category else "class_implementation"
@@ -286,8 +282,7 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                 })
                 _emit_class_methods(node, content, item_name, items,
                                     decl_only=False)
-            return
-        if nt == "protocol_declaration":
+        elif nt == "protocol_declaration":
             name_node = _find_first(node, "identifier")
             if name_node is not None:
                 proto_name = _node_text(name_node, content)
@@ -311,8 +306,7 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                 items.append(item)
                 _emit_class_methods(node, content, proto_name, items,
                                     decl_only=True)
-            return
-        if nt == "function_definition":
+        elif nt == "function_definition":
             # C-style free function (common in ObjC for utility helpers).
             decl = _find_descendant(node, {"function_declarator"})
             if decl is not None:
@@ -327,15 +321,6 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                         "byte_start": node.start_byte,
                         "byte_end": node.end_byte,
                     })
-            return
-        # Recurse — top-level only matters here.
-        for ch in node.children:
-            if ch.is_named:
-                visit(ch)
-
-    for ch in root.children:
-        if ch.is_named:
-            visit(ch)
 
 
 def _emit_class_methods(class_node, content: bytes, parent_name: str,

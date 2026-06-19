@@ -33,6 +33,7 @@ from typing import Callable
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _TS_QUERIES, _ts_setup
 from ...ts_setup import TS_AVAILABLE, ts
+from ._treewalk import iter_named_pre_order
 
 
 # Item kinds recognised by the analyzer. Mapped onto the L2 chunk kind by
@@ -210,7 +211,9 @@ def _attach_supertypes(items: list[dict], root, content: bytes) -> None:
                                            "annotation", "record"}
     }
 
-    def visit(node) -> None:
+    # Iterative full pre-order walk (see _treewalk): descends into method
+    # bodies, so a recursive walk would overflow on a deeply-nested file.
+    for node in iter_named_pre_order(root):
         if node.type in _TYPE_NODE_TYPES:
             key = (node.start_byte, node.end_byte)
             it = type_items_by_span.get(key)
@@ -220,11 +223,6 @@ def _attach_supertypes(items: list[dict], root, content: bytes) -> None:
                     it["extends"] = ext
                 if impl:
                     it["implements"] = impl
-        for ch in node.children:
-            if ch.is_named:
-                visit(ch)
-
-    visit(root)
 
 
 def extract_java_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[str]]:

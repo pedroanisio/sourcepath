@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 
 from pathlib import Path
@@ -36,6 +37,31 @@ from .models import (
     PinsDependencyEdge,
 )
 from .tests_edges import infer_tests_edges
+
+_log = logging.getLogger(__name__)
+
+
+def _safe_extract(analyzer, record, content, ctx):
+    """Run ``analyzer.extract`` with any failure contained to this one record.
+
+    A mapping run must not be aborted by a single pathological file. A
+    deeply-nested source can still overflow a recursive helper into
+    ``RecursionError`` (and any analyzer may raise on malformed input); either
+    way the failure is recorded in the record's ``extraction_errors`` and no
+    summary is returned, so the file degrades gracefully and the run continues.
+    The drop is logged, never silent (PALS's Law).
+    """
+    name = getattr(analyzer, "name", type(analyzer).__name__)
+    try:
+        return analyzer.extract(record, content, ctx)
+    except RecursionError:
+        _log.warning("extract recursion overflow on %s (%s); skipping file",
+                     record.path, name)
+        return None, ["extract_recursion_error"]
+    except Exception as e:  # noqa: BLE001 — untrusted input shape; never abort the run
+        _log.warning("extract failed on %s (%s): %s: %s",
+                     record.path, name, type(e).__name__, e)
+        return None, [f"extract_failed: {type(e).__name__}: {e}"]
 
 
 def map_codebase(
@@ -135,8 +161,8 @@ def map_codebase(
         content = content_by_path[rec.path]
         for analyzer in analyzers:
             if analyzer.matches(rec, ctx):
-                rec.ast_summary, rec.extraction_errors = analyzer.extract(
-                    rec, content, ctx,
+                rec.ast_summary, rec.extraction_errors = _safe_extract(
+                    analyzer, rec, content, ctx,
                 )
                 break
         rec.phases = refine_phases(rec)
