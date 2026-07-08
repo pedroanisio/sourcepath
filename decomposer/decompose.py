@@ -65,8 +65,52 @@ def decompose(bundle_dir: str | Path) -> Decomposition:
         detected_architecture=architecture,
         quality_gates=gates,
         build_order=build_order,
+        cycle_resolutions=_cycle_resolutions(ev, mg, module_cycles),
         provenance=provenance,
     )
+
+
+def _cycle_resolutions(
+    ev: EvidenceGraph, mg: ModuleGraph, module_cycles: list[list[str]],
+) -> list[dict]:
+    """File-level construction order for each directory-granularity SCC.
+
+    The YAML carries only module-granularity relationships, so this is the one
+    place file-level topology is preserved for consumers (the Recomposer): a
+    topological order over the cycle group's code files, restricted to the
+    import edges among them. If the files themselves are cyclic, the order is
+    empty and the note says so — never a fabricated linear order.
+    """
+    out: list[dict] = []
+    for cyc in sorted(module_cycles):
+        members = sorted(cyc)
+        group_files = sorted({
+            p for m in members for p in mg.files_of_module.get(m, [])
+            if ev.file_by_path.get(p, {}).get("type") in {"source_code", "test_code"}
+        })
+        in_group = set(group_files)
+        adjacency = {
+            p: sorted(t for t in ev.imports_out.get(p, []) if t in in_group)
+            for p in group_files
+        }
+        file_cycles = _cycles(group_files, adjacency)
+        if file_cycles:
+            out.append({
+                "members": [f"module:{m}" for m in members],
+                "file_order": [],
+                "note": (f"{len(file_cycles)} file-level cycle(s) inside the "
+                         f"group; no linear file order exists"),
+            })
+            continue
+        layers = _build_order(group_files, adjacency)
+        order = [p for layer in layers for p in sorted(layer)]
+        out.append({
+            "members": [f"module:{m}" for m in members],
+            "file_order": order,
+            "note": ("topological over the group's internal file imports; "
+                     "the directory-level cycle dissolves at file granularity"),
+        })
+    return out
 
 
 def _has_code(ev: EvidenceGraph, mg: ModuleGraph, mod: str) -> bool:

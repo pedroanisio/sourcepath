@@ -196,7 +196,7 @@ def _module_part(
 
     ev_obj = Evidence(
         files=files,
-        symbols=_sample_symbols(ev, code_files),
+        symbols=_symbol_inventory(ev, code_files),
         graph_nodes=[ev.file_by_path[p]["uri"] for p in code_files if p in ev.file_by_path][:20],
         graph_edges=_module_edge_descriptors(mg, mod),
         signals=_module_signals(ev, mod, files, code_files, phases, ca, ce, in_cycle),
@@ -214,6 +214,10 @@ def _module_part(
         "size_bytes": sum(ev.file_by_path.get(p, {}).get("size") or 0 for p in files),
         "xref_in": mg.xref_in.get(mod, 0), "xref_out": mg.xref_out.get(mod, 0),
         "phases": phases,
+        "languages": sorted({
+            lang for p in code_files
+            if (lang := ev.file_by_path.get(p, {}).get("language"))
+        }),
     }
     return Part(
         id=f"module:{mod}", name=mod, kind=kind, layer=layer,
@@ -561,15 +565,24 @@ def _module_responsibility(
     return (f"{role} module ({len(code_files)} code files).", Confidence.WEAK)
 
 
-def _sample_symbols(ev: EvidenceGraph, code_files: list[str]) -> list[str]:
+def _symbol_inventory(ev: EvidenceGraph, code_files: list[str]) -> list[str]:
+    """Full (uncapped) symbol inventory of a module: ``file:symbol (kind)``.
+
+    The complete inventory is what makes the decomposition usable as a mapping
+    artifact — a silent sample here would masquerade as coverage (no-silent-caps
+    rule). Order is (file, first line): the reading order of the module.
+    """
     syms: list[str] = []
     for p in code_files:
-        for c in ev.symbols_of(p):
+        chunks = sorted(
+            (ev.chunks[i] for i in ev.chunks_by_file.get(p, [])),
+            key=lambda c: (c.get("beginLine") or 0, str(c.get("symbol"))),
+        )
+        for c in chunks:
             s = c.get("symbol")
             if s and s != "<file>":
-                syms.append(f"{PurePosixPath(p).name}:{s}")
-            if len(syms) >= 30:
-                return syms
+                kind = c.get("kind") or "symbol"
+                syms.append(f"{PurePosixPath(p).name}:{s} ({kind})")
     return syms
 
 

@@ -12,9 +12,17 @@ This work is subject to the methodological caveats and commitments described in 
 Second delivery of the Decomposer/Recomposer system. Consumes a **Decomposer
 YAML document** — never the raw bundle or repository — and generates a
 **Natural Description Build Plan**: an ordered, dependency-aware,
-evidence-grounded sequence of natural-language construction steps that could
-recreate the system from scratch, executable by a human engineer or an AI
-coding agent.
+evidence-grounded sequence of natural-language construction steps.
+
+**Positioning (deliberate):** the plan is an **architecture/build-order map**
+— what exists, in what order, and why — to be executed alongside the original
+sources, or used standalone for onboarding and architecture review. It does
+not carry file contents or API signatures and therefore is *not* a source-free
+rebuilder. That tier already exists elsewhere in this project: the bundle's
+blob store plus `codebase_mapper`'s `reconstruct` tool restore the tree
+byte-exactly, so a lossy signature-level middle tier would duplicate it,
+worse. Full per-module symbol inventories (name + kind, uncapped) live in the
+decomposition's `evidence.symbols` for consumers that want deeper structure.
 
 ```bash
 # 1) produce a decomposition (first delivery)
@@ -31,19 +39,25 @@ summary.
 
 1. **Units.** Module/package parts are the unit of construction. Modules that
    are mutually dependent in the decomposition's own dependency edges (SCCs of
-   `dependencies.outgoing`) merge into one **joint step** — the evidence says no
-   linear order exists among them. Cycle detection does *not* parse
-   quality-gate findings, whose names/formats are reporting policy; the
-   scheduler depends only on the data contract.
-2. **Nominal phases.** Each unit gets a canonical Part III phase from its
+   `dependencies.outgoing`) merge into one **joint step**. When the
+   decomposition's `cycle_resolutions` carries a file-level topological order
+   for the group (directory cycles usually dissolve at file granularity), the
+   joint step lists its files **in dependency order** instead of "build
+   together". Cycle detection does *not* parse quality-gate findings, whose
+   names/formats are reporting policy; the scheduler depends only on the data
+   contract.
+2. **Ownership.** Each file is created by exactly one step — its first owner in
+   execution order; later steps that touch the same file declare
+   `modifies`, so an executing agent never overwrites earlier output.
+3. **Nominal phases.** Each unit gets a canonical Part III phase from its
    classification (domain→3, ports/shared-kernel→4, core/supporting→5,
    adapter/infrastructure→6, test→10); fixed steps (skeleton, environment,
    schemas, ops, validation, docs) take phases 1, 2, 3, 9, 11, 12.
-3. **Phase relaxation.** Dependency evidence overrides canon: a dependency is
+4. **Phase relaxation.** Dependency evidence overrides canon: a dependency is
    never scheduled after its dependent (single pass in descending build-order
    layer, correct because dependencies sit at strictly lower layers in the
    SCC-condensed DAG).
-4. **Invariant.** Every `requires` reference points to an earlier step; this is
+5. **Invariant.** Every `requires` reference points to an earlier step; this is
    asserted at generation time (`ValueError` on violation), not assumed.
 
 Each step carries: goal, rationale, required previous steps, files/components

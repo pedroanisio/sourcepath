@@ -6,9 +6,10 @@ natural-language construction steps able to recreate the system.
 
 Algorithm
 ---------
-1. **Units.** Module/package parts are the unit of construction. Parts that the
-   decomposition proves cyclic (``circular_dependencies`` quality findings) are
-   merged into one *joint unit* — the evidence says they cannot be built apart.
+1. **Units.** Module/package parts are the unit of construction. Mutually
+   dependent modules (SCCs of the decomposition's own dependency edges) merge
+   into one *joint unit*; when the decomposition carries a ``cycle_resolutions``
+   file-level order for the group, the joint step lists files in that order.
 2. **Nominal phase.** Each unit gets a canonical Part III phase from its
    classification (domain→3, ports/shared-kernel→4, core/supporting→5,
    adapter/infrastructure→6, test→10).
@@ -57,16 +58,24 @@ def recompose(doc: dict[str, Any]) -> BuildPlan:
         if q.get("gate") == "test_gap"
     }
     dead_code_by_module = _dead_code_by_module(doc, module_parts)
+    resolutions = {
+        frozenset(c.get("members", [])): c
+        for c in doc.get("cycle_resolutions", [])
+    }
 
     specs: list[dict] = []
     specs.append(_skeleton_spec(doc, parts))
-    specs.append(_environment_spec(doc, parts))
+    specs.append(_environment_spec(doc, parts, module_parts))
+    fixture_spec = _fixture_manifest_spec(parts, module_parts)
+    if fixture_spec:
+        specs.append(fixture_spec)
     schema_spec, schema_skip = _schema_spec(doc, parts)
     if schema_spec:
         specs.append(schema_spec)
     for u in units.values():
         specs.append(_unit_spec(u, module_parts, layer_of, ext_deps,
-                                test_edges, test_gaps, dead_code_by_module))
+                                test_edges, test_gaps, dead_code_by_module,
+                                resolutions))
     specs.extend(_delivery_specs(doc, parts, units))
     persistence_skip = _persistence_skip(module_parts)
     specs.extend(_ops_specs(parts))
@@ -83,6 +92,16 @@ def recompose(doc: dict[str, Any]) -> BuildPlan:
         for pid in s["parts"]:
             step_of_part[pid] = i
 
+    # Single-owner pass: the first step (in execution order) to list a file
+    # owns its creation; any later step re-listing it *modifies* an existing
+    # file. Without this, an executor would overwrite earlier output (e.g. a
+    # wiring step re-creating the entry file its module step already built).
+    claimed: set[str] = set()
+    for s in specs:
+        s["modifies"] = [f for f in s["creates"] if f in claimed]
+        s["creates"] = [f for f in s["creates"] if f not in claimed]
+        claimed.update(s["creates"])
+
     steps: list[BuildStep] = []
     for s in specs:
         requires = sorted({
@@ -98,7 +117,8 @@ def recompose(doc: dict[str, Any]) -> BuildPlan:
         steps.append(BuildStep(
             number=s["number"], phase=s["phase"], goal=s["goal"],
             rationale=s["rationale"], requires=requires,
-            creates=s["creates"], contracts=s["contracts"],
+            creates=s["creates"], creates_ordered=s.get("creates_ordered", False),
+            modifies=s["modifies"], contracts=s["contracts"],
             dependencies_introduced=s["deps_introduced"],
             tests_required=s["tests_required"], evidence=s["evidence"],
             expected_result=s["expected_result"], confidence=s["confidence"],
@@ -273,13 +293,63 @@ def _skeleton_spec(doc: dict, parts: dict[str, dict]) -> dict:
     )
 
 
-def _environment_spec(doc: dict, parts: dict[str, dict]) -> dict:
+def _test_dir_owned(path: str, module_parts: dict[str, dict]) -> bool:
+    """True when *path* belongs to a test-owned subtree.
+
+    Two evidence-grounded shapes (module==directory):
+    * an *ancestor* directory is a test-role module (file inside a test tree);
+    * the file sits at a fixture-package root: its own directory is non-root
+      and every module at-or-under it is test-role (e.g. a fixture repo's
+      ``pubspec.yaml`` whose code lives in ``<pkg>/lib``). A mixed subtree
+      (like a UI package that merely *contains* a __tests__ module) stays
+      non-test.
+    """
+    roles = {
+        p["name"]: (p.get("classification") or {}).get("role")
+        for p in module_parts.values()
+    }
+    segs = path.split("/")[:-1]
+    if any(roles.get("/".join(segs[:i + 1])) == "test" for i in range(len(segs))):
+        return True
+    d = "/".join(segs)
+    if not d:
+        return False
+    under = [r for n, r in roles.items() if n == d or n.startswith(d + "/")]
+    return bool(under) and all(r == "test" for r in under)
+
+
+def _split_manifests(
+    parts: dict[str, dict], module_parts: dict[str, dict]
+) -> tuple[list[str], list[str]]:
+    dep_mgmt = parts.get("ops:dependency_management")
+    manifests = (dep_mgmt or {}).get("evidence", {}).get("files", [])
+    env = [m for m in manifests if not _test_dir_owned(m, module_parts)]
+    fixture = [m for m in manifests if _test_dir_owned(m, module_parts)]
+    return env, fixture
+
+
+def _environment_spec(
+    doc: dict, parts: dict[str, dict], module_parts: dict[str, dict]
+) -> dict:
     ext = sorted(
         (p for p in parts.values() if p.get("kind") == "external_dependency"),
         key=lambda p: (-(p.get("metrics") or {}).get("importer_modules", 0), p["name"]),
     )
     dep_mgmt = parts.get("ops:dependency_management")
-    manifests = (dep_mgmt or {}).get("evidence", {}).get("files", [])
+    manifests, fixture = _split_manifests(parts, module_parts)
+    assumptions = []
+    if manifests:
+        assumptions.append(
+            "dependency versions are pinned in lockfiles; exact versions must "
+            "be taken from the original lockfiles, which the decomposition "
+            "lists but does not inline")
+    else:
+        assumptions.append("no dependency manifests were captured in the decomposition")
+    if fixture:
+        assumptions.append(
+            f"{len(fixture)} manifest(s) under test-owned directories are test "
+            f"fixtures, not environment inputs — they are set up with the test "
+            f"phase, not installed here")
     return _spec(
         phase=2, layer=-1, name="",
         goal="Configure the package/build/runtime environment and declare all external dependencies.",
@@ -292,13 +362,33 @@ def _environment_spec(doc: dict, parts: dict[str, dict]) -> dict:
         deps_introduced=[f"{p['name']} (used by {(p.get('metrics') or {}).get('importer_modules', '?')} modules)"
                          for p in ext],
         tests_required=["dependency install succeeds from the declared manifests"],
-        evidence=[p["id"] for p in ext[:15]] + ([dep_mgmt["id"]] if dep_mgmt else []),
+        evidence=[p["id"] for p in ext] + ([dep_mgmt["id"]] if dep_mgmt else []),
         expected_result="Reproducible environment: all third-party packages install from manifests.",
         confidence="certain",
-        assumptions=(["dependency versions are pinned in lockfiles; exact versions "
-                      "must be taken from the original lockfiles, which the "
-                      "decomposition lists but does not inline"] if manifests else
-                     ["no dependency manifests were captured in the decomposition"]),
+        assumptions=assumptions,
+    )
+
+
+def _fixture_manifest_spec(
+    parts: dict[str, dict], module_parts: dict[str, dict]
+) -> dict | None:
+    _, fixture = _split_manifests(parts, module_parts)
+    if not fixture:
+        return None
+    return _spec(
+        phase=10, layer=-2, name="",   # before the test modules that use them
+        goal="Recreate test-fixture dependency manifests.",
+        rationale=("These manifests live inside test-owned directories: they are "
+                   "inputs *to tests* (fixture repositories), not environment "
+                   "declarations, so they are built with the test phase."),
+        parts=["plan:fixture-manifests"], requires_parts=[], requires_steps=[1],
+        creates=fixture,
+        contracts=[], deps_introduced=[],
+        tests_required=["fixture-consuming tests can parse these manifests"],
+        evidence=["ops:dependency_management (test-subtree slice)"],
+        expected_result="Fixture manifests in place for the test modules that read them.",
+        confidence="certain",
+        assumptions=[],
     )
 
 
@@ -348,16 +438,42 @@ def _schema_spec(doc: dict, parts: dict[str, dict]) -> tuple[dict | None, dict |
     ), None
 
 
+# Languages whose modules can be validated by importing/compiling them; other
+# languages (css, protobuf, shell, ...) get a parse-level check instead.
+_IMPORTABLE = frozenset({
+    "python", "typescript", "javascript", "rust", "go", "java", "kotlin",
+    "swift", "dart", "ruby", "c", "cpp", "objective-c", "clojure",
+})
+
+
+def _unit_validation(members: list[dict]) -> str:
+    langs = sorted({
+        lang for m in members
+        for lang in (m.get("metrics") or {}).get("languages", [])
+    })
+    importable = [l for l in langs if l in _IMPORTABLE]
+    other = [l for l in langs if l not in _IMPORTABLE]
+    if importable and not other:
+        return f"smoke-import/compile the module ({', '.join(importable)})"
+    if importable and other:
+        return (f"smoke-import/compile the {', '.join(importable)} files; "
+                f"validate the {', '.join(other)} files parse")
+    if other:
+        return f"validate files parse/lint cleanly ({', '.join(other)})"
+    return "verify files are well-formed (language not recorded in decomposition)"
+
+
 def _unit_spec(
     u: _Unit, module_parts: dict[str, dict], layer_of: dict[str, int],
     ext_deps: dict[str, list[str]], test_edges: dict[str, list[str]],
     test_gaps: set[str], dead_code_by_module: dict[str, int],
+    resolutions: dict[frozenset, dict],
 ) -> dict:
     members = [module_parts[pid] for pid in u.members]
     joint = len(members) > 1
     names = [m["name"] for m in members]
     files = sorted({f for m in members for f in (m.get("evidence") or {}).get("files", [])})
-    contracts = sorted({c for m in members for c in m.get("interface_symbols", [])})[:25]
+    contracts = sorted({c for m in members for c in m.get("interface_symbols", [])})
     dep_parts = sorted({
         d for m in members
         for d in (m.get("dependencies") or {}).get("outgoing", [])
@@ -375,14 +491,31 @@ def _unit_spec(
                 f"(test_gap finding, probable)")
     tests_required.sort()
 
+    # Cycle resolution: if the decomposition carries a file-level topological
+    # order for this group, list the files in that order instead of asking the
+    # executor to "build together" blind.
+    resolution = resolutions.get(frozenset(u.members)) if joint else None
+    file_order = (resolution or {}).get("file_order") or []
+    creates_ordered = False
+    if joint and file_order:
+        in_order = set(file_order)
+        files = list(file_order) + [f for f in files if f not in in_order]
+        creates_ordered = True
+
     assumptions: list[str] = []
-    if joint:
+    if joint and creates_ordered:
+        assumptions.append(
+            "these modules are cyclic at directory granularity, but the cycle "
+            "dissolves at file granularity — the `creates` list is a valid "
+            "file-level construction order (cycle_resolutions evidence)")
+    elif joint:
         assumptions.append(
             "these modules form a dependency cycle at the decomposition's "
-            "module granularity (module==directory is a `probable` model; the "
-            "file-level graph may still be acyclic). Build them together, or "
-            "derive an internal file-level order from the original sources — "
-            "breaking the cycle diverges from the original structure")
+            "module granularity (module==directory is a `probable` model)"
+            + ((" and " + resolution["note"]) if resolution and resolution.get("note")
+               else "; no file-level order is available") +
+            ". Build them together — breaking the cycle diverges from the "
+            "original structure")
     for m in members:
         if _CONF_RANK.get(m.get("overall_confidence", "unknown"), 4) >= 3:
             assumptions.append(
@@ -398,7 +531,14 @@ def _unit_spec(
     resp = "; ".join(
         f"`{m['name']}`: {m.get('responsibility', '')}" for m in members
     )
-    if joint:
+    if joint and creates_ordered:
+        goal = (f"Build the {len(members)}-module group in file order: "
+                + ", ".join(f"`{n}`" for n in names) + ".")
+        rationale = ("These directories are mutually dependent as aggregates, "
+                     "but their files form a DAG — follow the `creates` list "
+                     "top to bottom and every import target exists before its "
+                     "importer. " + resp)
+    elif joint:
         goal = (f"Build the {len(members)}-module group together: "
                 + ", ".join(f"`{n}`" for n in names) + ".")
         rationale = ("Dependency evidence shows these modules are mutually "
@@ -410,7 +550,7 @@ def _unit_spec(
     metrics = members[0].get("metrics", {})
     conf = max((m.get("overall_confidence", "unknown") for m in members),
                key=lambda c: _CONF_RANK.get(c, 4))
-    return _spec(
+    spec = _spec(
         phase=u.phase, layer=u.layer, name=u.name,
         goal=goal, rationale=rationale,
         parts=list(u.members), requires_parts=dep_parts,
@@ -418,18 +558,21 @@ def _unit_spec(
         creates=files,
         contracts=contracts,
         deps_introduced=[d for d in dep_parts] + [f"external: {e}" for e in ext],
-        tests_required=tests_required or ["smoke-import the module"],
+        tests_required=tests_required or [_unit_validation(members)],
         evidence=[f"{pid} (Ca={module_parts[pid].get('metrics', {}).get('ca')}, "
                   f"Ce={module_parts[pid].get('metrics', {}).get('ce')}, "
                   f"I={module_parts[pid].get('metrics', {}).get('instability')})"
                   for pid in u.members],
         expected_result=(
             f"Module(s) import cleanly and expose the listed contracts"
-            + (f"; {metrics.get('n_symbols')} symbols expected in `{names[0]}`"
+            + (f"; {metrics.get('n_symbols')} symbols expected in `{names[0]}` "
+               f"(full inventory in the decomposition part's evidence.symbols)"
                if not joint and metrics.get("n_symbols") else "") + "."),
         confidence=conf,
         assumptions=assumptions,
     )
+    spec["creates_ordered"] = creates_ordered
+    return spec
 
 
 def _delivery_specs(
@@ -456,8 +599,12 @@ def _delivery_specs(
         } | ({f"module:{app['name']}"} if f"module:{app['name']}" in parts else set()))
         # Map module deps through cycle ownership so requires resolve to units.
         dep_parts = sorted({owner[d].members[0] if d in owner else d for d in dep_parts})
-        llm = [(e.get("evidence") or {}).get("llm_summaries", []) for e in eps]
-        llm_flat = [s for ls in llm for s in ls][:2]
+        llm_all = [s for e in eps
+                   for s in (e.get("evidence") or {}).get("llm_summaries", [])]
+        llm_flat = llm_all[:2]
+        if len(llm_all) > 2:
+            llm_flat.append(f"(+{len(llm_all) - 2} more LLM summaries in the "
+                            f"decomposition's entrypoint parts)")
         specs.append(_spec(
             phase=7, layer=_BIG_LAYER, name=app["name"],
             goal=(f"Wire the `{app['name']}` {app['kind']}: create its entry "
@@ -467,7 +614,7 @@ def _delivery_specs(
             parts=[app["id"]] + [e["id"] for e in eps],
             requires_parts=dep_parts,
             creates=ep_files,
-            contracts=sorted({s for e in eps for s in (e.get("evidence") or {}).get("symbols", [])})[:15],
+            contracts=sorted({s for e in eps for s in (e.get("evidence") or {}).get("symbols", [])}),
             deps_introduced=dep_parts,
             tests_required=[f"launch `{f}` and verify it starts" for f in ep_files],
             evidence=[app["id"]] + [e["id"] for e in eps] +
@@ -535,7 +682,7 @@ def _validation_spec(doc: dict) -> dict:
                    "be deliberate, not accidental."),
         parts=["plan:validation"], requires_parts=[],
         creates=[], contracts=[], deps_introduced=[],
-        tests_required=sorted(set(checklist))[:25],
+        tests_required=sorted(set(checklist)),
         evidence=[f"{len(doc.get('quality_gates', []))} quality findings, "
                   f"{len(viol)} architecture violations in the decomposition"],
         expected_result="System behaves per baseline; every intentional deviation is documented.",

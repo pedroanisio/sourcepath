@@ -91,6 +91,33 @@ def test_markdown_renders_with_disclaimer_and_phases(plan_and_doc):
     assert "Open assumptions" in md
 
 
+def test_no_file_created_by_two_steps(plan_and_doc):
+    """Review fix #1 end-to-end: every file has exactly one owning step."""
+    plan, _ = plan_and_doc
+    owners: dict[str, int] = {}
+    for s in plan.steps:
+        for f in s.creates:
+            assert f not in owners, (
+                f"`{f}` created by steps {owners[f]} and {s.number}")
+            owners[f] = s.number
+
+
+def test_joint_steps_consume_cycle_resolutions(plan_and_doc):
+    """Review fix #2 end-to-end: when the decomposition carries a file-level
+    order for a cycle group, the joint step lists files in that order."""
+    plan, doc = plan_and_doc
+    resolved = {frozenset(c["members"]): c["file_order"]
+                for c in doc.get("cycle_resolutions", []) if c.get("file_order")}
+    if not resolved:
+        pytest.skip("bundle decomposition has no resolvable cycle groups")
+    for s in plan.steps:
+        key = frozenset(s.parts)
+        if key in resolved:
+            assert s.creates_ordered is True
+            order = resolved[key]
+            assert s.creates[:len(order)] == order
+
+
 def test_cycles_become_joint_steps(plan_and_doc):
     """Modules the decomposer reports as a directory-granularity cycle must land
     in one joint step. The gate's *subject* lists the member module ids — an

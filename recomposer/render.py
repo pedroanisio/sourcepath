@@ -25,16 +25,29 @@ def to_markdown(plan: BuildPlan) -> str:
     _frontmatter(L, plan)
 
     L.append(f"# Reconstruction Build Plan — {r.get('name')}\n")
+    L.append("## What this plan is (and is not)\n")
+    L.append(
+        "This is an **architecture/build-order map**: it fixes *what exists, "
+        "in what order, and why* — file inventories, module dependency "
+        "topology, public contract names, and construction sequence. It does "
+        "**not** carry file contents, API signatures, or behavior; it is meant "
+        "to be executed alongside the original sources (or used standalone for "
+        "onboarding and architecture review). Byte-exact restoration is a "
+        "different tier entirely: the codebase-mapper bundle's blob store "
+        "plus its `reconstruct` tool rebuild the tree exactly.\n")
     L.append("## How to use this plan\n")
     L.append(
         "Execute the steps in order. Every `requires` reference points to an "
-        "earlier step — the ordering is dependency-safe by construction. "
-        "Structural facts (files, dependencies, build order) are mechanically "
-        "derived from the original repository's graph; responsibilities and "
-        "intent are interpretive and confidence-tagged. **Assumption blocks "
-        "must be resolved against the original sources before or while "
-        "executing their step.** The full machine-readable plan (complete file "
-        "lists) is the companion YAML.\n")
+        "earlier step — the ordering is dependency-safe by construction. Each "
+        "file is *created* by exactly one step (its first owner); later steps "
+        "that touch it say **modify/verify**. Structural facts (files, "
+        "dependencies, build order) are mechanically derived from the original "
+        "repository's graph; responsibilities and intent are interpretive and "
+        "confidence-tagged. **Assumption blocks must be resolved against the "
+        "original sources before or while executing their step.** The full "
+        "machine-readable plan (complete, unclipped lists) is the companion "
+        "YAML; per-module symbol inventories live in the decomposition's "
+        "`evidence.symbols`.\n")
 
     _intent(L, plan)
     _skipped(L, plan)
@@ -112,7 +125,11 @@ def _step(L: list[str], s: BuildStep) -> None:
         L.append(f"- **Requires steps:** {', '.join(str(n) for n in s.requires)}")
     else:
         L.append("- **Requires steps:** none")
-    L.append(f"- **Create:** {_clip([f'`{c}`' for c in s.creates])}")
+    create_label = "Create (in dependency order)" if s.creates_ordered else "Create"
+    L.append(f"- **{create_label}:** {_clip([f'`{c}`' for c in s.creates])}")
+    if s.modifies:
+        L.append(f"- **Modify/verify (files owned by earlier steps):** "
+                 f"{_clip([f'`{c}`' for c in s.modifies])}")
     if s.contracts:
         L.append(f"- **Contracts to define:** {_clip([f'`{c}`' for c in s.contracts])}")
     if s.dependencies_introduced:

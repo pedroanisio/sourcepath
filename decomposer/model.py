@@ -263,6 +263,12 @@ class Decomposition:
     detected_architecture: Architecture = field(default_factory=Architecture)
     quality_gates: list[QualityFinding] = field(default_factory=list)
     build_order: list[list[str]] = field(default_factory=list)
+    # One entry per directory-granularity cycle group: the *file-level*
+    # construction order inside it. Module-level SCCs often dissolve at file
+    # granularity (this repo's file graph is a DAG); when they do, a consumer
+    # can build the group file-by-file instead of "all at once". Empty
+    # ``file_order`` + a ``note`` means the files are genuinely cyclic too.
+    cycle_resolutions: list[dict[str, Any]] = field(default_factory=list)
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -273,6 +279,7 @@ class Decomposition:
             "detected_architecture": self.detected_architecture.to_dict(),
             "quality_gates": [q.to_dict() for q in self.quality_gates],
             "build_order": [list(layer) for layer in self.build_order],
+            "cycle_resolutions": [dict(c) for c in self.cycle_resolutions],
             "provenance": self.provenance,
         }
 

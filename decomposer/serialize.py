@@ -46,5 +46,6 @@ def _document(decomp: Decomposition) -> dict[str, Any]:
         "detected_architecture": d["detected_architecture"],
         "quality_gates": d["quality_gates"],
         "build_order": d["build_order"],
+        "cycle_resolutions": d["cycle_resolutions"],
         "provenance": d["provenance"],
     }

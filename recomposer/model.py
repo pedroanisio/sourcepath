@@ -44,7 +44,9 @@ class BuildStep:
     goal: str
     rationale: str                          # construction intent: why now, why this shape
     requires: list[int] = field(default_factory=list)       # earlier step numbers
-    creates: list[str] = field(default_factory=list)        # files/components to create
+    creates: list[str] = field(default_factory=list)        # files this step OWNS (first creator)
+    creates_ordered: bool = False                           # creates listed in dependency order
+    modifies: list[str] = field(default_factory=list)       # files owned by earlier steps
     contracts: list[str] = field(default_factory=list)      # interfaces/symbols to define
     dependencies_introduced: list[str] = field(default_factory=list)
     tests_required: list[str] = field(default_factory=list)
@@ -63,6 +65,8 @@ class BuildStep:
             "rationale": self.rationale,
             "requires_steps": list(self.requires),
             "creates": list(self.creates),
+            "creates_ordered": self.creates_ordered,
+            "modifies": list(self.modifies),
             "contracts": list(self.contracts),
             "dependencies_introduced": list(self.dependencies_introduced),
             "tests_required": list(self.tests_required),
