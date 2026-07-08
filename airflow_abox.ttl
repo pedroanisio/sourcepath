@@ -1,0 +1,395 @@
+@prefix arch: <https://w3id.org/arc4d3/software-architecture-dimensions#> .
+@prefix afx:  <https://w3id.org/arc4d3/abox/airflow#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+# Evidence basis & confidence (operator-approved split disclosure)
+#
+# ARCHITECTURAL REQUIREMENT (PALS's LAW): LLMs will always produce some
+# form of error. Absence of output verification is a design defect, not a
+# runtime bug. All LLM output must be treated as untrusted and validated.
+#
+# This ABox mixes two epistemic classes; every arch:DimensionApplication
+# carries an explicit arch:confidenceLevel:
+#
+#   * MECHANICALLY EXTRACTED — file counts, language mix, import-edge
+#     counts, and the presence of specific paths (alembic migrations,
+#     openapi specs, executor modules, helm chart, pyproject packages,
+#     opentelemetry/statsd, auth_manager) were produced by
+#     codebase-mapper v0.5.0 over Apache Airflow at commit
+#     01b425a06f6998950cada673582a17b6b2264b41 and confirmed by grep over
+#     the emitted inventory.ttl. These are evidence-backed facts.
+#
+#   * LLM-SYNTHESIZED INTERPRETATION — the mapping from those facts to a
+#     dimensional CLASSIFICATION (e.g. "acyclic dependency topology",
+#     "database-mediated connector", "perimeter security model") is an
+#     inference authored by an LLM. It is confidence-tagged and MUST be
+#     validated against the running system before high-stakes decisions.
+#
+# generated_by: "Claude Opus 4.8 via Claude Code"
+# date: "2026-07-08"
+# tbox: software_architecture_dimensions.ttl (arch:ScopeAFramework, owl:versionInfo 2.0.3-scope-a)
+#################################################################
+
+afx:AirflowAboxGraph
+    a owl:Ontology ;
+    dcterms:title "Scope A dimension ABox — Apache Airflow" ;
+    dcterms:description "Classification of Apache Airflow under the 20 Scope-A core system dimensions. Structural facts are mechanically extracted by codebase-mapper; dimensional classifications are LLM-synthesized and confidence-tagged." ;
+    dcterms:created "2026-07-08"^^xsd:date ;
+    dcterms:source <https://github.com/apache/airflow> ;
+    dcterms:creator "Claude Opus 4.8 via Claude Code (extraction: codebase-mapper v0.5.0)" ;
+    dcterms:conformsTo <https://w3id.org/arc4d3/software-architecture-dimensions#> ;
+    owl:imports <https://w3id.org/arc4d3/software-architecture-dimensions#> ;
+    owl:versionInfo "1.0.2-airflow-abox" ;
+    rdfs:comment "1.0.1 (review pass): afx classification values registered on their dimensions; execution-API connector and event-loop runtime region added from the file's own task-sdk/triggerer evidence; D05 writer set corrected to match the execution-API boundary; arch:atScope recorded on all applications; three flagged failure modes lifted into arch:RiskFinding instances; provenance lifted from comments into triples." ;
+    rdfs:comment "1.0.2 (layered-state demo): region-scoped application afx:App_D06_TriggererRegion added alongside the system-scope D06 application, exercising arch:inRegion and multi-application layering; system-scope D06 names arch:BatchRuntime as arch:dominantValue." .
+
+#################################################################
+# System under classification
+#################################################################
+
+afx:AirflowSystem
+    a arch:ImplementedSoftwareSystem ;
+    skos:prefLabel "Apache Airflow"@en ;
+    rdfs:comment "Apache Airflow — a workflow orchestration platform. Classified from the implemented system at commit 01b425a0 (13,415 files; 7,569 Python, 994 TypeScript, 94 Go, 42 Kotlin source files; 20,355 import edges, 6,169 external; 4,854 source-code and 4,027 test-code files as typed by codebase-mapper v0.5.0)." ;
+    dcterms:identifier "apache/airflow@01b425a06f6998950cada673582a17b6b2264b41" ;
+    rdfs:seeAlso <https://github.com/apache/airflow> .
+
+# Assessment overlay (O01) is NOT a peer core dimension and cannot be an
+# arch:DimensionApplication (its shape requires a arch:CoreSystemDimension).
+# Recorded here as a prose reading only, per the TBox constraint.
+afx:AirflowSystem
+    rdfs:comment "Quality-attribute overlay reading (O01, LLM-synthesized, Low confidence): revealed priorities appear ordered as evolvability/extensibility (large provider ecosystem, pluggable executors and auth managers) and operability (opentelemetry/statsd telemetry, health endpoints) ahead of strict consistency (metadata-database-mediated coordination) and low operational footprint. This is a cross-dimensional diagnosis, not an orthogonal dimension." .
+
+#################################################################
+# Airflow-specific classification values
+# (typed arch:ClassificationValue; extend the TBox's example archetypes
+#  where no example value fits Airflow precisely)
+#################################################################
+
+afx:ByProviderIntegration a arch:ClassificationValue ; skos:prefLabel "decomposition by provider integration"@en .
+afx:ByRuntimeComponent    a arch:ClassificationValue ; skos:prefLabel "decomposition by runtime component"@en .
+afx:MetadataDatabaseConnector a arch:ClassificationValue ; skos:prefLabel "metadata-database-mediated connector"@en .
+afx:ProviderPluginComposition a arch:ClassificationValue ; skos:prefLabel "provider-package plugin composition"@en .
+afx:PluggableExecutorComposition a arch:ClassificationValue ; skos:prefLabel "pluggable executor composition"@en .
+afx:ConfigurationDrivenVariability a arch:ClassificationValue ; skos:prefLabel "configuration-driven variability"@en .
+afx:PluggableAuthManagerSecurity a arch:ClassificationValue ; skos:prefLabel "pluggable auth-manager and RBAC security model"@en .
+afx:HatchMonorepoBuild a arch:ClassificationValue ; skos:prefLabel "hatchling monorepo package build"@en .
+afx:ExecutionApiConnector a arch:ClassificationValue ; skos:prefLabel "task execution API connector"@en .
+
+# Register minted values on their dimensions so the extension is explicit
+# and queryable via arch:hasClassificationValue (not merely used ad hoc).
+arch:D01_DecompositionModel arch:hasClassificationValue afx:ByProviderIntegration, afx:ByRuntimeComponent .
+arch:D03_ConnectorAndInteractionModel arch:hasClassificationValue afx:MetadataDatabaseConnector, afx:ExecutionApiConnector .
+arch:D10_CompositionAndReuseModel arch:hasClassificationValue afx:ProviderPluginComposition, afx:PluggableExecutorComposition .
+arch:D12_VariabilityAndConfigurationSpaceModel arch:hasClassificationValue afx:ConfigurationDrivenVariability .
+arch:D19_SecurityAndTrustBoundaryModel arch:hasClassificationValue afx:PluggableAuthManagerSecurity .
+arch:D20_BuildAndDeliveryModel arch:hasClassificationValue afx:HatchMonorepoBuild .
+
+#################################################################
+# Dimension applications (20)
+#################################################################
+
+afx:App_D01_Decomposition
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Decomposition model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D01_DecompositionModel ;
+    arch:usesClassificationValue afx:ByProviderIntegration, afx:ByRuntimeComponent, arch:ByFeature ;
+    arch:supportedByEvidence afx:Ev_D01 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D01 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Repository exposes a providers/src/airflow/providers/ tree and 171 dependency-manifest files, indicating decomposition by integration (one provider package per external system) layered over runtime components (scheduler, api-server, dag-processor, triggerer, executors, task-sdk). Component boundaries are inferred; provider tree presence is mechanically verified." .
+
+afx:App_D02_DependencyTopology
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Dependency topology" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D02_DependencyTopology ;
+    arch:usesClassificationValue arch:DAGDependencies ;
+    arch:revealsRisk afx:Risk_D02_UnverifiedAcyclicity ;
+    arch:supportedByEvidence afx:Ev_D02 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Low" .
+
+afx:Ev_D02 a arch:EvidenceRecord ;
+    arch:evidenceSummary "codebase-mapper counted 20,355 import edges (6,169 external). Intended topology is core -> providers (providers depend on airflow-core, not vice versa), i.e. a DAG. Actual acyclicity was NOT verified in this run; classification confidence is Low pending a cycle check on the import graph." .
+
+afx:App_D03_Connector
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Connector and interaction model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
+    arch:usesClassificationValue afx:MetadataDatabaseConnector, afx:ExecutionApiConnector, arch:MessageQueueConnector ;
+    arch:supportedByEvidence afx:Ev_D03 ;
+    arch:revealsRisk afx:Risk_D03_DbAsConnector ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D03 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Executor modules for celery and kubernetes are present (150 references to celery_executor/kubernetes_executor), and 2,183 task-sdk/task_sdk references evidence a Task Execution API boundary (consistent with Ev_D04). Scheduler-side coordination is metadata-database-mediated (a database-as-connector pattern the TBox flags as a failure mode; recorded as afx:Risk_D03_DbAsConnector); worker task execution crosses an HTTP execution-API connector via the Task SDK, with a message broker under CeleryExecutor. Module and task-sdk presence verified; coordination semantics are architectural interpretation." .
+
+afx:App_D04_Contract
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Interface and contract model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D04_InterfaceAndContractModel ;
+    arch:usesClassificationValue arch:SchemaFirstContract ;
+    arch:supportedByEvidence afx:Ev_D04 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D04 a arch:EvidenceRecord ;
+    arch:evidenceSummary "1,380 openapi references and 2,183 task-sdk/task_sdk references in the inventory indicate a schema-first REST API plus a versioned Task SDK / execution-API boundary between workers and the core. Presence is verified; contract-enforcement discipline is inferred. Whether specs are authored first or generated from server code (code-first-published) was not determined in this run." .
+
+afx:App_D05_StateOwnership
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — State and data ownership model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D05_StateAndDataOwnershipModel ;
+    arch:usesClassificationValue arch:SharedDatabaseOwnership ;
+    arch:supportedByEvidence afx:Ev_D05 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D05 a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLAlchemy models (models/dagrun, models/taskinstance) and 315 alembic references confirm a single central metadata database as authoritative state, written directly by scheduler, dag-processor, and API server; under the Task SDK boundary, workers reach state through the execution API rather than direct writes (consistent with Ev_D04). Multiple core writers over one shared store is the observed ownership regime; write-authority partitioning is inferred." .
+
+afx:App_D06_RuntimeExecution
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Runtime execution model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D06_RuntimeExecutionModel ;
+    arch:usesClassificationValue arch:BatchRuntime, arch:ThreadPerRequestRuntime, arch:EventLoopRuntime ;
+    arch:dominantValue arch:BatchRuntime ;
+    arch:supportedByEvidence afx:Ev_D06 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Low" .
+
+afx:Ev_D06 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Executor modules (local, celery, kubernetes, base) are verified present. Airflow runs a long-lived scheduler loop dispatching batch task instances to worker processes/pods. Presence of triggerer and api-server modules supports asyncio event-loop regions (deferrable-operator triggerer; ASGI API server) alongside the scheduler loop and batch dispatch. Concurrency detail (loop cadence, parallelism limits) is knowledge-based, not extracted; confidence Low." .
+
+afx:App_D07_Deployment
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Deployment and distribution model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D07_DeploymentAndDistributionModel ;
+    arch:usesClassificationValue arch:ContainerOrchestratedDeployment, arch:PackageRegistryDistribution ;
+    arch:supportedByEvidence afx:Ev_D07 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D07 a arch:EvidenceRecord ;
+    arch:evidenceSummary "A Helm chart (Chart.yaml / chart/values.yaml, 13 references) and 31 container files support container-orchestrated (Kubernetes) deployment; 171 dependency manifests and PyPI packaging support package-registry distribution of core and providers. Chart and container presence verified." .
+
+afx:App_D08_PhysicalOrganization
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Codebase physical organization" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D08_CodebasePhysicalOrganization ;
+    arch:usesClassificationValue arch:MonorepoOrganization, arch:PackageByFeatureLayout ;
+    arch:supportedByEvidence afx:Ev_D08 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "High" .
+
+afx:Ev_D08 a arch:EvidenceRecord ;
+    arch:evidenceSummary "477 pyproject.toml references, a providers/ package tree, a Go module (github.com/apache/airflow/go-sdk), and 23 tsconfig files across one repository confirm a polyglot monorepo with package-by-feature layout. Directly mechanically verified." .
+
+afx:App_D09_Abstraction
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Abstraction and encapsulation model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D09_AbstractionAndEncapsulationModel ;
+    arch:usesClassificationValue arch:OpaqueModuleEncapsulation ;
+    arch:supportedByEvidence afx:Ev_D09 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Low" .
+
+afx:Ev_D09 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Provider plugin points (BaseOperator, BaseHook, executor and auth-manager base classes) imply stable abstractions hiding integration internals. Encapsulation strength is not measured by this run; classification is knowledge-based, confidence Low." .
+
+afx:App_D10_Composition
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Composition and reuse model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D10_CompositionAndReuseModel ;
+    arch:usesClassificationValue arch:PluginComposition, afx:ProviderPluginComposition, afx:PluggableExecutorComposition ;
+    arch:supportedByEvidence afx:Ev_D10 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D10 a arch:EvidenceRecord ;
+    arch:evidenceSummary "The providers/ package tree, pluggable executor modules (celery/kubernetes/local), and pluggable auth managers (2,291 auth_manager/fab/rbac references) confirm extension-by-plugin as the dominant composition strategy. Plugin surfaces verified; contract stability inferred." .
+
+afx:App_D11_ChangeEvolution
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Change and evolution model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D11_ChangeAndEvolutionModel ;
+    arch:usesClassificationValue arch:ExpandContractMigration, arch:SemanticVersionEvolution ;
+    arch:supportedByEvidence afx:Ev_D11 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D11 a arch:EvidenceRecord ;
+    arch:evidenceSummary "142 migrations/versions files and 315 alembic references indicate a versioned, sequential schema-migration path (expand-contract style). Independently versioned provider packages imply semantic-version evolution. Migration mechanism verified; per-release compatibility policy inferred." .
+
+afx:App_D12_Variability
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Variability and configuration-space model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D12_VariabilityAndConfigurationSpaceModel ;
+    arch:usesClassificationValue afx:ConfigurationDrivenVariability, arch:FeatureFlagVariability ;
+    arch:supportedByEvidence afx:Ev_D12 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D12 a arch:EvidenceRecord ;
+    arch:evidenceSummary "109 references to config_templates/default_airflow.cfg/airflow_local_settings show a large airflow.cfg configuration surface; executor choice, auth-manager choice, and provider selection are build/deploy-time variation points. Configuration surface verified; feature-flag extent partially inferred." .
+
+afx:App_D13_Verification
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Verification and assurance model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D13_VerificationAndAssuranceModel ;
+    arch:usesClassificationValue arch:UnitIntegrationE2EPortfolio ;
+    arch:supportedByEvidence afx:Ev_D13 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D13 a arch:EvidenceRecord ;
+    arch:evidenceSummary "codebase-mapper typed 4,027 files as test_code (vs 4,854 source_code) and recorded 886 tests edges, indicating a substantial unit/integration/e2e portfolio. Test-file count is mechanically verified; the balance of test kinds and runtime assurance (monitors/canaries) is inferred." .
+
+afx:App_D14_Paradigm
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Programming paradigm model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:ObjectOrientedParadigm, arch:DeclarativeParadigm, arch:ProceduralParadigm ;
+    arch:supportedByEvidence afx:Ev_D14 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D14 a arch:EvidenceRecord ;
+    arch:evidenceSummary "7,569 Python files dominate the source. Core uses object-oriented operators/hooks (BaseOperator subclassing) while DAG authoring is declarative (task graphs) with procedural task bodies. Language mix is verified; paradigm attribution is interpretive." .
+
+afx:App_D15_Idiom
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Implementation idiom and style model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D15_ImplementationIdiomStyleModel ;
+    arch:usesClassificationValue arch:IdiomaticImplementation ;
+    arch:supportedByEvidence afx:Ev_D15 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Low" .
+
+afx:Ev_D15 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Presence of ruff/pre-commit style configuration in the Python ecosystem suggests enforced idiom, but idiom coherence is subjective and was not measured in this run; confidence Low." .
+
+afx:App_D16_ErrorHandling
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Error-handling and recovery model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D16_ErrorHandlingAndRecoveryModel ;
+    arch:usesClassificationValue arch:ExceptionErrorModel ;
+    arch:supportedByEvidence afx:Ev_D16 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Low" .
+
+afx:Ev_D16 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Python exception-based error propagation is expected, with task-level retries and up-for-retry state in the scheduler as the recovery mechanism. Not structurally measured in this run; classification is knowledge-based, confidence Low." .
+
+afx:App_D17_TypeDiscipline
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Type and data discipline" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
+    arch:usesClassificationValue arch:RuntimeSchemaDiscipline, arch:StaticTypeDiscipline ;
+    arch:supportedByEvidence afx:Ev_D17 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D17 a arch:EvidenceRecord ;
+    arch:evidenceSummary "994 TypeScript files (statically typed UI) plus openapi/Task-SDK schemas indicate runtime schema validation on API boundaries alongside static typing; Python core mixes type hints with dynamic typing. TS count and schema presence verified; Python typing strictness inferred." .
+
+afx:App_D18_Observability
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Operational observability and control model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D18_OperationalObservabilityAndControlModel ;
+    arch:usesClassificationValue arch:LogsMetricsTracesObservability ;
+    arch:supportedByEvidence afx:Ev_D18 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D18 a arch:EvidenceRecord ;
+    arch:evidenceSummary "272 opentelemetry/statsd references indicate metrics and tracing instrumentation; task logs and a web UI provide operator inspection and control (pause/trigger). Telemetry-library presence verified; correlation discipline and control levers inferred." .
+
+afx:App_D19_Security
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Security and trust-boundary model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
+    arch:usesClassificationValue afx:PluggableAuthManagerSecurity, arch:PerimeterSecurityModel ;
+    arch:supportedByEvidence afx:Ev_D19 ;
+    arch:revealsRisk afx:Risk_D19_SingleTenantTrust ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D19 a arch:EvidenceRecord ;
+    arch:evidenceSummary "2,291 auth_manager/fab/rbac/permissions references show a pluggable auth-manager with role-based access control at the API/UI perimeter. Auth surface verified; per-object authorization and tenant isolation strength are inferred, not measured." .
+
+afx:App_D20_BuildDelivery
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow — Build and delivery model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D20_BuildAndDeliveryModel ;
+    arch:usesClassificationValue arch:TrunkBasedDeliveryModel, afx:HatchMonorepoBuild ;
+    arch:supportedByEvidence afx:Ev_D20 ;
+    arch:atScope "system" ;
+    arch:confidenceLevel "Medium" .
+
+afx:Ev_D20 a arch:EvidenceRecord ;
+    arch:evidenceSummary "477 pyproject.toml references (hatchling-based packaging across monorepo packages), 55 .github/workflows references, 45 CI/CD files, and 13 lockfiles indicate a CI-gated, multi-package build/delivery pipeline publishing to PyPI. Build/CI artifacts verified; reproducibility and signing posture inferred." .
+
+#################################################################
+# Risk findings (Layer-2 diagnostics lifted from flagged failure modes)
+#################################################################
+
+afx:Risk_D03_DbAsConnector a arch:RiskFinding ;
+    rdfs:label "Metadata database as connector" ;
+    rdfs:comment "Scheduler-side coordination flows through the shared metadata database — the database-as-connector failure mode D03 names. Scenario: schema change or database saturation couples otherwise independent components. Interpretation over verified module evidence." .
+
+afx:Risk_D02_UnverifiedAcyclicity a arch:RiskFinding ;
+    rdfs:label "Core-to-provider acyclicity unverified" ;
+    rdfs:comment "Intended DAG topology (providers depend on core, not vice versa) was not cycle-checked over the 20,355 extracted import edges. Evidence-gathering action: run a cycle detector on the emitted import graph; settles D02 confidence either way." .
+
+afx:Risk_D19_SingleTenantTrust a arch:RiskFinding ;
+    rdfs:label "Single-tenant trust model" ;
+    rdfs:comment "DAG code executes with worker authority; isolation between DAG authors lies outside the RBAC perimeter, consistent with Airflow's documented security model. Knowledge-based; verify against current security documentation." .
+
+#################################################################
+# Layered classification demo: same dimension, same system,
+# second application at region scope (per TBox 2.0.4 arch:inRegion)
+#################################################################
+
+afx:App_D06_TriggererRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow triggerer region — Runtime execution model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D06_RuntimeExecutionModel ;
+    arch:usesClassificationValue arch:EventLoopRuntime ;
+    arch:supportedByEvidence afx:Ev_D06_Triggerer ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "triggerer (deferrable-operator async loop)" ;
+    arch:confidenceLevel "Low" .
+
+afx:Ev_D06_Triggerer a arch:EvidenceRecord ;
+    arch:evidenceSummary "The triggerer runtime component is mechanically present in the inventory (named among runtime components in Ev_D01). Its asyncio event-loop execution semantics are knowledge-based, not extracted in this run; a grep for asyncio entry points in the triggerer module would settle it." .

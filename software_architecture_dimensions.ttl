@@ -1,0 +1,1041 @@
+@prefix arch: <https://w3id.org/arc4d3/software-architecture-dimensions#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+# Ontology
+#################################################################
+
+arch:ScopeACoreSystemDimensionsOntology
+    a owl:Ontology ;
+    dcterms:title "Scope A Software-System Core Dimensions TBox and SHACL" ;
+    dcterms:description "A revised Scope-A TBox and SHACL validation layer for independently variable, observable core dimensions of intended or implemented software systems. The ontology contains 20 core system dimensions and one assessment overlay for quality-attribute prioritization." ;
+    dcterms:created "2026-07-08"^^xsd:date ;
+    dcterms:modified "2026-07-08"^^xsd:date ;
+    owl:versionInfo "2.0.4-scope-a" ;
+    rdfs:comment "In full agreement with the prose framework document orthogonal-dimensions-framework.md (version 2.0.2): both artifacts define the same 20 core dimensions, one assessment overlay, six categories, and identical D01-D20/O01 numbering." ;
+    rdfs:comment "2.0.1: language-tagged prefLabels (SHACL conformance); hasCategory domain widened to Dimension-or-Overlay; measuredBy declared inverse of appliesDimension; LeakyAbstraction renamed ConcretionExposedEncapsulation (normative-creep rule); AgenticLoopRuntime value added to D06." ;
+    rdfs:comment "2.0.2: sh:declare added so the SHACL-SPARQL layer resolves the arch: prefix; PositionUniquenessShape added to machine-enforce distinct dimension positions; unused orthogonalTo property and OrthogonalityAssertion class removed (orthogonality is modelled as per-dimension orthogonalityRationale prose); D03/D06 rationales tightened to name the connector-vs-runtime boundary explicitly." ;
+    rdfs:comment "2.0.3: merged the parallel 2.0.2 review branch — arch:atScope added on DimensionApplication (implements the rubric's scope-statement mandate; used by conforming ABoxes); resolves the duplicate 2.0.2-scope-a version label." ;
+    rdfs:comment "2.0.4 (layered-state hardening): arch:inRegion and arch:dominantValue added for per-region layered classifications with a named dominant; value presence made conditional so confidence Unknown is representable as a conforming application; ValueBelongsToDimensionShape (SHACL-SPARQL) machine-enforces that used values belong to the applied dimension's declared value set." ;
+    sh:declare [
+        sh:prefix "arch" ;
+        sh:namespace "https://w3id.org/arc4d3/software-architecture-dimensions#"^^xsd:anyURI ;
+    ] .
+
+#################################################################
+# Top-level classes
+#################################################################
+
+arch:FrameworkConcept
+    a owl:Class ;
+    rdfs:label "Framework concept" ;
+    rdfs:comment "Any concept used by the software-system analysis framework." .
+
+arch:ScopeAConcept
+    a owl:Class ;
+    rdfs:subClassOf arch:FrameworkConcept ;
+    rdfs:label "Scope A concept" ;
+    rdfs:comment "A concept constrained to Scope A: intended or implemented software-system properties and assessment overlays." .
+
+arch:AnalysisFramework
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Analysis framework" ;
+    rdfs:comment "A reusable framework for classifying software systems through independently variable dimensions." .
+
+arch:AnalysisRegion
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Analysis region" ;
+    rdfs:comment "A broad analysis region used for organization only. Regions are not necessarily orthogonal dimensions." .
+
+arch:Dimension
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Dimension" ;
+    rdfs:comment "An axis for classifying one defined property of a software system." .
+
+arch:CoreSystemDimension
+    a owl:Class ;
+    rdfs:subClassOf arch:Dimension ;
+    rdfs:label "Core system dimension" ;
+    rdfs:comment "An independently variable, observable, descriptive property of an intended or implemented software system." .
+
+arch:AssessmentOverlay
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Assessment overlay" ;
+    rdfs:comment "A cross-dimensional assessment concept. It is useful for diagnosis but is not a peer core system dimension." .
+
+arch:SystemArtifact
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "System artifact" ;
+    rdfs:comment "An observable artifact from which a dimension classification can be inferred." .
+
+arch:ClassificationValue
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Classification value" ;
+    rdfs:comment "A possible descriptive value, archetype, or range point for a dimension." .
+
+arch:DimensionCategory
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Dimension category" ;
+    rdfs:comment "A grouping category for core system dimensions." .
+
+arch:DimensionApplication
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Dimension application" ;
+    rdfs:comment "A concrete classification of one system or artifact under one dimension." .
+
+arch:EvidenceRecord
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Evidence record" ;
+    rdfs:comment "A record of evidence supporting a dimension classification." .
+
+arch:RiskFinding
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Risk finding" ;
+    rdfs:comment "A diagnostic finding associated with a dimension classification." .
+
+arch:SoftwareSystem
+    a owl:Class ;
+    rdfs:subClassOf arch:ScopeAConcept ;
+    rdfs:label "Software system" ;
+    rdfs:comment "An intended or implemented software system being classified." .
+
+arch:IntendedSoftwareSystem
+    a owl:Class ;
+    rdfs:subClassOf arch:SoftwareSystem ;
+    rdfs:label "Intended software system" ;
+    rdfs:comment "The intended architecture or design of a software system." .
+
+arch:ImplementedSoftwareSystem
+    a owl:Class ;
+    rdfs:subClassOf arch:SoftwareSystem ;
+    rdfs:label "Implemented software system" ;
+    rdfs:comment "The actual implemented software system visible through code, configuration, build, deployment, runtime, and operations artifacts." .
+
+#################################################################
+# Core-dimension categories
+#################################################################
+
+arch:StructuralDimensionCategory
+    a arch:DimensionCategory ;
+    skos:prefLabel "Structural dimensions"@en ;
+    rdfs:comment "Dimensions about the logical and physical structure of the system." .
+
+arch:BoundaryAndInformationDimensionCategory
+    a arch:DimensionCategory ;
+    skos:prefLabel "Boundary and information dimensions"@en ;
+    rdfs:comment "Dimensions about authority, types, contracts, information hiding, and security boundaries." .
+
+arch:RuntimeAndOperationalDimensionCategory
+    a arch:DimensionCategory ;
+    skos:prefLabel "Runtime and operational dimensions"@en ;
+    rdfs:comment "Dimensions about execution, failure, observability, and runtime control." .
+
+arch:LifecycleAndEvolutionDimensionCategory
+    a arch:DimensionCategory ;
+    skos:prefLabel "Lifecycle and evolution dimensions"@en ;
+    rdfs:comment "Dimensions about build, delivery, deployment, evolution, variability, and assurance." .
+
+arch:CodeExpressionDimensionCategory
+    a arch:DimensionCategory ;
+    skos:prefLabel "Code expression dimensions"@en ;
+    rdfs:comment "Dimensions about computational paradigm and implementation idiom." .
+
+arch:AssessmentOverlayCategory
+    a arch:DimensionCategory ;
+    skos:prefLabel "Assessment overlays"@en ;
+    rdfs:comment "Cross-dimensional diagnostic overlays that are not core dimensions." .
+
+#################################################################
+# Object properties
+#################################################################
+
+arch:hasDimension
+    a owl:ObjectProperty ;
+    rdfs:domain arch:AnalysisFramework ;
+    rdfs:range arch:CoreSystemDimension ;
+    rdfs:label "has dimension" .
+
+arch:hasAssessmentOverlay
+    a owl:ObjectProperty ;
+    rdfs:domain arch:AnalysisFramework ;
+    rdfs:range arch:AssessmentOverlay ;
+    rdfs:label "has assessment overlay" .
+
+arch:hasCategory
+    a owl:ObjectProperty ;
+    rdfs:domain [ a owl:Class ; owl:unionOf ( arch:Dimension arch:AssessmentOverlay ) ] ;
+    rdfs:range arch:DimensionCategory ;
+    rdfs:label "has category" .
+
+arch:hasObservableEvidence
+    a owl:ObjectProperty ;
+    rdfs:domain arch:Dimension ;
+    rdfs:range arch:SystemArtifact ;
+    rdfs:label "has observable evidence" .
+
+arch:hasClassificationValue
+    a owl:ObjectProperty ;
+    rdfs:domain arch:Dimension ;
+    rdfs:range arch:ClassificationValue ;
+    rdfs:label "has classification value" .
+
+arch:measuredBy
+    a owl:ObjectProperty ;
+    owl:inverseOf arch:appliesDimension ;
+    rdfs:domain arch:CoreSystemDimension ;
+    rdfs:range arch:DimensionApplication ;
+    rdfs:label "measured by" .
+
+arch:classifiesSystem
+    a owl:ObjectProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range arch:SoftwareSystem ;
+    rdfs:label "classifies system" .
+
+arch:appliesDimension
+    a owl:ObjectProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range arch:CoreSystemDimension ;
+    rdfs:label "applies dimension" .
+
+arch:usesClassificationValue
+    a owl:ObjectProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range arch:ClassificationValue ;
+    rdfs:label "uses classification value" .
+
+arch:supportedByEvidence
+    a owl:ObjectProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range arch:EvidenceRecord ;
+    rdfs:label "supported by evidence" .
+
+arch:revealsRisk
+    a owl:ObjectProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range arch:RiskFinding ;
+    rdfs:label "reveals risk" .
+
+#################################################################
+# Datatype properties
+#################################################################
+
+arch:definition
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "definition" .
+
+arch:measures
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "measures" .
+
+arch:doesNotMeasure
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "does not measure" .
+
+arch:diagnosticValue
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "diagnostic value" .
+
+arch:failureMode
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "failure mode" .
+
+arch:orthogonalityRationale
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "orthogonality rationale" .
+
+arch:scopeRule
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "scope rule" .
+
+arch:atScope
+    a owl:DatatypeProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "at scope" ;
+    rdfs:comment "The scope at which the classification was made (system, subsystem, module, or a named region), per the rubric's requirement that every classification states its scope." .
+
+arch:inRegion
+    a owl:DatatypeProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "in region" ;
+    rdfs:comment "Names the region within the stated scope that this classification covers (a module path, subsystem, or language region). Absent means the classification covers the whole scope. Multiple applications of one dimension to one system, differing by scope or region, are the intended representation of layered systems." .
+
+arch:dominantValue
+    a owl:ObjectProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range arch:ClassificationValue ;
+    rdfs:label "dominant value" ;
+    rdfs:comment "Marks which of the used classification values is dominant, per the rubric's per-region-values-plus-named-dominant rule. The dominant value should be one of the values in usesClassificationValue." .
+
+arch:confidenceLevel
+    a owl:DatatypeProperty ;
+    rdfs:domain arch:DimensionApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "confidence level" .
+
+arch:evidenceSummary
+    a owl:DatatypeProperty ;
+    rdfs:domain arch:EvidenceRecord ;
+    rdfs:range xsd:string ;
+    rdfs:label "evidence summary" .
+
+arch:unitOfAnalysis
+    a owl:DatatypeProperty ;
+    rdfs:domain arch:Dimension ;
+    rdfs:range xsd:string ;
+    rdfs:label "unit of analysis" .
+
+arch:position
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "position" .
+
+#################################################################
+# Scope A framework instance
+#################################################################
+
+arch:ScopeAFramework
+    a arch:AnalysisFramework ;
+    skos:prefLabel "Scope A core software-system dimension framework"@en ;
+    arch:scopeRule "A concept belongs to Scope A only if it describes an independently variable, observable, descriptive property of an intended or implemented software system. Concepts about stakeholders, views, rationale, architecture descriptions, governance, and external evaluation layers are outside Scope A unless represented as evidence or overlays." ;
+    arch:hasDimension
+        arch:D01_DecompositionModel,
+        arch:D02_DependencyTopology,
+        arch:D03_ConnectorAndInteractionModel,
+        arch:D04_InterfaceAndContractModel,
+        arch:D05_StateAndDataOwnershipModel,
+        arch:D06_RuntimeExecutionModel,
+        arch:D07_DeploymentAndDistributionModel,
+        arch:D08_CodebasePhysicalOrganization,
+        arch:D09_AbstractionAndEncapsulationModel,
+        arch:D10_CompositionAndReuseModel,
+        arch:D11_ChangeAndEvolutionModel,
+        arch:D12_VariabilityAndConfigurationSpaceModel,
+        arch:D13_VerificationAndAssuranceModel,
+        arch:D14_ProgrammingParadigmModel,
+        arch:D15_ImplementationIdiomStyleModel,
+        arch:D16_ErrorHandlingAndRecoveryModel,
+        arch:D17_TypeAndDataDiscipline,
+        arch:D18_OperationalObservabilityAndControlModel,
+        arch:D19_SecurityAndTrustBoundaryModel,
+        arch:D20_BuildAndDeliveryModel ;
+    arch:hasAssessmentOverlay arch:O01_QualityAttributePrioritizationProfile .
+
+#################################################################
+# System artifacts used as observable evidence
+#################################################################
+
+arch:SourceCode a arch:SystemArtifact ; skos:prefLabel "source code"@en .
+arch:RepositoryStructure a arch:SystemArtifact ; skos:prefLabel "repository structure"@en .
+arch:PackageModuleLayout a arch:SystemArtifact ; skos:prefLabel "package or module layout"@en .
+arch:DependencyGraph a arch:SystemArtifact ; skos:prefLabel "dependency graph"@en .
+arch:ApiSchema a arch:SystemArtifact ; skos:prefLabel "API schema"@en .
+arch:ContractTest a arch:SystemArtifact ; skos:prefLabel "contract test"@en .
+arch:DatabaseSchema a arch:SystemArtifact ; skos:prefLabel "database schema"@en .
+arch:MigrationScript a arch:SystemArtifact ; skos:prefLabel "migration script"@en .
+arch:BuildFile a arch:SystemArtifact ; skos:prefLabel "build file"@en .
+arch:CiCdConfiguration a arch:SystemArtifact ; skos:prefLabel "CI/CD configuration"@en .
+arch:DeploymentManifest a arch:SystemArtifact ; skos:prefLabel "deployment manifest"@en .
+arch:RuntimeTopology a arch:SystemArtifact ; skos:prefLabel "runtime topology"@en .
+arch:TelemetryConfiguration a arch:SystemArtifact ; skos:prefLabel "telemetry configuration"@en .
+arch:TestSuite a arch:SystemArtifact ; skos:prefLabel "test suite"@en .
+arch:StaticAnalysisConfiguration a arch:SystemArtifact ; skos:prefLabel "static analysis configuration"@en .
+arch:SecurityPolicy a arch:SystemArtifact ; skos:prefLabel "security policy"@en .
+arch:AccessControlConfiguration a arch:SystemArtifact ; skos:prefLabel "access-control configuration"@en .
+arch:FeatureFlagConfiguration a arch:SystemArtifact ; skos:prefLabel "feature-flag configuration"@en .
+arch:ProductConfiguration a arch:SystemArtifact ; skos:prefLabel "product configuration"@en .
+arch:ArchitectureDiagram a arch:SystemArtifact ; skos:prefLabel "architecture diagram"@en .
+arch:RuntimeLog a arch:SystemArtifact ; skos:prefLabel "runtime log"@en .
+arch:OperationalRunbook a arch:SystemArtifact ; skos:prefLabel "operational runbook"@en .
+
+#################################################################
+# Core dimensions: 20 dimensions
+#################################################################
+
+arch:D01_DecompositionModel
+    a arch:CoreSystemDimension ;
+    arch:position 1 ;
+    skos:prefLabel "Decomposition model"@en ;
+    arch:hasCategory arch:StructuralDimensionCategory ;
+    arch:definition "The principle and granularity by which the system is partitioned into conceptual units." ;
+    arch:unitOfAnalysis "System, subsystem, service, package, module, bounded context, repository." ;
+    arch:measures "Boundary criterion, unit granularity, responsibility allocation, and dominant partitioning logic." ;
+    arch:doesNotMeasure "Dependency direction, interaction mechanism, deployment placement, or physical file layout." ;
+    arch:orthogonalityRationale "The same decomposition can have different dependency rules, connector mechanisms, source layouts, and deployment forms." ;
+    arch:diagnosticValue "Reveals change blast radius, conceptual coherence, boundary ambiguity, and modularization risk." ;
+    arch:failureMode "Mixed decomposition criteria, god modules, unclear ownership, cross-cutting feature leakage." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:RepositoryStructure, arch:PackageModuleLayout, arch:ArchitectureDiagram .
+
+arch:D02_DependencyTopology
+    a arch:CoreSystemDimension ;
+    arch:position 2 ;
+    skos:prefLabel "Dependency topology"@en ;
+    arch:hasCategory arch:StructuralDimensionCategory ;
+    arch:definition "The shape, direction, and allowed structure of dependency relations among system units." ;
+    arch:unitOfAnalysis "Module graph, package graph, service graph, build graph, library graph." ;
+    arch:measures "Graph direction, layering rules, cycles, fan-in/fan-out topology, and permitted dependency paths." ;
+    arch:doesNotMeasure "Connector semantics, interface contract shape, or coupling strength as a metric." ;
+    arch:orthogonalityRationale "Graph shape can vary independently from unit decomposition, contracts, runtime model, and physical organization." ;
+    arch:diagnosticValue "Reveals cycle risk, architectural erosion, ripple paths, and hidden central hubs." ;
+    arch:failureMode "Cyclic dependencies, forbidden layer crossings, unstable dependency direction, accidental hubs." ;
+    arch:hasObservableEvidence arch:DependencyGraph, arch:BuildFile, arch:SourceCode, arch:PackageModuleLayout .
+
+arch:D03_ConnectorAndInteractionModel
+    a arch:CoreSystemDimension ;
+    arch:position 3 ;
+    skos:prefLabel "Connector and interaction model"@en ;
+    arch:hasCategory arch:StructuralDimensionCategory ;
+    arch:definition "How interaction between units is mediated, coordinated, synchronized, ordered, buffered, delivered, and failed." ;
+    arch:unitOfAnalysis "Connector, edge, call path, message path, workflow link, tool invocation, event channel." ;
+    arch:measures "Interaction mechanism, coordination semantics, delivery guarantees, ordering guarantees, synchrony, backpressure, and failure behavior." ;
+    arch:doesNotMeasure "Only who depends on whom, or only the static API contract exposed at a boundary." ;
+    arch:orthogonalityRationale "Two units can have the same dependency and contract but interact through direct calls, queues, streams, actor mailboxes, brokers, workflow engines, or tool calls. Interaction mechanism between units is distinct from the intra-unit runtime execution model: the same connector can operate under different execution models, and the same execution model can drive different connectors." ;
+    arch:diagnosticValue "Reveals coordination risk, temporal coupling, retry storms, message loss, implicit integration, and connector mismatch." ;
+    arch:failureMode "Database-as-connector, unbounded queues, hidden synchronous calls, unclear delivery semantics, mismatched interaction assumptions." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:ApiSchema, arch:RuntimeTopology, arch:DeploymentManifest, arch:RuntimeLog .
+
+arch:D04_InterfaceAndContractModel
+    a arch:CoreSystemDimension ;
+    arch:position 4 ;
+    skos:prefLabel "Interface and contract model"@en ;
+    arch:hasCategory arch:BoundaryAndInformationDimensionCategory ;
+    arch:definition "How boundaries expose capabilities and how the semantics, schemas, compatibility, and error contracts of those boundaries are specified and enforced." ;
+    arch:unitOfAnalysis "API, module interface, class interface, CLI, event schema, protocol boundary, tool contract." ;
+    arch:measures "Contract explicitness, schema discipline, versioning, compatibility policy, and boundary semantics." ;
+    arch:doesNotMeasure "Connector runtime mechanics or state authority behind the boundary." ;
+    arch:orthogonalityRationale "The same contract can run through different connectors, and the same connector can carry different contract styles." ;
+    arch:diagnosticValue "Reveals contract drift, implicit semantics, breaking-change risk, and integration fragility." ;
+    arch:failureMode "Implicit contracts, shared database contracts, undocumented error semantics, version drift." ;
+    arch:hasObservableEvidence arch:ApiSchema, arch:ContractTest, arch:SourceCode, arch:OperationalRunbook .
+
+arch:D05_StateAndDataOwnershipModel
+    a arch:CoreSystemDimension ;
+    arch:position 5 ;
+    skos:prefLabel "State and data ownership model"@en ;
+    arch:hasCategory arch:BoundaryAndInformationDimensionCategory ;
+    arch:definition "Where authoritative state lives, which unit may mutate which data, and how state authority is partitioned." ;
+    arch:unitOfAnalysis "Data store, aggregate, service, bounded context, cache, event store, global state object." ;
+    arch:measures "Source-of-truth allocation, write authority, state lifetime, shared mutable state, synchronization, and ownership granularity." ;
+    arch:doesNotMeasure "Schema shape alone, type discipline, or API style." ;
+    arch:orthogonalityRationale "The same schema can have different ownership regimes, and the same decomposition can share or separate state authority." ;
+    arch:diagnosticValue "Reveals split-brain risk, integration-by-database, ownership ambiguity, cache incoherence, and transaction-boundary risk." ;
+    arch:failureMode "Multiple writers without authority model, global mutable state, ambiguous source of truth, shared database coupling." ;
+    arch:hasObservableEvidence arch:DatabaseSchema, arch:MigrationScript, arch:SourceCode, arch:RuntimeTopology .
+
+arch:D06_RuntimeExecutionModel
+    a arch:CoreSystemDimension ;
+    arch:position 6 ;
+    skos:prefLabel "Runtime execution model"@en ;
+    arch:hasCategory arch:RuntimeAndOperationalDimensionCategory ;
+    arch:definition "How the system executes at runtime, including concurrency, scheduling, control flow, and execution coordination." ;
+    arch:unitOfAnalysis "Process, thread, event loop, actor, worker, job, agent loop, batch process." ;
+    arch:measures "Concurrency model, scheduling style, execution lifecycle, blocking behavior, control-flow regime, and work dispatch." ;
+    arch:doesNotMeasure "Where artifacts are deployed or how source is organized." ;
+    arch:orthogonalityRationale "The same deployment can host different execution models, and the same paradigm can run under different runtime execution styles. Intra-unit execution semantics are distinct from the connector and interaction model that mediates between units." ;
+    arch:diagnosticValue "Reveals deadlock, event-loop blocking, priority inversion, uncontrolled concurrency, and throughput bottlenecks." ;
+    arch:failureMode "Blocking event loops, unbounded goroutines/threads, hidden scheduler coupling, unsafe shared concurrency." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:RuntimeTopology, arch:RuntimeLog, arch:DeploymentManifest .
+
+arch:D07_DeploymentAndDistributionModel
+    a arch:CoreSystemDimension ;
+    arch:position 7 ;
+    skos:prefLabel "Deployment and distribution model"@en ;
+    arch:hasCategory arch:LifecycleAndEvolutionDimensionCategory ;
+    arch:definition "How built artifacts are placed, installed, published, or arranged across runtime or consumer environments." ;
+    arch:unitOfAnalysis "Runtime node, container, function, package registry, mobile app, embedded firmware, edge node, client installation." ;
+    arch:measures "Artifact placement, runtime distribution, hosting topology, install model, package publishing, and availability surface." ;
+    arch:doesNotMeasure "How source becomes artifact, or what execution semantics the artifact uses once running." ;
+    arch:orthogonalityRationale "Build pipeline, runtime execution, and deployment topology can vary independently." ;
+    arch:diagnosticValue "Reveals operational blast radius, environment coupling, rollout complexity, and placement risk." ;
+    arch:failureMode "Environment-specific behavior, undeclared placement assumptions, package/install drift, weak rollout strategy." ;
+    arch:hasObservableEvidence arch:DeploymentManifest, arch:RuntimeTopology, arch:BuildFile, arch:CiCdConfiguration .
+
+arch:D08_CodebasePhysicalOrganization
+    a arch:CoreSystemDimension ;
+    arch:position 8 ;
+    skos:prefLabel "Codebase physical organization"@en ;
+    arch:hasCategory arch:StructuralDimensionCategory ;
+    arch:definition "How source artifacts are physically arranged across repositories, directories, packages, modules, and files." ;
+    arch:unitOfAnalysis "Repository, workspace, package, directory, module, file." ;
+    arch:measures "Repository topology, package layout, directory conventions, naming/location rules, and artifact grouping." ;
+    arch:doesNotMeasure "Logical decomposition itself or runtime deployment." ;
+    arch:orthogonalityRationale "A logical decomposition can be represented by many physical layouts, and the same physical layout can hide different logical architectures." ;
+    arch:diagnosticValue "Reveals navigation cost, discoverability, accidental coupling through location, and atomic-change friction." ;
+    arch:failureMode "Architecture hidden by folder layout, package-by-layer confusion, scattered ownership, generated/source mixing." ;
+    arch:hasObservableEvidence arch:RepositoryStructure, arch:PackageModuleLayout, arch:SourceCode, arch:BuildFile .
+
+arch:D09_AbstractionAndEncapsulationModel
+    a arch:CoreSystemDimension ;
+    arch:position 9 ;
+    skos:prefLabel "Abstraction and encapsulation model"@en ;
+    arch:hasCategory arch:BoundaryAndInformationDimensionCategory ;
+    arch:definition "How implementation details, invariants, and internal representations are hidden behind stable abstractions." ;
+    arch:unitOfAnalysis "Module, class, component, API, aggregate, package, library boundary." ;
+    arch:measures "Information hiding, invariant protection, visibility discipline, boundary enforcement, and representation exposure." ;
+    arch:doesNotMeasure "How units are composed or reused, or the graph shape of dependencies." ;
+    arch:orthogonalityRationale "Units can compose in the same way while exposing different amounts of internal knowledge." ;
+    arch:diagnosticValue "Reveals abstraction leakage, representation exposure, invariant bypass, and brittle internals." ;
+    arch:failureMode "Primitive obsession at boundaries, public mutable internals, leaky abstractions, bypassed aggregate rules." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:ApiSchema, arch:PackageModuleLayout, arch:StaticAnalysisConfiguration .
+
+arch:D10_CompositionAndReuseModel
+    a arch:CoreSystemDimension ;
+    arch:position 10 ;
+    skos:prefLabel "Composition and reuse model"@en ;
+    arch:hasCategory arch:StructuralDimensionCategory ;
+    arch:definition "How units are combined, reused, extended, generated, configured, or assembled into larger capabilities." ;
+    arch:unitOfAnalysis "Component, library, plugin, module, function, template, generated artifact, reusable capability." ;
+    arch:measures "Reuse strategy, extension mechanism, composition mechanism, plugin model, inheritance/delegation, code generation, and library extraction posture." ;
+    arch:doesNotMeasure "What is hidden behind abstractions or how dependencies are directed." ;
+    arch:orthogonalityRationale "The same encapsulation style can be combined through inheritance, delegation, plugins, configuration, generated code, or pipelines." ;
+    arch:diagnosticValue "Reveals reuse friction, accidental framework lock-in, inheritance fragility, and extension-point ambiguity." ;
+    arch:failureMode "Copy-paste reuse, inheritance abuse, plugin contract drift, over-abstracted shared libraries." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:RepositoryStructure, arch:BuildFile, arch:ApiSchema .
+
+arch:D11_ChangeAndEvolutionModel
+    a arch:CoreSystemDimension ;
+    arch:position 11 ;
+    skos:prefLabel "Change and evolution model"@en ;
+    arch:hasCategory arch:LifecycleAndEvolutionDimensionCategory ;
+    arch:definition "How the system absorbs change over time through compatibility, migration, deprecation, and extension mechanisms." ;
+    arch:unitOfAnalysis "API, data schema, release, module, feature, extension point, migration path." ;
+    arch:measures "Compatibility policy, deprecation lifecycle, migration strategy, feature evolution, backward compatibility, and upgrade path." ;
+    arch:doesNotMeasure "Simultaneous configurable variants; those belong to variability and configuration-space model." ;
+    arch:orthogonalityRationale "A system can be highly configurable but poor at evolution, or stable over time but have little variability." ;
+    arch:diagnosticValue "Reveals breaking-change risk, migration debt, compatibility lock-in, and extension-point decay." ;
+    arch:failureMode "Eternal feature flags, missing expand-contract migrations, unversioned contracts, breaking-change cascades." ;
+    arch:hasObservableEvidence arch:MigrationScript, arch:ApiSchema, arch:CiCdConfiguration, arch:SourceCode .
+
+arch:D12_VariabilityAndConfigurationSpaceModel
+    a arch:CoreSystemDimension ;
+    arch:position 12 ;
+    skos:prefLabel "Variability and configuration-space model"@en ;
+    arch:hasCategory arch:LifecycleAndEvolutionDimensionCategory ;
+    arch:definition "How valid variants of the system are represented, constrained, selected, bound, and combined across build time, deployment time, tenant time, runtime, or user time." ;
+    arch:unitOfAnalysis "Feature, variation point, variant, product line, tenant profile, plugin set, build profile, runtime capability profile." ;
+    arch:measures "Variation points, variant constraints, binding time, feature model, configuration validity, and product/configuration space." ;
+    arch:doesNotMeasure "Temporal evolution, migration, or compatibility policy by itself." ;
+    arch:orthogonalityRationale "Selectable configuration space can vary independently from decomposition, deployment, runtime, and temporal evolution." ;
+    arch:diagnosticValue "Reveals invalid configuration risk, feature interaction, test matrix explosion, tenant drift, and hidden product-line complexity." ;
+    arch:failureMode "Unbounded feature combinations, undocumented variation points, configuration spaghetti, impossible test matrix, tenant-specific forks." ;
+    arch:hasObservableEvidence arch:FeatureFlagConfiguration, arch:ProductConfiguration, arch:BuildFile, arch:SourceCode, arch:TestSuite .
+
+arch:D13_VerificationAndAssuranceModel
+    a arch:CoreSystemDimension ;
+    arch:position 13 ;
+    skos:prefLabel "Verification and assurance model"@en ;
+    arch:hasCategory arch:LifecycleAndEvolutionDimensionCategory ;
+    arch:definition "How correctness, safety, compatibility, and reliability claims are established before release and during operation." ;
+    arch:unitOfAnalysis "Test suite, verification target, contract, invariant, monitor, canary, SLO, safety case." ;
+    arch:measures "Testing portfolio, static analysis, formal methods, contract tests, runtime monitors, canary validation, chaos testing, and assurance evidence." ;
+    arch:doesNotMeasure "The achieved quality level by itself or the release pipeline mechanics." ;
+    arch:orthogonalityRationale "Verification strategy can vary independently from architecture style, deployment model, paradigm, and runtime execution." ;
+    arch:diagnosticValue "Reveals unverified contracts, brittle tests, missing runtime assurance, weak oracles, and insufficient evidence for high-risk behavior." ;
+    arch:failureMode "Over-reliance on e2e tests, no contract tests, non-deterministic tests, missing production invariant checks, no safety evidence." ;
+    arch:hasObservableEvidence arch:TestSuite, arch:ContractTest, arch:StaticAnalysisConfiguration, arch:TelemetryConfiguration, arch:CiCdConfiguration .
+
+arch:D14_ProgrammingParadigmModel
+    a arch:CoreSystemDimension ;
+    arch:position 14 ;
+    skos:prefLabel "Programming paradigm model"@en ;
+    arch:hasCategory arch:CodeExpressionDimensionCategory ;
+    arch:definition "The dominant computational model used to express behavior in the code." ;
+    arch:unitOfAnalysis "Module, package, service, subsystem, codebase." ;
+    arch:measures "Paradigm posture such as object-oriented, functional, procedural, declarative, logic, dataflow, actor-based, reactive, or agentic loop-based expression." ;
+    arch:doesNotMeasure "Whether code follows local language idioms or formatting conventions." ;
+    arch:orthogonalityRationale "A system can use the same paradigm with different idioms, and the same idiom family can express different paradigms." ;
+    arch:diagnosticValue "Reveals paradigm mismatch, inconsistent computational model, state/control-flow mismatch, and maintainability risk from mixed paradigms." ;
+    arch:failureMode "Accidental paradigm mixing, OO shell around procedural scripts, functional facade with hidden mutation, declarative configuration with imperative side effects." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:StaticAnalysisConfiguration, arch:PackageModuleLayout .
+
+arch:D15_ImplementationIdiomStyleModel
+    a arch:CoreSystemDimension ;
+    arch:position 15 ;
+    skos:prefLabel "Implementation idiom and style model"@en ;
+    arch:hasCategory arch:CodeExpressionDimensionCategory ;
+    arch:definition "The local language, framework, community, naming, formatting, and metaprogramming conventions used to express the implementation." ;
+    arch:unitOfAnalysis "File, module, package, codebase, framework integration point." ;
+    arch:measures "Idiom coherence, naming/formatting discipline, framework idiom alignment, metaprogramming posture, and local expression consistency." ;
+    arch:doesNotMeasure "The computational paradigm itself or objective quality by itself." ;
+    arch:orthogonalityRationale "The same paradigm can be idiomatic or unidiomatic in a given ecosystem; style can vary without changing architecture." ;
+    arch:diagnosticValue "Reveals readability friction, onboarding cost, idiom mismatch, style fragmentation, and framework misuse." ;
+    arch:failureMode "Mixed naming schemes, unidiomatic framework use, excessive magic, reflective behavior without convention, style-only quality claims." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:StaticAnalysisConfiguration, arch:RepositoryStructure .
+
+arch:D16_ErrorHandlingAndRecoveryModel
+    a arch:CoreSystemDimension ;
+    arch:position 16 ;
+    skos:prefLabel "Error-handling and recovery model"@en ;
+    arch:hasCategory arch:RuntimeAndOperationalDimensionCategory ;
+    arch:definition "How failures are represented, propagated, contained, recovered from, compensated, and escalated." ;
+    arch:unitOfAnalysis "Function, module, service, process, workflow, job, runtime boundary." ;
+    arch:measures "Failure representation, propagation discipline, containment boundary, retry/compensation strategy, supervision, dead-letter handling, and escalation." ;
+    arch:doesNotMeasure "General observability or verification strategy, though both may provide evidence." ;
+    arch:orthogonalityRationale "Failure handling can vary independently from runtime execution model, connector model, and interface style." ;
+    arch:diagnosticValue "Reveals swallowed errors, retry storms, partial-failure incoherence, missing compensation, and weak containment." ;
+    arch:failureMode "Catch-all suppression, exception tunneling, retry without idempotency, no dead-letter path, inconsistent error contracts." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:ApiSchema, arch:RuntimeLog, arch:OperationalRunbook, arch:CiCdConfiguration .
+
+arch:D17_TypeAndDataDiscipline
+    a arch:CoreSystemDimension ;
+    arch:position 17 ;
+    skos:prefLabel "Type and data discipline"@en ;
+    arch:hasCategory arch:BoundaryAndInformationDimensionCategory ;
+    arch:definition "How types, schemas, validation, and data modeling constrain states, encode invariants, and prevent invalid data movement." ;
+    arch:unitOfAnalysis "Type, schema, DTO, value object, database constraint, validation boundary, serialization model." ;
+    arch:measures "Static/dynamic type posture, schema enforcement, validation placement, domain modeling, invariant encoding, and data-shape discipline." ;
+    arch:doesNotMeasure "Programming paradigm or state ownership authority." ;
+    arch:orthogonalityRationale "Dynamic systems can have strict runtime schemas, and statically typed systems can still be stringly typed or weakly modeled." ;
+    arch:diagnosticValue "Reveals validation gaps, primitive obsession, illegal states, schema drift, and boundary trust mistakes." ;
+    arch:failureMode "Stringly typed domains, scattered validation, unbounded any/object usage, missing DB constraints, unchecked deserialization." ;
+    arch:hasObservableEvidence arch:SourceCode, arch:ApiSchema, arch:DatabaseSchema, arch:StaticAnalysisConfiguration .
+
+arch:D18_OperationalObservabilityAndControlModel
+    a arch:CoreSystemDimension ;
+    arch:position 18 ;
+    skos:prefLabel "Operational observability and control model"@en ;
+    arch:hasCategory arch:RuntimeAndOperationalDimensionCategory ;
+    arch:definition "The system's capacity to be inspected, understood, and safely steered at runtime." ;
+    arch:unitOfAnalysis "Runtime process, service, job, tenant, deployment, feature flag, health endpoint, dashboard." ;
+    arch:measures "Telemetry model, correlation discipline, health/readiness semantics, feature flags, admin controls, kill switches, config reload, and intervention paths." ;
+    arch:doesNotMeasure "Verification portfolio or deployment placement by itself." ;
+    arch:orthogonalityRationale "A system can be deployable but unobservable, observable but hard to control, or strongly controlled under many runtime/deployment models." ;
+    arch:diagnosticValue "Reveals blind spots, noisy alerts, missing intervention levers, weak incident triage, and unsafe runtime control." ;
+    arch:failureMode "No trace correlation, ambiguous health checks, no kill switch, dashboard-only observability, alert floods." ;
+    arch:hasObservableEvidence arch:TelemetryConfiguration, arch:RuntimeLog, arch:OperationalRunbook, arch:DeploymentManifest, arch:SourceCode .
+
+arch:D19_SecurityAndTrustBoundaryModel
+    a arch:CoreSystemDimension ;
+    arch:position 19 ;
+    skos:prefLabel "Security and trust-boundary model"@en ;
+    arch:hasCategory arch:BoundaryAndInformationDimensionCategory ;
+    arch:definition "Where trust changes level and how identity, authorization, authority, isolation, secrets, policy, and protected data are structured." ;
+    arch:unitOfAnalysis "Trust boundary, tenant boundary, identity principal, policy boundary, service boundary, data boundary, secret boundary." ;
+    arch:measures "Trust boundary placement, identity model, authorization model, tenant isolation, secret handling, policy enforcement, and authority flow." ;
+    arch:doesNotMeasure "Network/deployment topology by itself or general code quality." ;
+    arch:orthogonalityRationale "Trust layout can differ from network layout; segmented deployments can have weak trust models, and flat deployments can enforce zero-trust per call." ;
+    arch:diagnosticValue "Reveals ambient authority, confused-deputy risk, trust-by-network-position, tenant breakout risk, and authorization gaps." ;
+    arch:failureMode "Perimeter-only auth, missing object-level authorization, secret sprawl, shared tenant state, implicit service trust." ;
+    arch:hasObservableEvidence arch:SecurityPolicy, arch:AccessControlConfiguration, arch:SourceCode, arch:DeploymentManifest, arch:ApiSchema .
+
+arch:D20_BuildAndDeliveryModel
+    a arch:CoreSystemDimension ;
+    arch:position 20 ;
+    skos:prefLabel "Build and delivery model"@en ;
+    arch:hasCategory arch:LifecycleAndEvolutionDimensionCategory ;
+    arch:definition "How source becomes versioned, tested, packaged, signed, promoted, and released artifacts." ;
+    arch:unitOfAnalysis "Build graph, artifact, pipeline, release channel, package, image, binary, generated artifact." ;
+    arch:measures "Build reproducibility, artifact strategy, release cadence, promotion path, gating, signing, packaging, and delivery workflow." ;
+    arch:doesNotMeasure "Where the artifact is deployed or installed after release." ;
+    arch:orthogonalityRationale "The same deployment model can be fed by different build/delivery pipelines, and the same build process can produce artifacts for different deployment forms." ;
+    arch:diagnosticValue "Reveals non-reproducibility, supply-chain risk, manual release fragility, environment drift, and weak gating." ;
+    arch:failureMode "Unpinned builds, manual packaging, no artifact provenance, pipeline snowflakes, generated files not controlled." ;
+    arch:hasObservableEvidence arch:BuildFile, arch:CiCdConfiguration, arch:StaticAnalysisConfiguration, arch:RepositoryStructure .
+
+#################################################################
+# Assessment overlay: explicitly not a peer core dimension
+#################################################################
+
+arch:O01_QualityAttributePrioritizationProfile
+    a arch:AssessmentOverlay ;
+    skos:prefLabel "Quality attribute prioritization profile"@en ;
+    arch:hasCategory arch:AssessmentOverlayCategory ;
+    arch:definition "A descriptive overlay recording which quality attributes the system appears to prioritize when tradeoffs occur." ;
+    arch:measures "Revealed priority among qualities such as performance, availability, consistency, security, evolvability, operability, cost, simplicity, and usability." ;
+    arch:doesNotMeasure "A single generic quality score or an independent system structure dimension." ;
+    arch:diagnosticValue "Reveals mismatch between stated priorities and actual structural decisions." ;
+    rdfs:comment "This overlay intentionally reads across the core dimensions and must not be treated as an orthogonal peer dimension." .
+
+#################################################################
+# Example classification values
+#################################################################
+
+arch:ByLayer a arch:ClassificationValue ; skos:prefLabel "by layer"@en .
+arch:ByFeature a arch:ClassificationValue ; skos:prefLabel "by feature"@en .
+arch:ByBoundedContext a arch:ClassificationValue ; skos:prefLabel "by bounded context"@en .
+arch:StrictLayeredDependencies a arch:ClassificationValue ; skos:prefLabel "strict layered dependencies"@en .
+arch:DAGDependencies a arch:ClassificationValue ; skos:prefLabel "DAG dependencies"@en .
+arch:CyclicDependencies a arch:ClassificationValue ; skos:prefLabel "cyclic dependencies"@en .
+arch:DirectCallConnector a arch:ClassificationValue ; skos:prefLabel "direct call connector"@en .
+arch:MessageQueueConnector a arch:ClassificationValue ; skos:prefLabel "message queue connector"@en .
+arch:PubSubConnector a arch:ClassificationValue ; skos:prefLabel "pub/sub connector"@en .
+arch:StreamConnector a arch:ClassificationValue ; skos:prefLabel "stream connector"@en .
+arch:ActorMailboxConnector a arch:ClassificationValue ; skos:prefLabel "actor mailbox connector"@en .
+arch:SchemaFirstContract a arch:ClassificationValue ; skos:prefLabel "schema-first contract"@en .
+arch:CodeFirstContract a arch:ClassificationValue ; skos:prefLabel "code-first contract"@en .
+arch:ImplicitContract a arch:ClassificationValue ; skos:prefLabel "implicit contract"@en .
+arch:SharedDatabaseOwnership a arch:ClassificationValue ; skos:prefLabel "shared database ownership"@en .
+arch:SingleWriterOwnership a arch:ClassificationValue ; skos:prefLabel "single-writer ownership"@en .
+arch:EventSourcedOwnership a arch:ClassificationValue ; skos:prefLabel "event-sourced ownership"@en .
+arch:SingleThreadedRuntime a arch:ClassificationValue ; skos:prefLabel "single-threaded runtime"@en .
+arch:ThreadPerRequestRuntime a arch:ClassificationValue ; skos:prefLabel "thread-per-request runtime"@en .
+arch:EventLoopRuntime a arch:ClassificationValue ; skos:prefLabel "event-loop runtime"@en .
+arch:ActorRuntime a arch:ClassificationValue ; skos:prefLabel "actor runtime"@en .
+arch:BatchRuntime a arch:ClassificationValue ; skos:prefLabel "batch runtime"@en .
+arch:AgenticLoopRuntime a arch:ClassificationValue ; skos:prefLabel "agentic-loop runtime"@en .
+arch:SingleNodeDeployment a arch:ClassificationValue ; skos:prefLabel "single-node deployment"@en .
+arch:ContainerOrchestratedDeployment a arch:ClassificationValue ; skos:prefLabel "container-orchestrated deployment"@en .
+arch:ServerlessDeployment a arch:ClassificationValue ; skos:prefLabel "serverless deployment"@en .
+arch:PackageRegistryDistribution a arch:ClassificationValue ; skos:prefLabel "package-registry distribution"@en .
+arch:MonorepoOrganization a arch:ClassificationValue ; skos:prefLabel "monorepo organization"@en .
+arch:PolyrepoOrganization a arch:ClassificationValue ; skos:prefLabel "polyrepo organization"@en .
+arch:PackageByFeatureLayout a arch:ClassificationValue ; skos:prefLabel "package-by-feature layout"@en .
+arch:OpaqueModuleEncapsulation a arch:ClassificationValue ; skos:prefLabel "opaque module encapsulation"@en .
+arch:ConcretionExposedEncapsulation a arch:ClassificationValue ; skos:prefLabel "concretion-exposed encapsulation"@en .
+arch:PluginComposition a arch:ClassificationValue ; skos:prefLabel "plugin composition"@en .
+arch:LibraryComposition a arch:ClassificationValue ; skos:prefLabel "library composition"@en .
+arch:GeneratedCodeComposition a arch:ClassificationValue ; skos:prefLabel "generated-code composition"@en .
+arch:SemanticVersionEvolution a arch:ClassificationValue ; skos:prefLabel "semantic-version evolution"@en .
+arch:ExpandContractMigration a arch:ClassificationValue ; skos:prefLabel "expand-contract migration"@en .
+arch:FeatureFlagVariability a arch:ClassificationValue ; skos:prefLabel "feature-flag variability"@en .
+arch:ProductLineVariability a arch:ClassificationValue ; skos:prefLabel "product-line variability"@en .
+arch:TenantSpecificVariability a arch:ClassificationValue ; skos:prefLabel "tenant-specific variability"@en .
+arch:UnitIntegrationE2EPortfolio a arch:ClassificationValue ; skos:prefLabel "unit/integration/e2e verification portfolio"@en .
+arch:FormalVerificationAssurance a arch:ClassificationValue ; skos:prefLabel "formal verification assurance"@en .
+arch:RuntimeInvariantAssurance a arch:ClassificationValue ; skos:prefLabel "runtime invariant assurance"@en .
+arch:ObjectOrientedParadigm a arch:ClassificationValue ; skos:prefLabel "object-oriented paradigm"@en .
+arch:FunctionalParadigm a arch:ClassificationValue ; skos:prefLabel "functional paradigm"@en .
+arch:ProceduralParadigm a arch:ClassificationValue ; skos:prefLabel "procedural paradigm"@en .
+arch:DeclarativeParadigm a arch:ClassificationValue ; skos:prefLabel "declarative paradigm"@en .
+arch:AgenticLoopParadigm a arch:ClassificationValue ; skos:prefLabel "agentic-loop paradigm"@en .
+arch:IdiomaticImplementation a arch:ClassificationValue ; skos:prefLabel "idiomatic implementation"@en .
+arch:UnidiomaticImplementation a arch:ClassificationValue ; skos:prefLabel "unidiomatic implementation"@en .
+arch:ExceptionErrorModel a arch:ClassificationValue ; skos:prefLabel "exception error model"@en .
+arch:ResultErrorModel a arch:ClassificationValue ; skos:prefLabel "result/either error model"@en .
+arch:SupervisorRecoveryModel a arch:ClassificationValue ; skos:prefLabel "supervisor recovery model"@en .
+arch:StaticTypeDiscipline a arch:ClassificationValue ; skos:prefLabel "static type discipline"@en .
+arch:RuntimeSchemaDiscipline a arch:ClassificationValue ; skos:prefLabel "runtime schema discipline"@en .
+arch:StringlyTypedDiscipline a arch:ClassificationValue ; skos:prefLabel "stringly typed discipline"@en .
+arch:LogsMetricsTracesObservability a arch:ClassificationValue ; skos:prefLabel "logs/metrics/traces observability"@en .
+arch:FeatureFlagControl a arch:ClassificationValue ; skos:prefLabel "feature-flag control"@en .
+arch:PerimeterSecurityModel a arch:ClassificationValue ; skos:prefLabel "perimeter security model"@en .
+arch:ZeroTrustModel a arch:ClassificationValue ; skos:prefLabel "zero-trust model"@en .
+arch:TenantIsolationModel a arch:ClassificationValue ; skos:prefLabel "tenant isolation model"@en .
+arch:HermeticBuildModel a arch:ClassificationValue ; skos:prefLabel "hermetic build model"@en .
+arch:ManualReleaseModel a arch:ClassificationValue ; skos:prefLabel "manual release model"@en .
+arch:TrunkBasedDeliveryModel a arch:ClassificationValue ; skos:prefLabel "trunk-based delivery model"@en .
+
+arch:D01_DecompositionModel arch:hasClassificationValue arch:ByLayer, arch:ByFeature, arch:ByBoundedContext .
+arch:D02_DependencyTopology arch:hasClassificationValue arch:StrictLayeredDependencies, arch:DAGDependencies, arch:CyclicDependencies .
+arch:D03_ConnectorAndInteractionModel arch:hasClassificationValue arch:DirectCallConnector, arch:MessageQueueConnector, arch:PubSubConnector, arch:StreamConnector, arch:ActorMailboxConnector .
+arch:D04_InterfaceAndContractModel arch:hasClassificationValue arch:SchemaFirstContract, arch:CodeFirstContract, arch:ImplicitContract .
+arch:D05_StateAndDataOwnershipModel arch:hasClassificationValue arch:SharedDatabaseOwnership, arch:SingleWriterOwnership, arch:EventSourcedOwnership .
+arch:D06_RuntimeExecutionModel arch:hasClassificationValue arch:SingleThreadedRuntime, arch:ThreadPerRequestRuntime, arch:EventLoopRuntime, arch:ActorRuntime, arch:BatchRuntime, arch:AgenticLoopRuntime .
+arch:D07_DeploymentAndDistributionModel arch:hasClassificationValue arch:SingleNodeDeployment, arch:ContainerOrchestratedDeployment, arch:ServerlessDeployment, arch:PackageRegistryDistribution .
+arch:D08_CodebasePhysicalOrganization arch:hasClassificationValue arch:MonorepoOrganization, arch:PolyrepoOrganization, arch:PackageByFeatureLayout .
+arch:D09_AbstractionAndEncapsulationModel arch:hasClassificationValue arch:OpaqueModuleEncapsulation, arch:ConcretionExposedEncapsulation .
+arch:D10_CompositionAndReuseModel arch:hasClassificationValue arch:PluginComposition, arch:LibraryComposition, arch:GeneratedCodeComposition .
+arch:D11_ChangeAndEvolutionModel arch:hasClassificationValue arch:SemanticVersionEvolution, arch:ExpandContractMigration .
+arch:D12_VariabilityAndConfigurationSpaceModel arch:hasClassificationValue arch:FeatureFlagVariability, arch:ProductLineVariability, arch:TenantSpecificVariability .
+arch:D13_VerificationAndAssuranceModel arch:hasClassificationValue arch:UnitIntegrationE2EPortfolio, arch:FormalVerificationAssurance, arch:RuntimeInvariantAssurance .
+arch:D14_ProgrammingParadigmModel arch:hasClassificationValue arch:ObjectOrientedParadigm, arch:FunctionalParadigm, arch:ProceduralParadigm, arch:DeclarativeParadigm, arch:AgenticLoopParadigm .
+arch:D15_ImplementationIdiomStyleModel arch:hasClassificationValue arch:IdiomaticImplementation, arch:UnidiomaticImplementation .
+arch:D16_ErrorHandlingAndRecoveryModel arch:hasClassificationValue arch:ExceptionErrorModel, arch:ResultErrorModel, arch:SupervisorRecoveryModel .
+arch:D17_TypeAndDataDiscipline arch:hasClassificationValue arch:StaticTypeDiscipline, arch:RuntimeSchemaDiscipline, arch:StringlyTypedDiscipline .
+arch:D18_OperationalObservabilityAndControlModel arch:hasClassificationValue arch:LogsMetricsTracesObservability, arch:FeatureFlagControl .
+arch:D19_SecurityAndTrustBoundaryModel arch:hasClassificationValue arch:PerimeterSecurityModel, arch:ZeroTrustModel, arch:TenantIsolationModel .
+arch:D20_BuildAndDeliveryModel arch:hasClassificationValue arch:HermeticBuildModel, arch:ManualReleaseModel, arch:TrunkBasedDeliveryModel .
+
+#################################################################
+# SHACL shapes
+#################################################################
+
+arch:CoreSystemDimensionShape
+    a sh:NodeShape ;
+    sh:targetClass arch:CoreSystemDimension ;
+    sh:property [
+        sh:path skos:prefLabel ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype rdf:langString ;
+        sh:message "Every core system dimension must have exactly one preferred label."
+    ] ;
+    sh:property [
+        sh:path arch:position ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 1 ;
+        sh:maxInclusive 20 ;
+        sh:message "Every core system dimension must have a position between 1 and 20."
+    ] ;
+    sh:property [
+        sh:path arch:hasCategory ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class arch:DimensionCategory ;
+        sh:message "Every core system dimension must belong to exactly one category."
+    ] ;
+    sh:property [
+        sh:path arch:definition ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 20 ;
+        sh:message "Every core system dimension must have a substantive definition."
+    ] ;
+    sh:property [
+        sh:path arch:unitOfAnalysis ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every core system dimension must state its unit of analysis."
+    ] ;
+    sh:property [
+        sh:path arch:measures ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every core system dimension must state what it measures."
+    ] ;
+    sh:property [
+        sh:path arch:doesNotMeasure ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every core system dimension must state what it explicitly does not measure."
+    ] ;
+    sh:property [
+        sh:path arch:orthogonalityRationale ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every core system dimension must explain why it is orthogonal."
+    ] ;
+    sh:property [
+        sh:path arch:diagnosticValue ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every core system dimension must state diagnostic value."
+    ] ;
+    sh:property [
+        sh:path arch:failureMode ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every core system dimension must list at least one failure mode."
+    ] ;
+    sh:property [
+        sh:path arch:hasObservableEvidence ;
+        sh:minCount 2 ;
+        sh:class arch:SystemArtifact ;
+        sh:message "Every core system dimension must identify at least two observable evidence artifact types."
+    ] ;
+    sh:property [
+        sh:path arch:hasClassificationValue ;
+        sh:minCount 2 ;
+        sh:class arch:ClassificationValue ;
+        sh:message "Every core system dimension must define at least two classification values."
+    ] .
+
+arch:AssessmentOverlayShape
+    a sh:NodeShape ;
+    sh:targetClass arch:AssessmentOverlay ;
+    sh:property [
+        sh:path skos:prefLabel ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype rdf:langString ;
+        sh:message "Every assessment overlay must have exactly one preferred label."
+    ] ;
+    sh:property [
+        sh:path arch:definition ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 20 ;
+        sh:message "Every assessment overlay must have a substantive definition."
+    ] ;
+    sh:property [
+        sh:path arch:measures ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every assessment overlay must state what it measures or reads across."
+    ] ;
+    sh:property [
+        sh:path arch:doesNotMeasure ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "Every assessment overlay must state why it is not a core dimension."
+    ] .
+
+arch:ScopeAFrameworkShape
+    a sh:NodeShape ;
+    sh:targetNode arch:ScopeAFramework ;
+    sh:property [
+        sh:path arch:hasDimension ;
+        sh:minCount 20 ;
+        sh:maxCount 20 ;
+        sh:class arch:CoreSystemDimension ;
+        sh:message "The Scope A framework must contain exactly 20 core system dimensions."
+    ] ;
+    sh:property [
+        sh:path arch:hasAssessmentOverlay ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class arch:AssessmentOverlay ;
+        sh:message "The Scope A framework must contain exactly one assessment overlay."
+    ] ;
+    sh:property [
+        sh:path arch:scopeRule ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "The Scope A framework must define the admission rule for Scope A concepts."
+    ] .
+
+arch:DimensionApplicationShape
+    a sh:NodeShape ;
+    sh:targetClass arch:DimensionApplication ;
+    sh:property [
+        sh:path arch:classifiesSystem ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class arch:SoftwareSystem ;
+        sh:message "A dimension application must classify exactly one software system."
+    ] ;
+    sh:property [
+        sh:path arch:appliesDimension ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class arch:CoreSystemDimension ;
+        sh:message "A dimension application must apply exactly one core system dimension."
+    ] ;
+    sh:property [
+        sh:path arch:usesClassificationValue ;
+        sh:class arch:ClassificationValue ;
+        sh:message "Every used classification value must be typed arch:ClassificationValue."
+    ] ;
+    sh:property [
+        sh:path arch:dominantValue ;
+        sh:maxCount 1 ;
+        sh:class arch:ClassificationValue ;
+        sh:message "A dimension application may name at most one dominant classification value."
+    ] ;
+    sh:or (
+        [ sh:property [ sh:path arch:usesClassificationValue ; sh:minCount 1 ] ]
+        [ sh:property [ sh:path arch:confidenceLevel ; sh:hasValue "Unknown" ] ]
+    ) ;
+    sh:message "A dimension application must use at least one classification value, unless its confidence is Unknown (in which case the evidence summary states what evidence would settle the classification)." ;
+    sh:property [
+        sh:path arch:supportedByEvidence ;
+        sh:minCount 1 ;
+        sh:class arch:EvidenceRecord ;
+        sh:message "A dimension application must be supported by at least one evidence record."
+    ] ;
+    sh:property [
+        sh:path arch:confidenceLevel ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ( "High" "Medium" "Low" "Unknown" ) ;
+        sh:message "A dimension application must declare confidence as High, Medium, Low, or Unknown."
+    ] .
+
+arch:EvidenceRecordShape
+    a sh:NodeShape ;
+    sh:targetClass arch:EvidenceRecord ;
+    sh:property [
+        sh:path arch:evidenceSummary ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 10 ;
+        sh:message "An evidence record must include an evidence summary."
+    ] .
+
+arch:QualityOverlayNotCoreDimensionShape
+    a sh:NodeShape ;
+    sh:targetNode arch:O01_QualityAttributePrioritizationProfile ;
+    sh:not [ sh:class arch:CoreSystemDimension ] ;
+    sh:message "Quality attribute prioritization profile must remain an assessment overlay, not a core system dimension." .
+
+arch:ConnectorDimensionRequiredShape
+    a sh:NodeShape ;
+    sh:targetNode arch:ScopeAFramework ;
+    sh:property [
+        sh:path arch:hasDimension ;
+        sh:hasValue arch:D03_ConnectorAndInteractionModel ;
+        sh:message "Scope A must include Connector and Interaction Model as a core dimension."
+    ] .
+
+arch:VariabilityDimensionRequiredShape
+    a sh:NodeShape ;
+    sh:targetNode arch:ScopeAFramework ;
+    sh:property [
+        sh:path arch:hasDimension ;
+        sh:hasValue arch:D12_VariabilityAndConfigurationSpaceModel ;
+        sh:message "Scope A must include Variability and Configuration-Space Model as a core dimension."
+    ] .
+
+arch:ParadigmIdiomSplitShape
+    a sh:NodeShape ;
+    sh:targetNode arch:ScopeAFramework ;
+    sh:property [
+        sh:path arch:hasDimension ;
+        sh:hasValue arch:D14_ProgrammingParadigmModel ;
+        sh:message "Scope A must include Programming Paradigm Model separately from implementation idiom/style."
+    ] ;
+    sh:property [
+        sh:path arch:hasDimension ;
+        sh:hasValue arch:D15_ImplementationIdiomStyleModel ;
+        sh:message "Scope A must include Implementation Idiom and Style Model separately from programming paradigm."
+    ] .
+
+arch:VerificationAssuranceRequiredShape
+    a sh:NodeShape ;
+    sh:targetNode arch:ScopeAFramework ;
+    sh:property [
+        sh:path arch:hasDimension ;
+        sh:hasValue arch:D13_VerificationAndAssuranceModel ;
+        sh:message "Scope A must use the broader Verification and Assurance Model instead of a pre-release-only testing model."
+    ] .
+
+arch:PositionUniquenessShape
+    a sh:NodeShape ;
+    sh:targetClass arch:CoreSystemDimension ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "Two core system dimensions must not share the same position." ;
+        sh:prefixes arch:ScopeACoreSystemDimensionsOntology ;
+        sh:select """
+            SELECT $this
+            WHERE {
+                $this arch:position ?p .
+                ?other arch:position ?p .
+                FILTER (?other != $this)
+            }
+        """ ;
+    ] .
+
+arch:ValueBelongsToDimensionShape
+    a sh:NodeShape ;
+    sh:targetClass arch:DimensionApplication ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "A dimension application must only use classification values that its applied dimension declares via arch:hasClassificationValue; ABoxes minting new values must register them on the dimension." ;
+        sh:prefixes arch:ScopeACoreSystemDimensionsOntology ;
+        sh:select """
+            SELECT $this ?value
+            WHERE {
+                $this arch:appliesDimension ?dim .
+                $this arch:usesClassificationValue ?value .
+                FILTER NOT EXISTS { ?dim arch:hasClassificationValue ?value . }
+            }
+        """ ;
+    ] .
