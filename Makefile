@@ -147,6 +147,15 @@ test-ui: ## Frontend (vitest) test suite.
 
 # ----------------------------------------------------------------- pipelines
 
+.PHONY: validate-ontology
+validate-ontology: ## Install RDF/SHACL toolchain (idempotent) and validate the ontology TTL(s).
+	uv run scripts/setup_and_validate_ontology.py $(ARGS)
+
+.PHONY: validate-abox
+validate-abox: ## Validate a generated ABox against the TBox shapes. Requires ABOX=<file.ttl>.
+	@if [ -z "$(ABOX)" ]; then echo "usage: make validate-abox ABOX=<file.ttl>"; exit 2; fi
+	uv run scripts/setup_and_validate_ontology.py --tbox static/schemas/software_architecture_dimensions.ttl $(ABOX)
+
 .PHONY: analyze
 analyze: ## Run end-to-end analysis. Requires REPO=<url|path> OUT=<dir>.
 	@if [ -z "$(REPO)" ] || [ -z "$(OUT)" ]; then \
