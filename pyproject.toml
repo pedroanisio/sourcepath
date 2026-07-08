@@ -46,7 +46,7 @@ site = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["codebase_mapper*", "plugins*"]
+include = ["codebase_mapper*", "plugins*", "decomposer*", "recomposer*"]
 exclude = ["tests*", "scripts*"]
 
 [tool.importlinter]
