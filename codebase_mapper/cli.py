@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.repo or not args.out:
         p.error("--repo and --out are required unless --self-test/--reconstruct/--regenerate/--verify-roundtrip is given")
 
-    with resolve_repo_source(args.repo, args.state) as repo:
+    with resolve_repo_source(args.repo, args.state, work_dir=args.out.resolve().parent) as repo:
         repo_name = args.name or repo.name
         mapped = map_codebase(repo.path, repo.state, exclude_patterns=args.exclude)
         manifest = emit(repo_name, mapped, args.out.resolve(),

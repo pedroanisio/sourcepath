@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,15 @@ from codebase_mapper.inspection.repo_source import (
     repo_name_from_source,
     resolve_repo_source,
 )
+
+
+def git_out(repo: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
 
 PASS = 0
@@ -56,6 +66,30 @@ def build_repo(path: Path) -> None:
     git(path, "add", "feature.py")
     git(path, "commit", "-q", "-m", "feature")
     git(path, "checkout", "-q", "master")
+
+
+def build_deep_repo(path: Path) -> str:
+    """master with three commits + a tag on the second; return the first SHA.
+
+    Multiple commits on the default branch are what make a depth-1 clone
+    observably shallow (commit count < source count).
+    """
+    path.mkdir()
+    subprocess.run(["git", "init", "-q", "--initial-branch", "master"], cwd=path, check=True)
+    git(path, "config", "user.email", "t@t")
+    git(path, "config", "user.name", "t")
+    (path / "a.py").write_text("V = 1\n")
+    git(path, "add", "-A")
+    git(path, "commit", "-q", "-m", "c1")
+    first = git_out(path, "rev-parse", "HEAD")
+    (path / "a.py").write_text("V = 2\n")
+    git(path, "add", "-A")
+    git(path, "commit", "-q", "-m", "c2")
+    git(path, "tag", "v1")
+    (path / "a.py").write_text("V = 3\n")
+    git(path, "add", "-A")
+    git(path, "commit", "-q", "-m", "c3")
+    return first
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,6 +148,80 @@ def main(argv: list[str] | None = None) -> int:
                 "feature.py" in feature_paths,
                 json.dumps(sorted(feature_paths)),
             )
+
+        # ---- Shallow-clone + work-dir relocation regression tests ----
+        deep = work / "deep"
+        first_sha = build_deep_repo(deep)
+        deep_bare = work / "deep.git"
+        subprocess.run(["git", "clone", "--bare", str(deep), str(deep_bare)], check=True)
+        deep_url = deep_bare.resolve().as_uri()
+
+        with resolve_repo_source(deep_url, "HEAD") as c:
+            is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
+            count = git_out(c.path, "rev-list", "--count", "HEAD")
+            head_v = (c.path / "a.py").read_text()
+            check(
+                "HEAD clone is shallow (depth 1, single commit)",
+                is_shallow == "true" and count == "1",
+                f"is_shallow={is_shallow} count={count}",
+            )
+            check("HEAD clone checks out the latest commit", head_v == "V = 3\n", head_v)
+
+        with resolve_repo_source(deep_url, "v1") as c:
+            is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
+            tag_v = (c.path / "a.py").read_text()
+            check("tag --state is shallow-cloned directly", is_shallow == "true", is_shallow)
+            check("tag --state checks out the tagged tree", tag_v == "V = 2\n", tag_v)
+
+        with resolve_repo_source(deep_url, first_sha) as c:
+            is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
+            sha_v = (c.path / "a.py").read_text()
+            check(
+                "commit SHA --state falls back to a full clone",
+                is_shallow == "false",
+                is_shallow,
+            )
+            check("commit SHA --state checks out that commit", sha_v == "V = 1\n", sha_v)
+
+        relo = work / "relocated"
+        relo.mkdir()
+        with resolve_repo_source(deep_url, "HEAD", work_dir=relo) as c:
+            check(
+                "work_dir places the clone on the chosen filesystem",
+                str(c.path).startswith(str(relo.resolve())),
+                f"{c.path} not under {relo}",
+            )
+        check("work_dir clone is cleaned up after context exit", not any(relo.iterdir()))
+
+        env_root = work / "env-root"
+        env_root.mkdir()
+        prev_env = os.environ.get("CBM_WORK_DIR")
+        os.environ["CBM_WORK_DIR"] = str(env_root)
+        try:
+            with resolve_repo_source(deep_url, "HEAD") as c:
+                check(
+                    "CBM_WORK_DIR env var relocates the clone",
+                    str(c.path).startswith(str(env_root.resolve())),
+                    str(c.path),
+                )
+        finally:
+            if prev_env is None:
+                os.environ.pop("CBM_WORK_DIR", None)
+            else:
+                os.environ["CBM_WORK_DIR"] = prev_env
+
+        missing_url = (work / "does-not-exist.git").resolve().as_uri()
+        raised = ""
+        try:
+            with resolve_repo_source(missing_url, "HEAD"):
+                pass
+        except RuntimeError as exc:
+            raised = str(exc)
+        check(
+            "failed clone raises an actionable RuntimeError with a relocation hint",
+            "CBM_WORK_DIR" in raised and "GiB free" in raised,
+            raised,
+        )
 
         out = work / "cli-out"
         cli = subprocess.run(

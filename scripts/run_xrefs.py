@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
             scopes=llm_enrich.ALL_SCOPES,
         )
 
-    with resolve_repo_source(args.repo, args.state) as repo:
+    with resolve_repo_source(args.repo, args.state, work_dir=args.out.resolve().parent) as repo:
         repo_name = args.name or repo.name
         mapped = map_codebase(repo.path, repo.state, exclude_patterns=args.exclude)
         manifest = emit(repo_name, mapped, args.out.resolve(),
