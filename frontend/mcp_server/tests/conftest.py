@@ -13,17 +13,28 @@ BUNDLES_ROOT = REPO_ROOT / "_tmp"
 LIVE_BUNDLE_FIXTURES = {"bundle_name", "live_bundle", "representative_file", "heavy_concept", "representative_args"}
 
 
+def _is_live_suite_bundle(p: Path) -> bool:
+    """A bundle this suite can exercise end-to-end.
+
+    The live tests assert on chunks, concepts, and co-occurrence, so a bare
+    L1 bundle (run_manifest.json but no L3 layer) must NOT be selected —
+    picking one turns every concept test into a spurious failure instead of
+    the honest skip whose message says how to generate a full bundle.
+    """
+    return (p / "run_manifest.json").exists() and (p / "concepts.json").exists()
+
+
 def _discover_bundle() -> Path | None:
-    """Pick the first ``_tmp/<name>/run_manifest.json`` found, or honor an
-    explicit ``CBM_OUTPUT_DIR`` if it points at a real bundle."""
+    """Pick the first full ``_tmp/<name>`` bundle, or honor an explicit
+    ``CBM_OUTPUT_DIR`` if it points at one."""
     env = os.environ.get("CBM_OUTPUT_DIR")
     if env:
         p = Path(env)
-        if (p / "run_manifest.json").exists():
+        if _is_live_suite_bundle(p):
             return p
     if BUNDLES_ROOT.exists():
         for child in sorted(BUNDLES_ROOT.iterdir()):
-            if (child / "run_manifest.json").exists():
+            if _is_live_suite_bundle(child):
                 return child
     return None
 
