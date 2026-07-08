@@ -138,6 +138,31 @@ def test_resolve_none_when_unreachable(monkeypatch):
     assert resolve_model(client) is None
 
 
+def test_resolve_none_when_client_lacks_available_models(monkeypatch):
+    """A cache-only stub (no available_models method) must not crash the
+    probe — resolve returns None so the caller keeps its preferred model.
+    Guards the CI-determinism fixture stub regression."""
+    monkeypatch.delenv(MODEL_ENV_VAR, raising=False)
+
+    class _CacheOnlyStub:
+        host = "stub://no-ollama"
+
+        def ping(self):
+            return True
+
+    assert resolve_model(_CacheOnlyStub()) is None
+
+
+def test_resolve_none_when_probe_raises_arbitrary_exception(monkeypatch):
+    monkeypatch.delenv(MODEL_ENV_VAR, raising=False)
+
+    class _AngryClient:
+        def available_models(self):
+            raise ValueError("kaboom")
+
+    assert resolve_model(_AngryClient()) is None
+
+
 def test_resolve_none_when_client_none(monkeypatch):
     monkeypatch.delenv(MODEL_ENV_VAR, raising=False)
     assert resolve_model(None) is None

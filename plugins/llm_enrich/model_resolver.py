@@ -98,11 +98,25 @@ def resolve_model(
     if client is None:
         return None
 
+    # Probe what's installed. resolve_model's contract is "never raises —
+    # degrade to None", so *any* probe failure (server unreachable, or a
+    # stub/offline client that does not implement available_models) means
+    # "cannot auto-resolve": the caller keeps its preferred model and the
+    # runtime degradation path takes over. This is deliberate — a
+    # cache-only client (e.g. the CI-determinism fixture stub) must not be
+    # silently switched to a different model, which would change cache
+    # keys and break the byte-identical guarantee.
     try:
         installed = set(client.available_models())
     except OllamaUnreachable as exc:
         _log.warning(
             "llm_enrich: cannot resolve model — Ollama unreachable: %s", exc,
+        )
+        return None
+    except Exception as exc:  # noqa: BLE001 — contract: never raise
+        _log.warning(
+            "llm_enrich: cannot resolve model — availability probe failed "
+            "(%s: %s); keeping preferred model", type(exc).__name__, exc,
         )
         return None
 

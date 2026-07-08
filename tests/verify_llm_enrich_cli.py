@@ -66,13 +66,19 @@ def check(name: str, ok: bool, detail: str = "") -> None:
         FAIL += 1
 
 
-def _ollama_reachable() -> bool:
+def _resolve_enrich_model() -> str | None:
+    """Model the pipeline will use here, or None if it cannot enrich.
+    Model-aware guard (see plugins/llm_enrich/model_resolver.py)."""
     sys.path.insert(0, str(REPO_ROOT))
     try:
+        from plugins.llm_enrich import resolve_model
         from plugins.llm_enrich.client import OllamaClient
-        return OllamaClient(timeout=3.0).ping()
+        return resolve_model(OllamaClient(timeout=5.0))
     except Exception:
-        return False
+        return None
+
+
+RESOLVED_MODEL = _resolve_enrich_model()
 
 
 def build_fixture(target: Path) -> None:
@@ -347,7 +353,7 @@ def main() -> int:
                 FAIL += 1
                 print(f"  FAIL  {t.__name__}")
                 traceback.print_exc()
-        if _ollama_reachable():
+        if RESOLVED_MODEL is not None:
             for t in ollama_tests:
                 try:
                     t(work)
