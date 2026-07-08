@@ -10,7 +10,7 @@ from pathlib import PurePosixPath
 try:
     import tomllib
 except ImportError:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore[no-redef]
 
 try:
     import yaml

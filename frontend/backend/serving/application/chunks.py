@@ -15,7 +15,7 @@ def list_chunks_response(
     limit: int = 50,
     offset: int = 0,
     bundle: str | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     b = get_bundle(bundle)
     rows = b.chunks
     if q:
@@ -35,7 +35,7 @@ def list_chunks_response(
     }
 
 
-def search_chunks_response(q: str, k: int, bundle: str | None = None) -> dict[str, object]:
+def search_chunks_response(q: str, k: int, bundle: str | None = None) -> dict[str, Any]:
     b = get_bundle(bundle)
     backend_name = (b.embeddings_meta.get("backend") or {}).get("name") or ""
     lowered = backend_name.lower()

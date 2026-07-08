@@ -418,7 +418,7 @@ def extract_cpp_ast_summary(content: bytes, path: str) -> tuple[dict | None, lis
     for it in items:
         if it.get("namespace"):
             ns_counts[it["namespace"]] += 1
-    primary_ns = max(ns_counts, key=ns_counts.get) if ns_counts else ""
+    primary_ns = max(ns_counts, key=lambda ns: ns_counts[ns]) if ns_counts else ""
 
     return {
         "language": "cpp",

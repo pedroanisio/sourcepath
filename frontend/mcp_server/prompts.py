@@ -208,4 +208,4 @@ def get_prompt(name: str, arguments: dict[str, str] | None) -> GetPromptResult:
     spec = PROMPTS.get(name)
     if spec is None:
         raise ToolError(INVALID_ARGUMENT, f"unknown prompt: {name!r}")
-    return spec.build(arguments)
+    return spec.build(arguments or {})

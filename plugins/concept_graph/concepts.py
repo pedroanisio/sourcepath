@@ -225,11 +225,11 @@ class ConceptAggregator:
                 # Compound concept: the full canonical tuple. Only meaningful
                 # if it has 2+ atomic parts (else it equals the atomic).
                 if len(canon) >= 2:
-                    key = tuple(canon)
-                    compound_freq[key] += 1
-                    compound_alt_labels[key].add(raw)
-                    compound_file_count[key].add(path)
-                    per_path_compound[path].add(key)
+                    ckey = tuple(canon)
+                    compound_freq[ckey] += 1
+                    compound_alt_labels[ckey].add(raw)
+                    compound_file_count[ckey].add(path)
+                    per_path_compound[path].add(ckey)
 
         # ----- Build concept records -----
         concepts: dict[str, dict] = {}
@@ -258,20 +258,20 @@ class ConceptAggregator:
                         record["broader"] = term.broader
             concepts[c] = record
         # compound — synthesize canonical_form by joining with underscore
-        for key in sorted(compound_freq, key=lambda k: ("_".join(k), k)):
-            if compound_freq[key] < MIN_FREQUENCY:
+        for ckey in sorted(compound_freq, key=lambda k: ("_".join(k), k)):
+            if compound_freq[ckey] < MIN_FREQUENCY:
                 continue
-            canon_form = "_".join(key)
+            canon_form = "_".join(ckey)
             # Avoid collision with atomic concepts.
             if canon_form in concepts:
                 # Rename: add a suffix to disambiguate.
                 canon_form = canon_form + "_compound"
             concepts[canon_form] = {
-                "label": " ".join(key),
-                "alt_labels": sorted(compound_alt_labels[key]),
-                "components": list(key),
-                "frequency": int(compound_freq[key]),
-                "file_count": len(compound_file_count[key]),
+                "label": " ".join(ckey),
+                "alt_labels": sorted(compound_alt_labels[ckey]),
+                "components": list(ckey),
+                "frequency": int(compound_freq[ckey]),
+                "file_count": len(compound_file_count[ckey]),
                 "embedding_row": None,
             }
 
@@ -279,8 +279,8 @@ class ConceptAggregator:
         per_path_concepts: dict[str, list[str]] = {}
         for path in sorted(per_path_atomic.keys() | per_path_compound.keys()):
             names = set(per_path_atomic.get(path, set()))
-            for key in per_path_compound.get(path, set()):
-                cf = "_".join(key)
+            for ckey in per_path_compound.get(path, set()):
+                cf = "_".join(ckey)
                 if cf not in concepts and cf + "_compound" in concepts:
                     cf = cf + "_compound"
                 if cf in concepts:
@@ -289,9 +289,9 @@ class ConceptAggregator:
 
         # ----- Co-occurrence (concept_a, concept_b, count) -----
         pair_counts: Counter[tuple[str, str]] = Counter()
-        for path, names in per_path_concepts.items():
-            for i, a in enumerate(names):
-                for b in names[i + 1:]:
+        for path, path_names in per_path_concepts.items():
+            for i, a in enumerate(path_names):
+                for b in path_names[i + 1:]:
                     pair_counts[(a, b)] += 1
         cooccurrence = [
             (a, b, int(c))

@@ -162,7 +162,7 @@ def _pos_to_byte(line_byte_starts: list[int], line: int, col: int) -> int:
     return base + col
 
 
-def _chunk_from_node(node: ast.AST, kind: str, parent: str | None,
+def _chunk_from_node(node: ast.stmt, kind: str, parent: str | None,
                      content: bytes, line_byte_starts: list[int]) -> dict:
     # Span the node's *own* byte range, not the whole line(s) it sits on — a
     # single-line definition must not absorb its neighbours (defect D1). The

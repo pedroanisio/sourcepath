@@ -38,6 +38,8 @@ codebase-mapper = "codebase_mapper.cli:main"
 [project.optional-dependencies]
 dev = [
     "import-linter",
+    "mypy",
+    "types-PyYAML",
 ]
 site = [
     "markdown-it-py",
@@ -48,6 +50,31 @@ site = [
 where = ["."]
 include = ["codebase_mapper*", "plugins*", "decomposer*", "recomposer*"]
 exclude = ["tests*", "scripts*"]
+
+[tool.mypy]
+# Executed contract for the repo's Python type annotations (`python -m mypy`,
+# gated in CI). The TS region already compiles under `strict`; this closes the
+# annotated-but-unenforced gap on the Python side. Scope: the shipped library
+# (codebase_mapper, plugins) plus both frontend service surfaces.
+files = [
+    "codebase_mapper",
+    "plugins",
+    "frontend/backend/app.py",
+    "frontend/backend/serving",
+    "frontend/mcp_server",
+]
+explicit_package_bases = true
+ignore_missing_imports = true
+exclude = [
+    "frontend/mcp_server/tests/",
+]
+
+[[tool.mypy.overrides]]
+# app.py deliberately imports its serving layer twice (package-relative,
+# then script-mode `import app` fallback for the test surface); every name
+# in the fallback branch re-binds the same symbol, which is the point.
+module = "frontend.backend.app"
+disable_error_code = ["no-redef"]
 
 [tool.importlinter]
 root_package = "codebase_mapper"

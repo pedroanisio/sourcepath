@@ -105,27 +105,27 @@ def build_inventory_graph(
 
     for e in import_edges:
         g.add((file_iri(e.src_path), CBM.imports, file_iri(e.dst_path)))
-    for e in tests_edges:
-        g.add((file_iri(e.test_path), CBM.tests, file_iri(e.subject_path)))
+    for te in tests_edges:
+        g.add((file_iri(te.test_path), CBM.tests, file_iri(te.subject_path)))
 
     declared: set[str] = set()
-    for e in dep_edges:
-        declared.add(e.package_name)
-        g.add((file_iri(e.manifest_path), CBM.declaresDependency, package_iri(e.package_name)))
-    for e in import_ext_edges:
+    for de in dep_edges:
+        declared.add(de.package_name)
+        g.add((file_iri(de.manifest_path), CBM.declaresDependency, package_iri(de.package_name)))
+    for xe in import_ext_edges:
         # Always emit; the package node may not be declared in any manifest
         # (still useful for downstream queries).
-        g.add((file_iri(e.src_path), CBM.importsExternal, package_iri(e.package_name)))
-        declared.add(e.package_name)
+        g.add((file_iri(xe.src_path), CBM.importsExternal, package_iri(xe.package_name)))
+        declared.add(xe.package_name)
     for pkg in sorted(declared):
         g.add((package_iri(pkg), RDF.type, CBM.ExternalPackage))
         g.add((package_iri(pkg), CBM.packageName, _plain(pkg)))
 
     pinned: set[tuple[str, str]] = set()
-    for e in pin_edges:
-        pinned.add((e.package_name, e.package_version))
-        g.add((file_iri(e.lockfile_path), CBM.pinsDependency,
-               release_iri(e.package_name, e.package_version)))
+    for pe in pin_edges:
+        pinned.add((pe.package_name, pe.package_version))
+        g.add((file_iri(pe.lockfile_path), CBM.pinsDependency,
+               release_iri(pe.package_name, pe.package_version)))
     for name, version in sorted(pinned):
         rn = release_iri(name, version)
         g.add((rn, RDF.type, CBM.PackageRelease))

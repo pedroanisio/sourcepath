@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from rdflib import Graph
 
@@ -21,9 +21,12 @@ class PipelineCtx:
     mode_by_path: dict[str, str]
     paths_set: set[str]
     read_path: Callable[[str], bytes]
-    indices: dict[str, object] = field(default_factory=dict)
+    # Values are heterogeneous per key (source-root lists, module maps,
+    # tsconfig dicts, …); each consumer knows its own key's shape.
+    indices: dict[str, Any] = field(default_factory=dict)
     resolver_annotations: dict[str, dict[str, list[str]]] = field(default_factory=dict)
-    scratch: dict[str, object] = field(default_factory=dict)
+    # Same heterogeneous-by-key contract as `indices`, for plugin use.
+    scratch: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

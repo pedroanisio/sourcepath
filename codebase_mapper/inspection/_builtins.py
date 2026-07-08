@@ -213,6 +213,18 @@ class ClojureAnalyzer:
 # ---------------------------------------------------------------------------
 
 
+def _summary(record: FileRecord) -> dict:
+    """Non-None ast_summary; resolve() only runs after matches() gated on it.
+
+    Raising (rather than returning {}) keeps a pipeline-contract violation
+    loud instead of silently resolving zero imports.
+    """
+    summary = record.ast_summary
+    if summary is None:
+        raise ValueError(f"{record.path}: resolve() called without ast_summary")
+    return summary
+
+
 class PythonResolver:
     name = "resolve_python"
 
@@ -224,7 +236,7 @@ class PythonResolver:
         by_module = ctx.indices["host:python_by_module"]
         by_suffix = ctx.indices["host:python_by_suffix"]
         in_repo, external = resolve_python_imports(
-            record.path, record.ast_summary, py_roots, by_module, by_suffix,
+            record.path, _summary(record), py_roots, by_module, by_suffix,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -241,7 +253,7 @@ class TsJsResolver:
         paths_set = ctx.paths_set
         in_repo: list[str] = []
         external: list[str] = []
-        for imp in record.ast_summary.get("imports", []):
+        for imp in _summary(record).get("imports", []):
             spec = imp["source"]
             dst = resolve_tsjs_import(record.path, spec, paths_set, tsconfigs)
             if dst:
@@ -261,7 +273,7 @@ class RustResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_rust_imports(
-            record.path, record.ast_summary,
+            record.path, _summary(record),
             ctx.indices["host:rust_crates"], ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
@@ -275,7 +287,7 @@ class RubyResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_ruby_imports(
-            record.path, record.ast_summary, ctx.paths_set,
+            record.path, _summary(record), ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -288,7 +300,7 @@ class GoResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_go_imports(
-            record.path, record.ast_summary,
+            record.path, _summary(record),
             ctx.indices["host:go_module"], ctx.paths_set,
         )
         external = [go_package_root(u) for u in external]
@@ -303,7 +315,7 @@ class CResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_c_includes(
-            record.path, record.ast_summary, ctx.paths_set,
+            record.path, _summary(record), ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -319,7 +331,7 @@ class CppResolver:
         # share the implementation. Future C++20 `import std;` /
         # `import :module;` is out of scope for this v1.
         in_repo, external = resolve_c_includes(
-            record.path, record.ast_summary, ctx.paths_set,
+            record.path, _summary(record), ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -332,7 +344,7 @@ class KotlinResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external, prefix_matched = resolve_kotlin_imports(
-            record.path, record.ast_summary,
+            record.path, _summary(record),
             ctx.indices["host:kotlin_fqn"],
             ctx.indices["host:declared_pkgs"],
         )
@@ -351,7 +363,7 @@ class JavaResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external, prefix_matched = resolve_java_imports(
-            record.path, record.ast_summary,
+            record.path, _summary(record),
             ctx.indices["host:java_fqn"],
             ctx.indices["host:java_packages"],
             ctx.indices["host:declared_pkgs"],
@@ -372,7 +384,7 @@ class ObjcResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_objc_includes(
-            record.path, record.ast_summary, ctx.paths_set,
+            record.path, _summary(record), ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -385,7 +397,7 @@ class SwiftResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_swift_imports(
-            record.path, record.ast_summary,
+            record.path, _summary(record),
             ctx.indices["host:swift_modules"], ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
@@ -404,7 +416,7 @@ class DartResolver:
         if not packages:
             packages = ctx.indices.get("host:dart_pkg_name")
         in_repo, external = resolve_dart_imports(
-            record.path, record.ast_summary,
+            record.path, _summary(record),
             packages, ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
@@ -418,7 +430,7 @@ class ClojureResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_clojure_imports(
-            record.path, record.ast_summary, ctx.paths_set,
+            record.path, _summary(record), ctx.paths_set,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -445,7 +457,7 @@ def register_builtins() -> None:
     the host's extension registries. Called from `__init__.py` at package
     import time, and from `reset_registries()` after clearing.
     """
-    for cls in _BUILTIN_ANALYZERS:
-        register_language_analyzer(cls())
-    for cls in _BUILTIN_RESOLVERS:
-        register_import_resolver(cls())
+    for analyzer_cls in _BUILTIN_ANALYZERS:
+        register_language_analyzer(analyzer_cls())
+    for resolver_cls in _BUILTIN_RESOLVERS:
+        register_import_resolver(resolver_cls())

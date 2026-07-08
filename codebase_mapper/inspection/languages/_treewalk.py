@@ -14,10 +14,44 @@ See issue: RecursionError from unbounded recursive CST walks.
 """
 from __future__ import annotations
 
-from typing import Callable, Iterator
+from typing import Callable, Iterator, Protocol, Sequence
 
 
-def iter_named_pre_order(root, descend: Callable[[object], bool] | None = None) -> Iterator:
+class CSTNode(Protocol):
+    """Structural stand-in for ``tree_sitter.Node``.
+
+    Keeps this module's deliberate no-tree-sitter-import property while
+    still letting analyzers type their walks: any object with these five
+    members (tree-sitter nodes included) satisfies it structurally.
+    """
+
+    @property
+    def children(self) -> Sequence["CSTNode"]: ...
+
+    @property
+    def is_named(self) -> bool: ...
+
+    @property
+    def type(self) -> str: ...
+
+    @property
+    def start_byte(self) -> int: ...
+
+    @property
+    def end_byte(self) -> int: ...
+
+    @property
+    def start_point(self) -> tuple[int, int]: ...
+
+    @property
+    def end_point(self) -> tuple[int, int]: ...
+
+    def child_by_field_name(self, name: str) -> "CSTNode | None": ...
+
+
+def iter_named_pre_order(
+    root: CSTNode, descend: Callable[[CSTNode], bool] | None = None,
+) -> Iterator[CSTNode]:
     """Yield ``root`` and its named descendants in pre-order, iteratively.
 
     Children are visited left-to-right — byte-for-byte the same order as the
@@ -36,7 +70,7 @@ def iter_named_pre_order(root, descend: Callable[[object], bool] | None = None) 
             stack.extend(reversed(named))
 
 
-def find_named_descendant(root, kinds):
+def find_named_descendant(root: CSTNode, kinds) -> CSTNode | None:
     """First node in ``iter_named_pre_order(root)`` whose ``type`` is in
     ``kinds`` (``root`` included), or ``None``. Iterative replacement for a
     recursive first-match descendant search; identical pre-order semantics."""
@@ -63,7 +97,7 @@ def node_to_jsonable(root, content: bytes):
     leaf/gap raises ``UnicodeDecodeError`` — the same signal the recursive
     version raised, for the caller to convert into ``cst_json = None``.
     """
-    def leaf(node):
+    def leaf(node: CSTNode):
         text = content[node.start_byte:node.end_byte].decode("utf-8")
         if not node.is_named and node.type == text:
             return text

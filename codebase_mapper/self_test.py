@@ -54,7 +54,9 @@ def self_test() -> int:
     fixture.add((f1, CBM.importsExternal, pkg))
     shapes = build_shacl_graph()
 
-    cases: list[tuple[str, bool, Callable[[Graph], None]]] = [
+    # Mutators are called for effect; their return value (Graph, tuple of
+    # Graphs, or None) is ignored, hence `object`.
+    cases: list[tuple[str, bool, Callable[[Graph], object]]] = [
         ("control (untouched)", True, lambda g: None),
         ("drop contentSha256", False,
             lambda g: g.remove((f1, CBM.contentSha256, None))),

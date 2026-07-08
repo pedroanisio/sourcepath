@@ -1,10 +1,12 @@
 """Graph endpoints application logic."""
 from __future__ import annotations
 
+from typing import Any
+
 from .bundle_data import get_bundle
 
 
-def build_file_graph_response(limit: int, bundle: str | None = None) -> dict[str, object]:
+def build_file_graph_response(limit: int, bundle: str | None = None) -> dict[str, Any]:
     b = get_bundle(bundle)
     deg: dict[str, int] = {}
     for a, b_ in b.imports:
@@ -43,7 +45,7 @@ def build_symbol_graph_response(
     limit: int,
     kind: str = "calls",
     bundle: str | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     b = get_bundle(bundle)
     selected_edges = [e for e in b.xrefs if kind == "all" or e["kind"] == kind]
     deg: dict[int, int] = {}
@@ -83,7 +85,7 @@ def build_concept_graph_response(
     limit: int,
     min_edge: int,
     bundle: str | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     b = get_bundle(bundle)
     concepts = b.concepts.get("concepts", {})
     ranked = sorted(

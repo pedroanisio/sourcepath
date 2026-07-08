@@ -272,7 +272,7 @@ def _project_from_jsonld(jsonld_path: Path) -> Projection:
                 "path": str(node["cbm:path"]) if "cbm:path" in node else str(None),
                 "language": str(lang_lit) if lang_lit else None,
                 "type": ftype_uri,
-                "size": int(size_b) if size_b is not None else None,
+                "size": int(str(size_b)) if size_b is not None else None,
                 "contentSha256": str(sha) if sha is not None else None,
             }
             files.append(rec)
@@ -334,7 +334,7 @@ def _project_from_rdflib(ttl_path: Path) -> Projection:
             "path": str(g.value(f, CBM.path)),
             "language": str(lang_lit) if lang_lit else None,
             "type": ftype_uri,
-            "size": int(size_b) if size_b is not None else None,
+            "size": int(str(size_b)) if size_b is not None else None,
             "contentSha256": str(sha) if sha is not None else None,
         }
         files.append(rec)

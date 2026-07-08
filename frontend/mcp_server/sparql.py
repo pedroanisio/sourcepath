@@ -21,7 +21,7 @@ import os
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from rdflib import Graph
 
@@ -142,7 +142,7 @@ def run_sparql(query: str, *, bundle_default: str | None = None) -> dict[str, An
             break
         rows.append({
             col: (str(val) if val is not None else None)
-            for col, val in zip(columns, row)
+            for col, val in zip(columns, cast("tuple", row))
         })
     return {
         "columns": columns,

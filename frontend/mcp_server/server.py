@@ -203,7 +203,7 @@ async def manifest_changed(uri: str, manager: SubscriptionManager) -> None:
     by tests that want to simulate a manifest change without touching
     the filesystem.
     """
-    backend_bundle_data.get_bundle.cache_clear()
+    backend_bundle_data._clear_bundle_cache()
     try:  # Keep the legacy `import app` compatibility surface coherent too.
         import app as legacy_backend_app  # type: ignore
     except ImportError:

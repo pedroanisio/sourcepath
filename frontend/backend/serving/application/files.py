@@ -1,12 +1,14 @@
 """File endpoint application logic."""
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import HTTPException
 
 from .bundle_data import get_bundle, xref_row
 
 
-def get_file_detail_response(path: str, bundle: str | None = None) -> dict[str, object]:
+def get_file_detail_response(path: str, bundle: str | None = None) -> dict[str, Any]:
     b = get_bundle(bundle)
     rec = b.file_by_path.get(path)
     if not rec:
@@ -18,8 +20,8 @@ def get_file_detail_response(path: str, bundle: str | None = None) -> dict[str, 
     ]
     concepts = list((b.concepts.get("per_path_concepts") or {}).get(path, []))
 
-    xrefs_out: list[dict[str, object]] = []
-    xrefs_in: list[dict[str, object]] = []
+    xrefs_out: list[dict[str, Any]] = []
+    xrefs_in: list[dict[str, Any]] = []
     seen_out: set[int] = set()
     seen_in: set[int] = set()
     for ci in chunk_idxs:

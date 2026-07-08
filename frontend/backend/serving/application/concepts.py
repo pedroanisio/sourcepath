@@ -1,6 +1,8 @@
 """Concept endpoint application logic."""
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import HTTPException
 
 from .bundle_data import get_bundle
@@ -12,7 +14,7 @@ def get_concept_detail_response(
     chunk_k: int = 50,
     file_k: int = 100,
     bundle: str | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     b = get_bundle(bundle)
     concept = b.concepts.get("concepts", {}).get(name)
     if not concept:

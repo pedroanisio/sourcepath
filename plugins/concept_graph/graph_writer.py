@@ -203,9 +203,9 @@ class ConceptGraphWriter:
                 concept_names: set[str] = set()
                 for sym in symbols:
                     for tok in split_identifier(sym):
-                        cn = canonicalize(tok, vocab)
-                        if cn and cn in concepts:
-                            concept_names.add(cn)
+                        cname = canonicalize(tok, vocab)
+                        if cname and cname in concepts:
+                            concept_names.add(cname)
                 if not concept_names:
                     continue
                 ciri_chunk = chunk_iri_for(c["chunk_id"])

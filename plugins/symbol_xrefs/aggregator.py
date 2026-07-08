@@ -46,7 +46,9 @@ class XrefAggregator:
             r_edges, r_unresolved = resolver(record, ctx)
             if not (r_edges or r_unresolved):
                 continue
-            lang = record.language
+            # Same "" fallback as the resolver lookup above, and it
+            # narrows str | None for the dict keys.
+            lang = record.language or ""
             per_lang_edges.setdefault(lang, set()).update(r_edges)
             per_lang_unresolved.setdefault(lang, set()).update(r_unresolved)
 
@@ -54,8 +56,8 @@ class XrefAggregator:
         all_unresolved: set[UnresolvedSymbolRef] = set()
         for s in per_lang_edges.values():
             all_edges.update(s)
-        for s in per_lang_unresolved.values():
-            all_unresolved.update(s)
+        for u in per_lang_unresolved.values():
+            all_unresolved.update(u)
 
         edges = sorted(all_edges, key=_edge_sort_key)
         unresolved = sorted(all_unresolved, key=_unresolved_sort_key)

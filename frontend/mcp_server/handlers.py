@@ -541,7 +541,7 @@ def _file_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]:
         payload = backend_files_app.get_file_detail_response(path, name)
     except HTTPException as e:
         _raise_mapped_http_error(e)
-    payload: dict[str, Any] = {
+    payload = {
         "file": _file_record(payload["file"]),
         "imports_out": payload["imports_out"],
         "imports_in": payload["imports_in"],
@@ -745,7 +745,7 @@ def _concept_detail(args: dict[str, Any], default: str | None) -> dict[str, Any]
         concept_payload["kind"] = c["kind"]
     if "broader" in c:
         concept_payload["broader"] = c["broader"]
-    payload: dict[str, Any] = {
+    payload = {
         "concept": concept_payload,
         "files": payload["files"],
         "cooccurring": payload["cooccurring"],

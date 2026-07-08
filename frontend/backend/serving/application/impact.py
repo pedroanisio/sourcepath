@@ -1,6 +1,8 @@
 """Impact endpoint application logic."""
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import HTTPException
 
 from .bundle_data import chunk_payload, get_bundle, walk_paths, walk_xref_chunks
@@ -11,7 +13,7 @@ def get_impact_response(
     depth: int = 2,
     limit: int = 100,
     bundle: str | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     b = get_bundle(bundle)
     if path not in b.file_by_path:
         raise HTTPException(status_code=404, detail="file not found")

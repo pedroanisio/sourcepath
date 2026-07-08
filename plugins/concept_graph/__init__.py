@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from .splitter import IdentifierSplitter, split_identifier
 from .concepts import (
-    USE_BUILTIN, ConceptAggregator, canonicalize,
+    USE_BUILTIN, ConceptAggregator, _UseBuiltin, canonicalize,
 )
 from .graph_writer import ConceptGraphWriter, ConceptShapes
 from .artifact import ConceptsArtifact
@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-def register_all(vocab: Vocabulary | None | object = USE_BUILTIN) -> None:
+def register_all(vocab: Vocabulary | _UseBuiltin | None = USE_BUILTIN) -> None:
     """Register every L3 plugin with the host's extension registries.
 
     `vocab` controls L3's typed-concept behavior:

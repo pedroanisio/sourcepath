@@ -249,7 +249,7 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
             if name is not None:
                 item_kind = "category" if category else "class_interface"
                 item_name = f"{name}({category})" if category else name
-                item = {
+                item: dict = {
                     "kind": item_kind,
                     "name": item_name,
                     "parent": None,
@@ -286,12 +286,12 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
             name_node = _find_first(node, "identifier")
             if name_node is not None:
                 proto_name = _node_text(name_node, content)
-                protocols: list[str] = []
+                proto_refs: list[str] = []
                 rl = _find_first(node, "protocol_reference_list")
                 if rl is not None:
                     for ch in rl.children:
                         if ch.is_named and ch.type == "identifier":
-                            protocols.append(_node_text(ch, content))
+                            proto_refs.append(_node_text(ch, content))
                 item = {
                     "kind": "protocol",
                     "name": proto_name,
@@ -301,8 +301,8 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                     "byte_start": node.start_byte,
                     "byte_end": node.end_byte,
                 }
-                if protocols:
-                    item["implements"] = protocols
+                if proto_refs:
+                    item["implements"] = proto_refs
                 items.append(item)
                 _emit_class_methods(node, content, proto_name, items,
                                     decl_only=True)

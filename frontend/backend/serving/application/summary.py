@@ -1,10 +1,12 @@
 """Summary use case."""
 from __future__ import annotations
 
+from typing import Any
+
 from .bundle_data import get_bundle
 
 
-def build_summary_response(bundle: str | None = None) -> dict[str, object]:
+def build_summary_response(bundle: str | None = None) -> dict[str, Any]:
     b = get_bundle(bundle)
     manifest = b.manifest
     return {

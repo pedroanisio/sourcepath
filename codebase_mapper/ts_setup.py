@@ -19,18 +19,9 @@ try:
     TS_AVAILABLE = True
 except Exception:
     TS_AVAILABLE = False
-    ts = None
-    tst = None
-    tsj = None
-    tsr = None
-    tsrb = None
-    tsgo = None
-    tsc = None
-    tscpp = None
-    tsk = None
-    tssw = None
-    tsja = None
-    tsobjc = None
+    # None sentinels so a caller that skips the TS_AVAILABLE guard fails
+    # loudly; single-line so the optional-import idiom needs one ignore.
+    ts = tst = tsj = tsr = tsrb = tsgo = tsc = tscpp = tsk = tssw = tsja = tsobjc = None  # type: ignore[assignment]
 
 
 
