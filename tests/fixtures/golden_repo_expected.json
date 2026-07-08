@@ -1,0 +1,55 @@
+{
+  "_comment": [
+    "HAND-WRITTEN expected bundle projection for tests/fixtures/golden_repo.",
+    "Every value here is derived by a human reading the fixture sources,",
+    "NOT by running the pipeline — that independence is the entire point:",
+    "it ground-truths the extractors instead of validating them against",
+    "themselves. If you edit the fixture repo, re-derive this file by hand.",
+    "Verified by tests/verify_golden_repo.py."
+  ],
+  "files": {
+    "data.bin": {"language": null, "type": "binary"},
+    "gosvc/main.go": {"language": "go", "type": "source_code"},
+    "notes.md": {"language": null, "type": "documentation"},
+    "pyapp/__init__.py": {"language": "python", "type": "source_code"},
+    "pyapp/main.py": {"language": "python", "type": "source_code"},
+    "pyapp/util.py": {"language": "python", "type": "source_code"},
+    "pyproject.toml": {"language": null, "type": "dependency_manifest"},
+    "web/src/index.ts": {"language": "typescript", "type": "source_code"},
+    "web/src/util.ts": {"language": "typescript", "type": "source_code"}
+  },
+  "import_edges": [
+    ["pyapp/main.py", "pyapp/util.py"],
+    ["web/src/index.ts", "web/src/util.ts"]
+  ],
+  "declared_dependencies": {
+    "pyproject.toml": ["rich"]
+  },
+  "chunks": {
+    "gosvc/main.go": [
+      {"symbol": "greet", "kind": "function", "begin_line": 5, "end_line": 7},
+      {"symbol": "main", "kind": "function", "begin_line": 9, "end_line": 11}
+    ],
+    "notes.md": [
+      {"symbol": "<file>", "kind": "file", "begin_line": 1, "end_line": 3}
+    ],
+    "pyapp/__init__.py": [
+      {"symbol": "<file>", "kind": "file", "begin_line": 1, "end_line": 1}
+    ],
+    "pyapp/main.py": [
+      {"symbol": "App", "kind": "class", "begin_line": 11, "end_line": 15},
+      {"symbol": "main", "kind": "function", "begin_line": 7, "end_line": 8},
+      {"symbol": "run", "kind": "method", "begin_line": 14, "end_line": 15}
+    ],
+    "pyapp/util.py": [
+      {"symbol": "helper", "kind": "function", "begin_line": 4, "end_line": 5}
+    ],
+    "web/src/index.ts": [
+      {"symbol": "main", "kind": "function", "begin_line": 3, "end_line": 5}
+    ],
+    "web/src/util.ts": [
+      {"symbol": "double", "kind": "function", "begin_line": 1, "end_line": 3}
+    ]
+  },
+  "shacl_conforms": true
+}

@@ -1,0 +1,4 @@
+[project]
+name = "golden-fixture"
+version = "0.0.1"
+dependencies = ["rich>=13.0"]
