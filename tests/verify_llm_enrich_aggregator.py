@@ -72,11 +72,18 @@ def skip(name: str, reason: str) -> None:
     SKIP += 1
 
 
-def _ollama_reachable() -> bool:
+def _resolve_enrich_model() -> str | None:
+    """Model the pipeline will use here, or None if it cannot enrich.
+    Model-aware guard: a reachable server with no suitable qwen2.5-coder
+    tag must skip, not fail (see plugins/llm_enrich/model_resolver.py)."""
     try:
-        return OllamaClient(timeout=3.0).ping()
+        from plugins.llm_enrich import resolve_model
+        return resolve_model(OllamaClient(timeout=5.0))
     except Exception:
-        return False
+        return None
+
+
+RESOLVED_MODEL = _resolve_enrich_model()
 
 
 def _concept_iri(canon: str) -> URIRef:
@@ -338,9 +345,9 @@ def main() -> int:
         "test_unreachable_ollama_degrades_silently",
     ]
 
-    if not _ollama_reachable():
+    if RESOLVED_MODEL is None:
         for n in test_names:
-            skip(n, "Ollama unreachable")
+            skip(n, "no suitable qwen2.5-coder model installed")
         print(f"\npassed: {PASS}   failed: {FAIL}   skipped: {SKIP}")
         return 0
 

@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING
 
 from .cache import Cache, hash_text
 from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
+from .model_resolver import DEFAULT_MODEL
 from .prompts import PROMPT_REGISTRY
 
 if TYPE_CHECKING:
@@ -87,15 +88,17 @@ class LlmEnricher:
       ``cache``:   Cache. None → an enabled default cache at the
                    conventional path. Pass ``Cache(enabled=False)`` to
                    disable caching entirely (verifier path).
-      ``model``:   Ollama model tag. Locked to qwen2.5-coder:7b per the
-                   benchmark (docs/llm-baseline-results.md).
+      ``model``:   Ollama model tag. Defaults to qwen2.5-coder:7b per the
+                   benchmark (docs/llm-baseline-results.md); ``register_all``
+                   may auto-resolve it to an installed same-family tag when
+                   the default is not pulled (see model_resolver.py).
       ``scopes``:  Tuple of scope names to opt in to. ``None`` or empty
                    tuple = no-op (Step 1 back-compat anchor).
     """
 
     client: OllamaClient | None = None
     cache: Cache | None = None
-    model: str = "qwen2.5-coder:7b"
+    model: str = DEFAULT_MODEL
     scopes: tuple[str, ...] | None = None
 
     name: str = ENRICHER_NAME

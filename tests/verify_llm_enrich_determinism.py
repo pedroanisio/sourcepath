@@ -79,11 +79,17 @@ def skip(name: str, reason: str) -> None:
     SKIP += 1
 
 
-def _ollama_reachable() -> bool:
+def _resolve_enrich_model() -> str | None:
+    """Model the pipeline will use here, or None if it cannot enrich.
+    Model-aware guard (see plugins/llm_enrich/model_resolver.py)."""
     try:
-        return OllamaClient(timeout=3.0).ping()
+        from plugins.llm_enrich import resolve_model
+        return resolve_model(OllamaClient(timeout=5.0))
     except Exception:
-        return False
+        return None
+
+
+RESOLVED_MODEL = _resolve_enrich_model()
 
 
 def build_fixture(target: Path) -> None:
@@ -164,11 +170,11 @@ def _strip_generated_at(manifest_path: Path) -> dict:
 def main() -> int:
     global FAIL
 
-    if not _ollama_reachable():
+    if RESOLVED_MODEL is None:
         for name in ("test_warm_cache_byte_identical",
                      "test_run2_all_cache_hits",
                      "test_manifest_l4_fragment_stable"):
-            skip(name, "Ollama unreachable")
+            skip(name, "no suitable qwen2.5-coder model installed")
         print(f"\npassed: {PASS}   failed: {FAIL}   skipped: {SKIP}")
         return 0
 

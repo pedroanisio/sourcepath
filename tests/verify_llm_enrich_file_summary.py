@@ -68,11 +68,18 @@ def skip(name: str, reason: str) -> None:
     SKIP += 1
 
 
-def _ollama_reachable() -> bool:
+def _resolve_enrich_model() -> str | None:
+    """Model the pipeline will actually use here, or None if it cannot
+    enrich. Model-aware guard: a reachable server with no suitable
+    qwen2.5-coder tag must skip, not fail (see model_resolver.py)."""
     try:
-        return OllamaClient(timeout=3.0).ping()
+        from plugins.llm_enrich import resolve_model
+        return resolve_model(OllamaClient(timeout=5.0))
     except Exception:
-        return False
+        return None
+
+
+RESOLVED_MODEL = _resolve_enrich_model()
 
 
 def build_fixture(target: Path) -> None:
@@ -147,9 +154,9 @@ def test_opt_in_produces_summaries(work: Path) -> None:
     check("text is non-empty",
           isinstance(rec.get("text"), str) and len(rec["text"].strip()) > 0,
           f"text={rec.get('text')!r}")
-    check("model field matches registered default",
-          rec.get("model") == "qwen2.5-coder:7b",
-          f"got {rec.get('model')!r}")
+    check("model field matches resolved pipeline model",
+          rec.get("model") == RESOLVED_MODEL,
+          f"got {rec.get('model')!r}, expected {RESOLVED_MODEL!r}")
     check("first run was a cache miss",
           rec.get("was_cache_hit") is False,
           f"hit={rec.get('was_cache_hit')}")
@@ -222,12 +229,12 @@ def test_unreachable_ollama_degrades_silently(work: Path) -> None:
 
 def main() -> int:
     global FAIL
-    if not _ollama_reachable():
+    if RESOLVED_MODEL is None:
         for name in ("test_opt_in_produces_summaries",
                      "test_second_run_is_all_hits",
                      "test_default_scope_is_noop",
                      "test_unreachable_ollama_degrades_silently"):
-            skip(name, "Ollama unreachable")
+            skip(name, "no suitable qwen2.5-coder model installed")
         print(f"\npassed: {PASS}   failed: {FAIL}   skipped: {SKIP}")
         return 0
 

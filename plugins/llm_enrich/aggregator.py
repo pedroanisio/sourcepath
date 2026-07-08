@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, cast
 
 from .cache import Cache, hash_text
 from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
+from .model_resolver import DEFAULT_MODEL
 from .prompts import PROMPT_REGISTRY
 
 if TYPE_CHECKING:
@@ -83,7 +84,7 @@ class LlmAggregator:
 
     client: OllamaClient | None = None
     cache: Cache | None = None
-    model: str = "qwen2.5-coder:7b"
+    model: str = DEFAULT_MODEL
     scopes: tuple[str, ...] | None = None
 
     name: str = AGGREGATOR_NAME

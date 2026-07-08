@@ -35,21 +35,31 @@ from .cache import Cache
 from .client import OllamaClient
 from .enricher import LlmEnricher
 from .graph_writer import LlmGraphWriter, LlmShapes
+from .model_resolver import (
+    DEFAULT_MODEL,
+    MODEL_ENV_VAR,
+    preferred_model,
+    resolve_model,
+)
 
 __all__ = [
     "ALL_SCOPES",
     "Cache",
+    "DEFAULT_MODEL",
     "LlmAggregator",
     "LlmArtifact",
     "LlmEnricher",
     "LlmGraphWriter",
     "LlmShapes",
+    "MODEL_ENV_VAR",
     "OllamaClient",
     "SCOPE_CONCEPTS",
     "SCOPE_FILES",
     "SCOPE_SCHEMAS",
     "SIDECAR_FILENAME",
+    "preferred_model",
     "register_all",
+    "resolve_model",
 ]
 
 
@@ -57,19 +67,30 @@ def register_all(
     *,
     client: "OllamaClient | None" = None,
     cache: "Cache | None" = None,
-    model: str = "qwen2.5-coder:7b",
+    model: "str | None" = None,
     scopes: "tuple[str, ...] | None" = None,
+    auto_resolve: bool = True,
 ) -> None:
     """Register every L4 component with the host's extension registries.
 
-    Parameters mirror the CLI flags on ``scripts/run_l4.py`` (Step 8). All
-    are optional in Step 1 — the skeleton ignores them. Each parameter
-    becomes load-bearing in a later step:
+    Parameters mirror the CLI flags on ``scripts/run_l4.py``:
 
-      ``client``   Step 2 wires it into the enricher + aggregator.
-      ``cache``    Step 2 wires it into the enricher + aggregator.
-      ``model``    Step 3 uses it in the cache key.
-      ``scopes``   Step 5 uses it to opt in/out of each enrichment kind.
+      ``client``   Wired into the enricher + aggregator (``None`` → no-op).
+      ``cache``    Wired into the enricher + aggregator.
+      ``model``    Preferred Ollama tag. ``None`` → ``$CBM_LLM_MODEL`` →
+                   :data:`DEFAULT_MODEL`. Used in the cache key and
+                   provenance.
+      ``scopes``   Which enrichment kinds to opt in to.
+      ``auto_resolve``  When True (default) and a ``client`` is given,
+                   the *preferred* tag is resolved against the models
+                   actually installed on the server via
+                   :func:`resolve_model` — if the preferred tag is
+                   missing but a smaller same-family tag is present, the
+                   pipeline auto-solves to it instead of silently
+                   emitting an un-enriched bundle. When the server is
+                   unreachable or has no suitable model, the preferred
+                   tag is wired as-is and the runtime degradation path
+                   (log + skip, SHACL stays green) takes over.
     """
     from codebase_mapper.shared_kernel.extensions import (
         register_aggregator,
@@ -78,10 +99,14 @@ def register_all(
         register_record_enricher,
         register_shape_contributor,
     )
+    preferred = preferred_model(model)
+    effective = preferred
+    if auto_resolve and client is not None:
+        effective = resolve_model(client, model) or preferred
     register_record_enricher(LlmEnricher(client=client, cache=cache,
-                                         model=model, scopes=scopes))
+                                         model=effective, scopes=scopes))
     register_aggregator(LlmAggregator(client=client, cache=cache,
-                                      model=model, scopes=scopes))
+                                      model=effective, scopes=scopes))
     register_graph_contributor(LlmGraphWriter())
     register_shape_contributor(LlmShapes())
     register_artifact_emitter(LlmArtifact())

@@ -39,9 +39,10 @@ from codebase_mapper.inspection.repo_source import resolve_repo_source
 from plugins import chunks_embeddings, concept_graph, llm_enrich
 
 
-# Default model — locked to the benchmark winner from
-# docs/llm-baseline-results.md. Override via --llm-model.
-DEFAULT_MODEL = "qwen2.5-coder:7b"
+# Default model — the benchmark winner from docs/llm-baseline-results.md.
+# Override via --llm-model or $CBM_LLM_MODEL; register_all auto-resolves to
+# an installed same-family tag when this one is not pulled.
+from plugins.llm_enrich import DEFAULT_MODEL
 DEFAULT_SCOPES = ("files", "concepts", "schemas")
 
 

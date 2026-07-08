@@ -24,18 +24,33 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def _ollama_reachable() -> bool:
+def _resolve_enrich_model() -> str | None:
+    """The model the enrichment pipeline will actually use here, or None.
+
+    Model-aware skip guard: connectivity alone is not enough — an Ollama
+    server that is up but lacks any suitable qwen2.5-coder tag cannot
+    enrich, so these surface tests must skip (not fail). ``resolve_model``
+    returns the auto-solved installed tag, mirroring exactly what
+    ``register_all`` wires into the pipeline below.
+    """
     sys.path.insert(0, str(REPO_ROOT))
     try:
         from plugins.llm_enrich.client import OllamaClient
-        return OllamaClient(timeout=3.0).ping()
+        from plugins.llm_enrich.model_resolver import resolve_model
+        return resolve_model(OllamaClient(timeout=5.0))
     except Exception:
-        return False
+        return None
 
+
+# The tag the pipeline resolves to (e.g. qwen2.5-coder:7b, or an
+# auto-solved smaller same-family tag). Provenance assertions compare
+# against this, not a hard-coded tag, so the suite runs on whatever
+# qwen2.5-coder size the host has pulled.
+RESOLVED_MODEL = _resolve_enrich_model()
 
 pytestmark = pytest.mark.skipif(
-    not _ollama_reachable(),
-    reason="Ollama unreachable — L4 surface tests skipped",
+    RESOLVED_MODEL is None,
+    reason="no suitable qwen2.5-coder model installed — L4 surface tests skipped",
 )
 
 
@@ -159,7 +174,7 @@ def test_file_detail_returns_llm_summary():
     enr = payload["llm_summary"]
     assert isinstance(enr.get("text"), str) and enr["text"].strip()
     prov = enr["provenance"]
-    assert prov["model"] == "qwen2.5-coder:7b"
+    assert prov["model"] == RESOLVED_MODEL
     assert len(prov["prompt_sha"]) == 64
     assert len(prov["target_sha"]) == 64
     assert prov["generated_at"]
@@ -173,7 +188,7 @@ def test_concept_detail_returns_llm_description_when_typed():
     enr = payload["llm_description"]
     assert isinstance(enr.get("text"), str) and enr["text"].strip()
     prov = enr["provenance"]
-    assert prov["model"] == "qwen2.5-coder:7b"
+    assert prov["model"] == RESOLVED_MODEL
     assert len(prov["prompt_sha"]) == 64
 
 
