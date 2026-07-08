@@ -33,7 +33,20 @@
 #
 # generated_by: "Claude Opus 4.8 via Claude Code"
 # date: "2026-07-08"
-# tbox: software_architecture_dimensions.ttl (arch:ScopeAFramework, owl:versionInfo 2.0.3-scope-a)
+# tbox: software_architecture_dimensions.ttl (arch:ScopeAFramework, owl:versionInfo 2.0.4-scope-a)
+#
+# SCOPE & REGION — MULTI-LAYERED ANALYSIS
+# The framework represents a layered system as *several* arch:DimensionApplication
+# nodes over the SAME (system, dimension) pair, separated by:
+#   * arch:atScope  — the analytical altitude of a classification. This ABox uses
+#     a fixed ladder:  "system" > "subsystem" > "language-region" > "module".
+#   * arch:inRegion — the named region within that scope (a runtime component,
+#     a language/authoring region, or an interaction path). Absent ⇒ whole scope.
+#   * arch:dominantValue — on the system-scope roll-up, which regional value wins.
+# Regions are also reified as arch:AnalysisRegion individuals (afx:Region_*) so the
+# layer has graph identity; each region-scoped application rdfs:seeAlso-links its
+# region. A dimension that does not vary across regions carries a single
+# system-scope application only (no false layering is manufactured).
 #################################################################
 
 afx:AirflowAboxGraph
@@ -45,9 +58,10 @@ afx:AirflowAboxGraph
     dcterms:creator "Claude Opus 4.8 via Claude Code (extraction: codebase-mapper v0.5.0)" ;
     dcterms:conformsTo <https://w3id.org/arc4d3/software-architecture-dimensions#> ;
     owl:imports <https://w3id.org/arc4d3/software-architecture-dimensions#> ;
-    owl:versionInfo "1.0.2-airflow-abox" ;
+    owl:versionInfo "1.1.0-airflow-abox" ;
     rdfs:comment "1.0.1 (review pass): afx classification values registered on their dimensions; execution-API connector and event-loop runtime region added from the file's own task-sdk/triggerer evidence; D05 writer set corrected to match the execution-API boundary; arch:atScope recorded on all applications; three flagged failure modes lifted into arch:RiskFinding instances; provenance lifted from comments into triples." ;
-    rdfs:comment "1.0.2 (layered-state demo): region-scoped application afx:App_D06_TriggererRegion added alongside the system-scope D06 application, exercising arch:inRegion and multi-application layering; system-scope D06 names arch:BatchRuntime as arch:dominantValue." .
+    rdfs:comment "1.0.2 (layered-state demo): region-scoped application afx:App_D06_TriggererRegion added alongside the system-scope D06 application, exercising arch:inRegion and multi-application layering; system-scope D06 names arch:BatchRuntime as arch:dominantValue." ;
+    rdfs:comment "1.1.0 (scope & region multi-layer): promoted layered analysis from a one-dimension demo to a first-class treatment. arch:AnalysisRegion individuals (afx:Region_*) reify Airflow's runtime-component, language, and interaction-path regions. Six dimensions that genuinely vary across regions (D01 decomposition, D03 connector, D06 runtime, D14 paradigm, D17 type discipline, D19 security) now carry a system-scope roll-up with an explicit arch:dominantValue plus region-scoped applications along arch:atScope/arch:inRegion. Dimensions that are uniform across regions keep a single system-scope application; no synthetic layering is added." .
 
 #################################################################
 # System under classification
@@ -81,15 +95,59 @@ afx:ConfigurationDrivenVariability a arch:ClassificationValue ; skos:prefLabel "
 afx:PluggableAuthManagerSecurity a arch:ClassificationValue ; skos:prefLabel "pluggable auth-manager and RBAC security model"@en .
 afx:HatchMonorepoBuild a arch:ClassificationValue ; skos:prefLabel "hatchling monorepo package build"@en .
 afx:ExecutionApiConnector a arch:ClassificationValue ; skos:prefLabel "task execution API connector"@en .
+afx:GradualTypeDiscipline a arch:ClassificationValue ; skos:prefLabel "gradual (optional) type discipline"@en ;
+    rdfs:comment "Python type-hints checked by an optional static checker over an otherwise dynamically typed runtime — the discipline of the Python core region, distinct from strict static typing or stringly-typed code." .
+afx:AmbientWorkerAuthority a arch:ClassificationValue ; skos:prefLabel "ambient single-tenant worker authority"@en ;
+    rdfs:comment "Executed DAG/task code runs with the worker process's full authority; there is no per-DAG-author trust boundary inside the execution region. Distinct from perimeter RBAC, which governs the API/UI region." .
 
 # Register minted values on their dimensions so the extension is explicit
-# and queryable via arch:hasClassificationValue (not merely used ad hoc).
+# and queryable via arch:hasClassificationValue (ValueBelongsToDimensionShape
+# machine-enforces that every used value is registered on its dimension).
 arch:D01_DecompositionModel arch:hasClassificationValue afx:ByProviderIntegration, afx:ByRuntimeComponent .
 arch:D03_ConnectorAndInteractionModel arch:hasClassificationValue afx:MetadataDatabaseConnector, afx:ExecutionApiConnector .
 arch:D10_CompositionAndReuseModel arch:hasClassificationValue afx:ProviderPluginComposition, afx:PluggableExecutorComposition .
 arch:D12_VariabilityAndConfigurationSpaceModel arch:hasClassificationValue afx:ConfigurationDrivenVariability .
-arch:D19_SecurityAndTrustBoundaryModel arch:hasClassificationValue afx:PluggableAuthManagerSecurity .
+arch:D17_TypeAndDataDiscipline arch:hasClassificationValue afx:GradualTypeDiscipline .
+arch:D19_SecurityAndTrustBoundaryModel arch:hasClassificationValue afx:PluggableAuthManagerSecurity, afx:AmbientWorkerAuthority .
 arch:D20_BuildAndDeliveryModel arch:hasClassificationValue afx:HatchMonorepoBuild .
+
+#################################################################
+# Analysis regions (reified arch:AnalysisRegion individuals)
+# Regions give the layered classifications graph identity. Three region
+# families are used: runtime-component regions, language/authoring regions,
+# and decomposition/trust regions. arch:atScope on each application states
+# the altitude; arch:inRegion mirrors the region's prefLabel.
+#################################################################
+
+# Runtime-component regions (deployable Airflow processes)
+afx:Region_Scheduler    a arch:AnalysisRegion ; skos:prefLabel "scheduler"@en ;
+    rdfs:comment "The scheduling loop process (airflow scheduler); dispatches task instances. atScope subsystem." .
+afx:Region_ApiServer    a arch:AnalysisRegion ; skos:prefLabel "api-server"@en ;
+    rdfs:comment "The FastAPI/ASGI API server (and it hosts the execution API). atScope subsystem." .
+afx:Region_Worker       a arch:AnalysisRegion ; skos:prefLabel "worker"@en ;
+    rdfs:comment "Celery/Kubernetes worker executing task instances as processes/pods. atScope subsystem." .
+afx:Region_Triggerer    a arch:AnalysisRegion ; skos:prefLabel "triggerer"@en ;
+    rdfs:comment "The deferrable-operator async trigger runner (asyncio event loop). atScope subsystem." .
+
+# Language / authoring regions
+afx:Region_PythonCore   a arch:AnalysisRegion ; skos:prefLabel "Python core"@en ;
+    rdfs:comment "airflow-core Python (operators, hooks, scheduler, models). 7,569 Python files. atScope language-region." .
+afx:Region_UiTypeScript a arch:AnalysisRegion ; skos:prefLabel "React/TypeScript UI"@en ;
+    rdfs:comment "airflow-core UI: 994 TypeScript files, React. atScope language-region." .
+afx:Region_GoSdk        a arch:AnalysisRegion ; skos:prefLabel "Go SDK"@en ;
+    rdfs:comment "go-sdk module (github.com/apache/airflow/go-sdk); 94 Go files. atScope language-region." .
+afx:Region_DagAuthoring a arch:AnalysisRegion ; skos:prefLabel "DAG authoring surface"@en ;
+    rdfs:comment "User-facing DAG-definition API where workflows are expressed declaratively. atScope language-region." .
+
+# Decomposition / trust regions
+afx:Region_Core         a arch:AnalysisRegion ; skos:prefLabel "airflow-core"@en ;
+    rdfs:comment "The core runtime decomposed by component. atScope subsystem." .
+afx:Region_Providers    a arch:AnalysisRegion ; skos:prefLabel "providers/ tree"@en ;
+    rdfs:comment "The provider-package tree; one package per external integration. atScope subsystem." .
+afx:Region_ApiUiPerimeter a arch:AnalysisRegion ; skos:prefLabel "API/UI perimeter"@en ;
+    rdfs:comment "The authenticated API/UI trust boundary governed by RBAC. atScope subsystem." .
+afx:Region_DagExecution a arch:AnalysisRegion ; skos:prefLabel "DAG/task execution"@en ;
+    rdfs:comment "The region where user DAG/task code runs under worker authority. atScope subsystem." .
 
 #################################################################
 # Dimension applications (20)
@@ -101,6 +159,7 @@ afx:App_D01_Decomposition
     arch:classifiesSystem afx:AirflowSystem ;
     arch:appliesDimension arch:D01_DecompositionModel ;
     arch:usesClassificationValue afx:ByProviderIntegration, afx:ByRuntimeComponent, arch:ByFeature ;
+    arch:dominantValue afx:ByProviderIntegration ;
     arch:supportedByEvidence afx:Ev_D01 ;
     arch:atScope "system" ;
     arch:confidenceLevel "Medium" .
@@ -128,6 +187,7 @@ afx:App_D03_Connector
     arch:classifiesSystem afx:AirflowSystem ;
     arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
     arch:usesClassificationValue afx:MetadataDatabaseConnector, afx:ExecutionApiConnector, arch:MessageQueueConnector ;
+    arch:dominantValue afx:MetadataDatabaseConnector ;
     arch:supportedByEvidence afx:Ev_D03 ;
     arch:revealsRisk afx:Risk_D03_DbAsConnector ;
     arch:atScope "system" ;
@@ -272,7 +332,8 @@ afx:App_D14_Paradigm
     rdfs:label "Airflow — Programming paradigm model" ;
     arch:classifiesSystem afx:AirflowSystem ;
     arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
-    arch:usesClassificationValue arch:ObjectOrientedParadigm, arch:DeclarativeParadigm, arch:ProceduralParadigm ;
+    arch:usesClassificationValue arch:ObjectOrientedParadigm, arch:DeclarativeParadigm, arch:ProceduralParadigm, arch:FunctionalParadigm ;
+    arch:dominantValue arch:ObjectOrientedParadigm ;
     arch:supportedByEvidence afx:Ev_D14 ;
     arch:atScope "system" ;
     arch:confidenceLevel "Medium" .
@@ -311,7 +372,8 @@ afx:App_D17_TypeDiscipline
     rdfs:label "Airflow — Type and data discipline" ;
     arch:classifiesSystem afx:AirflowSystem ;
     arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
-    arch:usesClassificationValue arch:RuntimeSchemaDiscipline, arch:StaticTypeDiscipline ;
+    arch:usesClassificationValue arch:RuntimeSchemaDiscipline, arch:StaticTypeDiscipline, afx:GradualTypeDiscipline ;
+    arch:dominantValue afx:GradualTypeDiscipline ;
     arch:supportedByEvidence afx:Ev_D17 ;
     arch:atScope "system" ;
     arch:confidenceLevel "Medium" .
@@ -337,7 +399,8 @@ afx:App_D19_Security
     rdfs:label "Airflow — Security and trust-boundary model" ;
     arch:classifiesSystem afx:AirflowSystem ;
     arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
-    arch:usesClassificationValue afx:PluggableAuthManagerSecurity, arch:PerimeterSecurityModel ;
+    arch:usesClassificationValue afx:PluggableAuthManagerSecurity, arch:PerimeterSecurityModel, afx:AmbientWorkerAuthority ;
+    arch:dominantValue arch:PerimeterSecurityModel ;
     arch:supportedByEvidence afx:Ev_D19 ;
     arch:revealsRisk afx:Risk_D19_SingleTenantTrust ;
     arch:atScope "system" ;
@@ -376,9 +439,139 @@ afx:Risk_D19_SingleTenantTrust a arch:RiskFinding ;
     rdfs:comment "DAG code executes with worker authority; isolation between DAG authors lies outside the RBAC perimeter, consistent with Airflow's documented security model. Knowledge-based; verify against current security documentation." .
 
 #################################################################
-# Layered classification demo: same dimension, same system,
-# second application at region scope (per TBox 2.0.4 arch:inRegion)
+# LAYERED ANALYSIS — region-scoped applications
+#
+# Each block below is a second (or third/fourth) application of a dimension
+# already applied at system scope above. They share arch:classifiesSystem +
+# arch:appliesDimension and differ only by arch:atScope / arch:inRegion, which
+# is the framework's representation of a layered system. rdfs:seeAlso links the
+# reified afx:Region_* individual. The matching system-scope application names
+# the arch:dominantValue that these regional values roll up into.
 #################################################################
+
+##### D01 Decomposition — core (by component) vs providers (by integration)
+afx:App_D01_CoreRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow core region — Decomposition model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D01_DecompositionModel ;
+    arch:usesClassificationValue afx:ByRuntimeComponent ;
+    arch:dominantValue afx:ByRuntimeComponent ;
+    arch:supportedByEvidence afx:Ev_D01_Core ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "airflow-core" ;
+    rdfs:seeAlso afx:Region_Core ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D01_Core a arch:EvidenceRecord ;
+    arch:evidenceSummary "airflow-core is partitioned by runtime component (scheduler, api-server, dag-processor, triggerer, executors, task-sdk), each an independently runnable process. Component modules are present in the inventory; the boundary criterion is interpretive." .
+
+afx:App_D01_ProvidersRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow providers region — Decomposition model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D01_DecompositionModel ;
+    arch:usesClassificationValue afx:ByProviderIntegration ;
+    arch:dominantValue afx:ByProviderIntegration ;
+    arch:supportedByEvidence afx:Ev_D01_Providers ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "providers/ tree" ;
+    rdfs:seeAlso afx:Region_Providers ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D01_Providers a arch:EvidenceRecord ;
+    arch:evidenceSummary "The providers/src/airflow/providers/ tree and 171 dependency-manifest files show decomposition by external integration — one provider package per system (aws, google, http, ...). Tree presence is mechanically verified." .
+
+##### D03 Connector — three distinct interaction paths
+afx:App_D03_SchedulerDbRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Scheduler↔metadata-DB path — Connector model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
+    arch:usesClassificationValue afx:MetadataDatabaseConnector ;
+    arch:dominantValue afx:MetadataDatabaseConnector ;
+    arch:supportedByEvidence afx:Ev_D03_SchedulerDb ;
+    arch:revealsRisk afx:Risk_D03_DbAsConnector ;
+    arch:atScope "module" ;
+    arch:inRegion "scheduler ↔ metadata database" ;
+    rdfs:seeAlso afx:Region_Scheduler ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D03_SchedulerDb a arch:EvidenceRecord ;
+    arch:evidenceSummary "Scheduler, dag-processor, and API server coordinate through the shared metadata database (SQLAlchemy models + 315 alembic references). The database is the connector on this path — the failure mode D03 names. Store presence verified; coordination semantics interpreted." .
+
+afx:App_D03_WorkerExecRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Worker↔core execution-API path — Connector model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
+    arch:usesClassificationValue afx:ExecutionApiConnector ;
+    arch:dominantValue afx:ExecutionApiConnector ;
+    arch:supportedByEvidence afx:Ev_D03_WorkerExec ;
+    arch:atScope "module" ;
+    arch:inRegion "worker ↔ core (Task SDK execution API)" ;
+    rdfs:seeAlso afx:Region_Worker ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D03_WorkerExec a arch:EvidenceRecord ;
+    arch:evidenceSummary "2,183 task-sdk/task_sdk references evidence a versioned HTTP execution-API boundary between workers and the core, replacing direct DB access on this path (consistent with Ev_D04/Ev_D05). Task-SDK presence verified; call semantics inferred." .
+
+afx:App_D03_CeleryBrokerRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Scheduler↔worker Celery-broker path — Connector model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
+    arch:usesClassificationValue arch:MessageQueueConnector ;
+    arch:dominantValue arch:MessageQueueConnector ;
+    arch:supportedByEvidence afx:Ev_D03_CeleryBroker ;
+    arch:atScope "module" ;
+    arch:inRegion "scheduler ↔ worker (Celery broker)" ;
+    rdfs:seeAlso afx:Region_Worker ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D03_CeleryBroker a arch:EvidenceRecord ;
+    arch:evidenceSummary "Under CeleryExecutor (celery_executor module present, 150 references), task dispatch crosses a message broker queue — a message-queue connector. This path exists only in the Celery deployment variant. Module presence verified; broker choice is deploy-time configuration." .
+
+##### D06 Runtime execution — one region per runtime component
+afx:App_D06_SchedulerRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow scheduler region — Runtime execution model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D06_RuntimeExecutionModel ;
+    arch:usesClassificationValue arch:SingleThreadedRuntime ;
+    arch:dominantValue arch:SingleThreadedRuntime ;
+    arch:supportedByEvidence afx:Ev_D06_Scheduler ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "scheduler loop" ;
+    rdfs:seeAlso afx:Region_Scheduler ;
+    arch:confidenceLevel "Low" .
+afx:Ev_D06_Scheduler a arch:EvidenceRecord ;
+    arch:evidenceSummary "Each scheduler process runs a single long-lived scheduling loop (HA runs multiple scheduler processes, each its own loop). Scheduler module present; per-process single-loop semantics are knowledge-based, not extracted." .
+
+afx:App_D06_ApiServerRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow api-server region — Runtime execution model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D06_RuntimeExecutionModel ;
+    arch:usesClassificationValue arch:EventLoopRuntime ;
+    arch:dominantValue arch:EventLoopRuntime ;
+    arch:supportedByEvidence afx:Ev_D06_ApiServer ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "api-server (ASGI)" ;
+    rdfs:seeAlso afx:Region_ApiServer ;
+    arch:confidenceLevel "Low" .
+afx:Ev_D06_ApiServer a arch:EvidenceRecord ;
+    arch:evidenceSummary "The api-server exposes a FastAPI/ASGI application (1,380 openapi references), typically served on an asyncio event loop. API-surface presence verified; event-loop execution and worker model are inferred and may run sync workers thread-per-request depending on deployment." .
+
+afx:App_D06_WorkerRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Airflow worker region — Runtime execution model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D06_RuntimeExecutionModel ;
+    arch:usesClassificationValue arch:BatchRuntime ;
+    arch:dominantValue arch:BatchRuntime ;
+    arch:supportedByEvidence afx:Ev_D06_Worker ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "worker task execution" ;
+    rdfs:seeAlso afx:Region_Worker ;
+    arch:confidenceLevel "Low" .
+afx:Ev_D06_Worker a arch:EvidenceRecord ;
+    arch:evidenceSummary "Celery/Kubernetes workers execute task instances as discrete processes/pods — batch-style per-task execution. Executor modules verified; process-per-task semantics are knowledge-based." .
 
 afx:App_D06_TriggererRegion
     a arch:DimensionApplication ;
@@ -386,10 +579,150 @@ afx:App_D06_TriggererRegion
     arch:classifiesSystem afx:AirflowSystem ;
     arch:appliesDimension arch:D06_RuntimeExecutionModel ;
     arch:usesClassificationValue arch:EventLoopRuntime ;
+    arch:dominantValue arch:EventLoopRuntime ;
     arch:supportedByEvidence afx:Ev_D06_Triggerer ;
     arch:atScope "subsystem" ;
     arch:inRegion "triggerer (deferrable-operator async loop)" ;
+    rdfs:seeAlso afx:Region_Triggerer ;
     arch:confidenceLevel "Low" .
-
 afx:Ev_D06_Triggerer a arch:EvidenceRecord ;
     arch:evidenceSummary "The triggerer runtime component is mechanically present in the inventory (named among runtime components in Ev_D01). Its asyncio event-loop execution semantics are knowledge-based, not extracted in this run; a grep for asyncio entry points in the triggerer module would settle it." .
+
+##### D14 Programming paradigm — one region per language/authoring surface
+afx:App_D14_PythonCoreRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Python core region — Programming paradigm model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:ObjectOrientedParadigm ;
+    arch:dominantValue arch:ObjectOrientedParadigm ;
+    arch:supportedByEvidence afx:Ev_D14_PythonCore ;
+    arch:atScope "language-region" ;
+    arch:inRegion "Python core (operators/hooks)" ;
+    rdfs:seeAlso afx:Region_PythonCore ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D14_PythonCore a arch:EvidenceRecord ;
+    arch:evidenceSummary "The Python core (7,569 files) expresses behavior through class hierarchies — BaseOperator/BaseHook subclassing — an object-oriented paradigm. Language dominance verified; paradigm attribution interpretive." .
+
+afx:App_D14_DagAuthoringRegion
+    a arch:DimensionApplication ;
+    rdfs:label "DAG authoring region — Programming paradigm model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:DeclarativeParadigm ;
+    arch:dominantValue arch:DeclarativeParadigm ;
+    arch:supportedByEvidence afx:Ev_D14_DagAuthoring ;
+    arch:atScope "language-region" ;
+    arch:inRegion "DAG authoring surface" ;
+    rdfs:seeAlso afx:Region_DagAuthoring ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D14_DagAuthoring a arch:EvidenceRecord ;
+    arch:evidenceSummary "DAG definition is declarative — authors describe a task graph and dependencies; procedural task bodies run inside the declared structure. Interpretive over the documented DAG/TaskFlow authoring model." .
+
+afx:App_D14_UiRegion
+    a arch:DimensionApplication ;
+    rdfs:label "TypeScript UI region — Programming paradigm model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:FunctionalParadigm ;
+    arch:dominantValue arch:FunctionalParadigm ;
+    arch:supportedByEvidence afx:Ev_D14_Ui ;
+    arch:atScope "language-region" ;
+    arch:inRegion "React/TypeScript UI" ;
+    rdfs:seeAlso afx:Region_UiTypeScript ;
+    arch:confidenceLevel "Low" .
+afx:Ev_D14_Ui a arch:EvidenceRecord ;
+    arch:evidenceSummary "994 TypeScript files build a React UI, which favors a function-component/hooks (functional) style. Language and count verified; the functional attribution is a convention-based inference, not extracted." .
+
+afx:App_D14_GoSdkRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Go SDK region — Programming paradigm model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:ProceduralParadigm ;
+    arch:dominantValue arch:ProceduralParadigm ;
+    arch:supportedByEvidence afx:Ev_D14_GoSdk ;
+    arch:atScope "language-region" ;
+    arch:inRegion "Go SDK" ;
+    rdfs:seeAlso afx:Region_GoSdk ;
+    arch:confidenceLevel "Low" .
+afx:Ev_D14_GoSdk a arch:EvidenceRecord ;
+    arch:evidenceSummary "A Go module (github.com/apache/airflow/go-sdk; 94 Go files) is present. Go idiom is predominantly procedural/struct-based. Module presence verified; paradigm attribution is a convention-based inference." .
+
+##### D17 Type discipline — one region per language/boundary
+afx:App_D17_PythonCoreRegion
+    a arch:DimensionApplication ;
+    rdfs:label "Python core region — Type and data discipline" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
+    arch:usesClassificationValue afx:GradualTypeDiscipline ;
+    arch:dominantValue afx:GradualTypeDiscipline ;
+    arch:supportedByEvidence afx:Ev_D17_PythonCore ;
+    arch:atScope "language-region" ;
+    arch:inRegion "Python core" ;
+    rdfs:seeAlso afx:Region_PythonCore ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D17_PythonCore a arch:EvidenceRecord ;
+    arch:evidenceSummary "The Python core carries type hints checked by an optional static checker over a dynamic runtime — gradual typing. Language dominance verified; the strictness of hint coverage was not measured in this run." .
+
+afx:App_D17_UiRegion
+    a arch:DimensionApplication ;
+    rdfs:label "TypeScript UI region — Type and data discipline" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
+    arch:usesClassificationValue arch:StaticTypeDiscipline ;
+    arch:dominantValue arch:StaticTypeDiscipline ;
+    arch:supportedByEvidence afx:Ev_D17_Ui ;
+    arch:atScope "language-region" ;
+    arch:inRegion "TypeScript UI" ;
+    rdfs:seeAlso afx:Region_UiTypeScript ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D17_Ui a arch:EvidenceRecord ;
+    arch:evidenceSummary "994 TypeScript files across 23 tsconfig scopes give the UI region compile-time static typing. File and tsconfig counts mechanically verified." .
+
+afx:App_D17_ApiBoundaryRegion
+    a arch:DimensionApplication ;
+    rdfs:label "API/Task-SDK boundary region — Type and data discipline" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
+    arch:usesClassificationValue arch:RuntimeSchemaDiscipline ;
+    arch:dominantValue arch:RuntimeSchemaDiscipline ;
+    arch:supportedByEvidence afx:Ev_D17_ApiBoundary ;
+    arch:atScope "module" ;
+    arch:inRegion "API / Task-SDK boundary" ;
+    rdfs:seeAlso afx:Region_ApiServer ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D17_ApiBoundary a arch:EvidenceRecord ;
+    arch:evidenceSummary "The REST API and Task SDK are schema-defined (1,380 openapi + 2,183 task-sdk references), implying runtime schema validation (Pydantic-style) at the boundary. Schema presence verified; validation placement inferred." .
+
+##### D19 Security — RBAC perimeter vs single-tenant execution region
+afx:App_D19_PerimeterRegion
+    a arch:DimensionApplication ;
+    rdfs:label "API/UI perimeter region — Security and trust-boundary model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
+    arch:usesClassificationValue arch:PerimeterSecurityModel, afx:PluggableAuthManagerSecurity ;
+    arch:dominantValue arch:PerimeterSecurityModel ;
+    arch:supportedByEvidence afx:Ev_D19_Perimeter ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "API/UI perimeter" ;
+    rdfs:seeAlso afx:Region_ApiUiPerimeter ;
+    arch:confidenceLevel "Medium" .
+afx:Ev_D19_Perimeter a arch:EvidenceRecord ;
+    arch:evidenceSummary "2,291 auth_manager/fab/rbac/permissions references show RBAC enforced at the API/UI perimeter via a pluggable auth manager. Auth surface mechanically verified; per-object authorization coverage inferred." .
+
+afx:App_D19_DagExecRegion
+    a arch:DimensionApplication ;
+    rdfs:label "DAG/task execution region — Security and trust-boundary model" ;
+    arch:classifiesSystem afx:AirflowSystem ;
+    arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
+    arch:usesClassificationValue afx:AmbientWorkerAuthority ;
+    arch:dominantValue afx:AmbientWorkerAuthority ;
+    arch:supportedByEvidence afx:Ev_D19_DagExec ;
+    arch:revealsRisk afx:Risk_D19_SingleTenantTrust ;
+    arch:atScope "subsystem" ;
+    arch:inRegion "DAG/task execution" ;
+    rdfs:seeAlso afx:Region_DagExecution ;
+    arch:confidenceLevel "Low" .
+afx:Ev_D19_DagExec a arch:EvidenceRecord ;
+    arch:evidenceSummary "Inside the execution region, DAG/task code runs with the worker's ambient authority; there is no per-DAG-author trust boundary — consistent with Airflow's documented single-tenant security posture. Knowledge-based; verify against current security documentation." .
