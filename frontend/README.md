@@ -75,7 +75,10 @@ WITH_SBERT=1 docker compose build backend && docker compose up
 
 ```bash
 # terminal 1: backend
-CBM_OUTPUT_DIR=_tmp/usl-ng-core-map \
+# The API fails closed: pass CBM_ALLOW_ANONYMOUS=1 for local dev, or set
+# CBM_API_TOKEN=<secret> and send `Authorization: Bearer <secret>`.
+# uvicorn binds 127.0.0.1 by default — add --host only if you mean to expose it.
+CBM_OUTPUT_DIR=_tmp/usl-ng-core-map CBM_ALLOW_ANONYMOUS=1 \
   .venv/bin/uvicorn frontend.backend.app:app --port 8765 --reload
 
 # terminal 2: ui

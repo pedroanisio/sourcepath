@@ -20,6 +20,11 @@ services:
       # /data makes both layouts work.
       CBM_OUTPUT_DIR: /data
       CBM_BUNDLES_ROOT: /data
+      # Explicit opt-in: the backend fails closed by default. Anonymous
+      # access is safe HERE because the port is `expose`d only on the
+      # compose-internal network and reached through the nginx front.
+      # If you publish 8765 directly, remove this and set CBM_API_TOKEN.
+      CBM_ALLOW_ANONYMOUS: "1"
     volumes:
       - "${CBM_BUNDLE:-../_tmp}:/data:ro"
     expose:

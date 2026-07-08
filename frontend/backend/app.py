@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import os
+import secrets
 from typing import Any
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
+from starlette.responses import JSONResponse
 
 try:  # Support both `frontend.backend.app` and test-time `import app`.
     from .serving.application.bundle_data import (
@@ -269,11 +271,78 @@ class FileDetailResp(BaseModel):
 
 from codebase_mapper.shared_kernel.constants import TOOL_VERSION as _CBM_TOOL_VERSION
 app = FastAPI(title="codebase-mapper visualizer", version=_CBM_TOOL_VERSION)
+
+# Bundles hold source-derived facts about (possibly private) codebases, so
+# the perimeter fails closed. Both shipped consumers reach /api same-origin
+# (vite dev proxy, nginx in the compose stack) and need no CORS grant at all;
+# the default origin list below only covers direct loopback development.
+# Never a wildcard — an operator who wants wider access sets CBM_CORS_ORIGINS.
+_DEFAULT_CORS_ORIGINS = (
+    "http://localhost:5173,http://127.0.0.1:5173,"  # vite dev server
+    "http://localhost:8080,http://127.0.0.1:8080"   # compose nginx front
+)
+
+# Liveness stays open: the Docker HEALTHCHECK probes it unauthenticated,
+# and it reveals nothing bundle-derived.
+_PUBLIC_API_PATHS = frozenset({"/api/healthz"})
+
+
+def _authorize(request: Request) -> JSONResponse | None:
+    """Fail-closed gate for /api/*. Returns an error response, or None to pass.
+
+    Env is read per request (not at import) so one process can be exercised
+    under several perimeter configurations — tests rely on this, and it means
+    a leaked-token rotation needs no restart-ordering care.
+
+    A configured CBM_API_TOKEN always wins: CBM_ALLOW_ANONYMOUS must not be
+    able to weaken an explicitly token-protected deployment.
+    """
+    token = os.environ.get("CBM_API_TOKEN", "")
+    if token:
+        auth = request.headers.get("authorization", "")
+        supplied = auth[len("Bearer "):].strip() if auth.lower().startswith("bearer ") else ""
+        if supplied and secrets.compare_digest(supplied, token):
+            return None
+        return JSONResponse(
+            {"detail": "invalid or missing bearer token"},
+            status_code=401,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if os.environ.get("CBM_ALLOW_ANONYMOUS") == "1":
+        return None
+    return JSONResponse(
+        {"detail": "anonymous access is disabled by default; "
+                    "set CBM_API_TOKEN or opt in with CBM_ALLOW_ANONYMOUS=1"},
+        status_code=401,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+@app.middleware("http")
+async def _perimeter(request: Request, call_next):
+    # OPTIONS is exempt so CORS preflight (which cannot carry Authorization)
+    # still resolves; preflight responses expose no bundle data. /mcp keeps
+    # its own bearer gate in frontend.mcp_server.http_transport.
+    if (
+        request.url.path.startswith("/api")
+        and request.url.path not in _PUBLIC_API_PATHS
+        and request.method != "OPTIONS"
+    ):
+        denied = _authorize(request)
+        if denied is not None:
+            return denied
+    return await call_next(request)
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        o.strip()
+        for o in os.environ.get("CBM_CORS_ORIGINS", _DEFAULT_CORS_ORIGINS).split(",")
+        if o.strip()
+    ],
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Optionally expose the MCP server over streamable HTTP. Skipped unless

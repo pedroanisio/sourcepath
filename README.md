@@ -179,7 +179,9 @@ JSON endpoints:
 ```bash
 # Point at any output dir containing run_manifest.json + inventory.ttl +
 # embeddings.npz + embeddings_meta.json + concepts.json.
-CBM_OUTPUT_DIR=_tmp/usl-ng-core-map \
+# The API fails closed: opt in to anonymous access for local dev (as below)
+# or set CBM_API_TOKEN=<secret> and authenticate with `Authorization: Bearer`.
+CBM_OUTPUT_DIR=_tmp/usl-ng-core-map CBM_ALLOW_ANONYMOUS=1 \
   .venv/bin/uvicorn frontend.backend.app:app --port 8000 --reload
 ```
 

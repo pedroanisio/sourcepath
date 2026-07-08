@@ -15,6 +15,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_DIR = REPO_ROOT / "frontend" / "backend"
 DEFAULT_BUNDLE = REPO_ROOT / "_tmp" / "usl-ng-core-map"
 
+# The API perimeter fails closed. This suite exercises endpoint behavior,
+# not the perimeter, so opt the whole session in; tests/test_perimeter.py
+# monkeypatches these away per-test to exercise the fail-closed default.
+os.environ.setdefault("CBM_ALLOW_ANONYMOUS", "1")
+os.environ.pop("CBM_API_TOKEN", None)
+
 
 LIVE_BUNDLE_FIXTURES = {"client", "summary", "bundle_dir"}
 
