@@ -1,0 +1,527 @@
+@prefix arch: <https://w3id.org/arc4d3/software-architecture-dimensions#> .
+@prefix sqx:  <https://w3id.org/arc4d3/abox/sqlite#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+# Evidence basis & confidence (operator-approved split disclosure)
+#
+# ARCHITECTURAL REQUIREMENT (PALS's LAW): LLMs will always produce some
+# form of error. Absence of output verification is a design defect, not a
+# runtime bug. All LLM output must be treated as untrusted and validated.
+#
+# Two epistemic classes; every arch:DimensionApplication is confidence-tagged:
+#   * MECHANICALLY EXTRACTED — file counts, language mix, import-edge counts,
+#     and the PRESENCE of specific paths (src/btree.c, src/vdbe*, src/pager.c,
+#     src/wal.c, src/os_unix.c, src/os_win.c, src/parse.y, tool/lemon,
+#     tool/mksqlite3c, ext/fts5, ext/rtree, ext/jni, ext/wasm, test/*.test)
+#     were produced by codebase-mapper v0.5.0 over the SQLite GitHub mirror at
+#     commit cfab83477533d12a01303e3f73eec7e3a8ef5e9f and confirmed by grep
+#     over inventory.ttl. These are evidence-backed facts.
+#   * LLM-SYNTHESIZED INTERPRETATION — mapping those facts (plus SQLite's
+#     public architecture/testing/C-API documentation) to a dimensional
+#     CLASSIFICATION is an LLM inference. It is confidence-tagged and MUST be
+#     validated before high-stakes decisions.
+#   NOTE: C source bodies are stored by the mapper as AST summaries, so
+#     CONTENT-level greps (e.g. SQLITE_OMIT macros) are NOT reliable here;
+#     only path/filename signals are treated as mechanically verified. Claims
+#     resting on macros or runtime semantics are tagged as documented-knowledge.
+#
+# generated_by: "Claude Opus 4.8 via Claude Code"
+# date: "2026-07-08"
+# tbox: software_architecture_dimensions.ttl (arch:ScopeAFramework, owl:versionInfo 2.0.4-scope-a)
+#
+# SCOPE & REGION — MULTI-LAYERED ANALYSIS (SQLite is a layered LIBRARY, not a
+# distributed system; it has NO processes/services/network). Layering is
+# represented as several arch:DimensionApplication nodes over the same
+# (system, dimension) pair, separated by arch:atScope + arch:inRegion, with a
+# system-scope arch:dominantValue. SQLite's region axes are DIFFERENT from a
+# service system's: (a) the documented architectural STACK — interface > SQL
+# compiler > VDBE > B-tree > pager > VFS; (b) an artifact duality — developer
+# source tree vs shipped single-file amalgamation; (c) a type duality — static
+# C implementation vs dynamically-typed SQL value system; (d) language-binding
+# regions — core C vs JNI Java vs WASM/JS. Scope ladder used:
+#   "system" > "subsystem" (a stack layer) > "language-region" > "module" > "artifact".
+# Dimensions uniform across regions carry a single system-scope application;
+# no synthetic layering is manufactured.
+#################################################################
+
+sqx:SqliteAboxGraph
+    a owl:Ontology ;
+    dcterms:title "Scope A dimension ABox — SQLite" ;
+    dcterms:description "Classification of SQLite under the 20 Scope-A core system dimensions, with first-class scope/region layered analysis along SQLite's documented architectural stack, artifact duality, and type duality. Structural facts are mechanically extracted by codebase-mapper; classifications are LLM-synthesized and confidence-tagged." ;
+    dcterms:created "2026-07-08"^^xsd:date ;
+    dcterms:source <https://github.com/sqlite/sqlite> ;
+    dcterms:creator "Claude Opus 4.8 via Claude Code (extraction: codebase-mapper v0.5.0)" ;
+    dcterms:conformsTo <https://w3id.org/arc4d3/software-architecture-dimensions#> ;
+    owl:imports <https://w3id.org/arc4d3/software-architecture-dimensions#> ;
+    owl:versionInfo "1.0.0-sqlite-abox" ;
+    rdfs:comment "Companion to airflow_abox.ttl. Where Airflow layered by runtime process, SQLite layers by architectural stack + build-artifact duality + type-system duality, exercising arch:atScope/arch:inRegion/arch:dominantValue on a fundamentally different system class (an embedded in-process C library)." .
+
+#################################################################
+# System under classification
+#################################################################
+
+sqx:SqliteSystem
+    a arch:ImplementedSoftwareSystem ;
+    skos:prefLabel "SQLite"@en ;
+    rdfs:comment "SQLite — a self-contained, serverless, zero-configuration, transactional SQL database engine distributed as an embeddable C library. Classified from the GitHub mirror at commit cfab8347 (2,216 files; 357 C, 58 Java (JNI), 42 JavaScript (WASM), 12 SQL, 21 HTML docs; 523 include edges, 0 external dependency edges; 457 source-code and 55 test-code files, with ~4,443 references to TCL .test files as typed by codebase-mapper v0.5.0)." ;
+    dcterms:identifier "sqlite/sqlite@cfab83477533d12a01303e3f73eec7e3a8ef5e9f" ;
+    rdfs:seeAlso <https://sqlite.org/arch.html> .
+
+# O01 assessment overlay — prose reading only (cannot be a DimensionApplication;
+# its shape requires a arch:CoreSystemDimension).
+sqx:SqliteSystem
+    rdfs:comment "Quality-attribute overlay reading (O01, LLM-synthesized, Low confidence): revealed priorities appear ordered as reliability/robustness (exhaustive test suite, hardening against malicious inputs, backward-compatible file format) and portability/simplicity (VFS abstraction, single-file amalgamation, zero dependencies) ahead of raw multi-writer concurrency (single-writer file locking) and runtime observability. Cross-dimensional diagnosis, not an orthogonal dimension." .
+
+#################################################################
+# SQLite-specific classification values (typed arch:ClassificationValue,
+# registered on their dimensions per ValueBelongsToDimensionShape)
+#################################################################
+
+sqx:FunctionPointerDispatchConnector a arch:ClassificationValue ; skos:prefLabel "function-pointer dispatch connector"@en ;
+    rdfs:comment "In-process interaction mediated by a registered table of function pointers (the VFS object; the virtual-table module methods; loadable-extension entry points) rather than a direct static call. Still synchronous and in-process, but late-bound through an interface struct." .
+sqx:SourceAmalgamationDistribution a arch:ClassificationValue ; skos:prefLabel "source amalgamation distribution"@en ;
+    rdfs:comment "Shipped as a single generated C source file (sqlite3.c) plus one header, compiled directly into the consuming build." .
+sqx:EmbeddedLibraryDistribution a arch:ClassificationValue ; skos:prefLabel "embedded in-process library distribution"@en ;
+    rdfs:comment "Linked into and executed inside the host application's process; no server, daemon, or separate runtime is deployed." .
+sqx:SingleFileAmalgamationLayout a arch:ClassificationValue ; skos:prefLabel "single-file amalgamation layout"@en ;
+    rdfs:comment "The consumed physical organization is one concatenated .c file, generated from the many-file developer tree by tool/mksqlite3c.tcl." .
+sqx:CompileTimeConfigVariability a arch:ClassificationValue ; skos:prefLabel "compile-time configuration variability"@en ;
+    rdfs:comment "Primary variation points are compile-time preprocessor options (SQLITE_OMIT_*, SQLITE_ENABLE_*, threading mode, default page size), bound before the artifact exists; complemented by runtime PRAGMAs. Documented; macro extent not grep-verified in this run." .
+sqx:ManifestTypingDiscipline a arch:ClassificationValue ; skos:prefLabel "manifest typing (dynamic value typing)"@en ;
+    rdfs:comment "At the SQL/value layer, types are properties of values not columns (manifest typing) with column type affinity; distinct from the static C typing of the implementation." .
+sqx:TraceAndExplainObservability a arch:ClassificationValue ; skos:prefLabel "trace-hook and EXPLAIN observability"@en ;
+    rdfs:comment "Introspection via sqlite3_trace_v2, EXPLAIN / EXPLAIN QUERY PLAN, status/stmt-status counters, and PRAGMAs — exposed to the host, which owns operational observability. No standalone telemetry pipeline." .
+sqx:InProcessHostAuthority a arch:ClassificationValue ; skos:prefLabel "in-process host authority (no trust boundary of its own)"@en ;
+    rdfs:comment "SQLite executes with the full authority of the host process; it introduces no privilege boundary between itself and the caller." .
+sqx:UntrustedInputHardening a arch:ClassificationValue ; skos:prefLabel "untrusted-input hardening"@en ;
+    rdfs:comment "The database file and SQL text are treated as potentially hostile; the engine is explicitly hardened to not be subvertible by a corrupt or malicious database (a documented design goal)." .
+sqx:AuthorizerCallbackControl a arch:ClassificationValue ; skos:prefLabel "authorizer-callback access control"@en ;
+    rdfs:comment "A host-supplied authorizer callback (sqlite3_set_authorizer) can permit/deny individual SQL actions at prepare time — an optional, host-driven access-control hook." .
+sqx:AmalgamationBuild a arch:ClassificationValue ; skos:prefLabel "amalgamation build (generated single-unit)"@en ;
+    rdfs:comment "Build generates the LALR parser via lemon and concatenates the source into the amalgamation via mksqlite3c.tcl before compilation." .
+sqx:HostThreadExecution a arch:ClassificationValue ; skos:prefLabel "host-thread synchronous execution"@en ;
+    rdfs:comment "SQLite has no runtime of its own: API calls run synchronously on the caller's thread. Concurrency is whatever the host provides; a configurable threading mode (single/multi/serialized) governs shared use." .
+
+# Registrations
+arch:D03_ConnectorAndInteractionModel arch:hasClassificationValue sqx:FunctionPointerDispatchConnector .
+arch:D06_RuntimeExecutionModel arch:hasClassificationValue sqx:HostThreadExecution .
+arch:D07_DeploymentAndDistributionModel arch:hasClassificationValue sqx:SourceAmalgamationDistribution, sqx:EmbeddedLibraryDistribution .
+arch:D08_CodebasePhysicalOrganization arch:hasClassificationValue sqx:SingleFileAmalgamationLayout .
+arch:D12_VariabilityAndConfigurationSpaceModel arch:hasClassificationValue sqx:CompileTimeConfigVariability .
+arch:D17_TypeAndDataDiscipline arch:hasClassificationValue sqx:ManifestTypingDiscipline .
+arch:D18_OperationalObservabilityAndControlModel arch:hasClassificationValue sqx:TraceAndExplainObservability .
+arch:D19_SecurityAndTrustBoundaryModel arch:hasClassificationValue sqx:InProcessHostAuthority, sqx:UntrustedInputHardening, sqx:AuthorizerCallbackControl .
+arch:D20_BuildAndDeliveryModel arch:hasClassificationValue sqx:AmalgamationBuild .
+
+#################################################################
+# Analysis regions (reified arch:AnalysisRegion individuals)
+#################################################################
+
+# Architectural-stack regions (SQLite's documented layer stack, top → bottom)
+sqx:Region_Interface   a arch:AnalysisRegion ; skos:prefLabel "interface / public C API layer"@en ;
+    rdfs:comment "src/main.c, prepare.c, sqlite3.h — connection and statement API surface. atScope subsystem." .
+sqx:Region_SqlCompiler a arch:AnalysisRegion ; skos:prefLabel "SQL compiler layer"@en ;
+    rdfs:comment "src/tokenize.c, parse.y (lemon), and code generators — SQL text to VDBE bytecode. atScope subsystem." .
+sqx:Region_Vdbe        a arch:AnalysisRegion ; skos:prefLabel "VDBE bytecode virtual machine"@en ;
+    rdfs:comment "src/vdbe*.c — the register-based bytecode engine that executes prepared statements. atScope subsystem." .
+sqx:Region_BTree       a arch:AnalysisRegion ; skos:prefLabel "B-tree layer"@en ;
+    rdfs:comment "src/btree.c — ordered key/value storage over database pages. atScope subsystem." .
+sqx:Region_Pager       a arch:AnalysisRegion ; skos:prefLabel "pager / page cache / WAL layer"@en ;
+    rdfs:comment "src/pager.c, pcache*.c, wal.c — transactions, rollback journal or write-ahead log, and page caching. atScope subsystem." .
+sqx:Region_Vfs         a arch:AnalysisRegion ; skos:prefLabel "OS interface / VFS portability layer"@en ;
+    rdfs:comment "src/os_unix.c, os_win.c, os.c — the pluggable VFS boundary isolating all OS calls. atScope subsystem." .
+sqx:Region_Extensions  a arch:AnalysisRegion ; skos:prefLabel "loadable extensions"@en ;
+    rdfs:comment "ext/fts5, ext/fts3, ext/rtree, ext/misc — feature modules and virtual tables. atScope subsystem." .
+
+# Artifact regions (build-artifact duality)
+sqx:Region_DeveloperTree  a arch:AnalysisRegion ; skos:prefLabel "developer source tree"@en ;
+    rdfs:comment "src/ as many individual .c/.h files — the authoring/authoritative form. atScope subsystem." .
+sqx:Region_Amalgamation   a arch:AnalysisRegion ; skos:prefLabel "shipped amalgamation"@en ;
+    rdfs:comment "The generated single-file sqlite3.c (+ sqlite3.h) that downstreams actually compile. atScope artifact." .
+sqx:Region_EmbeddedLibrary a arch:AnalysisRegion ; skos:prefLabel "embedded library in host process"@en ;
+    rdfs:comment "SQLite as linked into and running inside the consuming application. atScope artifact." .
+
+# Language-binding regions
+sqx:Region_CoreC    a arch:AnalysisRegion ; skos:prefLabel "core C implementation"@en ;
+    rdfs:comment "357 C files — the engine itself. atScope language-region." .
+sqx:Region_JniJava  a arch:AnalysisRegion ; skos:prefLabel "JNI Java bindings"@en ;
+    rdfs:comment "ext/jni — 58 Java files exposing SQLite to the JVM. atScope language-region." .
+sqx:Region_WasmJs   a arch:AnalysisRegion ; skos:prefLabel "WASM / JavaScript bindings"@en ;
+    rdfs:comment "ext/wasm — 42 JavaScript files exposing SQLite to browsers/JS. atScope language-region." .
+
+# Type-system and trust regions
+sqx:Region_SqlValues     a arch:AnalysisRegion ; skos:prefLabel "SQL value/type system"@en ;
+    rdfs:comment "The dynamically-typed SQL value domain with column type affinity. atScope subsystem." .
+sqx:Region_HostProcess   a arch:AnalysisRegion ; skos:prefLabel "host process trust region"@en ;
+    rdfs:comment "The caller's process, whose authority SQLite runs under. atScope subsystem." .
+sqx:Region_UntrustedInput a arch:AnalysisRegion ; skos:prefLabel "untrusted input surface"@en ;
+    rdfs:comment "The database file and SQL text entering the engine from potentially hostile sources. atScope subsystem." .
+
+#################################################################
+# System-scope dimension applications (20)
+#################################################################
+
+sqx:App_D01_Decomposition
+    a arch:DimensionApplication ; rdfs:label "SQLite — Decomposition model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D01_DecompositionModel ;
+    arch:usesClassificationValue arch:ByLayer, arch:ByFeature ;
+    arch:dominantValue arch:ByLayer ;
+    arch:supportedByEvidence sqx:Ev_D01 ; arch:atScope "system" ; arch:confidenceLevel "High" .
+sqx:Ev_D01 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Layer files are all mechanically present: btree.c, vdbe*, pager.c, wal.c, os_unix.c, os_win.c, parse.y, tokenize.c, main.c. This is SQLite's defining, documented layered decomposition (interface > SQL compiler > VDBE > B-tree > pager > VFS), with extensions (ext/fts5, rtree) decomposed by feature. Layer/extension file presence verified; the by-layer principle is documented (sqlite.org/arch.html)." .
+
+sqx:App_D02_DependencyTopology
+    a arch:DimensionApplication ; rdfs:label "SQLite — Dependency topology" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D02_DependencyTopology ;
+    arch:usesClassificationValue arch:StrictLayeredDependencies ;
+    arch:revealsRisk sqx:Risk_D02_UnverifiedAcyclicity ;
+    arch:supportedByEvidence sqx:Ev_D02 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D02 a arch:EvidenceRecord ;
+    arch:evidenceSummary "523 include edges, 0 external dependency edges — the engine has no third-party runtime dependencies. Each layer is documented to call only the layer beneath it through a narrow interface (strict layering). Include-edge count and zero-external verified; strict acyclicity of the include graph was NOT cycle-checked in this run." .
+
+sqx:App_D03_Connector
+    a arch:DimensionApplication ; rdfs:label "SQLite — Connector and interaction model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
+    arch:usesClassificationValue arch:DirectCallConnector, sqx:FunctionPointerDispatchConnector ;
+    arch:dominantValue arch:DirectCallConnector ;
+    arch:supportedByEvidence sqx:Ev_D03 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D03 a arch:EvidenceRecord ;
+    arch:evidenceSummary "All interaction is synchronous, in-process C function calls (no queues, streams, or network). The VFS layer (os_unix.c/os_win.c verified) and virtual-table/loadable-extension interfaces add late-bound function-pointer dispatch through interface structs. Direct-call dominance is definitional for an in-process library; VFS/vtab indirection is documented and file-verified." .
+
+sqx:App_D04_Contract
+    a arch:DimensionApplication ; rdfs:label "SQLite — Interface and contract model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D04_InterfaceAndContractModel ;
+    arch:usesClassificationValue arch:CodeFirstContract ;
+    arch:supportedByEvidence sqx:Ev_D04 ; arch:atScope "system" ; arch:confidenceLevel "High" .
+sqx:Ev_D04 a arch:EvidenceRecord ;
+    arch:evidenceSummary "The public contract is a hand-written C header (sqlite.h.in -> sqlite3.h, 114 references) — a code-first API renowned for long-term source/binary backward compatibility. Additional stable code-first C interfaces exist for the VFS, virtual tables, and loadable extensions. Header presence verified; compatibility policy is documented, not measured here." .
+
+sqx:App_D05_StateOwnership
+    a arch:DimensionApplication ; rdfs:label "SQLite — State and data ownership model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D05_StateAndDataOwnershipModel ;
+    arch:usesClassificationValue arch:SingleWriterOwnership ;
+    arch:supportedByEvidence sqx:Ev_D05 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D05 a arch:EvidenceRecord ;
+    arch:evidenceSummary "The database file is the single source of truth; the pager owns file state and enforces one writer at a time via file locks (wal.c present, 51 journal/WAL references). WAL mode admits concurrent readers with a single writer. Pager/WAL presence verified; locking semantics are documented (sqlite.org/lockingv3.html)." .
+
+sqx:App_D06_RuntimeExecution
+    a arch:DimensionApplication ; rdfs:label "SQLite — Runtime execution model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D06_RuntimeExecutionModel ;
+    arch:usesClassificationValue sqx:HostThreadExecution, arch:SingleThreadedRuntime ;
+    arch:dominantValue sqx:HostThreadExecution ;
+    arch:supportedByEvidence sqx:Ev_D06 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D06 a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLite has no runtime of its own — API calls execute synchronously on the caller's thread; the VDBE (vdbe* present) is a bytecode interpreter driven step-by-step by the host. A compile/runtime threading mode (single-thread, multi-thread, serialized) governs concurrent use. No scheduler, thread pool, or event loop. Definitional for a library; threading modes documented." .
+
+sqx:App_D07_Deployment
+    a arch:DimensionApplication ; rdfs:label "SQLite — Deployment and distribution model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D07_DeploymentAndDistributionModel ;
+    arch:usesClassificationValue sqx:EmbeddedLibraryDistribution, sqx:SourceAmalgamationDistribution ;
+    arch:dominantValue sqx:EmbeddedLibraryDistribution ;
+    arch:supportedByEvidence sqx:Ev_D07 ; arch:atScope "system" ; arch:confidenceLevel "High" .
+sqx:Ev_D07 a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLite is not deployed as a server; it is embedded in-process into the host application. The primary distribution form is the source amalgamation (sqlite3.c, 61 references incl. mksqlite3c) compiled directly into the consumer. No container/serverless/registry topology applies. Amalgamation tooling verified; embedding is definitional." .
+
+sqx:App_D08_PhysicalOrganization
+    a arch:DimensionApplication ; rdfs:label "SQLite — Codebase physical organization" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D08_CodebasePhysicalOrganization ;
+    arch:usesClassificationValue arch:MonorepoOrganization, sqx:SingleFileAmalgamationLayout ;
+    arch:dominantValue arch:MonorepoOrganization ;
+    arch:supportedByEvidence sqx:Ev_D08 ; arch:atScope "system" ; arch:confidenceLevel "High" .
+sqx:Ev_D08 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Two physical organizations coexist: the authoritative developer tree (one repository, src/ as many flat .c files, ext/, test/, tool/ — 357 C files verified) and the derived shipped artifact (a single concatenated sqlite3.c produced by tool/mksqlite3c, 2 references). Both forms mechanically evidenced." .
+
+sqx:App_D09_Abstraction
+    a arch:DimensionApplication ; rdfs:label "SQLite — Abstraction and encapsulation model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D09_AbstractionAndEncapsulationModel ;
+    arch:usesClassificationValue arch:OpaqueModuleEncapsulation ;
+    arch:supportedByEvidence sqx:Ev_D09 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D09 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Public handle types (sqlite3*, sqlite3_stmt*, sqlite3_value*) are opaque — internals are hidden behind the header; the VFS and virtual-table structs are the sanctioned extension seams. Opaque-handle design is documented in the C API; internal encapsulation strength not measured here." .
+
+sqx:App_D10_Composition
+    a arch:DimensionApplication ; rdfs:label "SQLite — Composition and reuse model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D10_CompositionAndReuseModel ;
+    arch:usesClassificationValue arch:PluginComposition, arch:GeneratedCodeComposition, arch:LibraryComposition ;
+    arch:dominantValue arch:GeneratedCodeComposition ;
+    arch:supportedByEvidence sqx:Ev_D10 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D10 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Composition mixes loadable extensions / virtual tables / VFS shims (plugin) with heavy code generation: the parser is generated by lemon (tool/lemon, parse.y, 20 references) and the shipped unit is generated by mksqlite3c. Extension trees (ext/fts5 205, ext/rtree 38, ext/misc 64) and generator tooling verified." .
+
+sqx:App_D11_ChangeEvolution
+    a arch:DimensionApplication ; rdfs:label "SQLite — Change and evolution model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D11_ChangeAndEvolutionModel ;
+    arch:usesClassificationValue arch:SemanticVersionEvolution ;
+    arch:supportedByEvidence sqx:Ev_D11 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D11 a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLite maintains a stable, forward/backward-compatible on-disk file format and a source/binary-compatible C API across releases (documented commitment to support the format through 2050). Semantic-version releases from trunk. Policy is documented; not measured in this run." .
+
+sqx:App_D12_Variability
+    a arch:DimensionApplication ; rdfs:label "SQLite — Variability and configuration-space model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D12_VariabilityAndConfigurationSpaceModel ;
+    arch:usesClassificationValue sqx:CompileTimeConfigVariability, arch:FeatureFlagVariability ;
+    arch:dominantValue sqx:CompileTimeConfigVariability ;
+    arch:supportedByEvidence sqx:Ev_D12 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D12 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Variation is dominated by compile-time preprocessor options (SQLITE_OMIT_* / SQLITE_ENABLE_*, threading mode, default page/cache sizes) bound before the artifact exists, complemented by runtime PRAGMAs. Build scripts (20 build_script files) verified; the macro option set is documented (sqlite.org/compile.html) but NOT grep-verified here since C bodies are stored as AST summaries." .
+
+sqx:App_D13_Verification
+    a arch:DimensionApplication ; rdfs:label "SQLite — Verification and assurance model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D13_VerificationAndAssuranceModel ;
+    arch:usesClassificationValue arch:UnitIntegrationE2EPortfolio, arch:RuntimeInvariantAssurance ;
+    arch:dominantValue arch:UnitIntegrationE2EPortfolio ;
+    arch:supportedByEvidence sqx:Ev_D13 ; arch:atScope "system" ; arch:confidenceLevel "High" .
+sqx:Ev_D13 a arch:EvidenceRecord ;
+    arch:evidenceSummary "~4,443 references to TCL .test files plus 55 mapper-typed test-code files evidence a very large test corpus. SQLite is publicly documented to hold 100% MC/DC branch coverage via three independent harnesses (TCL tests in-repo; TH3 and dbsqlfuzz are external/proprietary) and heavy runtime assertions/testcase() macros (RuntimeInvariantAssurance). In-repo .test corpus verified; the external harnesses and coverage figure are documented, not present in this mirror." .
+
+sqx:App_D14_Paradigm
+    a arch:DimensionApplication ; rdfs:label "SQLite — Programming paradigm model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:ProceduralParadigm, arch:ObjectOrientedParadigm ;
+    arch:dominantValue arch:ProceduralParadigm ;
+    arch:supportedByEvidence sqx:Ev_D14 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D14 a arch:EvidenceRecord ;
+    arch:evidenceSummary "357 C files dominate: a procedural paradigm, with a bytecode-interpreter core (the VDBE). The JNI (58 Java) and WASM (42 JS) binding regions present object-oriented facades. Language mix verified; paradigm attribution interpretive." .
+
+sqx:App_D15_Idiom
+    a arch:DimensionApplication ; rdfs:label "SQLite — Implementation idiom and style model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D15_ImplementationIdiomStyleModel ;
+    arch:usesClassificationValue arch:IdiomaticImplementation ;
+    arch:supportedByEvidence sqx:Ev_D15 ; arch:atScope "system" ; arch:confidenceLevel "Low" .
+sqx:Ev_D15 a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLite is documented for an exceptionally disciplined C style (dense assert()/testcase() instrumentation, defensive coding, uniform naming). Idiom coherence is subjective and was not measured in this run; confidence Low." .
+
+sqx:App_D16_ErrorHandling
+    a arch:DimensionApplication ; rdfs:label "SQLite — Error-handling and recovery model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D16_ErrorHandlingAndRecoveryModel ;
+    arch:usesClassificationValue arch:ResultErrorModel ;
+    arch:supportedByEvidence sqx:Ev_D16 ; arch:atScope "system" ; arch:confidenceLevel "High" .
+sqx:Ev_D16 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Errors are propagated as C integer result codes (SQLITE_OK / SQLITE_ERROR / SQLITE_BUSY / extended codes), not exceptions — the classic result-code error model. Transactional recovery is via rollback journal or WAL. Result-code model is definitional for the SQLite C API; documented at sqlite.org/rescode.html." .
+
+sqx:App_D17_TypeDiscipline
+    a arch:DimensionApplication ; rdfs:label "SQLite — Type and data discipline" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
+    arch:usesClassificationValue arch:StaticTypeDiscipline, sqx:ManifestTypingDiscipline ;
+    arch:dominantValue arch:StaticTypeDiscipline ;
+    arch:supportedByEvidence sqx:Ev_D17 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D17 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Two type disciplines coexist: the C implementation is statically typed, while the SQL value layer uses manifest typing (types belong to values) with column type affinity (16 affinity/SQLITE_INTEGER references). The static/dynamic duality is documented (sqlite.org/datatype3.html)." .
+
+sqx:App_D18_Observability
+    a arch:DimensionApplication ; rdfs:label "SQLite — Operational observability and control model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D18_OperationalObservabilityAndControlModel ;
+    arch:usesClassificationValue sqx:TraceAndExplainObservability ;
+    arch:supportedByEvidence sqx:Ev_D18 ; arch:atScope "system" ; arch:confidenceLevel "Low" .
+sqx:Ev_D18 a arch:EvidenceRecord ;
+    arch:evidenceSummary "Observability is library-scoped: trace hooks (sqlite3_trace_v2), EXPLAIN / EXPLAIN QUERY PLAN, status counters, and PRAGMAs (27 trace/explain references) surface introspection to the host, which owns operational control. No standalone telemetry/alerting. Interface presence partly verified; operational control is the host's, inferred." .
+
+sqx:App_D19_Security
+    a arch:DimensionApplication ; rdfs:label "SQLite — Security and trust-boundary model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
+    arch:usesClassificationValue sqx:InProcessHostAuthority, sqx:UntrustedInputHardening, sqx:AuthorizerCallbackControl ;
+    arch:dominantValue sqx:InProcessHostAuthority ;
+    arch:revealsRisk sqx:Risk_D19_HostAuthority ;
+    arch:supportedByEvidence sqx:Ev_D19 ; arch:atScope "system" ; arch:confidenceLevel "Medium" .
+sqx:Ev_D19 a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLite runs with the host process's full authority (no privilege boundary of its own). It is explicitly hardened to resist malicious/corrupt database files and SQL, and offers an optional authorizer callback for SQL-level access control (22 authorizer/auth.c references). Authorizer presence verified; hardening posture is documented (sqlite.org/security.html)." .
+
+sqx:App_D20_BuildDelivery
+    a arch:DimensionApplication ; rdfs:label "SQLite — Build and delivery model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D20_BuildAndDeliveryModel ;
+    arch:usesClassificationValue sqx:AmalgamationBuild ;
+    arch:supportedByEvidence sqx:Ev_D20 ; arch:atScope "system" ; arch:confidenceLevel "High" .
+sqx:Ev_D20 a arch:EvidenceRecord ;
+    arch:evidenceSummary "The build generates the LALR parser via lemon and concatenates src/ into the amalgamation via tool/mksqlite3c.tcl before compiling (20 lemon + 61 sqlite3.c/mksqlite3c references, 20 build_script files). Generation-then-compile is the defining build model. Tooling mechanically verified." .
+
+#################################################################
+# Risk findings (Layer-2 diagnostics)
+#################################################################
+
+sqx:Risk_D02_UnverifiedAcyclicity a arch:RiskFinding ;
+    rdfs:label "Layer acyclicity unverified" ;
+    rdfs:comment "SQLite's strict layer ordering is documented but the 523-edge include graph was not cycle-checked in this run. Evidence-gathering action: run a cycle detector over the emitted include graph; settles D02 either way." .
+
+sqx:Risk_D19_HostAuthority a arch:RiskFinding ;
+    rdfs:label "In-process authority — no isolation from host" ;
+    rdfs:comment "SQLite executes with the host process's full authority and no sandbox of its own; a vulnerability in the engine or a hostile database is contained only by the host's own isolation. Consistent with SQLite's documented design; mitigations (authorizer, malicious-DB hardening, running untrusted DBs in a sandbox) are the host's responsibility. Documented; verify against sqlite.org/security.html." .
+
+#################################################################
+# LAYERED ANALYSIS — region-scoped applications
+# (second/third applications of a dimension already applied at system scope;
+#  share classifiesSystem + appliesDimension, differ by atScope/inRegion)
+#################################################################
+
+##### D01 Decomposition — architectural stack vs feature extensions
+sqx:App_D01_CoreStack
+    a arch:DimensionApplication ; rdfs:label "Core architectural stack — Decomposition model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D01_DecompositionModel ;
+    arch:usesClassificationValue arch:ByLayer ; arch:dominantValue arch:ByLayer ;
+    arch:supportedByEvidence sqx:Ev_D01_CoreStack ; arch:atScope "subsystem" ;
+    arch:inRegion "core architectural stack (interface > compiler > VDBE > B-tree > pager > VFS)" ;
+    rdfs:seeAlso sqx:Region_Vdbe , sqx:Region_BTree , sqx:Region_Pager , sqx:Region_Vfs ;
+    arch:confidenceLevel "High" .
+sqx:Ev_D01_CoreStack a arch:EvidenceRecord ;
+    arch:evidenceSummary "The core is decomposed strictly by layer: interface (main.c), SQL compiler (tokenize.c/parse.y), VDBE (vdbe*), B-tree (btree.c), pager+WAL (pager.c/wal.c), VFS (os_unix.c/os_win.c). Every layer file is mechanically present; the by-layer principle is documented." .
+
+sqx:App_D01_Extensions
+    a arch:DimensionApplication ; rdfs:label "Extensions — Decomposition model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D01_DecompositionModel ;
+    arch:usesClassificationValue arch:ByFeature ; arch:dominantValue arch:ByFeature ;
+    arch:supportedByEvidence sqx:Ev_D01_Ext ; arch:atScope "subsystem" ;
+    arch:inRegion "ext/ loadable modules" ; rdfs:seeAlso sqx:Region_Extensions ;
+    arch:confidenceLevel "High" .
+sqx:Ev_D01_Ext a arch:EvidenceRecord ;
+    arch:evidenceSummary "ext/ is decomposed by feature: fts5/fts3 full-text search (205 refs), rtree spatial index (38), and ext/misc utilities (64) — each a self-contained feature module / virtual table. Extension tree presence mechanically verified." .
+
+##### D03 Connector — direct calls vs VFS/vtab function-pointer dispatch
+sqx:App_D03_InProcessCore
+    a arch:DimensionApplication ; rdfs:label "In-process core calls — Connector model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
+    arch:usesClassificationValue arch:DirectCallConnector ; arch:dominantValue arch:DirectCallConnector ;
+    arch:supportedByEvidence sqx:Ev_D03_Core ; arch:atScope "subsystem" ;
+    arch:inRegion "inter-layer core calls" ; rdfs:seeAlso sqx:Region_Vdbe ;
+    arch:confidenceLevel "High" .
+sqx:Ev_D03_Core a arch:EvidenceRecord ;
+    arch:evidenceSummary "Between core layers, interaction is plain synchronous C function calls in one process — the direct-call connector. Definitional for an in-process amalgamated library; supported by 0 external edges and no network/queue artifacts." .
+
+sqx:App_D03_VfsDispatch
+    a arch:DimensionApplication ; rdfs:label "VFS / vtab dispatch — Connector model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D03_ConnectorAndInteractionModel ;
+    arch:usesClassificationValue sqx:FunctionPointerDispatchConnector ; arch:dominantValue sqx:FunctionPointerDispatchConnector ;
+    arch:supportedByEvidence sqx:Ev_D03_Vfs ; arch:atScope "module" ;
+    arch:inRegion "VFS / virtual-table / extension interface tables" ; rdfs:seeAlso sqx:Region_Vfs ;
+    arch:confidenceLevel "Medium" .
+sqx:Ev_D03_Vfs a arch:EvidenceRecord ;
+    arch:evidenceSummary "OS access and pluggable features cross a registered table of function pointers: the sqlite3_vfs object (os_unix.c/os_win.c verified, 20 vfs/os refs), virtual-table module methods, and loadable-extension entry points — late-bound in-process dispatch. Interface files verified; dispatch mechanism documented (sqlite.org/vfs.html, vtab.html)." .
+
+##### D07 Distribution — embedded library vs source amalgamation
+sqx:App_D07_Embedded
+    a arch:DimensionApplication ; rdfs:label "Embedded library form — Deployment model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D07_DeploymentAndDistributionModel ;
+    arch:usesClassificationValue sqx:EmbeddedLibraryDistribution ; arch:dominantValue sqx:EmbeddedLibraryDistribution ;
+    arch:supportedByEvidence sqx:Ev_D07_Embedded ; arch:atScope "artifact" ;
+    arch:inRegion "in-process embedded library" ; rdfs:seeAlso sqx:Region_EmbeddedLibrary ;
+    arch:confidenceLevel "High" .
+sqx:Ev_D07_Embedded a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLite is linked into and runs inside the host application's process — no server or daemon is deployed. Definitional; no server/container/service artifacts exist in the tree." .
+
+sqx:App_D07_Amalgamation
+    a arch:DimensionApplication ; rdfs:label "Source amalgamation form — Deployment model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D07_DeploymentAndDistributionModel ;
+    arch:usesClassificationValue sqx:SourceAmalgamationDistribution ; arch:dominantValue sqx:SourceAmalgamationDistribution ;
+    arch:supportedByEvidence sqx:Ev_D07_Amalg ; arch:atScope "artifact" ;
+    arch:inRegion "shipped single-file source (sqlite3.c)" ; rdfs:seeAlso sqx:Region_Amalgamation ;
+    arch:confidenceLevel "High" .
+sqx:Ev_D07_Amalg a arch:EvidenceRecord ;
+    arch:evidenceSummary "The dominant distribution artifact is the single-file amalgamation (sqlite3.c) generated by tool/mksqlite3c (61 sqlite3.c/mksqlite3c references), compiled directly into consumers. Generator tooling mechanically verified." .
+
+##### D08 Physical organization — developer tree vs shipped amalgamation
+sqx:App_D08_DevTree
+    a arch:DimensionApplication ; rdfs:label "Developer source tree — Physical organization" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D08_CodebasePhysicalOrganization ;
+    arch:usesClassificationValue arch:MonorepoOrganization ; arch:dominantValue arch:MonorepoOrganization ;
+    arch:supportedByEvidence sqx:Ev_D08_Dev ; arch:atScope "subsystem" ;
+    arch:inRegion "src/ developer tree" ; rdfs:seeAlso sqx:Region_DeveloperTree ;
+    arch:confidenceLevel "High" .
+sqx:Ev_D08_Dev a arch:EvidenceRecord ;
+    arch:evidenceSummary "The authoritative form is one repository with src/ as many flat .c/.h files plus ext/, test/, tool/ — 357 C files mechanically counted." .
+
+sqx:App_D08_Amalgamation
+    a arch:DimensionApplication ; rdfs:label "Shipped amalgamation — Physical organization" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D08_CodebasePhysicalOrganization ;
+    arch:usesClassificationValue sqx:SingleFileAmalgamationLayout ; arch:dominantValue sqx:SingleFileAmalgamationLayout ;
+    arch:supportedByEvidence sqx:Ev_D08_Amalg ; arch:atScope "artifact" ;
+    arch:inRegion "shipped amalgamation (single sqlite3.c)" ; rdfs:seeAlso sqx:Region_Amalgamation ;
+    arch:confidenceLevel "High" .
+sqx:Ev_D08_Amalg a arch:EvidenceRecord ;
+    arch:evidenceSummary "The consumed form collapses the many-file tree into one generated sqlite3.c via tool/mksqlite3c — a distinct physical organization from the developer tree. Generator verified." .
+
+##### D14 Paradigm — one region per language binding
+sqx:App_D14_CoreC
+    a arch:DimensionApplication ; rdfs:label "Core C — Programming paradigm model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:ProceduralParadigm ; arch:dominantValue arch:ProceduralParadigm ;
+    arch:supportedByEvidence sqx:Ev_D14_CoreC ; arch:atScope "language-region" ;
+    arch:inRegion "core C implementation" ; rdfs:seeAlso sqx:Region_CoreC ;
+    arch:confidenceLevel "Medium" .
+sqx:Ev_D14_CoreC a arch:EvidenceRecord ;
+    arch:evidenceSummary "357 C files implement the engine in a procedural paradigm, executing prepared statements via a bytecode interpreter (VDBE). Language dominance verified; paradigm attribution interpretive." .
+
+sqx:App_D14_Jni
+    a arch:DimensionApplication ; rdfs:label "JNI Java bindings — Programming paradigm model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:ObjectOrientedParadigm ; arch:dominantValue arch:ObjectOrientedParadigm ;
+    arch:supportedByEvidence sqx:Ev_D14_Jni ; arch:atScope "language-region" ;
+    arch:inRegion "JNI Java bindings" ; rdfs:seeAlso sqx:Region_JniJava ;
+    arch:confidenceLevel "Low" .
+sqx:Ev_D14_Jni a arch:EvidenceRecord ;
+    arch:evidenceSummary "58 Java files (ext/jni, 151 jni/wasm/jdbc references) wrap the C engine in an object-oriented JVM API. File count verified; OO attribution is a convention-based inference." .
+
+sqx:App_D14_Wasm
+    a arch:DimensionApplication ; rdfs:label "WASM/JS bindings — Programming paradigm model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D14_ProgrammingParadigmModel ;
+    arch:usesClassificationValue arch:ObjectOrientedParadigm ; arch:dominantValue arch:ObjectOrientedParadigm ;
+    arch:supportedByEvidence sqx:Ev_D14_Wasm ; arch:atScope "language-region" ;
+    arch:inRegion "WASM/JavaScript bindings" ; rdfs:seeAlso sqx:Region_WasmJs ;
+    arch:confidenceLevel "Low" .
+sqx:Ev_D14_Wasm a arch:EvidenceRecord ;
+    arch:evidenceSummary "42 JavaScript files (ext/wasm) provide an object-oriented (oo1) JS API over the WASM build. File count verified; OO attribution is a convention-based inference." .
+
+##### D17 Type discipline — static C vs SQL manifest typing
+sqx:App_D17_CImpl
+    a arch:DimensionApplication ; rdfs:label "C implementation — Type and data discipline" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
+    arch:usesClassificationValue arch:StaticTypeDiscipline ; arch:dominantValue arch:StaticTypeDiscipline ;
+    arch:supportedByEvidence sqx:Ev_D17_C ; arch:atScope "language-region" ;
+    arch:inRegion "core C implementation" ; rdfs:seeAlso sqx:Region_CoreC ;
+    arch:confidenceLevel "Medium" .
+sqx:Ev_D17_C a arch:EvidenceRecord ;
+    arch:evidenceSummary "The implementation is statically typed C (357 files). Language dominance verified; hint/annotation strictness not measured here." .
+
+sqx:App_D17_SqlValues
+    a arch:DimensionApplication ; rdfs:label "SQL value system — Type and data discipline" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D17_TypeAndDataDiscipline ;
+    arch:usesClassificationValue sqx:ManifestTypingDiscipline ; arch:dominantValue sqx:ManifestTypingDiscipline ;
+    arch:supportedByEvidence sqx:Ev_D17_Sql ; arch:atScope "subsystem" ;
+    arch:inRegion "SQL value/type system" ; rdfs:seeAlso sqx:Region_SqlValues ;
+    arch:confidenceLevel "Medium" .
+sqx:Ev_D17_Sql a arch:EvidenceRecord ;
+    arch:evidenceSummary "At the SQL layer, types belong to values (manifest typing) with column type affinity (16 affinity/type-code references) — a dynamic discipline layered atop the static C engine. Documented at sqlite.org/datatype3.html." .
+
+##### D19 Security — host authority vs untrusted-input vs authorizer
+sqx:App_D19_HostAuthority
+    a arch:DimensionApplication ; rdfs:label "In-process host authority — Security model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
+    arch:usesClassificationValue sqx:InProcessHostAuthority ; arch:dominantValue sqx:InProcessHostAuthority ;
+    arch:supportedByEvidence sqx:Ev_D19_Host ; arch:atScope "subsystem" ;
+    arch:inRegion "host process authority" ; rdfs:seeAlso sqx:Region_HostProcess ;
+    arch:revealsRisk sqx:Risk_D19_HostAuthority ; arch:confidenceLevel "High" .
+sqx:Ev_D19_Host a arch:EvidenceRecord ;
+    arch:evidenceSummary "SQLite introduces no trust boundary of its own — it runs with the host process's authority. Definitional for an embedded library; isolation is the host's responsibility." .
+
+sqx:App_D19_UntrustedInput
+    a arch:DimensionApplication ; rdfs:label "Untrusted-input hardening — Security model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
+    arch:usesClassificationValue sqx:UntrustedInputHardening ; arch:dominantValue sqx:UntrustedInputHardening ;
+    arch:supportedByEvidence sqx:Ev_D19_Input ; arch:atScope "subsystem" ;
+    arch:inRegion "untrusted DB file + SQL text" ; rdfs:seeAlso sqx:Region_UntrustedInput ;
+    arch:confidenceLevel "Medium" .
+sqx:Ev_D19_Input a arch:EvidenceRecord ;
+    arch:evidenceSummary "The database file and SQL text crossing into the engine are treated as potentially hostile; SQLite is explicitly hardened (fuzz-tested, corruption-resistant) against malicious databases. Hardening is a documented design goal (sqlite.org/security.html); tested via the corpus but the posture is documented, not measured here." .
+
+sqx:App_D19_Authorizer
+    a arch:DimensionApplication ; rdfs:label "Authorizer callback — Security model" ;
+    arch:classifiesSystem sqx:SqliteSystem ; arch:appliesDimension arch:D19_SecurityAndTrustBoundaryModel ;
+    arch:usesClassificationValue sqx:AuthorizerCallbackControl ; arch:dominantValue sqx:AuthorizerCallbackControl ;
+    arch:supportedByEvidence sqx:Ev_D19_Authz ; arch:atScope "module" ;
+    arch:inRegion "authorizer access-control hook" ; rdfs:seeAlso sqx:Region_HostProcess ;
+    arch:confidenceLevel "Medium" .
+sqx:Ev_D19_Authz a arch:EvidenceRecord ;
+    arch:evidenceSummary "An optional host-supplied authorizer callback (sqlite3_set_authorizer, auth.c — 22 references) can allow/deny individual SQL actions at prepare time. Authorizer surface mechanically verified; policy is the host's." .
