@@ -116,7 +116,12 @@ def test_report_role_tables_exclude_domain_parts(decomp):
     # Interpretive domain overlays live in their own section, not in the
     # structural parts inventory.
     assert "`domain:" not in section
-    assert "## Semantic domains" in md
+    # The section itself exists only when the bundle carries concept evidence
+    # (a bundle built without the concept plugin legitimately has no domains).
+    if any(p.kind == "domain" for p in decomp.parts):
+        assert "## Semantic domains" in md
+    else:
+        assert "## Semantic domains" not in md
 
 
 def test_report_gate_table_has_examples(decomp):
