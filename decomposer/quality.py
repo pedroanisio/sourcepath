@@ -12,7 +12,7 @@ from pathlib import PurePosixPath
 
 from .evidence import EvidenceGraph
 from .model import Confidence, QualityFinding
-from .parts import ModuleGraph, ROOT, detect_entrypoints
+from .parts import ModuleGraph, ROOT, detect_entrypoints, file_edges_between
 
 # Thresholds — named so they are auditable and tunable.
 GOD_CA = 6          # afferent coupling at/above which a module is "widely used"
@@ -20,12 +20,21 @@ GOD_CE = 6          # efferent coupling at/above which it is "widely dependent"
 WIDE_EXTERNAL = 8   # importer count making an external dep a concentration risk
 DUP_JACCARD = 0.6   # concept-set overlap flagged as duplicated responsibility
 
+# Languages with a testing convention the test-gap gate can meaningfully probe.
+# Files typed source_code but outside this set (shell wrappers with no language,
+# .proto contracts, ...) produce only false-positive "untested" noise.
+TESTABLE_LANGUAGES = frozenset({
+    "python", "typescript", "javascript", "rust", "go", "java", "kotlin",
+    "swift", "dart", "ruby", "c", "cpp", "objective-c", "clojure",
+})
+
 
 def run_gates(
-    ev: EvidenceGraph, mg: ModuleGraph, module_cycles: list[list[str]],
+    ev: EvidenceGraph, mg: ModuleGraph,
+    module_cycles: list[list[str]], file_cycles: list[list[str]],
 ) -> list[QualityFinding]:
     out: list[QualityFinding] = []
-    out += _circular(module_cycles)
+    out += _circular(ev, mg, module_cycles, file_cycles)
     out += _god_modules(mg)
     out += _dead_code(ev, mg)
     out += _hidden_entrypoints(ev, mg)
@@ -37,17 +46,73 @@ def run_gates(
     return out
 
 
-def _circular(module_cycles: list[list[str]]) -> list[QualityFinding]:
-    return [
-        QualityFinding(
-            gate="circular_dependencies", severity="error",
-            subject=", ".join(f"module:{m}" for m in cyc),
-            description=f"Import cycle across {len(cyc)} modules: {' -> '.join(cyc)} -> {cyc[0]}.",
-            confidence=Confidence.CERTAIN,
-            evidence=[f"module:{m}" for m in cyc],
+def _circular(
+    ev: EvidenceGraph, mg: ModuleGraph,
+    module_cycles: list[list[str]], file_cycles: list[list[str]],
+) -> list[QualityFinding]:
+    """Cycles, granularity-qualified.
+
+    File-level cycles are graph facts on extractor output: ``certain``, error.
+    Directory-level cycles exist only under the module==directory aggregation —
+    a self-declared ``probable`` model — so the finding's confidence is capped
+    at the model's, its severity is warning, and the real inducing file edges
+    are attached so one grep can adjudicate any of them. When the two
+    granularities disagree (file DAG, directory cycles), that divergence is
+    itself surfaced: consumers of one artifact must not quote either topology
+    claim without its granularity.
+    """
+    out: list[QualityFinding] = []
+
+    for cyc in file_cycles:
+        members = set(cyc)
+        edges = sorted(
+            f"{a} -> {b}"
+            for a in cyc for b in ev.imports_out.get(a, []) if b in members
         )
-        for cyc in module_cycles
-    ]
+        out.append(QualityFinding(
+            gate="circular_dependencies", severity="error",
+            subject=", ".join(cyc),
+            description=(f"File-level import cycle among {len(cyc)} files: "
+                         + "; ".join(edges) + "."),
+            confidence=Confidence.CERTAIN,
+            evidence=edges,
+        ))
+
+    for cyc in module_cycles:
+        members = set(cyc)
+        module_edges = [
+            (a, b, w) for (a, b), w in sorted(mg.edge_weight.items())
+            if a in members and b in members
+        ]
+        edge_strs = [f"{a} -> {b} (x{w})" for a, b, w in module_edges]
+        samples: list[str] = []
+        for a, b, _ in module_edges:
+            samples += file_edges_between(ev, mg, a, b, limit=2)
+        out.append(QualityFinding(
+            gate="directory_aggregation_cycle", severity="warning",
+            subject=", ".join(f"module:{m}" for m in cyc),
+            description=(
+                f"{len(cyc)} directories are mutually reachable once file "
+                f"imports are aggregated to directories (module==directory is "
+                f"a `probable` model). Inducing module edges: "
+                + "; ".join(edge_strs) + "."),
+            confidence=Confidence.PROBABLE,
+            evidence=edge_strs + samples,
+        ))
+
+    if module_cycles and not file_cycles:
+        out.append(QualityFinding(
+            gate="granularity_divergence", severity="info",
+            subject="import-graph-topology",
+            description=(
+                f"The file-level import graph is acyclic (a DAG), while "
+                f"{len(module_cycles)} cycle(s) appear at directory "
+                f"granularity. Both statements are true at their own "
+                f"granularity; neither may be quoted without it."),
+            confidence=Confidence.CERTAIN,
+            evidence=[f"file_cycles=0", f"directory_cycles={len(module_cycles)}"],
+        ))
+    return out
 
 
 def _god_modules(mg: ModuleGraph) -> list[QualityFinding]:
@@ -181,7 +246,8 @@ def _test_gaps(ev: EvidenceGraph, mg: ModuleGraph) -> list[QualityFinding]:
     out: list[QualityFinding] = []
     for m in mg.modules():
         code = [p for p in mg.files_of_module.get(m, [])
-                if ev.file_by_path.get(p, {}).get("type") == "source_code"]
+                if ev.file_by_path.get(p, {}).get("type") == "source_code"
+                and ev.file_by_path.get(p, {}).get("language") in TESTABLE_LANGUAGES]
         if not code or m in covered:
             continue
         # Skip infra/config-only and root.

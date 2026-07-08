@@ -56,7 +56,7 @@ _CONF_RANK = {
 PART_KINDS = frozenset({
     "file", "module", "package", "application", "service", "library",
     "external_dependency", "entrypoint", "domain", "data_schema",
-    "generated_artifact",
+    "generated_artifact", "operational", "documentation",
 })
 ROLES = frozenset({
     "core", "supporting", "infrastructure", "adapter", "test", "generated",

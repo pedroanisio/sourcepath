@@ -17,6 +17,7 @@ the corresponding maps are simply empty and downstream confidence is lowered.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -52,6 +53,7 @@ class EvidenceGraph:
     schema_purposes: dict[str, dict[str, Any]]     # path -> {text, model, ...}  (LLM, unverified)
     phases: dict[str, list[str]]                   # path -> phase local names
     rust_items: list[dict[str, Any]] = field(default_factory=list)
+    manifest_sha256: str = ""                      # run identity for provenance
 
     # ── convenience accessors ────────────────────────────────────────────────
     def code_files(self) -> list[dict[str, Any]]:
@@ -102,7 +104,19 @@ def load_evidence(bundle_dir: str | Path) -> EvidenceGraph:
         schema_purposes=b.enrichment_schema_purpose,
         phases=phases,
         rust_items=b.rust_items,
+        manifest_sha256=_manifest_sha256(bundle_dir),
     )
+
+
+def _manifest_sha256(bundle_dir: Path) -> str:
+    """Hash of run_manifest.json — the bundle's run identity. Decomposition
+    consumers need it to tell apart bundles built from the same commit with
+    different plugin sets (concepts present vs. absent, etc.)."""
+    manifest = bundle_dir / "run_manifest.json"
+    try:
+        return hashlib.sha256(manifest.read_bytes()).hexdigest()
+    except OSError:
+        return ""
 
 
 def _load_bundle(bundle_dir: Path):

@@ -12,11 +12,12 @@ from pathlib import PurePosixPath
 
 from .evidence import EvidenceGraph
 from .model import Architecture, Confidence, Hypothesis, Violation
-from .parts import ModuleGraph, ROOT
+from .parts import ModuleGraph, ROOT, file_edges_between
 
 
 def detect_architecture(
-    ev: EvidenceGraph, mg: ModuleGraph, module_cycles: list[list[str]]
+    ev: EvidenceGraph, mg: ModuleGraph,
+    module_cycles: list[list[str]], file_cycles: list[list[str]],
 ) -> Architecture:
     top_segments = {_top(m) for m in mg.modules() if m != ROOT}
     all_segments = {seg for m in mg.modules() for seg in PurePosixPath(m).parts}
@@ -79,7 +80,7 @@ def detect_architecture(
     # ── choose dominant style ───────────────────────────────────────────────
     style, style_conf = _dominant(labels)
 
-    violations = _violations(ev, mg, module_cycles)
+    violations = _violations(ev, mg, module_cycles, file_cycles)
     return Architecture(
         style=style, confidence=style_conf,
         evidence=_dedupe(evidence), violations=violations, hypotheses=hypotheses,
@@ -103,45 +104,78 @@ def _dominant(labels: list[tuple[str, Confidence]]) -> tuple[str, Confidence]:
 
 
 def _violations(
-    ev: EvidenceGraph, mg: ModuleGraph, module_cycles: list[list[str]]
+    ev: EvidenceGraph, mg: ModuleGraph,
+    module_cycles: list[list[str]], file_cycles: list[list[str]],
 ) -> list[Violation]:
     out: list[Violation] = []
 
-    for cyc in module_cycles:
+    # File-level cycles are extractor-graph facts: CERTAIN, with the edges named.
+    for cyc in file_cycles:
+        members = set(cyc)
+        edges = sorted(
+            f"{a} -> {b}"
+            for a in cyc for b in ev.imports_out.get(a, []) if b in members
+        )
         out.append(Violation(
             kind="circular_dependency",
-            description=f"Import cycle across {len(cyc)} modules: {' -> '.join(cyc)} -> {cyc[0]}.",
-            confidence=Confidence.CERTAIN, subjects=[f"module:{m}" for m in cyc],
+            description=(f"File-level import cycle among {len(cyc)} files: "
+                         + "; ".join(edges) + "."),
+            confidence=Confidence.CERTAIN, subjects=sorted(cyc),
         ))
 
-    # Shared-kernel independence: a kernel package should not import outward into
-    # sibling feature packages. Any such edge is a graph fact (CERTAIN) and a
-    # recognized anti-pattern; the repo's own import-linter encodes the same rule.
+    # Directory-level cycles exist only under the module==directory aggregation
+    # (a `probable` model), so the finding inherits that confidence and cites
+    # the real inducing edges instead of a chain through the sorted SCC.
+    for cyc in module_cycles:
+        members = set(cyc)
+        edge_strs = [
+            f"{a} -> {b} (x{w})" for (a, b), w in sorted(mg.edge_weight.items())
+            if a in members and b in members
+        ]
+        out.append(Violation(
+            kind="directory_aggregation_cycle",
+            description=(
+                f"{len(cyc)} directories are mutually reachable under "
+                f"directory aggregation (file-level graph "
+                f"{'is acyclic' if not file_cycles else 'also has cycles'}). "
+                f"Inducing edges: " + "; ".join(edge_strs) + "."),
+            confidence=Confidence.PROBABLE, subjects=[f"module:{m}" for m in cyc],
+        ))
+
+    # Shared-kernel independence: a kernel package should not import outward —
+    # not into sibling feature packages, not into its parent package. The cited
+    # file edges are graph facts (CERTAIN); this mirrors the import-linter
+    # "forbidden" contract shape (source: kernel, forbidden: everything outside).
     for m in mg.modules():
         segs = set(PurePosixPath(m).parts)
         if not (segs & {"shared_kernel", "kernel"}):
             continue
-        kernel_top = _top(m)
         outward = [d for d in mg.adjacency.get(m, [])
-                   if _top(d) != kernel_top]
+                   if not (d == m or d.startswith(m + "/"))]
         if outward:
+            edges = [e for d in outward for e in file_edges_between(ev, mg, m, d)]
             out.append(Violation(
                 kind="shared_kernel_not_independent",
                 description=(f"Shared-kernel module `{m}` imports outward into "
-                             f"{outward}, coupling the kernel to feature packages."),
+                             f"{outward}, coupling the kernel to the packages "
+                             f"it should serve. File edges: " + "; ".join(edges) + "."),
                 confidence=Confidence.CERTAIN,
                 subjects=[f"module:{m}"] + [f"module:{d}" for d in outward],
             ))
 
-    # Bidirectional module coupling (two-way import between packages).
+    # Bidirectional module coupling (two-way import between directories) —
+    # phrased on the directory model, hence PROBABLE, with file edges cited.
     seen: set[frozenset[str]] = set()
-    for (a, b) in mg.edge_weight:
+    for (a, b) in sorted(mg.edge_weight):
         if (b, a) in mg.edge_weight and frozenset({a, b}) not in seen:
             seen.add(frozenset({a, b}))
+            fwd = file_edges_between(ev, mg, a, b, limit=2)
+            rev = file_edges_between(ev, mg, b, a, limit=2)
             out.append(Violation(
                 kind="bidirectional_coupling",
-                description=f"Modules `{a}` and `{b}` import each other.",
-                confidence=Confidence.CERTAIN,
+                description=(f"Directories `{a}` and `{b}` import each other. "
+                             f"File edges: " + "; ".join(fwd + rev) + "."),
+                confidence=Confidence.PROBABLE,
                 subjects=[f"module:{a}", f"module:{b}"],
             ))
     return out

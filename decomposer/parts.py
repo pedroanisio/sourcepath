@@ -120,16 +120,20 @@ def _compute_interfaces(ev: EvidenceGraph, mg: ModuleGraph) -> None:
         if sym and sym != "<file>":
             iface.setdefault(dm, set()).add(sym)
 
-    # Fallback: files imported across the module boundary are public surface.
+    # Fallback: files imported across the module boundary are public surface —
+    # only for modules with NO symbol-level xrefs crossing in, so a module's
+    # interface list is either symbols or file basenames, never a mix.
+    fallback: dict[str, set[str]] = {}
     for src, targets in ev.imports_out.items():
         sm = mg.module_of_file.get(src)
         for dst in targets:
             dm = mg.module_of_file.get(dst)
             if dm and sm != dm:
-                iface.setdefault(dm, set()).add(PurePosixPath(dst).name)
+                fallback.setdefault(dm, set()).add(PurePosixPath(dst).name)
 
     for m in mg.files_of_module:
-        mg.interfaces[m] = sorted(iface.get(m, set()))[:40]
+        surface = iface.get(m) or fallback.get(m, set())
+        mg.interfaces[m] = sorted(surface)[:40]
         mg.xref_in[m] = xin.get(m, 0)
         mg.xref_out[m] = xout.get(m, 0)
 
@@ -229,6 +233,8 @@ def build_cross_cutting_parts(ev: EvidenceGraph, mg: ModuleGraph) -> list[Part]:
     parts.extend(_domain_parts(ev))
     parts.extend(_data_schema_parts(ev, mg))
     parts.extend(_generated_parts(ev, mg))
+    parts.extend(_operational_parts(ev))
+    parts.extend(_documentation_part(ev))
     return parts
 
 
@@ -442,7 +448,91 @@ def _generated_parts(ev: EvidenceGraph, mg: ModuleGraph) -> list[Part]:
     return parts
 
 
+# Operational categories, keyed by the extractor's *certain* file-type facts.
+# Each category becomes one ``operational`` part so build/CI/deploy/runtime-env
+# concerns are first-class parts even when their files live outside any
+# code-bearing module (e.g. a root Dockerfile).
+_OPERATIONAL_CATEGORIES: list[tuple[str, frozenset[str], str]] = [
+    ("build_system", frozenset({"build_script"}),
+     "Build orchestration (make/gradle/cmake-style entry tasks)."),
+    ("dependency_management", frozenset({"dependency_manifest", "lockfile"}),
+     "Dependency declaration and version pinning."),
+    ("ci_cd", frozenset({"ci_cd"}),
+     "Continuous integration / delivery pipeline definitions."),
+    ("deployment", frozenset({"container"}),
+     "Container / deployment topology definitions."),
+    ("runtime_configuration", frozenset({"configuration", "environment"}),
+     "Runtime and tooling configuration, environment variables."),
+]
+
+
+def _operational_parts(ev: EvidenceGraph) -> list[Part]:
+    parts: list[Part] = []
+    for name, types, responsibility in _OPERATIONAL_CATEGORIES:
+        files = sorted(f["path"] for f in ev.files if f.get("type") in types)
+        if not files:
+            continue
+        parts.append(Part(
+            id=f"ops:{name}", name=name, kind="operational",
+            layer="operational",
+            responsibility=responsibility,
+            responsibility_confidence=Confidence.STRONG,
+            evidence=Evidence(
+                files=files,
+                signals=[f"{len(files)} file(s) of type {sorted(types)}"],
+            ),
+            classification=Classification(
+                role="infrastructure", role_confidence=Confidence.CERTAIN,
+                reusability="internal", risk="low",
+            ),
+            metrics={"n_files": len(files), "file_types": sorted(types)},
+            overall_confidence=Confidence.CERTAIN,
+        ))
+    return parts
+
+
+def _documentation_part(ev: EvidenceGraph) -> list[Part]:
+    files = sorted(f["path"] for f in ev.files if f.get("type") == "documentation")
+    if not files:
+        return []
+    return [Part(
+        id="docs:documentation", name="documentation", kind="documentation",
+        layer="operational",
+        responsibility="Project documentation (READMEs, guides, specs).",
+        responsibility_confidence=Confidence.CERTAIN,
+        evidence=Evidence(
+            files=files,
+            signals=[f"{len(files)} documentation file(s)"],
+        ),
+        classification=Classification(
+            role="supporting", role_confidence=Confidence.CERTAIN,
+            reusability="internal", risk="low",
+        ),
+        metrics={"n_files": len(files)},
+        overall_confidence=Confidence.CERTAIN,
+    )]
+
+
 # ── helpers ───────────────────────────────────────────────────────────────────
+def file_edges_between(
+    ev: EvidenceGraph, mg: ModuleGraph, src_mod: str, dst_mod: str, limit: int = 3,
+) -> list[str]:
+    """The file-level import edges inducing the aggregated ``src_mod -> dst_mod``
+    module edge, as ``"src.py -> dst.py"`` strings. This is the evidence every
+    cycle/coupling finding must cite: module-level claims are only as good as
+    the file edges underneath them."""
+    out: list[str] = []
+    for src in sorted(ev.imports_out):
+        if mg.module_of_file.get(src) != src_mod:
+            continue
+        for dst in sorted(ev.imports_out[src]):
+            if mg.module_of_file.get(dst) == dst_mod:
+                out.append(f"{src} -> {dst}")
+                if len(out) >= limit:
+                    return out
+    return out
+
+
 def _subtree_files(ev: EvidenceGraph, root: str) -> list[str]:
     prefix = "" if root == ROOT else root + "/"
     return [f["path"] for f in ev.files

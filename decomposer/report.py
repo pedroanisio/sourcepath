@@ -65,15 +65,21 @@ def _frontmatter(L: list[str], decomp: Decomposition) -> None:
 
 def _overview(L: list[str], decomp: Decomposition) -> None:
     r = decomp.repository
-    inp = decomp.provenance.get("inputs", {})
+    prov = decomp.provenance
+    inp = prov.get("inputs", {})
     L.append("## Overview\n")
     L.append(f"- **Repository:** {r.get('name')} @ `{(r.get('commit_sha') or '')[:12]}` "
              f"(tool {r.get('tool_version')})")
+    exts = ", ".join(prov.get("bundle_extensions") or []) or "none"
+    L.append(f"- **Bundle:** `{prov.get('bundle_dir')}` · "
+             f"run_manifest sha256 `{(prov.get('run_manifest_sha256') or '')[:12]}` · "
+             f"generated {prov.get('bundle_generated_at')} · extensions: {exts}")
     L.append(f"- **Files analyzed:** {r.get('files')} · "
              f"internal import edges: {inp.get('internal_import_edges')} · "
              f"xref edges: {inp.get('xref_edges')} · chunks: {inp.get('chunks')}")
     L.append(f"- **Parts decomposed:** {r.get('n_parts')} · "
-             f"module cycles: {r.get('n_module_cycles')}")
+             f"file-level import cycles: {r.get('n_file_cycles')} · "
+             f"directory-level cycles: {r.get('n_module_cycles')}")
     L.append(f"- **Evidence available:** concepts={inp.get('concepts')}, "
              f"LLM summaries={inp.get('llm_file_summaries')}, "
              f"phases={inp.get('phases_available')}")
@@ -107,6 +113,10 @@ def _parts_by_role(L: list[str], decomp: Decomposition) -> None:
     L.append("## Parts by role\n")
     by_role: dict[str, list] = defaultdict(list)
     for p in decomp.parts:
+        # Semantic domains are interpretive overlays, not structural parts;
+        # they render in their own section, never in the parts inventory.
+        if p.kind == "domain":
+            continue
         by_role[p.classification.role].append(p)
     kind_counts = Counter(p.kind for p in decomp.parts)
     L.append("Part kinds: " + ", ".join(f"{k}×{v}" for k, v in sorted(kind_counts.items())) + "\n")
@@ -122,7 +132,7 @@ def _parts_by_role(L: list[str], decomp: Decomposition) -> None:
             m = p.metrics
             inst = m.get("instability")
             L.append(
-                f"| `{p.name}` | {p.kind} | {p.layer or '—'} | "
+                f"| `{p.id}` | {p.kind} | {p.layer or '—'} | "
                 f"{m.get('ca', '—')} | {m.get('ce', '—')} | "
                 f"{inst if inst is not None else '—'} | "
                 f"{p.classification.reusability} | {p.classification.risk} | "
@@ -177,13 +187,14 @@ def _quality(L: list[str], decomp: Decomposition) -> None:
     by_gate: dict[str, list] = defaultdict(list)
     for q in decomp.quality_gates:
         by_gate[q.gate].append(q)
-    L.append("| gate | findings | worst severity |")
-    L.append("|---|---:|---|")
+    L.append("| gate | findings | worst severity | examples |")
+    L.append("|---|---:|---|---|")
     sev_rank = {"error": 0, "warning": 1, "info": 2}
     for gate in sorted(by_gate, key=lambda g: min(sev_rank.get(x.severity, 3) for x in by_gate[g])):
         items = by_gate[gate]
         worst = min(items, key=lambda x: sev_rank.get(x.severity, 3)).severity
-        L.append(f"| `{gate}` | {len(items)} | {worst} |")
+        examples = ", ".join(_truncate(q.subject, 48) for q in items[:2])
+        L.append(f"| `{gate}` | {len(items)} | {worst} | {examples} |")
     L.append("")
     # Detail the error/warning findings.
     serious = [q for q in decomp.quality_gates if q.severity in {"error", "warning"}]
@@ -198,10 +209,26 @@ def _quality(L: list[str], decomp: Decomposition) -> None:
 def _build_order(L: list[str], decomp: Decomposition) -> None:
     L.append("## Reconstruction build order (module layers)\n")
     L.append("_Layer 0 has no internal dependencies (build first); each later "
-             "layer depends only on earlier ones. Cyclic groups appear together._\n")
+             "layer depends only on earlier ones. Directory-cycle groups appear "
+             "in braces (`{a ⇄ b}`): their members must be built jointly._\n")
+    cycle_of: dict[str, int] = {}
+    cycles = decomp.provenance.get("module_cycles") or []
+    for ci, cyc in enumerate(cycles):
+        for m in cyc:
+            cycle_of[m] = ci
     for i, layer in enumerate(decomp.build_order):
-        names = ", ".join(pid.split(":", 1)[1] for pid in layer)
-        L.append(f"- **Layer {i}** ({len(layer)}): {names}")
+        names = [pid.split(":", 1)[1] for pid in layer]
+        rendered: list[str] = []
+        done_groups: set[int] = set()
+        for n in names:
+            ci = cycle_of.get(n)
+            if ci is None:
+                rendered.append(n)
+            elif ci not in done_groups:
+                done_groups.add(ci)
+                members = [m for m in names if cycle_of.get(m) == ci]
+                rendered.append("{" + " ⇄ ".join(members) + "}")
+        L.append(f"- **Layer {i}** ({len(layer)}): {', '.join(rendered)}")
     L.append("")
 
 
@@ -209,8 +236,26 @@ def _legend(L: list[str]) -> None:
     L.append("---")
     L.append("_Ca = afferent coupling (fan-in); Ce = efferent coupling (fan-out); "
              "I = Ce/(Ca+Ce), Martin instability (0=maximally stable, 1=maximally "
-             "unstable). Modules == directory subtrees containing code (a `probable` "
-             "model). This report is produced by the codebase-mapper Decomposer._")
+             "unstable)._\n")
+    L.append("_reuse: `reusable` = high fan-in with low fan-out (shared surface); "
+             "`internal` = consumed within its own area; `replaceable` = no inbound "
+             "importers; `external` = third-party. risk: `low`/`elevated`/`high`, "
+             "from cycle participation, god-module shape (Ca≥6 and Ce≥6), and high "
+             "fan-in on unstable modules. layer: a directory-naming hypothesis "
+             "(`probable`), never proven by the graph._\n")
+    L.append("_confidence mapping to the ABox vocabulary: certain/strong ≈ High, "
+             "probable ≈ Medium, weak ≈ Low, unknown ≈ Unknown._\n")
+    L.append("_Modules == directories that directly contain code files (a `probable` "
+             "model; files in subdirectories belong to their own module). Interface "
+             "symbols are cross-module xref targets — leading-underscore names there "
+             "mean private symbols are consumed across module boundaries, itself a "
+             "coupling signal; when no symbol xrefs cross in, imported file basenames "
+             "are listed instead. This report is produced by the codebase-mapper "
+             "Decomposer._")
+
+
+def _truncate(s: str, n: int) -> str:
+    return s if len(s) <= n else s[: n - 1] + "…"
 
 
 def _part_sort_key(p):

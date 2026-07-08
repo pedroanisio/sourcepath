@@ -33,6 +33,10 @@ def decompose(bundle_dir: str | Path) -> Decomposition:
 
     module_names = [m for m in mg.modules() if _has_code(ev, mg, m)]
     module_cycles = _cycles(module_names, mg.adjacency)
+    # Cycles at file granularity too: directory aggregation both manufactures
+    # cycles (parent/child re-exports) and hides them, so topology claims are
+    # only honest when both granularities are computed and reported.
+    file_cycles = _cycles([f["path"] for f in ev.files], ev.imports_out)
     cycle_modules = {m for cyc in module_cycles for m in cyc}
 
     module_parts = build_module_parts(ev, mg, cycle_modules)
@@ -40,8 +44,8 @@ def decompose(bundle_dir: str | Path) -> Decomposition:
     parts = module_parts + cross_parts
 
     relationships = _relationships(ev, mg)
-    architecture = detect_architecture(ev, mg, module_cycles)
-    gates = run_gates(ev, mg, module_cycles)
+    architecture = detect_architecture(ev, mg, module_cycles, file_cycles)
+    gates = run_gates(ev, mg, module_cycles, file_cycles)
 
     module_part_ids = {p.id for p in module_parts}
     order_layers = _build_order(module_names, mg.adjacency)
@@ -51,8 +55,8 @@ def decompose(bundle_dir: str | Path) -> Decomposition:
     ]
     build_order = [layer for layer in build_order if layer]
 
-    repository = _repository_header(ev, parts, module_cycles)
-    provenance = _provenance(ev, mg, parts, gates)
+    repository = _repository_header(ev, parts, module_cycles, file_cycles)
+    provenance = _provenance(ev, mg, parts, gates, module_cycles)
 
     return Decomposition(
         repository=repository,
@@ -129,7 +133,8 @@ def _relationships(ev: EvidenceGraph, mg: ModuleGraph) -> list[Relationship]:
 
 
 def _repository_header(
-    ev: EvidenceGraph, parts: list[Part], module_cycles: list[list[str]]
+    ev: EvidenceGraph, parts: list[Part],
+    module_cycles: list[list[str]], file_cycles: list[list[str]],
 ) -> dict:
     m = ev.manifest
     purpose, purpose_conf = _purpose(ev)
@@ -149,6 +154,7 @@ def _repository_header(
         "files": (m.get("counts") or {}).get("files"),
         "n_parts": len(parts),
         "n_module_cycles": len(module_cycles),
+        "n_file_cycles": len(file_cycles),
     }
 
 
@@ -169,12 +175,19 @@ def _purpose(ev: EvidenceGraph) -> tuple[str, Confidence]:
     return ("Not determinable from bundle evidence.", Confidence.UNKNOWN)
 
 
-def _provenance(ev: EvidenceGraph, mg: ModuleGraph, parts, gates) -> dict:
+def _provenance(
+    ev: EvidenceGraph, mg: ModuleGraph, parts, gates,
+    module_cycles: list[list[str]],
+) -> dict:
     from collections import Counter
     kinds = Counter(p.kind for p in parts)
     return {
         "tool": TOOL_ID,
         "bundle_dir": str(ev.bundle_dir),
+        "run_manifest_sha256": ev.manifest_sha256,
+        "bundle_generated_at": ev.manifest.get("generated_at"),
+        "bundle_extensions": sorted((ev.manifest.get("extensions") or {}).keys()),
+        "module_cycles": [list(c) for c in module_cycles],
         "evidence_basis": (
             "Structural parts, dependencies, coupling metrics (Ca/Ce, Martin "
             "instability), cycles and build order are mechanically derived from "

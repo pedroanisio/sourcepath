@@ -94,3 +94,45 @@ def test_markdown_report_renders(decomp):
     assert md.startswith("---")            # disclaimer frontmatter
     assert "Detected architecture" in md
     assert "Reconstruction build order" in md
+
+
+def test_report_carries_bundle_provenance(decomp):
+    md = to_markdown(decomp)
+    assert "**Bundle:**" in md
+    assert "run_manifest sha256" in md
+
+
+def test_report_part_tables_use_unique_ids(decomp):
+    md = to_markdown(decomp)
+    # `codebase_mapper` exists both as a module part and an application part;
+    # rows must be distinguishable by part id.
+    assert "`module:" in md
+    assert "`app:" in md
+
+
+def test_report_role_tables_exclude_domain_parts(decomp):
+    md = to_markdown(decomp)
+    section = md.split("## Parts by role", 1)[1].split("## Coupling", 1)[0]
+    # Interpretive domain overlays live in their own section, not in the
+    # structural parts inventory.
+    assert "`domain:" not in section
+    assert "## Semantic domains" in md
+
+
+def test_report_gate_table_has_examples(decomp):
+    md = to_markdown(decomp)
+    assert "| gate | findings | worst severity | examples |" in md
+
+
+def test_report_marks_cycle_groups_in_build_order(decomp):
+    md = to_markdown(decomp)
+    if decomp.provenance.get("module_cycles"):
+        section = md.split("## Reconstruction build order", 1)[1]
+        assert "⇄" in section
+
+
+def test_report_legend_defines_interpretive_columns(decomp):
+    md = to_markdown(decomp)
+    legend = md.rsplit("---", 1)[-1]
+    for term in ("reuse", "risk", "layer", "confidence"):
+        assert term in legend, f"legend missing {term}"
