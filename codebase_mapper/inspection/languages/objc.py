@@ -62,6 +62,11 @@ def _find_descendant(node, kinds: set[str]):
     return find_named_descendant(node, kinds)
 
 
+def _collapse(text: str) -> str:
+    """Collapse all whitespace runs to single spaces (single-line headers)."""
+    return " ".join(text.split())
+
+
 # ---------------------------------------------------------------------------
 # Includes / @import
 # ---------------------------------------------------------------------------
@@ -182,6 +187,142 @@ def _method_selector(node, content: bytes) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Canonical signature fields (plugins/chunks_embeddings/signatures.py)
+# ---------------------------------------------------------------------------
+
+
+# Direct children that belong to a type declaration's header line; the header
+# ends at the first child of any other kind (ivars, properties, methods,
+# ``@end``).
+_TYPE_HEADER_CHILD_TYPES = frozenset({
+    "@interface", "@implementation", "@protocol", "identifier",
+    ":", "(", ")", "parameterized_arguments", "protocol_qualifiers",
+    "protocol_reference_list",
+})
+
+# The ``<...>`` list node kinds a type header may carry (grammar versions
+# differ on the node name).
+_ANGLE_LIST_TYPES = frozenset({
+    "parameterized_arguments", "protocol_qualifiers", "protocol_reference_list",
+})
+
+
+def _protocol_names(list_node, content: bytes) -> list[str]:
+    """Names inside a ``<Proto1, Proto2>`` list node, as written."""
+    out: list[str] = []
+    for ch in list_node.children:
+        if ch.is_named and ch.type in {"type_identifier", "identifier"}:
+            out.append(_node_text(ch, content))
+        elif ch.is_named and ch.type == "type_name":
+            ti = _find_first(ch, "type_identifier") or _find_first(ch, "identifier")
+            if ti is not None:
+                out.append(_node_text(ti, content))
+    return out
+
+
+def _split_angle_lists(node, content: bytes) -> tuple[list[str], list[str]]:
+    """Split a type header's ``<...>`` lists into ``(type_params, protocols)``.
+
+    Position disambiguates lightweight generics from protocol adoption:
+    ``@interface Box<ObjectType> : NSObject <NSCopying>`` puts the generics
+    list BEFORE the superclass identifier and the protocol list AFTER it.
+    The anchor is the last direct identifier child (class name, superclass,
+    or category name — whichever comes last).
+    """
+    ids = [c for c in node.children if c.is_named and c.type == "identifier"]
+    anchor = ids[-1].end_byte if ids else node.start_byte
+    type_params: list[str] = []
+    protocols: list[str] = []
+    for ch in node.children:
+        if not (ch.is_named and ch.type in _ANGLE_LIST_TYPES):
+            continue
+        names = _protocol_names(ch, content)
+        if ch.start_byte >= anchor:
+            protocols.extend(names)
+        else:
+            type_params.extend(names)
+    return type_params, protocols
+
+
+def _type_header_signature(node, content: bytes) -> str | None:
+    """The declaration header as written — e.g. ``@interface Dog : Animal
+    <NSCopying>`` — cut before the first non-header child and collapsed to
+    a single line."""
+    end = None
+    for ch in node.children:
+        if ch.type not in _TYPE_HEADER_CHILD_TYPES:
+            break
+        end = ch.end_byte
+    if end is None:
+        return None
+    return _collapse(content[node.start_byte:end].decode("utf-8", "replace")) or None
+
+
+def _type_signature_fields(node, content: bytes, superclass: str | None) -> dict:
+    """Canonical signature fields for an ``@interface`` / ``@implementation``
+    / ``@protocol`` node. Empty fields are omitted (presence is evidence);
+    ``visibility`` / ``is_async`` / ``decorators`` never apply to ObjC types.
+    """
+    fields: dict = {}
+    signature = _type_header_signature(node, content)
+    if signature:
+        fields["signature"] = signature
+    type_params, protocols = _split_angle_lists(node, content)
+    bases = ([superclass] if superclass else []) + protocols
+    if bases:
+        fields["bases"] = bases
+    if type_params:
+        fields["type_params"] = type_params
+    return fields
+
+
+def _method_signature_fields(node, content: bytes) -> dict:
+    """Canonical signature fields for a ``method_declaration`` /
+    ``method_definition`` node.
+
+    ObjC has no default arguments (``default`` is always None), no member
+    visibility keywords, and no async marker — those fields are never
+    emitted. ``params`` carries one entry per selector segment that takes
+    an argument (each ``method_parameter`` child).
+    """
+    fields: dict = {}
+    sig_end = node.end_byte
+    for ch in node.children:
+        if ch.type in {";", "compound_statement"}:
+            sig_end = ch.start_byte
+            break
+    signature = _collapse(
+        content[node.start_byte:sig_end].decode("utf-8", "replace"))
+    if signature:
+        fields["signature"] = signature
+    ret = _find_first(node, "method_type")  # return type; param types nest deeper
+    if ret is not None:
+        tn = _find_first(ret, "type_name")
+        if tn is not None:
+            returns = _collapse(_node_text(tn, content))
+            if returns:
+                fields["returns"] = returns
+    params: list[dict] = []
+    for ch in node.children:
+        if not (ch.is_named and ch.type == "method_parameter"):
+            continue
+        ids = [c for c in ch.children if c.is_named and c.type == "identifier"]
+        if not ids:
+            continue
+        ptype = None
+        mt = _find_first(ch, "method_type")
+        if mt is not None:
+            tn = _find_first(mt, "type_name")
+            if tn is not None:
+                ptype = _collapse(_node_text(tn, content)) or None
+        params.append({"name": _node_text(ids[-1], content),
+                       "type": ptype, "default": None})
+    if params:
+        fields["params"] = params
+    return fields
+
+
+# ---------------------------------------------------------------------------
 # Class interface / implementation / protocol walker
 # ---------------------------------------------------------------------------
 
@@ -223,13 +364,7 @@ def _class_interface_name(node, content: bytes) -> tuple[str | None, str | None,
         or _find_first(node, "protocol_qualifiers") \
         or _find_first(node, "protocol_reference_list")
     if pl is not None:
-        for ch in pl.children:
-            if ch.is_named and ch.type in {"type_identifier", "identifier"}:
-                protocols.append(_node_text(ch, content))
-            elif ch.is_named and ch.type == "type_name":
-                ti = _find_first(ch, "type_identifier") or _find_first(ch, "identifier")
-                if ti is not None:
-                    protocols.append(_node_text(ti, content))
+        protocols = _protocol_names(pl, content)
     return class_name, superclass, protocols, category
 
 
@@ -262,6 +397,7 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                     item["extends"] = superclass
                 if protocols:
                     item["implements"] = protocols
+                item.update(_type_signature_fields(node, content, superclass))
                 items.append(item)
                 # Walk methods inside the interface body.
                 _emit_class_methods(node, content, item_name, items,
@@ -271,7 +407,7 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
             if name is not None:
                 item_kind = "category_impl" if category else "class_implementation"
                 item_name = f"{name}({category})" if category else name
-                items.append({
+                impl_item: dict = {
                     "kind": item_kind,
                     "name": item_name,
                     "parent": None,
@@ -279,7 +415,14 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                     "line_end": node.end_point[0] + 1,
                     "byte_start": node.start_byte,
                     "byte_end": node.end_byte,
-                })
+                }
+                # An @implementation states no supertypes: only the header
+                # signature applies (superclass=None keeps bases out).
+                impl_item.update(
+                    {k: v for k, v in
+                     _type_signature_fields(node, content, None).items()
+                     if k != "bases"})
+                items.append(impl_item)
                 _emit_class_methods(node, content, item_name, items,
                                     decl_only=False)
         elif nt == "protocol_declaration":
@@ -303,6 +446,7 @@ def _walk_tu(root, content: bytes, items: list[dict]) -> None:
                 }
                 if proto_refs:
                     item["implements"] = proto_refs
+                item.update(_type_signature_fields(node, content, None))
                 items.append(item)
                 _emit_class_methods(node, content, proto_name, items,
                                     decl_only=True)
@@ -338,10 +482,10 @@ def _emit_class_methods(class_node, content: bytes, parent_name: str,
         if depth > 5:
             return
         nt = node.type
-        if nt == "method_declaration":
+        if nt in ("method_declaration", "method_definition"):
             selector, short = _method_selector(node, content)
             if short:
-                items.append({
+                method_item = {
                     "kind": "method",
                     "name": short,
                     "parent": parent_name,
@@ -350,21 +494,9 @@ def _emit_class_methods(class_node, content: bytes, parent_name: str,
                     "line_end": node.end_point[0] + 1,
                     "byte_start": node.start_byte,
                     "byte_end": node.end_byte,
-                })
-            return
-        if nt == "method_definition":
-            selector, short = _method_selector(node, content)
-            if short:
-                items.append({
-                    "kind": "method",
-                    "name": short,
-                    "parent": parent_name,
-                    "selector": selector,
-                    "line_start": node.start_point[0] + 1,
-                    "line_end": node.end_point[0] + 1,
-                    "byte_start": node.start_byte,
-                    "byte_end": node.end_byte,
-                })
+                }
+                method_item.update(_method_signature_fields(node, content))
+                items.append(method_item)
             return
         for ch in node.children:
             if ch.is_named:

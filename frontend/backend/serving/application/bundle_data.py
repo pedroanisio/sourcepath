@@ -131,18 +131,32 @@ def _assemble_projection(
     chunks: list[dict[str, Any]] = []
     for rc in raw_chunks:
         in_file_uri = rc.get("in_file_uri")
-        chunks.append(
-            {
-                "uri": rc["uri"],
-                "symbol": rc["symbol"],
-                "kind": rc["kind"],
-                "file": file_by_uri.get(in_file_uri, {}).get("path") if in_file_uri else None,
-                "beginLine": rc["beginLine"],
-                "endLine": rc["endLine"],
-                "embeddingRow": rc["embeddingRow"],
-                "contentSha256": rc["contentSha256"],
-            }
-        )
+        chunk = {
+            "uri": rc["uri"],
+            "symbol": rc["symbol"],
+            "kind": rc["kind"],
+            "file": file_by_uri.get(in_file_uri, {}).get("path") if in_file_uri else None,
+            "beginLine": rc["beginLine"],
+            "endLine": rc["endLine"],
+            "embeddingRow": rc["embeddingRow"],
+            "contentSha256": rc["contentSha256"],
+        }
+        # signature/type surface (omission contract: keys appear only when the
+        # graph carries them — consumers treat absence as "not extracted")
+        for key in ("parentSymbol", "signature", "returns", "visibility"):
+            if rc.get(key) is not None:
+                chunk[key] = rc[key]
+        for key in ("bases", "typeParams", "decorators"):
+            if rc.get(key):
+                chunk[key] = rc[key]
+        if rc.get("isAsync"):
+            chunk["isAsync"] = True
+        if rc.get("paramsJson"):
+            try:
+                chunk["params"] = json.loads(rc["paramsJson"])
+            except (json.JSONDecodeError, TypeError):
+                pass  # malformed generator output must not abort projection
+        chunks.append(chunk)
     chunks.sort(key=lambda r: (r["file"] or "", r["beginLine"] or 0))
     chunk_uri_to_idx: dict[str, int] = {}
     chunks_by_file: dict[str, list[int]] = {}
@@ -231,6 +245,18 @@ def _project_from_jsonld(jsonld_path: Path) -> Projection:
             return value.get("@value")
         return value
 
+    def literals(value: Any) -> list[str]:
+        # All values of a (possibly repeated) literal predicate, as strings.
+        if value is None:
+            return []
+        items = value if isinstance(value, list) else [value]
+        out: list[str] = []
+        for it in items:
+            v = it.get("@value") if isinstance(it, dict) else it
+            if v is not None:
+                out.append(str(v))
+        return out
+
     def id_refs(value: Any) -> list[str]:
         if value is None:
             return []
@@ -290,6 +316,18 @@ def _project_from_jsonld(jsonld_path: Path) -> Projection:
                     "endLine": _int_or_none(literal(node.get("cbml2:endLine"))),
                     "embeddingRow": _int_or_none(literal(node.get("cbml2:embeddingRow"))),
                     "contentSha256": _str_or_none(literal(node.get("cbml2:contentSha256"))),
+                    "parentSymbol": _str_or_none(literal(node.get("cbml2:parentSymbol"))),
+                    "signature": _str_or_none(literal(node.get("cbml2:signature"))),
+                    "returns": _str_or_none(literal(node.get("cbml2:returnsType"))),
+                    "visibility": _str_or_none(literal(node.get("cbml2:visibility"))),
+                    "paramsJson": _str_or_none(literal(node.get("cbml2:paramsJson"))),
+                    "isAsync": bool(literal(node.get("cbml2:isAsync"))),
+                    # sorted: repeated RDF predicates carry no order, so both
+                    # parser paths normalize identically; declaration order is
+                    # recoverable from the ``signature`` text
+                    "bases": sorted(literals(node.get("cbml2:baseType"))),
+                    "typeParams": sorted(literals(node.get("cbml2:typeParam"))),
+                    "decorators": sorted(literals(node.get("cbml2:decorator"))),
                 }
             )
 
@@ -350,6 +388,7 @@ def _project_from_rdflib(ttl_path: Path) -> Projection:
     raw_chunks: list[dict[str, Any]] = []
     for c in g.subjects(RDF.type, CBML2.Chunk):
         in_file = g.value(c, CBML2.inFile)
+        is_async = g.value(c, CBML2.isAsync)
         raw_chunks.append(
             {
                 "uri": str(c),
@@ -360,6 +399,15 @@ def _project_from_rdflib(ttl_path: Path) -> Projection:
                 "endLine": _int_or_none(g.value(c, CBML2.endLine)),
                 "embeddingRow": _int_or_none(g.value(c, CBML2.embeddingRow)),
                 "contentSha256": _str_or_none(g.value(c, CBML2.contentSha256)),
+                "parentSymbol": _str_or_none(g.value(c, CBML2.parentSymbol)),
+                "signature": _str_or_none(g.value(c, CBML2.signature)),
+                "returns": _str_or_none(g.value(c, CBML2.returnsType)),
+                "visibility": _str_or_none(g.value(c, CBML2.visibility)),
+                "paramsJson": _str_or_none(g.value(c, CBML2.paramsJson)),
+                "isAsync": bool(is_async and is_async.toPython() is True),
+                "bases": sorted(str(o) for o in g.objects(c, CBML2.baseType)),
+                "typeParams": sorted(str(o) for o in g.objects(c, CBML2.typeParam)),
+                "decorators": sorted(str(o) for o in g.objects(c, CBML2.decorator)),
             }
         )
 

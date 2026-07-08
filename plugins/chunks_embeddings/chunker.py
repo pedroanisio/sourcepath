@@ -28,6 +28,11 @@ Each chunk is a dict:
         "content_sha256": str,         # sha256 of the full chunk bytes
     }
 
+Symbol-level chunks additionally MAY carry the optional signature/type fields
+defined in plugins/chunks_embeddings/signatures.py (signature, params,
+returns, bases, type_params, visibility, is_async, decorators) — omitted when
+empty/unknown, never emitted as placeholders.
+
 Chunks are stored at `ctx.scratch["chunks"][path]` as a sorted list. The list
 is empty for files with no chunkable content.
 """
@@ -40,6 +45,11 @@ from typing import cast
 
 from codebase_mapper.shared_kernel.extensions import PipelineCtx
 from codebase_mapper.inspection.models import FileRecord
+from plugins.chunks_embeddings.signatures import (
+    apply_signature_fields,
+    python_signature_fields,
+    signature_fields_from_item,
+)
 
 
 SKIP_TYPES = {"binary", "asset", "license", "lockfile", "generated"}
@@ -183,7 +193,7 @@ def _chunk_from_node(node: ast.stmt, kind: str, parent: str | None,
     chunk_bytes = content[byte_start:byte_end]
     text = chunk_bytes.decode("utf-8", "replace")
     name = getattr(node, "name", "<unknown>")
-    return {
+    chunk = {
         "kind": kind,
         "symbol": name,
         "parent_symbol": parent,
@@ -194,6 +204,7 @@ def _chunk_from_node(node: ast.stmt, kind: str, parent: str | None,
         "text": text,
         "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
     }
+    return apply_signature_fields(chunk, python_signature_fields(node))
 
 
 # ---------------------------------------------------------------------------
@@ -242,19 +253,27 @@ def _chunk_tsjs(content: bytes, path: str) -> list[dict]:
         if inner.type == "function_declaration":
             name = _tsjs_named_child_text(inner, "identifier", content)
             if name:
-                chunks.append(_chunk_from_ts_node(node, "function", None, name, content))
+                chunks.append(_chunk_from_ts_node(
+                    node, "function", None, name, content,
+                    _tsjs_callable_fields(inner, content)))
         elif inner.type == "class_declaration":
             name = _tsjs_class_name(inner, content)
             if not name:
                 continue
-            chunks.append(_chunk_from_ts_node(node, "class", None, name, content))
+            chunks.append(_chunk_from_ts_node(
+                node, "class", None, name, content,
+                _tsjs_class_fields(inner, content)))
             for method in _tsjs_iter_methods(inner):
                 m_name = _tsjs_named_child_text(method, "property_identifier", content)
                 if m_name:
-                    chunks.append(_chunk_from_ts_node(method, "method", name, m_name, content))
+                    chunks.append(_chunk_from_ts_node(
+                        method, "method", name, m_name, content,
+                        _tsjs_callable_fields(method, content)))
         elif inner.type in ("lexical_declaration", "variable_declaration"):
-            for name in _tsjs_decl_function_bindings(inner, content):
-                chunks.append(_chunk_from_ts_node(node, "function", None, name, content))
+            for name, declarator in _tsjs_decl_function_bindings(inner, content):
+                chunks.append(_chunk_from_ts_node(
+                    node, "function", None, name, content,
+                    _tsjs_arrow_fields(inner, declarator, content)))
 
     if not chunks:
         return _whole_file_chunk(content, path)
@@ -299,11 +318,11 @@ def _tsjs_iter_methods(class_node):
             yield c
 
 
-def _tsjs_decl_function_bindings(decl_node, content: bytes) -> list[str]:
+def _tsjs_decl_function_bindings(decl_node, content: bytes) -> list[tuple[str, object]]:
     """For ``const foo = () => ...`` / ``const foo = function() ...``
-    declarations, yield the bound name(s). Skips declarators whose RHS isn't
-    a function/arrow (we only chunk callable bindings)."""
-    out: list[str] = []
+    declarations, yield ``(name, declarator_node)`` pairs. Skips declarators
+    whose RHS isn't a function/arrow (we only chunk callable bindings)."""
+    out: list[tuple[str, object]] = []
     for c in decl_node.children:
         if c.type != "variable_declarator":
             continue
@@ -318,12 +337,13 @@ def _tsjs_decl_function_bindings(decl_node, content: bytes) -> list[str]:
         if value is None:
             continue
         if value.type in ("arrow_function", "function_expression"):
-            out.append(content[name_node.start_byte:name_node.end_byte].decode("utf-8", "replace"))
+            name = content[name_node.start_byte:name_node.end_byte].decode("utf-8", "replace")
+            out.append((name, c))
     return out
 
 
 def _chunk_from_ts_node(node, kind: str, parent: str | None, name: str,
-                        content: bytes) -> dict:
+                        content: bytes, fields: dict | None = None) -> dict:
     # Span the node's own byte range — tree-sitter exposes exact byte offsets,
     # so a minified single-line file yields one distinct chunk per symbol
     # rather than N copies of the whole line (defect D1).
@@ -331,7 +351,7 @@ def _chunk_from_ts_node(node, kind: str, parent: str | None, name: str,
     byte_end = node.end_byte
     chunk_bytes = content[byte_start:byte_end]
     text = chunk_bytes.decode("utf-8", "replace")
-    return {
+    chunk = {
         "kind": kind,
         "symbol": name,
         "parent_symbol": parent,
@@ -343,6 +363,172 @@ def _chunk_from_ts_node(node, kind: str, parent: str | None, name: str,
         "text": text,
         "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
     }
+    return apply_signature_fields(chunk, fields or {})
+
+
+# ---------------------------------------------------------------------------
+# TS/JS signature extraction (canonical fields — see signatures.py)
+# ---------------------------------------------------------------------------
+
+
+def _ts_text(node, content: bytes) -> str:
+    return content[node.start_byte:node.end_byte].decode("utf-8", "replace")
+
+
+def _ws_collapse(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _tsjs_annotation_type(node, content: bytes) -> str | None:
+    # A type_annotation node's text is ": T" — drop the leading colon.
+    return _ws_collapse(_ts_text(node, content).lstrip(":")) or None
+
+
+def _tsjs_params(params_node, content: bytes) -> list[dict]:
+    """Flatten formal_parameters. Names are as written: rest params keep the
+    ``...`` prefix and TS optional params keep the ``?`` suffix."""
+    out: list[dict] = []
+    for p in params_node.children:
+        if not p.is_named:
+            continue
+        if p.type in ("required_parameter", "optional_parameter"):   # TS
+            pattern = p.child_by_field_name("pattern")
+            if pattern is None:
+                continue
+            name = _ws_collapse(_ts_text(pattern, content))
+            if p.type == "optional_parameter":
+                name += "?"
+            ta = p.child_by_field_name("type")
+            value = p.child_by_field_name("value")
+            out.append({
+                "name": name,
+                "type": _tsjs_annotation_type(ta, content) if ta is not None else None,
+                "default": _ws_collapse(_ts_text(value, content)) if value is not None else None,
+            })
+        elif p.type in ("identifier", "rest_pattern",                 # JS
+                        "object_pattern", "array_pattern"):
+            out.append({"name": _ws_collapse(_ts_text(p, content)),
+                        "type": None, "default": None})
+        elif p.type == "assignment_pattern":                          # JS default
+            left = p.child_by_field_name("left")
+            right = p.child_by_field_name("right")
+            if left is not None:
+                out.append({
+                    "name": _ws_collapse(_ts_text(left, content)),
+                    "type": None,
+                    "default": _ws_collapse(_ts_text(right, content)) if right is not None else None,
+                })
+    return out
+
+
+def _tsjs_type_params(node, content: bytes) -> list[str]:
+    tp = node.child_by_field_name("type_parameters")
+    if tp is None:
+        return []
+    return [_ws_collapse(_ts_text(c, content))
+            for c in tp.children if c.is_named]
+
+
+def _tsjs_callable_fields(node, content: bytes) -> dict:
+    """Canonical fields for function_declaration / method_definition /
+    arrow_function / function_expression nodes."""
+    fields: dict = {}
+    params_node = node.child_by_field_name("parameters")
+    if params_node is not None:
+        params = _tsjs_params(params_node, content)
+        if params:
+            fields["params"] = params
+    rt = node.child_by_field_name("return_type")
+    if rt is not None:
+        returns = _tsjs_annotation_type(rt, content)
+        if returns:
+            fields["returns"] = returns
+    type_params = _tsjs_type_params(node, content)
+    if type_params:
+        fields["type_params"] = type_params
+    for c in node.children:
+        if not c.is_named and c.type == "async":
+            fields["is_async"] = True
+        elif c.type == "accessibility_modifier":
+            fields["visibility"] = _ts_text(c, content)
+        elif c.type == "decorator":
+            fields.setdefault("decorators", []).append(
+                _ws_collapse(_ts_text(c, content)).lstrip("@"))
+    body = node.child_by_field_name("body")
+    end = body.start_byte if body is not None else node.end_byte
+    signature = _ws_collapse(
+        content[node.start_byte:end].decode("utf-8", "replace")
+    ).rstrip(";").strip()
+    if signature:
+        fields["signature"] = signature
+    return fields
+
+
+def _tsjs_class_fields(class_node, content: bytes) -> dict:
+    """Canonical fields for a class_declaration: heritage → bases, generics,
+    decorators, header signature (up to the class body)."""
+    fields: dict = {}
+    type_params = _tsjs_type_params(class_node, content)
+    if type_params:
+        fields["type_params"] = type_params
+    bases: list[str] = []
+    heritage = next((c for c in class_node.children
+                     if c.type == "class_heritage"), None)
+    if heritage is not None:
+        for clause in heritage.children:
+            if clause.type == "extends_clause":
+                # TS pairs each value with optional type_arguments; slice from
+                # the value start to its (possibly extended) end to keep
+                # ``Base<T>`` as written.
+                named = [c for c in clause.children if c.is_named]
+                i = 0
+                while i < len(named):
+                    start = named[i].start_byte
+                    end = named[i].end_byte
+                    if i + 1 < len(named) and named[i + 1].type == "type_arguments":
+                        end = named[i + 1].end_byte
+                        i += 1
+                    bases.append(_ws_collapse(
+                        content[start:end].decode("utf-8", "replace")))
+                    i += 1
+            elif clause.type == "implements_clause":
+                bases.extend(_ws_collapse(_ts_text(c, content))
+                             for c in clause.children if c.is_named)
+            elif clause.is_named:
+                # JS grammar: class_heritage wraps the expression directly.
+                bases.append(_ws_collapse(_ts_text(clause, content)))
+    if bases:
+        fields["bases"] = bases
+    decorators = [_ws_collapse(_ts_text(c, content)).lstrip("@")
+                  for c in class_node.children if c.type == "decorator"]
+    if decorators:
+        fields["decorators"] = decorators
+    body = next((c for c in class_node.children if c.type == "class_body"), None)
+    end = body.start_byte if body is not None else class_node.end_byte
+    signature = _ws_collapse(
+        content[class_node.start_byte:end].decode("utf-8", "replace")).strip()
+    if signature:
+        fields["signature"] = signature
+    return fields
+
+
+def _tsjs_arrow_fields(inner_decl, declarator, content: bytes) -> dict:
+    """Canonical fields for a ``const f = (...) => ...`` binding: callable
+    fields come from the arrow/function expression; the signature is the
+    declaration keyword + declarator text up to and including the ``=>``
+    (or up to the function body for ``function`` expressions)."""
+    value = declarator.child_by_field_name("value")
+    fields = _tsjs_callable_fields(value, content) if value is not None else {}
+    keyword = inner_decl.children[0] if inner_decl.children else None
+    kw = _ts_text(keyword, content) if keyword is not None and not keyword.is_named else ""
+    body = value.child_by_field_name("body") if value is not None else None
+    end = body.start_byte if body is not None else declarator.end_byte
+    tail = _ws_collapse(
+        content[declarator.start_byte:end].decode("utf-8", "replace")).strip()
+    signature = f"{kw} {tail}".strip()
+    if signature:
+        fields["signature"] = signature
+    return fields
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +557,110 @@ def _rust_decl_list(node):
         if c.type == "declaration_list":
             return c
     return None
+
+
+# ---------------------------------------------------------------------------
+# Rust signature extraction (canonical fields — see signatures.py)
+# ---------------------------------------------------------------------------
+
+
+def _rust_params(params_node, content: bytes) -> list[dict]:
+    """Flatten a ``parameters`` node. Self params keep their exact form
+    (``&self`` / ``&mut self``) with type None unless explicitly typed."""
+    out: list[dict] = []
+    for p in params_node.children:
+        if not p.is_named:
+            continue
+        if p.type == "self_parameter":
+            text = _ws_collapse(_ts_text(p, content))
+            name, _, ptype = text.partition(":")
+            out.append({"name": name.strip(),
+                        "type": ptype.strip() or None, "default": None})
+        elif p.type == "parameter":
+            pattern = p.child_by_field_name("pattern")
+            ptype = p.child_by_field_name("type")
+            if pattern is None:
+                continue
+            out.append({
+                "name": _ws_collapse(_ts_text(pattern, content)),
+                "type": _ws_collapse(_ts_text(ptype, content)) if ptype is not None else None,
+                "default": None,
+            })
+        elif p.type == "variadic_parameter":
+            out.append({"name": "...", "type": None, "default": None})
+    return out
+
+
+def _rust_attributes(node, content: bytes) -> list[str]:
+    """Preceding ``attribute_item`` siblings, with the ``#[`` ``]`` sigil
+    stripped (attributes are separate sibling nodes in tree-sitter-rust)."""
+    out: list[str] = []
+    sib = node.prev_named_sibling
+    while sib is not None and sib.type == "attribute_item":
+        text = _ws_collapse(_ts_text(sib, content))
+        if text.startswith("#[") and text.endswith("]"):
+            text = text[2:-1]
+        out.insert(0, text)
+        sib = sib.prev_named_sibling
+    return out
+
+
+def _rust_signature_fields(node, content: bytes,
+                           bases: list[str] | None = None) -> dict:
+    """Canonical fields for a Rust item node (function / struct / enum /
+    union / trait / impl / function_signature_item)."""
+    fields: dict = {}
+    for c in node.children:
+        if c.type == "visibility_modifier":
+            fields["visibility"] = _ws_collapse(_ts_text(c, content))
+        elif c.type == "function_modifiers":
+            if "async" in _ts_text(c, content).split():
+                fields["is_async"] = True
+        elif not c.is_named and c.type == "async":
+            fields["is_async"] = True
+    tp = node.child_by_field_name("type_parameters")
+    if tp is not None:
+        type_params = [_ws_collapse(_ts_text(c, content))
+                       for c in tp.children if c.is_named]
+        if type_params:
+            fields["type_params"] = type_params
+    params_node = node.child_by_field_name("parameters")
+    if params_node is not None:
+        params = _rust_params(params_node, content)
+        if params:
+            fields["params"] = params
+    rt = node.child_by_field_name("return_type")
+    if rt is not None:
+        fields["returns"] = _ws_collapse(_ts_text(rt, content))
+    if bases:
+        fields["bases"] = list(bases)
+    decorators = _rust_attributes(node, content)
+    if decorators:
+        fields["decorators"] = decorators
+    body = node.child_by_field_name("body")
+    end = body.start_byte if body is not None else node.end_byte
+    signature = _ws_collapse(
+        content[node.start_byte:end].decode("utf-8", "replace")
+    ).rstrip(";").strip()
+    if signature:
+        fields["signature"] = signature
+    return fields
+
+
+def _rust_trait_bases(node, content: bytes) -> list[str]:
+    """Supertraits from a trait_item's ``bounds`` (``: Draw + Resize``)."""
+    bounds = node.child_by_field_name("bounds")
+    if bounds is None:
+        return []
+    return [_ws_collapse(_ts_text(c, content))
+            for c in bounds.children if c.is_named]
+
+
+def _rust_impl_bases(node, content: bytes) -> list[str]:
+    """For ``impl Trait for Type``, the implemented trait; empty for
+    inherent impls."""
+    trait = node.child_by_field_name("trait")
+    return [_ws_collapse(_ts_text(trait, content))] if trait is not None else []
 
 
 def _chunk_rust(content: bytes, path: str) -> list[dict]:
@@ -409,35 +699,49 @@ def _chunk_rust(content: bytes, path: str) -> list[dict]:
         if t == "function_item":
             name = _rust_chunk_name(node, content)
             if name:
-                chunks.append(_chunk_from_ts_node(node, "function", None, name, content))
+                chunks.append(_chunk_from_ts_node(
+                    node, "function", None, name, content,
+                    _rust_signature_fields(node, content)))
         elif t in ("struct_item", "enum_item", "union_item"):
             name = _rust_chunk_name(node, content)
             if name:
-                chunks.append(_chunk_from_ts_node(node, "class", None, name, content))
+                chunks.append(_chunk_from_ts_node(
+                    node, "class", None, name, content,
+                    _rust_signature_fields(node, content)))
         elif t == "trait_item":
             name = _rust_chunk_name(node, content)
             if not name:
                 continue
-            chunks.append(_chunk_from_ts_node(node, "class", None, name, content))
+            chunks.append(_chunk_from_ts_node(
+                node, "class", None, name, content,
+                _rust_signature_fields(node, content,
+                                       _rust_trait_bases(node, content))))
             body = _rust_decl_list(node)
             if body is not None:
                 for m in body.children:
                     if m.is_named and m.type in ("function_item", "function_signature_item"):
                         m_name = _rust_chunk_name(m, content)
                         if m_name:
-                            chunks.append(_chunk_from_ts_node(m, "method", name, m_name, content))
+                            chunks.append(_chunk_from_ts_node(
+                                m, "method", name, m_name, content,
+                                _rust_signature_fields(m, content)))
         elif t == "impl_item":
             impl_name = _rust_chunk_name(node, content)
             if not impl_name:
                 continue
-            chunks.append(_chunk_from_ts_node(node, "class", None, impl_name, content))
+            chunks.append(_chunk_from_ts_node(
+                node, "class", None, impl_name, content,
+                _rust_signature_fields(node, content,
+                                       _rust_impl_bases(node, content))))
             body = _rust_decl_list(node)
             if body is not None:
                 for m in body.children:
                     if m.is_named and m.type == "function_item":
                         m_name = _rust_chunk_name(m, content)
                         if m_name:
-                            chunks.append(_chunk_from_ts_node(m, "method", impl_name, m_name, content))
+                            chunks.append(_chunk_from_ts_node(
+                                m, "method", impl_name, m_name, content,
+                                _rust_signature_fields(m, content)))
 
     if not chunks:
         return _whole_file_chunk(content, path)
@@ -535,7 +839,7 @@ def _chunk_dart(content: bytes, record: FileRecord) -> list[dict]:
         # The analyzer's byte spans are computed against the raw bytes;
         # for the chunk's content_sha we hash the actual reconstructed
         # text bytes — matches the convention used by _chunk_from_node.
-        chunks.append({
+        chunks.append(apply_signature_fields({
             "kind": _DART_TO_CHUNK_KIND.get(kind, "method"),
             "symbol": _dart_symbol_for(item),
             "parent_symbol": item.get("parent"),
@@ -545,7 +849,7 @@ def _chunk_dart(content: bytes, record: FileRecord) -> list[dict]:
             "line_end": line_end,
             "text": chunk_text,
             "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
-        })
+        }, signature_fields_from_item(item)))
 
     if not chunks:
         return _whole_file_chunk(content, record.path)
@@ -605,7 +909,7 @@ def _chunk_java(content: bytes, record: FileRecord) -> list[dict]:
             continue
         chunk_text = "".join(src_lines[line_start - 1: line_end])
         chunk_bytes = chunk_text.encode("utf-8")
-        chunks.append({
+        chunks.append(apply_signature_fields({
             "kind": _JAVA_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
@@ -615,7 +919,7 @@ def _chunk_java(content: bytes, record: FileRecord) -> list[dict]:
             "line_end": line_end,
             "text": chunk_text,
             "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
-        })
+        }, signature_fields_from_item(item)))
 
     if not chunks:
         return _whole_file_chunk(content, record.path)
@@ -666,7 +970,7 @@ def _chunk_go(content: bytes, record: FileRecord) -> list[dict]:
             continue
         chunk_text = "".join(src_lines[line_start - 1: line_end])
         chunk_bytes = chunk_text.encode("utf-8")
-        chunks.append({
+        chunks.append(apply_signature_fields({
             "kind": _GO_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
@@ -676,7 +980,7 @@ def _chunk_go(content: bytes, record: FileRecord) -> list[dict]:
             "line_end": line_end,
             "text": chunk_text,
             "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
-        })
+        }, signature_fields_from_item(item)))
 
     if not chunks:
         return _whole_file_chunk(content, record.path)
@@ -726,7 +1030,7 @@ def _chunk_clojure(content: bytes, record: FileRecord) -> list[dict]:
             continue
         chunk_text = "".join(src_lines[line_start - 1: line_end])
         chunk_bytes = chunk_text.encode("utf-8")
-        chunks.append({
+        chunks.append(apply_signature_fields({
             "kind": _CLOJURE_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
@@ -736,7 +1040,7 @@ def _chunk_clojure(content: bytes, record: FileRecord) -> list[dict]:
             "line_end": line_end,
             "text": chunk_text,
             "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
-        })
+        }, signature_fields_from_item(item)))
 
     if not chunks:
         return _whole_file_chunk(content, record.path)
@@ -808,7 +1112,7 @@ def _chunk_cpp(content: bytes, record: FileRecord) -> list[dict]:
         seen_ids.add(key)
         chunk_text = "".join(src_lines[line_start - 1: line_end])
         chunk_bytes = chunk_text.encode("utf-8")
-        chunks.append({
+        chunks.append(apply_signature_fields({
             "kind": _CPP_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
@@ -818,7 +1122,7 @@ def _chunk_cpp(content: bytes, record: FileRecord) -> list[dict]:
             "line_end": line_end,
             "text": chunk_text,
             "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
-        })
+        }, signature_fields_from_item(item)))
 
     if not chunks:
         return _whole_file_chunk(content, record.path)
@@ -892,7 +1196,7 @@ def _chunk_objc(content: bytes, record: FileRecord) -> list[dict]:
         seen_ids.add(key)
         chunk_text = "".join(src_lines[line_start - 1: line_end])
         chunk_bytes = chunk_text.encode("utf-8")
-        chunks.append({
+        chunks.append(apply_signature_fields({
             "kind": _OBJC_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
@@ -902,7 +1206,7 @@ def _chunk_objc(content: bytes, record: FileRecord) -> list[dict]:
             "line_end": line_end,
             "text": chunk_text,
             "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
-        })
+        }, signature_fields_from_item(item)))
 
     if not chunks:
         return _whole_file_chunk(content, record.path)

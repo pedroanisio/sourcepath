@@ -21,6 +21,7 @@ emitter is responsible for actually writing the file at that path.
 """
 from __future__ import annotations
 
+import json
 import re
 import urllib.parse
 from typing import cast
@@ -45,6 +46,21 @@ CBM = Namespace(CBM_NS)
 
 CHUNK_KINDS = ("function", "class", "method", "file")
 EMBEDDINGS_ARTIFACT_FILENAME = "embeddings.npz"
+
+# Signature/type fields (plugins/chunks_embeddings/signatures.py) → predicates.
+# Emitted only when present on the chunk (omission contract); ``params`` is a
+# JSON literal — its inner structure is validated at extraction time, and a
+# JSON string keeps the graph compact and SPARQL-safe.
+SIGNATURE_SCALAR_PREDICATES = (
+    ("signature", "signature"),
+    ("returns", "returnsType"),
+    ("visibility", "visibility"),
+)
+SIGNATURE_REPEATED_PREDICATES = (
+    ("bases", "baseType"),
+    ("type_params", "typeParam"),
+    ("decorators", "decorator"),
+)
 
 
 def chunk_iri(chunk_id: str) -> URIRef:
@@ -84,6 +100,19 @@ class ChunkGraphWriter:
                    Literal(c["content_sha256"], datatype=XSD.hexBinary)))
             if c.get("truncated_for_embedding"):
                 g.add((ciri, CBML2.truncatedForEmbedding,
+                       Literal(True, datatype=XSD.boolean)))
+            for field, pred in SIGNATURE_SCALAR_PREDICATES:
+                value = c.get(field)
+                if value:
+                    g.add((ciri, CBML2[pred], Literal(value)))
+            for field, pred in SIGNATURE_REPEATED_PREDICATES:
+                for value in c.get(field) or []:
+                    g.add((ciri, CBML2[pred], Literal(value)))
+            if c.get("params"):
+                g.add((ciri, CBML2.paramsJson,
+                       Literal(json.dumps(c["params"], sort_keys=False))))
+            if c.get("is_async"):
+                g.add((ciri, CBML2.isAsync,
                        Literal(True, datatype=XSD.boolean)))
             if has_embeddings:
                 g.add((ciri, CBML2.embeddingRow,
@@ -138,6 +167,20 @@ class ChunkShapes:
                   datatype=XSD.string, max_count=1)
         _add_prop(shapes, chunk_shape, CBML2.truncatedForEmbedding,
                   datatype=XSD.boolean, max_count=1)
+        # signature/type fields — all optional (omission contract)
+        _add_prop(shapes, chunk_shape, CBML2.signature,
+                  datatype=XSD.string, max_count=1)
+        _add_prop(shapes, chunk_shape, CBML2.returnsType,
+                  datatype=XSD.string, max_count=1)
+        _add_prop(shapes, chunk_shape, CBML2.visibility,
+                  datatype=XSD.string, max_count=1)
+        _add_prop(shapes, chunk_shape, CBML2.paramsJson,
+                  datatype=XSD.string, max_count=1)
+        _add_prop(shapes, chunk_shape, CBML2.isAsync,
+                  datatype=XSD.boolean, max_count=1)
+        _add_prop(shapes, chunk_shape, CBML2.baseType, datatype=XSD.string)
+        _add_prop(shapes, chunk_shape, CBML2.typeParam, datatype=XSD.string)
+        _add_prop(shapes, chunk_shape, CBML2.decorator, datatype=XSD.string)
 
 
 def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,

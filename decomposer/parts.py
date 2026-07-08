@@ -26,7 +26,7 @@ from . import classify
 from .evidence import EvidenceGraph
 from .metrics import instability as _instability
 from .model import (
-    Classification, Confidence, DepRef, Evidence, Part,
+    Classification, Confidence, DepRef, Evidence, Part, SymbolRecord,
 )
 
 _CODE_TYPES = frozenset({"source_code", "test_code"})
@@ -120,9 +120,22 @@ def _compute_interfaces(ev: EvidenceGraph, mg: ModuleGraph) -> None:
         if sym and sym != "<file>":
             iface.setdefault(dm, set()).add(sym)
 
-    # Fallback: files imported across the module boundary are public surface —
-    # only for modules with NO symbol-level xrefs crossing in, so a module's
-    # interface list is either symbols or file basenames, never a mix.
+    # Rust fallback: declared public surface from the rust_items sidecar —
+    # top-level `pub` items per module. Stronger than filenames: it is the
+    # crate's actual exported API, mechanically extracted.
+    rust_pub: dict[str, set[str]] = {}
+    for item in ev.rust_items:
+        if not item.get("is_pub") or item.get("parent"):
+            continue
+        name = item.get("name")
+        m = mg.module_of_file.get(item.get("path") or "")
+        if name and m is not None:
+            rust_pub.setdefault(m, set()).add(name)
+
+    # Last-resort fallback: files imported across the module boundary are
+    # public surface — only for modules with NO symbol-level xrefs crossing in
+    # and no declared-API evidence, so a module's interface list is symbols,
+    # declared pub items, or file basenames — never a mix.
     fallback: dict[str, set[str]] = {}
     for src, targets in ev.imports_out.items():
         sm = mg.module_of_file.get(src)
@@ -132,15 +145,69 @@ def _compute_interfaces(ev: EvidenceGraph, mg: ModuleGraph) -> None:
                 fallback.setdefault(dm, set()).add(PurePosixPath(dst).name)
 
     for m in mg.files_of_module:
-        surface = iface.get(m) or fallback.get(m, set())
-        mg.interfaces[m] = sorted(surface)[:40]
+        surface = iface.get(m) or rust_pub.get(m) or fallback.get(m, set())
+        mg.interfaces[m] = sorted(surface)
         mg.xref_in[m] = xin.get(m, 0)
         mg.xref_out[m] = xout.get(m, 0)
 
 
+# ── symbol map (Tier 1) ──────────────────────────────────────────────────────
+def build_symbol_map(
+    ev: EvidenceGraph, mg: ModuleGraph,
+) -> dict[str, list[SymbolRecord]]:
+    """Full symbol inventory per module part: one :class:`SymbolRecord` per
+    symbol chunk (``file`` chunks are containers, not symbols — excluded).
+
+    ``is_interface`` marks chunks that are the *target* of a cross-module xref
+    (called / subclassed / overridden from another module) — the uncapped,
+    per-symbol counterpart of the part's ``interface_symbols`` list.
+    Everything here is graph-proven, hence CERTAIN.
+    """
+    interface_idx: set[int] = set()
+    for e in ev.xrefs:
+        src = ev.chunks[e["src_idx"]]
+        dst = ev.chunks[e["dst_idx"]]
+        sm = mg.module_of_file.get(src.get("file") or "")
+        dm = mg.module_of_file.get(dst.get("file") or "")
+        if sm is not None and dm is not None and sm != dm:
+            interface_idx.add(e["dst_idx"])
+
+    out: dict[str, list[SymbolRecord]] = {}
+    for mod, files in mg.files_of_module.items():
+        records: list[SymbolRecord] = []
+        for path in files:
+            for i in ev.chunks_by_file.get(path, []):
+                c = ev.chunks[i]
+                if c.get("kind") == "file":
+                    continue
+                records.append(SymbolRecord(
+                    name=c.get("symbol") or "<unknown>",
+                    kind=c.get("kind") or "unknown",
+                    file=path,
+                    line_start=c.get("beginLine"),
+                    line_end=c.get("endLine"),
+                    parent=c.get("parentSymbol"),
+                    signature=c.get("signature"),
+                    params=c.get("params"),
+                    returns=c.get("returns"),
+                    bases=c.get("bases"),
+                    type_params=c.get("typeParams"),
+                    visibility=c.get("visibility"),
+                    is_async=bool(c.get("isAsync")),
+                    decorators=c.get("decorators"),
+                    is_interface=i in interface_idx,
+                ))
+        if records:
+            records.sort(key=lambda s: (s.name, s.file, s.line_start or 0))
+            out[f"module:{mod}"] = records
+    return out
+
+
 # ── module → Part ─────────────────────────────────────────────────────────────
 def build_module_parts(
-    ev: EvidenceGraph, mg: ModuleGraph, cycle_modules: set[str]
+    ev: EvidenceGraph, mg: ModuleGraph, cycle_modules: set[str],
+    crate_of_module: dict[str, str] | None = None,
+    test_edges: set[tuple[str, str]] | None = None,
 ) -> list[Part]:
     parts: list[Part] = []
     for mod in mg.modules():
@@ -148,13 +215,15 @@ def build_module_parts(
         code_files = [p for p in files if ev.file_by_path.get(p, {}).get("type") in _CODE_TYPES]
         if not code_files:
             continue  # non-code directory: represented via evidence elsewhere
-        parts.append(_module_part(ev, mg, mod, files, code_files, cycle_modules))
+        parts.append(_module_part(ev, mg, mod, files, code_files, cycle_modules,
+                                  crate_of_module or {}, test_edges or set()))
     return parts
 
 
 def _module_part(
     ev: EvidenceGraph, mg: ModuleGraph, mod: str,
     files: list[str], code_files: list[str], cycle_modules: set[str],
+    crate_of_module: dict[str, str], test_edges: set[tuple[str, str]],
 ) -> Part:
     ca, ce = mg.ca.get(mod, 0), mg.ce.get(mod, 0)
     inst, stab, stab_conf = classify.classify_stability(ca, ce)
@@ -202,9 +271,14 @@ def _module_part(
         signals=_module_signals(ev, mod, files, code_files, phases, ca, ce, in_cycle),
         llm_summaries=_module_llm_summaries(ev, code_files),
     )
+    # Dev/test-only edges (e.g. Cargo dev-dependency imports) are carried
+    # separately: they are real, but must not drive SCC/build-order math.
+    prod_out = [m for m in mg.adjacency.get(mod, []) if (mod, m) not in test_edges]
+    test_out = [m for m in mg.adjacency.get(mod, []) if (mod, m) in test_edges]
     deps = DepRef(
         incoming=[f"module:{m}" for m in mg.importers.get(mod, [])],
-        outgoing=[f"module:{m}" for m in mg.adjacency.get(mod, [])],
+        outgoing=[f"module:{m}" for m in prod_out],
+        test_only_outgoing=[f"module:{m}" for m in test_out],
     )
     metrics = {
         "ca": ca, "ce": ce,
@@ -219,6 +293,8 @@ def _module_part(
             if (lang := ev.file_by_path.get(p, {}).get("language"))
         }),
     }
+    if crate_of_module.get(mod):
+        metrics["crate"] = crate_of_module[mod]
     return Part(
         id=f"module:{mod}", name=mod, kind=kind, layer=layer,
         responsibility=responsibility, responsibility_confidence=resp_conf,
@@ -239,6 +315,7 @@ def build_cross_cutting_parts(ev: EvidenceGraph, mg: ModuleGraph) -> list[Part]:
     parts.extend(_generated_parts(ev, mg))
     parts.extend(_operational_parts(ev))
     parts.extend(_documentation_part(ev))
+    parts.extend(_unclassified_part(ev))
     return parts
 
 
@@ -467,7 +544,46 @@ _OPERATIONAL_CATEGORIES: list[tuple[str, frozenset[str], str]] = [
      "Container / deployment topology definitions."),
     ("runtime_configuration", frozenset({"configuration", "environment"}),
      "Runtime and tooling configuration, environment variables."),
+    ("licensing", frozenset({"license"}),
+     "License and legal notices."),
 ]
+
+# File types owned by non-operational builders (code modules, docs part,
+# generated-artifact parts). Anything outside these and the operational
+# categories falls into an explicit catch-all part — the coverage invariant:
+# no repository file may be silently absent from every part.
+_NON_OPERATIONAL_TYPES = frozenset({
+    "source_code", "test_code", "documentation", "generated",
+})
+
+
+def _unclassified_part(ev: EvidenceGraph) -> list[Part]:
+    """Catch-all for file types no builder claims (coverage invariant)."""
+    covered = _NON_OPERATIONAL_TYPES | {
+        t for _, types, _ in _OPERATIONAL_CATEGORIES for t in types
+    }
+    files = sorted(f["path"] for f in ev.files if f.get("type") not in covered)
+    if not files:
+        return []
+    types = sorted({str(ev.file_by_path[p].get("type")) for p in files})
+    return [Part(
+        id="ops:unclassified_files", name="unclassified_files",
+        kind="operational", layer="operational",
+        responsibility=("Files whose graph type matches no structural or "
+                        "operational category; carried so the decomposition "
+                        "accounts for every repository file."),
+        responsibility_confidence=Confidence.CERTAIN,
+        evidence=Evidence(
+            files=files,
+            signals=[f"{len(files)} file(s) of uncategorized type(s) {types}"],
+        ),
+        classification=Classification(
+            role="supporting", role_confidence=Confidence.WEAK,
+            reusability="internal", risk="low",
+        ),
+        metrics={"n_files": len(files), "file_types": types},
+        overall_confidence=Confidence.CERTAIN,
+    )]
 
 
 def _operational_parts(ev: EvidenceGraph) -> list[Part]:

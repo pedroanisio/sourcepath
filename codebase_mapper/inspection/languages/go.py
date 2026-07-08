@@ -29,6 +29,111 @@ def _go_item(kind: str, name: str, parent: str | None, node) -> dict:
     }
 
 
+def _collapse(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _go_params(param_list, content: bytes) -> list[dict]:
+    """Expand a ``parameter_list`` into ordered {name, type, default} records
+    (the canonical contract in plugins/chunks_embeddings/signatures.py).
+
+    Grouped names (``a, b int``) become one entry per name sharing the type;
+    a variadic keeps the ``...`` prefix on its type as written; an unnamed
+    parameter (``func f(int)``) carries name ``""`` — nothing was written, and
+    fabricating ``_`` would conflate it with an explicit blank identifier.
+    ``default`` is always None: Go has no parameter defaults.
+    """
+    out: list[dict] = []
+    if param_list is None:
+        return out
+    for decl in param_list.children:
+        if not decl.is_named:
+            continue
+        type_node = decl.child_by_field_name("type")
+        ptype = _collapse(_node_text(type_node, content)) if type_node is not None else None
+        if decl.type == "variadic_parameter_declaration":
+            name_node = decl.child_by_field_name("name")
+            name = _node_text(name_node, content) if name_node is not None else ""
+            out.append({"name": name, "type": "..." + ptype if ptype else "...",
+                        "default": None})
+        elif decl.type == "parameter_declaration":
+            names = decl.children_by_field_name("name")
+            if names:
+                for n in names:
+                    out.append({"name": _node_text(n, content), "type": ptype,
+                                "default": None})
+            else:
+                out.append({"name": "", "type": ptype, "default": None})
+    return out
+
+
+def _go_type_params(owner, content: bytes) -> list[str]:
+    """Generic type parameters as written, one entry per declaration."""
+    tp_list = owner.child_by_field_name("type_parameters")
+    if tp_list is None:
+        return []
+    return [_collapse(_node_text(c, content)) for c in tp_list.children
+            if c.is_named and c.type == "type_parameter_declaration"]
+
+
+def _go_callable_fields(node, content: bytes) -> dict:
+    """Signature fields for a function/method declaration.
+
+    ``signature`` is the header as written — everything before the body ``{``,
+    whitespace-collapsed to one line — so a method's receiver is included.
+    ``visibility``/``is_async``/``decorators`` are never set: Go has no
+    visibility keywords (capitalization is recoverable from the name itself),
+    no async functions, and no decorators. Empty fields are omitted entirely.
+    """
+    body = node.child_by_field_name("body")
+    end = body.start_byte if body is not None else node.end_byte
+    fields: dict = {
+        "signature": _collapse(content[node.start_byte:end].decode("utf-8", "replace")),
+    }
+    params = _go_params(node.child_by_field_name("parameters"), content)
+    if params:
+        fields["params"] = params
+    result = node.child_by_field_name("result")
+    if result is not None:
+        fields["returns"] = _collapse(_node_text(result, content))
+    type_params = _go_type_params(node, content)
+    if type_params:
+        fields["type_params"] = type_params
+    return fields
+
+
+def _go_type_fields(spec, content: bytes) -> dict:
+    """Signature fields for a ``type_spec`` (struct / interface / plain type).
+
+    ``signature`` is ``type <header>`` up to (excluding) the body braces.
+    Interface ``type_elem`` members (embedded interfaces / constraint
+    elements) become ``bases`` as written; struct embedded fields do NOT —
+    Go struct embedding is composition, not subtyping.
+    """
+    type_node = spec.child_by_field_name("type")
+    end = spec.end_byte
+    fields: dict = {}
+    if type_node is not None and type_node.type == "struct_type":
+        body = next((c for c in type_node.children
+                     if c.type == "field_declaration_list"), None)
+        if body is not None:
+            end = body.start_byte
+    elif type_node is not None and type_node.type == "interface_type":
+        brace = next((c for c in type_node.children if c.type == "{"), None)
+        if brace is not None:
+            end = brace.start_byte
+        bases = [_collapse(_node_text(c, content)) for c in type_node.children
+                 if c.is_named and c.type == "type_elem"]
+        if bases:
+            fields["bases"] = bases
+    fields["signature"] = "type " + _collapse(
+        content[spec.start_byte:end].decode("utf-8", "replace"))
+    type_params = _go_type_params(spec, content)
+    if type_params:
+        fields["type_params"] = type_params
+    return fields
+
+
 def _collect_go_items(root, content: bytes) -> list[dict]:
     """One item per top-level func / method / struct / interface / type, with
     byte+line spans (powers L2 chunking + the symbol surface).
@@ -45,7 +150,9 @@ def _collect_go_items(root, content: bytes) -> list[dict]:
         if nt == "function_declaration":
             name_node = node.child_by_field_name("name")
             if name_node is not None:
-                items.append(_go_item("function", _node_text(name_node, content), None, node))
+                item = _go_item("function", _node_text(name_node, content), None, node)
+                item.update(_go_callable_fields(node, content))
+                items.append(item)
         elif nt == "method_declaration":
             name_node = node.child_by_field_name("name")
             recv = node.child_by_field_name("receiver")
@@ -55,7 +162,9 @@ def _collect_go_items(root, content: bytes) -> list[dict]:
                 if tid is not None:
                     parent = _node_text(tid, content)
             if name_node is not None:
-                items.append(_go_item("method", _node_text(name_node, content), parent, node))
+                item = _go_item("method", _node_text(name_node, content), parent, node)
+                item.update(_go_callable_fields(node, content))
+                items.append(item)
         elif nt == "type_declaration":
             for spec in node.children:
                 if not (spec.is_named and spec.type == "type_spec"):
@@ -69,7 +178,9 @@ def _collect_go_items(root, content: bytes) -> list[dict]:
                     kind = "struct"
                 elif type_node is not None and type_node.type == "interface_type":
                     kind = "interface"
-                items.append(_go_item(kind, _node_text(name_node, content), None, spec))
+                item = _go_item(kind, _node_text(name_node, content), None, spec)
+                item.update(_go_type_fields(spec, content))
+                items.append(item)
     return items
 
 

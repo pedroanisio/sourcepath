@@ -20,6 +20,13 @@ def _find_bundle() -> Path | None:
     root = REPO_ROOT / "_tmp"
     if not root.is_dir():
         return None
+    # Prefer the project's own bundle: several assertions below are about
+    # THIS repository's shape (e.g. codebase_mapper being both a module and
+    # an application part) and must not float to whichever foreign bundle
+    # happens to sort first as _tmp accumulates.
+    own = root / "cbm"
+    if (own / "run_manifest.json").exists():
+        return own
     for child in sorted(root.iterdir()):
         if (child / "run_manifest.json").exists():
             return child

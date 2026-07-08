@@ -16,19 +16,22 @@ Public API:
 """
 from __future__ import annotations
 
-from .decompose import decompose
+from .decompose import decompose, decompose_evidence
 from .model import (
     Architecture, Classification, Confidence, Decomposition, DepRef, Evidence,
-    Part, QualityFinding, Relationship,
+    Part, QualityFinding, Relationship, SymbolRecord,
 )
 from .report import to_markdown
-from .serialize import to_document, to_yaml
+from .serialize import to_document, to_symbols_yaml, to_yaml
 
 __all__ = [
     "decompose",
+    "decompose_evidence",
     "to_yaml",
+    "to_symbols_yaml",
     "to_document",
     "to_markdown",
+    "SymbolRecord",
     "Decomposition",
     "Part",
     "Relationship",

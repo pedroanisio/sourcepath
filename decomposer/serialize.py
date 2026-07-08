@@ -20,6 +20,40 @@ def to_yaml(decomp: Decomposition) -> str:
     return yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=100)
 
 
+def to_symbols_yaml(decomp: Decomposition) -> str:
+    """Serialize the full symbol map (Tier 1) as a sidecar document.
+
+    Kept out of the main YAML deliberately: the main document stays
+    "meaningful parts", while this sidecar carries the exhaustive, per-part
+    symbol inventory (one record per graph-proven chunk, with signature
+    evidence where the bundle provides it).
+    """
+    doc = {
+        "disclaimer": {
+            "notice": (
+                "Full symbol inventory — every record is mechanically derived "
+                "from a chunk node in the codebase-mapper graph (confidence: "
+                "certain). Signature fields are parsed from source at bundle "
+                "time; their absence means 'not extracted', never 'empty'."
+            ),
+            "generated_by": decomp.provenance.get("tool"),
+        },
+        "repository": {
+            "name": decomp.repository.get("name"),
+            "commit_sha": decomp.repository.get("commit_sha"),
+        },
+        "provenance": {
+            "tool": decomp.provenance.get("tool"),
+            "run_manifest_sha256": decomp.provenance.get("run_manifest_sha256"),
+        },
+        "symbols": {
+            part_id: [s.to_dict() for s in records]
+            for part_id, records in sorted(decomp.symbol_map.items())
+        },
+    }
+    return yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=100)
+
+
 def to_document(decomp: Decomposition) -> dict[str, Any]:
     return _document(decomp)
 

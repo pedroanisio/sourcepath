@@ -67,6 +67,162 @@ def _named_child_by_type(node, kind: str):
     return None
 
 
+# ---------------------------------------------------------------------------
+# Canonical signature fields (plugins/chunks_embeddings/signatures.py)
+# ---------------------------------------------------------------------------
+
+
+_VISIBILITY_KEYWORDS = {"public", "private", "protected"}
+_ANNOTATION_NODE_TYPES = {"marker_annotation", "annotation"}
+
+
+def _collapse(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _modifier_info(node, content: bytes) -> tuple[str | None, list[str], list[tuple[int, int]]]:
+    """Return ``(visibility, decorators, annotation_spans)``.
+
+    In the tree-sitter Java grammar, annotations live inside the
+    ``modifiers`` child of a declaration. Visibility is the explicit
+    public/private/protected keyword only — package-private yields None.
+    The annotation byte spans let the header builder excise them from
+    the signature text.
+    """
+    mods = _named_child_by_type(node, "modifiers")
+    if mods is None:
+        return None, [], []
+    visibility: str | None = None
+    decorators: list[str] = []
+    spans: list[tuple[int, int]] = []
+    for ch in mods.children:
+        if ch.type in _ANNOTATION_NODE_TYPES:
+            decorators.append(_collapse(_node_text(ch, content)).removeprefix("@"))
+            spans.append((ch.start_byte, ch.end_byte))
+        elif ch.type in _VISIBILITY_KEYWORDS and visibility is None:
+            visibility = ch.type
+    return visibility, decorators, spans
+
+
+def _header_text(node, content: bytes, skip_spans: list[tuple[int, int]]) -> str:
+    """Declaration header up to (excluding) the body ``{`` — or the
+    terminating ``;`` for bodyless methods — single-line-collapsed,
+    with annotation spans excised.
+    """
+    body = node.child_by_field_name("body")
+    end = body.start_byte if body is not None else node.end_byte
+    parts: list[bytes] = []
+    cursor = node.start_byte
+    for start, stop in sorted(skip_spans):
+        if start >= end:
+            break
+        parts.append(content[cursor:start])
+        cursor = max(cursor, stop)
+    parts.append(content[cursor:end])
+    text = _collapse(b" ".join(parts).decode("utf-8", "replace"))
+    return text[:-1].rstrip() if text.endswith(";") else text
+
+
+def _param_records(params_node, content: bytes) -> list[dict]:
+    """Flatten a ``formal_parameters`` node into canonical param records.
+
+    Java has no default parameter values, so ``default`` is always None.
+    Varargs (``spread_parameter``) keep the ``...`` in the type as written.
+    """
+    out: list[dict] = []
+    for ch in params_node.children:
+        if not ch.is_named:
+            continue
+        if ch.type == "formal_parameter":
+            type_node = ch.child_by_field_name("type")
+            name_node = ch.child_by_field_name("name")
+            if name_node is None:
+                continue
+            ptype = _collapse(_node_text(type_node, content)) if type_node is not None else None
+            dims = ch.child_by_field_name("dimensions")
+            if dims is not None and ptype is not None:
+                # C-style dimensions (``int x[]``) belong to the type.
+                ptype += _node_text(dims, content)
+            out.append({"name": _node_text(name_node, content),
+                        "type": ptype, "default": None})
+        elif ch.type == "spread_parameter":
+            decl = _named_child_by_type(ch, "variable_declarator")
+            name_node = decl.child_by_field_name("name") if decl is not None else None
+            if name_node is None:
+                continue
+            # Type text runs from the first non-modifier named child
+            # through the ``...`` token (i.e. up to the declarator).
+            type_start = ch.start_byte
+            for sub in ch.children:
+                if sub.is_named and sub.type != "modifiers":
+                    type_start = sub.start_byte
+                    break
+            ptype = _collapse(
+                content[type_start:decl.start_byte].decode("utf-8", "replace"))
+            out.append({"name": _node_text(name_node, content),
+                        "type": ptype or None, "default": None})
+    return out
+
+
+def _base_types(node, content: bytes) -> list[str]:
+    """Supertypes as written in source (generic arguments preserved):
+    ``[extends] + implements``, in source order. Distinct from the
+    xref-consumed ``extends``/``implements`` item fields, which carry
+    bare type identifiers.
+    """
+    out: list[str] = []
+    for sub in node.children:
+        if sub.type == "superclass":
+            for tch in sub.children:
+                if tch.is_named:
+                    out.append(_collapse(_node_text(tch, content)))
+        elif sub.type in {"super_interfaces", "extends_interfaces"}:
+            tl = _named_child_by_type(sub, "type_list")
+            if tl is not None:
+                for tch in tl.children:
+                    if tch.is_named:
+                        out.append(_collapse(_node_text(tch, content)))
+    return out
+
+
+def _type_param_texts(node, content: bytes) -> list[str]:
+    tp = node.child_by_field_name("type_parameters")
+    if tp is None:
+        return []
+    return [_collapse(_node_text(ch, content)) for ch in tp.children if ch.is_named]
+
+
+def _signature_fields(node, content: bytes) -> dict:
+    """Canonical signature fields for one type/method/constructor node.
+
+    Empty/unknown fields are omitted entirely (presence is evidence);
+    ``is_async`` is never true for Java, so it is never emitted.
+    """
+    visibility, decorators, annotation_spans = _modifier_info(node, content)
+    fields: dict = {"signature": _header_text(node, content, annotation_spans)}
+    if visibility:
+        fields["visibility"] = visibility
+    if decorators:
+        fields["decorators"] = decorators
+    type_params = _type_param_texts(node, content)
+    if type_params:
+        fields["type_params"] = type_params
+    if node.type in _TYPE_NODE_TYPES:
+        bases = _base_types(node, content)
+        if bases:
+            fields["bases"] = bases
+    params_node = node.child_by_field_name("parameters")
+    if params_node is not None:
+        params = _param_records(params_node, content)
+        if params:
+            fields["params"] = params
+    if node.type == "method_declaration":
+        return_type = node.child_by_field_name("type")
+        if return_type is not None:
+            fields["returns"] = _collapse(_node_text(return_type, content))
+    return fields
+
+
 def _walk_for_items(node, content: bytes, parent_name: str | None,
                     out: list[dict]) -> None:
     """Depth-first descend the AST, emitting one record per type
@@ -85,7 +241,7 @@ def _walk_for_items(node, content: bytes, parent_name: str | None,
                 "annotation_type_declaration": "annotation",
                 "record_declaration": "record",
             }[node.type]
-            out.append({
+            item = {
                 "kind": kind,
                 "name": type_name,
                 "parent": parent_name,
@@ -93,7 +249,9 @@ def _walk_for_items(node, content: bytes, parent_name: str | None,
                 "line_end": node.end_point[0] + 1,
                 "byte_start": node.start_byte,
                 "byte_end": node.end_byte,
-            })
+            }
+            item.update(_signature_fields(node, content))
+            out.append(item)
             # Descend into the body so nested types and methods get
             # ``parent=type_name``.
             body = _named_child_by_type(node, "class_body") or \
@@ -111,7 +269,7 @@ def _walk_for_items(node, content: bytes, parent_name: str | None,
         if name_node is not None and parent_name is not None:
             method_name = _node_text(name_node, content)
             kind = "method" if node.type == "method_declaration" else "constructor"
-            out.append({
+            item = {
                 "kind": kind,
                 "name": method_name,
                 "parent": parent_name,
@@ -119,7 +277,9 @@ def _walk_for_items(node, content: bytes, parent_name: str | None,
                 "line_end": node.end_point[0] + 1,
                 "byte_start": node.start_byte,
                 "byte_end": node.end_byte,
-            })
+            }
+            item.update(_signature_fields(node, content))
+            out.append(item)
         return
     # Generic descent.
     for ch in node.children:

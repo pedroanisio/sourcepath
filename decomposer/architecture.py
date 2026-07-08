@@ -61,6 +61,25 @@ def detect_architecture(
             Confidence.PROBABLE, [f"shared-kernel package: {sorted(kernel)}"]))
         labels.append(("shared-kernel", Confidence.PROBABLE))
 
+    # ── signal: Cargo workspace (multi-crate) ────────────────────────────────
+    crate_manifests = {
+        p: info for p, info in ev.manifest_deps.items()
+        if info.get("name")
+    }
+    workspace_root = any(
+        info.get("workspace_members") for info in ev.manifest_deps.values()
+    )
+    if len(crate_manifests) >= 2 and workspace_root:
+        names = sorted(i["name"] for i in crate_manifests.values())
+        ev_list = [f"root workspace manifest enumerating members",
+                   f"{len(names)} member crates: {names[:8]}"]
+        hypotheses.append(Hypothesis(
+            "Cargo workspace: a multi-crate Rust repository whose build "
+            "topology is the member dependency DAG.", Confidence.STRONG,
+            ev_list))
+        labels.append(("cargo-workspace (multi-crate)", Confidence.STRONG))
+        evidence.extend(ev_list)
+
     # ── signal: multi-surface client/server ─────────────────────────────────
     surfaces = all_segments & {"frontend", "backend", "mcp_server", "ui", "server"}
     has_web = any(
@@ -109,9 +128,15 @@ def _violations(
 ) -> list[Violation]:
     out: list[Violation] = []
 
-    # File-level cycles are extractor-graph facts: CERTAIN, with the edges named.
+    # File-level cycles are extractor-graph facts: CERTAIN, with the edges
+    # named. All-Rust cycles are NOT architecture violations — the compilation
+    # unit is the crate, and parent mod.rs <-> child cycles are the mandatory
+    # module idiom. They remain in the quality gates as info-grade facts.
     for cyc in file_cycles:
         members = set(cyc)
+        langs = {ev.file_by_path.get(p, {}).get("language") for p in cyc}
+        if langs == {"rust"}:
+            continue
         edges = sorted(
             f"{a} -> {b}"
             for a in cyc for b in ev.imports_out.get(a, []) if b in members

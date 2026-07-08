@@ -13,6 +13,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from .architecture import detect_architecture
+from .crates import CrateMap, _module_crate, build_crate_parts, detect_crates, \
+    test_only_module_edges
 from .evidence import EvidenceGraph, load_evidence
 from .metrics import build_order as _build_order, cycles as _cycles
 from .model import (
@@ -20,7 +22,7 @@ from .model import (
 )
 from .parts import (
     ModuleGraph, ROOT, build_cross_cutting_parts, build_module_graph,
-    build_module_parts, detect_entrypoints,
+    build_module_parts, build_symbol_map, detect_entrypoints,
 )
 from .quality import run_gates
 
@@ -28,27 +30,55 @@ TOOL_ID = "codebase-mapper decomposer v0.1.0"
 
 
 def decompose(bundle_dir: str | Path) -> Decomposition:
-    ev = load_evidence(bundle_dir)
+    return decompose_evidence(load_evidence(bundle_dir))
+
+
+def decompose_evidence(ev: EvidenceGraph) -> Decomposition:
+    """Assemble a Decomposition from an already-loaded evidence graph.
+
+    Split from :func:`decompose` so tests (and callers that already hold an
+    :class:`EvidenceGraph`) can run the pipeline without a bundle directory.
+    """
     mg = build_module_graph(ev)
 
+    # Crate awareness (Cargo workspaces): dev-only cross-crate edges are legal
+    # cycles in Cargo and must not drive SCC/build-order computation.
+    cm = detect_crates(ev)
+    test_edges = test_only_module_edges(ev, mg, cm)
+    crate_of_module = _crate_names_by_module(mg, cm)
+    prod_adjacency = _prod_adjacency(ev, mg, cm, test_edges)
+
     module_names = [m for m in mg.modules() if _has_code(ev, mg, m)]
-    module_cycles = _cycles(module_names, mg.adjacency)
+    module_cycles = _cycles(module_names, prod_adjacency)
     # Cycles at file granularity too: directory aggregation both manufactures
     # cycles (parent/child re-exports) and hides them, so topology claims are
     # only honest when both granularities are computed and reported.
     file_cycles = _cycles([f["path"] for f in ev.files], ev.imports_out)
     cycle_modules = {m for cyc in module_cycles for m in cyc}
 
-    module_parts = build_module_parts(ev, mg, cycle_modules)
+    module_parts = build_module_parts(ev, mg, cycle_modules,
+                                      crate_of_module, test_edges)
     cross_parts = build_cross_cutting_parts(ev, mg)
-    parts = module_parts + cross_parts
+    crate_parts = build_crate_parts(ev, mg, cm)
+    parts = module_parts + cross_parts + crate_parts
+
+    symbol_map = build_symbol_map(ev, mg)
+    for p in module_parts:
+        symbols = symbol_map.get(p.id)
+        if symbols:
+            counts: dict[str, int] = {}
+            for s in symbols:
+                key = {"class": "classes", "function": "functions",
+                       "method": "methods"}.get(s.kind, s.kind)
+                counts[key] = counts.get(key, 0) + 1
+            p.metrics["symbols"] = dict(sorted(counts.items()))
 
     relationships = _relationships(ev, mg)
     architecture = detect_architecture(ev, mg, module_cycles, file_cycles)
     gates = run_gates(ev, mg, module_cycles, file_cycles)
 
     module_part_ids = {p.id for p in module_parts}
-    order_layers = _build_order(module_names, mg.adjacency)
+    order_layers = _build_order(module_names, prod_adjacency)
     build_order = [
         [f"module:{m}" for m in layer if f"module:{m}" in module_part_ids]
         for layer in order_layers
@@ -61,6 +91,7 @@ def decompose(bundle_dir: str | Path) -> Decomposition:
     return Decomposition(
         repository=repository,
         parts=parts,
+        symbol_map=symbol_map,
         relationships=relationships,
         detected_architecture=architecture,
         quality_gates=gates,
@@ -68,6 +99,36 @@ def decompose(bundle_dir: str | Path) -> Decomposition:
         cycle_resolutions=_cycle_resolutions(ev, mg, module_cycles),
         provenance=provenance,
     )
+
+
+def _crate_names_by_module(mg: ModuleGraph, cm: CrateMap) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for mod in mg.files_of_module:
+        crate_dir = _module_crate(mod, mg, cm)
+        if crate_dir is not None:
+            name = cm.crates[crate_dir].get("name")
+            if name:
+                out[mod] = name
+    return out
+
+
+def _prod_adjacency(
+    ev: EvidenceGraph, mg: ModuleGraph,
+    cm: CrateMap | None = None,
+    test_edges: set[tuple[str, str]] | None = None,
+) -> dict[str, list[str]]:
+    """Module adjacency with dev/test-only cross-crate edges removed — the
+    graph that SCC and build-order math must run on. Identical to
+    ``mg.adjacency`` for repositories without crate manifests."""
+    if test_edges is None:
+        cm = cm or detect_crates(ev)
+        test_edges = test_only_module_edges(ev, mg, cm)
+    if not test_edges:
+        return mg.adjacency
+    return {
+        m: [d for d in deps if (m, d) not in test_edges]
+        for m, deps in mg.adjacency.items()
+    }
 
 
 def _cycle_resolutions(
@@ -158,20 +219,30 @@ def _relationships(ev: EvidenceGraph, mg: ModuleGraph) -> list[Relationship]:
             evidence=f"{w} tests edge(s) {tm}->{subm}",
         ))
 
-    # module -> module calls (aggregated cross-module xref call edges), CERTAIN.
-    call_w: dict[tuple[str, str], int] = {}
+    # module -> module symbol-level edges (calls / subclassOf / overrides),
+    # aggregated across the module boundary. Confidence is CERTAIN only when
+    # every contributing xref was resolved exactly; one heuristic edge
+    # downgrades the aggregate to PROBABLE (weakest-link rule).
+    xref_w: dict[tuple[str, str, str], int] = {}
+    xref_exact: dict[tuple[str, str, str], bool] = {}
     for e in ev.xrefs:
-        if e["kind"] != "calls":
+        kind = e["kind"]
+        if kind not in ("calls", "subclassOf", "overrides"):
             continue
         sm = mg.module_of_file.get(ev.chunks[e["src_idx"]].get("file") or "")
         dm = mg.module_of_file.get(ev.chunks[e["dst_idx"]].get("file") or "")
         if sm and dm and sm != dm:
-            call_w[(sm, dm)] = call_w.get((sm, dm), 0) + 1
-    for (sm, dm), w in sorted(call_w.items()):
+            key = (kind, sm, dm)
+            xref_w[key] = xref_w.get(key, 0) + 1
+            xref_exact[key] = (
+                xref_exact.get(key, True) and e.get("resolution") == "exact"
+            )
+    for (kind, sm, dm), w in sorted(xref_w.items()):
+        conf = Confidence.CERTAIN if xref_exact[(kind, sm, dm)] else Confidence.PROBABLE
         rels.append(Relationship(
-            source=f"module:{sm}", target=f"module:{dm}", type="calls",
-            strength=w, confidence=Confidence.CERTAIN,
-            evidence=f"{w} cross-module call edge(s) {sm}->{dm}",
+            source=f"module:{sm}", target=f"module:{dm}", type=kind,
+            strength=w, confidence=conf,
+            evidence=f"{w} cross-module {kind} edge(s) {sm}->{dm}",
         ))
     return rels
 

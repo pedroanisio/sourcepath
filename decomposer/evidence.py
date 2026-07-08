@@ -54,6 +54,9 @@ class EvidenceGraph:
     phases: dict[str, list[str]]                   # path -> phase local names
     rust_items: list[dict[str, Any]] = field(default_factory=list)
     manifest_sha256: str = ""                      # run identity for provenance
+    manifest_deps: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # ^ dependency manifests parsed from bundle blobs (Cargo.toml for now):
+    #   {manifest_path: {name, deps, dev_deps, workspace_members}}
 
     # ── convenience accessors ────────────────────────────────────────────────
     def code_files(self) -> list[dict[str, Any]]:
@@ -105,6 +108,7 @@ def load_evidence(bundle_dir: str | Path) -> EvidenceGraph:
         phases=phases,
         rust_items=b.rust_items,
         manifest_sha256=_manifest_sha256(bundle_dir),
+        manifest_deps=_read_manifest_deps(bundle_dir),
     )
 
 
@@ -176,6 +180,48 @@ def _read_phases(bundle_dir: Path) -> dict[str, list[str]]:
         phases = _local_names(node.get("cbm:hasPhase"))
         if phases:
             out[path] = sorted(set(phases))
+    return out
+
+
+def _read_manifest_deps(bundle_dir: Path) -> dict[str, dict[str, Any]]:
+    """Parse dependency manifests from the bundle's own blob store.
+
+    The graph records ``cbm:declaresDependency`` without dev/prod scope, but
+    the manifest *contents* are in the bundle (content-addressed blobs), so
+    scope is recoverable without re-extraction. Cargo.toml only for now —
+    the shape is generic: ``{manifest_path: {name, deps, dev_deps,
+    workspace_members}}``. Best-effort: unparseable manifests are skipped.
+    """
+    jsonld = bundle_dir / "inventory.jsonld"
+    if not jsonld.exists():
+        return {}
+    try:
+        data = json.loads(jsonld.read_text())
+    except Exception:  # noqa: BLE001 — optional evidence
+        return {}
+    import tomllib
+    out: dict[str, dict[str, Any]] = {}
+    for node in data.get("@graph") or []:
+        path = node.get("cbm:path")
+        if not isinstance(path, str) or not path.endswith("Cargo.toml"):
+            continue
+        sha = node.get("cbm:contentSha256")
+        if isinstance(sha, dict):
+            sha = sha.get("@value")
+        if not isinstance(sha, str):
+            continue
+        blob = bundle_dir / "blobs" / sha
+        try:
+            toml = tomllib.loads(blob.read_text())
+        except Exception:  # noqa: BLE001 — a bad blob must not sink the load
+            continue
+        out[path] = {
+            "name": (toml.get("package") or {}).get("name"),
+            "deps": sorted((toml.get("dependencies") or {})),
+            "dev_deps": sorted((toml.get("dev-dependencies") or {})),
+            "workspace_members": list(
+                (toml.get("workspace") or {}).get("members") or []),
+        }
     return out
 
 

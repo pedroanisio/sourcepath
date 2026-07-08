@@ -128,9 +128,17 @@ class Classification:
 class DepRef:
     incoming: list[str] = field(default_factory=list)   # part ids that depend on this
     outgoing: list[str] = field(default_factory=list)   # part ids this depends on
+    # Edges that exist only through a dev/test-scoped dependency (e.g. a Cargo
+    # dev-dependency cycle). Legal, but excluded from SCC/build-order math —
+    # a builder needs them only when building the tests.
+    test_only_outgoing: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"incoming": sorted(self.incoming), "outgoing": sorted(self.outgoing)}
+        d: dict[str, Any] = {"incoming": sorted(self.incoming),
+                             "outgoing": sorted(self.outgoing)}
+        if self.test_only_outgoing:
+            d["test_only_outgoing"] = sorted(self.test_only_outgoing)
+        return d
 
 
 @dataclass
@@ -165,6 +173,66 @@ class Part:
             "notes": list(self.notes),
             "overall_confidence": self.overall_confidence.value,
         }
+
+
+@dataclass
+class SymbolRecord:
+    """One symbol chunk, projected for the symbol map (Tier 1).
+
+    Every record is proven by a ``cbml2:Chunk`` node in the bundle graph, so
+    ``confidence`` defaults to CERTAIN. Signature fields mirror the canonical
+    chunk contract (plugins/chunks_embeddings/signatures.py) and follow the
+    same omission rule: ``to_dict`` drops empty/unknown values so absence in
+    the YAML means "not extracted", never "empty placeholder".
+    """
+
+    name: str
+    kind: str                                  # class | function | method
+    file: str
+    line_start: int | None = None
+    line_end: int | None = None
+    parent: str | None = None
+    signature: str | None = None
+    params: list[dict[str, Any]] | None = None
+    returns: str | None = None
+    bases: list[str] | None = None
+    type_params: list[str] | None = None
+    visibility: str | None = None
+    is_async: bool = False
+    decorators: list[str] | None = None
+    is_interface: bool = False                 # cross-module xref target
+    confidence: Confidence = Confidence.CERTAIN
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "name": self.name,
+            "kind": self.kind,
+            "file": self.file,
+            "line_start": self.line_start,
+            "line_end": self.line_end,
+            "confidence": self.confidence.value,
+        }
+        if self.parent:
+            out["parent"] = self.parent
+        if self.signature:
+            out["signature"] = self.signature
+        if self.params:
+            out["params"] = [dict(p) for p in self.params]
+        if self.returns:
+            out["returns"] = self.returns
+        if self.bases:
+            out["bases"] = list(self.bases)
+        if self.type_params:
+            out["type_params"] = list(self.type_params)
+        if self.visibility:
+            out["visibility"] = self.visibility
+        if self.is_async:
+            out["is_async"] = True
+        if self.decorators:
+            out["decorators"] = list(self.decorators)
+        if self.is_interface:
+            out["is_interface"] = True
+        return out
 
 
 @dataclass
@@ -259,6 +327,10 @@ class QualityFinding:
 class Decomposition:
     repository: dict[str, Any]
     parts: list[Part] = field(default_factory=list)
+    # part id -> full symbol inventory (Tier 1). Serialized to a sidecar via
+    # serialize.to_symbols_yaml, NOT into the main YAML: the main document
+    # stays "meaningful parts", the sidecar holds the exhaustive map.
+    symbol_map: dict[str, list[SymbolRecord]] = field(default_factory=dict)
     relationships: list[Relationship] = field(default_factory=list)
     detected_architecture: Architecture = field(default_factory=Architecture)
     quality_gates: list[QualityFinding] = field(default_factory=list)

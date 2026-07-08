@@ -69,6 +69,27 @@ def _circular(
             f"{a} -> {b}"
             for a in cyc for b in ev.imports_out.get(a, []) if b in members
         )
+        # Severity is language-semantics-dependent: Rust compiles the crate,
+        # not the file, so intra-crate file cycles are legal — and the parent
+        # mod.rs <-> child pattern is the mandatory module idiom, not a defect.
+        # Python (import-time execution) keeps error severity.
+        langs = {ev.file_by_path.get(p, {}).get("language") for p in cyc}
+        if langs == {"rust"}:
+            out.append(QualityFinding(
+                gate="circular_dependencies", severity="info",
+                subject=", ".join(cyc),
+                description=(
+                    f"File-level import cycle among {len(cyc)} Rust files: "
+                    + "; ".join(edges)
+                    + ". Legal in Rust — the compilation unit is the crate, "
+                      "not the file"
+                    + (" — and this is the idiomatic parent-module <-> child "
+                       "declaration pattern" if rust_containment_cycle(cyc)
+                       else "") + "."),
+                confidence=Confidence.CERTAIN,
+                evidence=edges,
+            ))
+            continue
         out.append(QualityFinding(
             gate="circular_dependencies", severity="error",
             subject=", ".join(cyc),
@@ -113,6 +134,19 @@ def _circular(
             evidence=[f"file_cycles=0", f"directory_cycles={len(module_cycles)}"],
         ))
     return out
+
+
+def rust_containment_cycle(cyc: list[str]) -> bool:
+    """True when a Rust file cycle involves a parent ``mod.rs``/``lib.rs`` and
+    files under its directory subtree — the module-declaration idiom
+    (path-convention evidence, hence part of a *probable*-grade note)."""
+    roots = [p for p in cyc
+             if PurePosixPath(p).name in {"mod.rs", "lib.rs", "main.rs"}]
+    for root in roots:
+        parent = str(PurePosixPath(root).parent)
+        if all(p == root or p.startswith(parent + "/") for p in cyc):
+            return True
+    return False
 
 
 def _god_modules(mg: ModuleGraph) -> list[QualityFinding]:
