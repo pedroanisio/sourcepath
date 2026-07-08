@@ -17,15 +17,24 @@ arch:ScopeACoreSystemDimensionsOntology
     dcterms:description "A revised Scope-A TBox and SHACL validation layer for independently variable, observable core dimensions of intended or implemented software systems. The ontology contains 20 core system dimensions and one assessment overlay for quality-attribute prioritization." ;
     dcterms:created "2026-07-08"^^xsd:date ;
     dcterms:modified "2026-07-08"^^xsd:date ;
-    owl:versionInfo "2.0.4-scope-a" ;
+    owl:versionInfo "2.0.5-scope-a" ;
     rdfs:comment "In full agreement with the prose framework document orthogonal-dimensions-framework.md (version 2.0.2): both artifacts define the same 20 core dimensions, one assessment overlay, six categories, and identical D01-D20/O01 numbering." ;
     rdfs:comment "2.0.1: language-tagged prefLabels (SHACL conformance); hasCategory domain widened to Dimension-or-Overlay; measuredBy declared inverse of appliesDimension; LeakyAbstraction renamed ConcretionExposedEncapsulation (normative-creep rule); AgenticLoopRuntime value added to D06." ;
     rdfs:comment "2.0.2: sh:declare added so the SHACL-SPARQL layer resolves the arch: prefix; PositionUniquenessShape added to machine-enforce distinct dimension positions; unused orthogonalTo property and OrthogonalityAssertion class removed (orthogonality is modelled as per-dimension orthogonalityRationale prose); D03/D06 rationales tightened to name the connector-vs-runtime boundary explicitly." ;
     rdfs:comment "2.0.3: merged the parallel 2.0.2 review branch — arch:atScope added on DimensionApplication (implements the rubric's scope-statement mandate; used by conforming ABoxes); resolves the duplicate 2.0.2-scope-a version label." ;
     rdfs:comment "2.0.4 (layered-state hardening): arch:inRegion and arch:dominantValue added for per-region layered classifications with a named dominant; value presence made conditional so confidence Unknown is representable as a conforming application; ValueBelongsToDimensionShape (SHACL-SPARQL) machine-enforces that used values belong to the applied dimension's declared value set." ;
+    rdfs:comment "2.0.5 (silent-acceptance hardening): arch:atScope is now mandatory on every dimension application and constrained to the closed altitude set {system, subsystem, module, artifact, language-region} — named regions belong in arch:inRegion, and new altitudes must be registered here first; DominantValueCoherenceShape (SHACL-SPARQL) machine-enforces that a dominant value is one of the application's used values (previously only an rdfs:comment); AnalysisProvenanceShape machine-enforces that every ABox ontology header discloses its author via dcterms:creator, so the authoring model identity is a queryable triple rather than a comment." ;
     sh:declare [
         sh:prefix "arch" ;
         sh:namespace "https://w3id.org/arc4d3/software-architecture-dimensions#"^^xsd:anyURI ;
+    ] ;
+    sh:declare [
+        sh:prefix "dcterms" ;
+        sh:namespace "http://purl.org/dc/terms/"^^xsd:anyURI ;
+    ] ;
+    sh:declare [
+        sh:prefix "owl" ;
+        sh:namespace "http://www.w3.org/2002/07/owl#"^^xsd:anyURI ;
     ] .
 
 #################################################################
@@ -276,7 +285,7 @@ arch:atScope
     rdfs:domain arch:DimensionApplication ;
     rdfs:range xsd:string ;
     rdfs:label "at scope" ;
-    rdfs:comment "The scope at which the classification was made (system, subsystem, module, or a named region), per the rubric's requirement that every classification states its scope." .
+    rdfs:comment "The analytical altitude at which the classification was made, per the rubric's requirement that every classification states its scope. Closed value set (SHACL-enforced): system, subsystem, module, artifact, language-region. Naming the concrete region covered (a module path, subsystem name, …) is arch:inRegion's job; a new altitude must be registered in the TBox before ABoxes may use it, mirroring the ValueBelongsToDimensionShape discipline." .
 
 arch:inRegion
     a owl:DatatypeProperty ;
@@ -290,7 +299,7 @@ arch:dominantValue
     rdfs:domain arch:DimensionApplication ;
     rdfs:range arch:ClassificationValue ;
     rdfs:label "dominant value" ;
-    rdfs:comment "Marks which of the used classification values is dominant, per the rubric's per-region-values-plus-named-dominant rule. The dominant value should be one of the values in usesClassificationValue." .
+    rdfs:comment "Marks which of the used classification values is dominant, per the rubric's per-region-values-plus-named-dominant rule. The dominant value must be one of the values in usesClassificationValue (machine-enforced by DominantValueCoherenceShape)." .
 
 arch:confidenceLevel
     a owl:DatatypeProperty ;
@@ -946,6 +955,13 @@ arch:DimensionApplicationShape
         sh:maxCount 1 ;
         sh:in ( "High" "Medium" "Low" "Unknown" ) ;
         sh:message "A dimension application must declare confidence as High, Medium, Low, or Unknown."
+    ] ;
+    sh:property [
+        sh:path arch:atScope ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ( "system" "subsystem" "module" "artifact" "language-region" ) ;
+        sh:message "A dimension application must state its analytical altitude as one of: system, subsystem, module, artifact, language-region. Name the concrete region via arch:inRegion; register any new altitude in the TBox first."
     ] .
 
 arch:EvidenceRecordShape
@@ -1036,6 +1052,43 @@ arch:ValueBelongsToDimensionShape
                 $this arch:appliesDimension ?dim .
                 $this arch:usesClassificationValue ?value .
                 FILTER NOT EXISTS { ?dim arch:hasClassificationValue ?value . }
+            }
+        """ ;
+    ] .
+
+arch:DominantValueCoherenceShape
+    a sh:NodeShape ;
+    sh:targetClass arch:DimensionApplication ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "A dominant classification value must be one of the application's own arch:usesClassificationValue values; a dominant that the application does not use is incoherent." ;
+        sh:prefixes arch:ScopeACoreSystemDimensionsOntology ;
+        sh:select """
+            SELECT $this ?dominant
+            WHERE {
+                $this arch:dominantValue ?dominant .
+                FILTER NOT EXISTS { $this arch:usesClassificationValue ?dominant . }
+            }
+        """ ;
+    ] .
+
+# Every ABox declares an ontology header (the fixtures' established pattern);
+# this shape makes the author identity a machine-checked triple instead of a
+# courtesy comment, so the authoring model stays independently queryable from
+# the verifier version (dcterms:creator names model + tool + extractor).
+# The TBox's own header is exempted by IRI — its authorship predates this rule.
+arch:AnalysisProvenanceShape
+    a sh:NodeShape ;
+    sh:targetClass owl:Ontology ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "An analysis ABox ontology header must disclose its author (model/tool identity) as a dcterms:creator triple." ;
+        sh:prefixes arch:ScopeACoreSystemDimensionsOntology ;
+        sh:select """
+            SELECT $this
+            WHERE {
+                FILTER ($this != arch:ScopeACoreSystemDimensionsOntology)
+                FILTER NOT EXISTS { $this dcterms:creator ?creator . }
             }
         """ ;
     ] .

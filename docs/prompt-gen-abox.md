@@ -16,7 +16,7 @@ Reusable command for classifying **any** codebase-mapper instance against the
 twenty core dimensions and one assessment overlay defined by the Scope-A
 framework. The framework's authoritative forms are:
 
-- **TBox + SHACL** — [static/schemas/software_architecture_dimensions.ttl](../static/schemas/software_architecture_dimensions.ttl) (`owl:versionInfo 2.0.4-scope-a`)
+- **TBox + SHACL** — [static/schemas/software_architecture_dimensions.ttl](../static/schemas/software_architecture_dimensions.ttl) (`owl:versionInfo 2.0.5-scope-a`)
 - **Prose** — [static/refs/orthogonal-dimensions-framework.md](../static/refs/orthogonal-dimensions-framework.md) (v2.0.2)
 
 This document produces the **ABox** (instance data): a set of
@@ -102,7 +102,7 @@ session, or the API). The model's only output is a single Turtle file.
 ````text
 You are an architecture analyst applying the Scope-A Orthogonal Dimensions
 framework (static/schemas/software_architecture_dimensions.ttl, owl:versionInfo
-2.0.4-scope-a; prose: static/refs/orthogonal-dimensions-framework.md v2.0.2).
+2.0.5-scope-a; prose: static/refs/orthogonal-dimensions-framework.md v2.0.2).
 Read both before you begin.
 
 INPUTS
@@ -123,7 +123,9 @@ but the Turtle. Do not restate the TBox; reference its IRIs.
 FOR EACH of D01..D20, emit at least one arch:DimensionApplication with:
   - arch:classifiesSystem   → the single system node (typed arch:ImplementedSoftwareSystem)  [exactly 1]
   - arch:appliesDimension   → the arch:Dxx_... IRI of that dimension                          [exactly 1]
-  - arch:atScope            → scope string: "system", "subsystem", or "module"   [rubric-required]
+  - arch:atScope            → exactly one of "system" "subsystem" "module"
+                              "artifact" "language-region" (closed set,
+                              SHACL-enforced; new altitudes need a TBox change)  [exactly 1]
   - arch:usesClassificationValue → one or more values (see VALUES)  [required UNLESS confidence is "Unknown"]
   - arch:supportedByEvidence → one or more arch:EvidenceRecord nodes                          [>=1]
   - arch:confidenceLevel     → exactly one of "High" "Medium" "Low" "Unknown"                 [exactly 1]
@@ -131,9 +133,11 @@ FOR EACH of D01..D20, emit at least one arch:DimensionApplication with:
 HETEROGENEOUS / LAYERED SYSTEMS (the intended representation)
 Emit multiple applications of the SAME dimension to the SAME system, each with a
 different arch:inRegion "<module path | subsystem | language region>", PLUS one
-whole-scope application that names arch:dominantValue → the prevailing value. An
-application with no arch:inRegion covers the whole stated scope. Never force a
-single value onto a genuinely heterogeneous system.
+whole-scope application that names arch:dominantValue → the prevailing value. The
+dominant MUST be one of that application's own arch:usesClassificationValue
+values (SHACL-enforced by DominantValueCoherenceShape). An application with no
+arch:inRegion covers the whole stated scope. Never force a single value onto a
+genuinely heterogeneous system.
 
 EVIDENCE
 Every arch:EvidenceRecord carries arch:evidenceSummary (≥10 chars) that CITES a
@@ -179,16 +183,20 @@ Emit the revealed priority ordering as an ex:OverlayReading_<system> node with a
 rdfs:comment giving the ranked profile and its explicitness (ADR-stated /
 SLO-implied / emergent-only), plus a arch:RiskFinding if stated priorities and
 structural reality diverge. (The TBox has no overlay-application class as of
-2.0.4; represent it descriptively and flag it as a candidate TBox extension.)
+2.0.5; represent it descriptively and flag it as a candidate TBox extension.)
 
 ACTUAL OVER INTENDED
 Classify the system as implemented. Where documentation and code diverge,
 classify the code and record the delta as an arch:RiskFinding.
 
 SELF-CHECK BEFORE YOU EMIT (PALS's Law — you will still be validated downstream)
+  □ the document declares an owl:Ontology header with dcterms:creator naming
+    the authoring model + tool (SHACL-enforced by AnalysisProvenanceShape)
   □ every dimension D01..D20 has >=1 application (more when layered by region)
-  □ each application has classifiesSystem, appliesDimension, atScope,
-    supportedByEvidence (>=1), and exactly one confidenceLevel
+  □ each application has classifiesSystem, appliesDimension, exactly one
+    atScope from the closed set, supportedByEvidence (>=1), and exactly one
+    confidenceLevel
+  □ every arch:dominantValue is one of its application's own used values
   □ usesClassificationValue present on every application whose confidence is not
     "Unknown"; each value is a typed arch:ClassificationValue
   □ every used value is registered on its dimension via arch:hasClassificationValue
@@ -224,7 +232,14 @@ Minimal skeleton (prefixes required):
 @prefix arch: <https://w3id.org/arc4d3/software-architecture-dimensions#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
 @prefix ex:   <https://example.org/abox/acme#> .
+
+# Ontology header — dcterms:creator is SHACL-required (AnalysisProvenanceShape):
+# the authoring model identity must be a queryable triple, not a comment.
+ex:Ontology a owl:Ontology ;
+    dcterms:creator "<model/tool identifier> (extraction: codebase-mapper vX.Y.Z)" .
 
 ex:System_acme a arch:ImplementedSoftwareSystem ;
     skos:prefLabel "ACME billing platform"@en .
@@ -265,7 +280,7 @@ ex:App_D19 a arch:DimensionApplication ;
     arch:supportedByEvidence ex:Ev_D19 .
 ex:Ev_D19 a arch:EvidenceRecord ; arch:evidenceSummary "No authz middleware or IAM config in the bundle; would be settled by security-policy artifacts or gateway config." .
 
-# O01 overlay reading (descriptive: the TBox has no overlay-application class as of 2.0.4)
+# O01 overlay reading (descriptive: the TBox has no overlay-application class as of 2.0.5)
 ex:OverlayReading_acme rdfs:comment
     "O01 overlay: delivery-cadence > modifiability > latency; SLO-implied only." .
 ```
@@ -276,13 +291,15 @@ ex:OverlayReading_acme rdfs:comment
 |---|---|---|
 | `arch:DimensionApplication` | `arch:classifiesSystem` | exactly 1, class `arch:SoftwareSystem` |
 | | `arch:appliesDimension` | exactly 1, class `arch:CoreSystemDimension` |
-| | `arch:atScope` | scope string (`"system"`/`"subsystem"`/`"module"`); rubric-required |
+| | `arch:atScope` | exactly 1 of `"system"`/`"subsystem"`/`"module"`/`"artifact"`/`"language-region"` (closed set, SHACL-enforced) |
 | | `arch:inRegion` | optional; names the region for layered per-region variants |
 | | `arch:usesClassificationValue` | class `arch:ClassificationValue`; ≥ 1 **unless** confidence is `Unknown` |
 | | `arch:dominantValue` | ≤ 1, class `arch:ClassificationValue` (whole-scope dominant) |
 | | `arch:supportedByEvidence` | ≥ 1, class `arch:EvidenceRecord` |
 | | `arch:confidenceLevel` | exactly 1 ∈ {`High`,`Medium`,`Low`,`Unknown`} |
 | *(cross-cutting SPARQL)* | `ValueBelongsToDimensionShape` | every used value must be registered on its dimension via `arch:hasClassificationValue` |
+| *(cross-cutting SPARQL)* | `DominantValueCoherenceShape` | every `arch:dominantValue` must be one of the application's own used values |
+| *(cross-cutting SPARQL)* | `AnalysisProvenanceShape` | the ABox `owl:Ontology` header must carry `dcterms:creator` naming the authoring model/tool |
 | `arch:EvidenceRecord` | `arch:evidenceSummary` | ≥ 1, string, min length 10 |
 | `arch:RiskFinding` | — | unconstrained (free-form findings) |
 

@@ -33,7 +33,7 @@
 #
 # generated_by: "Claude Opus 4.8 via Claude Code"
 # date: "2026-07-08"
-# tbox: software_architecture_dimensions.ttl (arch:ScopeAFramework, owl:versionInfo 2.0.4-scope-a)
+# tbox: software_architecture_dimensions.ttl (arch:ScopeAFramework, owl:versionInfo 2.0.5-scope-a)
 #
 # SCOPE & REGION — MULTI-LAYERED ANALYSIS (SQLite is a layered LIBRARY, not a
 # distributed system; it has NO processes/services/network). Layering is

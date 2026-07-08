@@ -9,7 +9,7 @@ disclaimer: |
   logical definition may be invalid, erroneous, or a hallucination.
   References are cited in good faith; the reader is expected to verify
   them independently.
-status: aligned edition — in full agreement with the machine-readable Scope-A TBox/SHACL artifact (software_architecture_dimensions.ttl, owl:versionInfo 2.0.4-scope-a). The two artifacts define the same twenty core dimensions, one assessment overlay, six categories, and identical numbering.
+status: aligned edition — in full agreement with the machine-readable Scope-A TBox/SHACL artifact (software_architecture_dimensions.ttl, owl:versionInfo 2.0.5-scope-a). The two artifacts define the same twenty core dimensions, one assessment overlay, six categories, and identical numbering.
 ---
 
 # Orthogonal Dimensions for Software System Analysis
