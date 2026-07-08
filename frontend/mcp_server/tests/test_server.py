@@ -32,7 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 def test_build_server_returns_server_and_session():
     server, session = build_server()
-    assert server.name == "cbm-mcp"
+    assert server.name == "cbm"
     assert isinstance(session, Session)
     assert session.selected_bundle is None
 

@@ -36,7 +36,7 @@ from .schemas import DESCRIPTIONS, INPUT_SCHEMAS, OUTPUT_SCHEMAS, TOOL_NAMES
 from .subscriptions import ManifestWatcher, SubscriptionManager, manifest_uri
 from .validators import ToolError
 
-SERVER_NAME = "cbm-mcp"
+SERVER_NAME = "cbm"
 SERVER_VERSION = "0.1.0"
 
 logger = logging.getLogger(SERVER_NAME)

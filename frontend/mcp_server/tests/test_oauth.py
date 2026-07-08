@@ -330,7 +330,7 @@ async def test_http_endpoint_accepts_valid_jwt(verifier, keypair, bundle_name):
             async with ClientSession(read, write) as client:
                 init = await client.initialize()
                 tools = await client.list_tools()
-    assert init.serverInfo.name == "cbm-mcp"
+    assert init.serverInfo.name == "cbm"
     from frontend.mcp_server import TOOL_NAMES
     assert len(tools.tools) == len(TOOL_NAMES)
 
