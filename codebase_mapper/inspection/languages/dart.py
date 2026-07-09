@@ -252,6 +252,151 @@ def _line_of(byte_idx: int, line_byte_starts: list[int]) -> int:
     return lo
 
 
+def _dart_collapse(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _dart_find_body_start(text: str, start_idx: int) -> int:
+    """Index of the body-opening delimiter (``{``, ``;``, or the ``=`` of an
+    ``=>`` expression body) scanning forward from ``start_idx`` — mirrors
+    ``_scan_member_end`` but returns the delimiter position instead of the
+    end of the member, so the header text before it can be sliced out."""
+    n = len(text)
+    k = start_idx
+    while k < n and text[k] not in "{;":
+        if text[k] == "=" and k + 1 < n and text[k + 1] == ">":
+            return k
+        k += 1
+    return k
+
+
+_DART_EXTENDS_RE = re.compile(
+    r"\bextends\s+([A-Za-z_][\w.<>,\s]*?)(?=\s+(?:with|implements)\b|$)")
+_DART_WITH_RE = re.compile(
+    r"\bwith\s+([A-Za-z_][\w.<>,\s]*?)(?=\s+(?:implements)\b|$)")
+_DART_IMPLEMENTS_RE = re.compile(r"\bimplements\s+(.+)$")
+
+
+def _dart_bases(rest: str) -> list[str]:
+    """Parse a class declaration's ``rest`` capture (the text between the
+    generics and the delimiter) for ``extends``/``with``/``implements``
+    clauses, merged into one list in source order."""
+    rest = rest.strip()
+    bases: list[str] = []
+    m = _DART_EXTENDS_RE.search(rest)
+    if m:
+        bases.append(m.group(1).strip())
+    m = _DART_WITH_RE.search(rest)
+    if m:
+        bases.extend(p.strip() for p in m.group(1).split(",") if p.strip())
+    m = _DART_IMPLEMENTS_RE.search(rest)
+    if m:
+        bases.extend(p.strip() for p in m.group(1).split(",") if p.strip())
+    return bases
+
+
+def _dart_strip_group_markers(s: str) -> str:
+    """Drop the literal ``[``/``]``/``{``/``}`` optional-positional / named
+    parameter *grouping* markers (at depth 0 relative to ``(``/``<``) so the
+    parameters they wrap can be split like ordinary positional ones. Real
+    nesting — generics, function-typed parameters — uses ``(``/``<`` and is
+    left untouched."""
+    out: list[str] = []
+    depth = 0
+    for ch in s:
+        if ch in "(<":
+            depth += 1
+            out.append(ch)
+        elif ch in ")>":
+            depth -= 1
+            out.append(ch)
+        elif ch in "[]{}" and depth == 0:
+            continue
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _dart_split_top_level(s: str) -> list[str]:
+    """Split on commas at ``(``/``<`` depth 0."""
+    parts: list[str] = []
+    depth = 0
+    cur: list[str] = []
+    for ch in s:
+        if ch in "(<":
+            depth += 1
+        elif ch in ")>":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    if cur:
+        parts.append("".join(cur))
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _dart_find_top_level_eq(s: str) -> int | None:
+    """Index of a default-value ``=`` at depth 0 — not ``==``/``=>``/``<=``/
+    ``>=``."""
+    depth = 0
+    n = len(s)
+    for i, ch in enumerate(s):
+        if ch in "(<":
+            depth += 1
+        elif ch in ")>":
+            depth -= 1
+        elif ch == "=" and depth == 0:
+            prev_ch = s[i - 1] if i > 0 else ""
+            next_ch = s[i + 1] if i + 1 < n else ""
+            if prev_ch in "=<>!" or next_ch in "=>":
+                continue
+            return i
+    return None
+
+
+def _dart_parse_param(raw: str) -> dict | None:
+    s = raw.strip()
+    if not s:
+        return None
+    if s.startswith("required "):
+        s = s[len("required "):].strip()
+    eq_idx = _dart_find_top_level_eq(s)
+    default = None
+    if eq_idx is not None:
+        default = s[eq_idx + 1:].strip()
+        s = s[:eq_idx].strip()
+    tokens = s.split()
+    if not tokens:
+        return None
+    name = tokens[-1]
+    ptype = " ".join(tokens[:-1]) if len(tokens) > 1 else None
+    return {"name": name, "type": ptype, "default": default}
+
+
+def _dart_params(param_text: str) -> list[dict]:
+    """Parse a raw parameter-list string (already stripped of its outer
+    parens) into ordered {name, type, default} records. ``required``/
+    optional-positional (``[...]``)/named (``{...}``) grouping markers are
+    stripped before splitting — a param's ``name`` is its trailing
+    identifier as written (a ``this.foo``/``super.foo`` shorthand constructor
+    parameter is kept intact, not split into a separate marker)."""
+    stripped = _dart_strip_group_markers(param_text)
+    out: list[dict] = []
+    for raw in _dart_split_top_level(stripped):
+        p = _dart_parse_param(raw)
+        if p is not None:
+            out.append(p)
+    return out
+
+
+def _dart_is_async(gap_text: str) -> bool:
+    """Explicit ``async``/``async*``/``sync*`` keyword found verbatim in the
+    text between a member's parameter list and its body — never derived."""
+    return any(t in ("async", "async*", "sync*") for t in gap_text.split())
+
+
 def _emit_imports(text: str, content: bytes) -> tuple[list[dict], list[dict]]:
     """Return ``(imports, parts)`` where:
 
@@ -341,12 +486,14 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
         decl_byte_start = m.start()
         decl_line_start = _line_of(decl_byte_start, line_byte_starts)
 
+        generics = m.group("generics") or ""
+
         if delim == ";":
             # Forward typedef or extension-on-form without body — span ends at `;`.
             decl_byte_end = m.end()
             decl_line_end = _line_of(decl_byte_end - 1, line_byte_starts)
             kind = "typedef" if "typedef" in keyword else "class"
-            items.append({
+            item = {
                 "kind": kind,
                 "name": name,
                 "parent": None,
@@ -354,7 +501,11 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
                 "line_end": decl_line_end,
                 "byte_start": decl_byte_start,
                 "byte_end": decl_byte_end,
-            })
+                "signature": _dart_collapse(text[decl_byte_start:decl_byte_end - 1]),
+            }
+            if generics:
+                item["type_params"] = [p.strip() for p in generics[1:-1].split(",") if p.strip()]
+            items.append(item)
             continue
 
         # `{` — has a body.
@@ -370,7 +521,7 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
             kind = "enum"
         else:
             kind = "class"
-        items.append({
+        item = {
             "kind": kind,
             "name": name,
             "parent": None,
@@ -378,7 +529,14 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
             "line_end": decl_line_end,
             "byte_start": decl_byte_start,
             "byte_end": decl_byte_end,
-        })
+            "signature": _dart_collapse(text[decl_byte_start:body_open]),
+        }
+        if generics:
+            item["type_params"] = [p.strip() for p in generics[1:-1].split(",") if p.strip()]
+        bases = _dart_bases(m.group("rest") or "")
+        if bases:
+            item["bases"] = bases
+        items.append(item)
         if kind in ("class", "mixin", "extension"):
             class_spans.append((name, body_open, body_close))
 
@@ -405,10 +563,36 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
                 continue
             kw = m.group("kw")
             name = m.group("name")
+            ret = (m.group("ret") or "").strip()
             byte_start = body_offset + decl_start
             line_start = _line_of(byte_start, line_byte_starts)
+            delim_idx = m.end() - 1
+            params: list[dict] = []
+            # Default scan-start for the no-parens (bare getter) case is right
+            # after the name — NOT `delim_idx`, which for a matched "=>" points
+            # at its *second* char (">"), already past the boundary
+            # `_dart_find_body_start` needs to see to stop there correctly.
+            params_end_idx = m.end("name")
+            if body[delim_idx] == "(":
+                # Setter/operator parameter list: scan to the matching `)`.
+                j = delim_idx
+                depth = 0
+                n_body = len(body)
+                while j < n_body:
+                    ch = body[j]
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            j += 1
+                            break
+                    j += 1
+                params = _dart_params(body[delim_idx + 1: j - 1])
+                params_end_idx = j
+            body_start_idx = _dart_find_body_start(body, params_end_idx)
             # Walk to body / `;`.
-            end_in_body = _scan_member_end(body, m.end() - 1)
+            end_in_body = _scan_member_end(body, delim_idx)
             byte_end = body_offset + end_in_body
             line_end = _line_of(byte_end - 1, line_byte_starts)
             if kw == "get":
@@ -420,7 +604,7 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
             else:  # operator
                 kind = "operator"
                 item_name = f"operator {name}"
-            items.append({
+            item = {
                 "kind": kind,
                 "name": item_name,
                 "parent": class_name,
@@ -428,7 +612,15 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
                 "line_end": line_end,
                 "byte_start": byte_start,
                 "byte_end": byte_end,
-            })
+                "signature": _dart_collapse(body[decl_start:body_start_idx]),
+            }
+            if params:
+                item["params"] = params
+            if ret:
+                item["returns"] = ret
+            if _dart_is_async(body[params_end_idx:body_start_idx]):
+                item["is_async"] = True
+            items.append(item)
             claimed_ranges.append((decl_start, end_in_body))
 
         # Second pass: ordinary methods + constructors.
@@ -463,6 +655,9 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
             end_in_body = _scan_member_end(body, j)
             byte_end = body_offset + end_in_body
             line_end = _line_of(byte_end - 1, line_byte_starts)
+            params = _dart_params(body[paren_open + 1: j - 1])
+            body_start_idx = _dart_find_body_start(body, j)
+            generics = m.group("generics") or ""
 
             if "factory" in mods:
                 kind = "constructor"
@@ -486,7 +681,7 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
                 kind = "method"
                 item_name = name
 
-            items.append({
+            item = {
                 "kind": kind,
                 "name": item_name,
                 "parent": class_name,
@@ -494,7 +689,17 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
                 "line_end": line_end,
                 "byte_start": byte_start,
                 "byte_end": byte_end,
-            })
+                "signature": _dart_collapse(body[decl_start:body_start_idx]),
+            }
+            if params:
+                item["params"] = params
+            if ret:
+                item["returns"] = ret
+            if generics:
+                item["type_params"] = [p.strip() for p in generics[1:-1].split(",") if p.strip()]
+            if _dart_is_async(body[j:body_start_idx]):
+                item["is_async"] = True
+            items.append(item)
             claimed_ranges.append((decl_start, end_in_body))
 
     # Top-level free functions: scan only the regions OUTSIDE class bodies.
@@ -560,7 +765,7 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
             byte_start += 1
         line_end = _line_of(byte_end - 1, line_byte_starts)
 
-        items.append({
+        item = {
             "kind": "function",
             "name": name,
             "parent": None,
@@ -568,7 +773,20 @@ def _emit_items(text: str, content: bytes) -> list[dict]:
             "line_end": line_end,
             "byte_start": byte_start,
             "byte_end": byte_end,
-        })
+            "signature": _dart_collapse(text[byte_start:k]),
+        }
+        params = _dart_params(text[paren_open + 1: j - 1])
+        if params:
+            item["params"] = params
+        ret = (m.group("ret") or "").strip()
+        if ret:
+            item["returns"] = ret
+        generics = m.group("generics") or ""
+        if generics:
+            item["type_params"] = [p.strip() for p in generics[1:-1].split(",") if p.strip()]
+        if _dart_is_async(text[j:k]):
+            item["is_async"] = True
+        items.append(item)
 
     items.sort(key=lambda x: (x["line_start"], x["kind"], x.get("parent") or "", x["name"]))
     return items

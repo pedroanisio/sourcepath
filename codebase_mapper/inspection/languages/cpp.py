@@ -56,6 +56,102 @@ def _node_text(node, content: bytes) -> str:
     return content[node.start_byte:node.end_byte].decode("utf-8", "replace")
 
 
+def _collapse(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _cpp_unwrap_to_function_declarator(declarator):
+    """Follow a ``pointer_declarator``/``reference_declarator`` chain down to
+    the ``function_declarator`` it wraps (e.g. ``char *make()``), or ``None``
+    if this declarator isn't a function at all."""
+    node = declarator
+    while node is not None and node.type in ("pointer_declarator", "reference_declarator"):
+        node = node.child_by_field_name("declarator")
+    return node if node is not None and node.type == "function_declarator" else None
+
+
+def _cpp_end_before_body(node) -> int:
+    """Byte offset where a declaration header ends: the earliest of its
+    compound-statement body, constructor member-initializer-list, or
+    trailing ``;`` — whichever is present."""
+    candidates: list[int] = []
+    body = node.child_by_field_name("body")
+    if body is not None:
+        candidates.append(body.start_byte)
+    finit = next((c for c in node.children if c.type == "field_initializer_list"), None)
+    if finit is not None:
+        candidates.append(finit.start_byte)
+    semi = next((c for c in node.children if c.type == ";"), None)
+    if semi is not None:
+        candidates.append(semi.start_byte)
+    return min(candidates) if candidates else node.end_byte
+
+
+def _cpp_params(param_list, content: bytes) -> list[dict]:
+    """Expand a ``parameter_list`` into ordered {name, type, default} records.
+
+    ``type`` is reconstructed by splicing the name identifier back out of the
+    parameter's own text (preserving ``const``/pointer/reference decoration
+    exactly as written); ``default`` comes from ``optional_parameter_declaration``'s
+    ``default_value`` field. A variadic ``...`` becomes ``{"name": "", "type":
+    "...", "default": None}``.
+    """
+    out: list[dict] = []
+    if param_list is None:
+        return out
+    for p in param_list.children:
+        if not p.is_named:
+            continue
+        if p.type == "variadic_parameter_declaration":
+            out.append({"name": "", "type": "...", "default": None})
+            continue
+        if p.type not in ("parameter_declaration", "optional_parameter_declaration"):
+            continue
+        declarator = p.child_by_field_name("declarator")
+        default_node = p.child_by_field_name("default_value")
+        default = _collapse(_node_text(default_node, content)) if default_node is not None else None
+        eq_node = next((c for c in p.children if c.type == "="), None)
+        end = eq_node.start_byte if eq_node is not None else p.end_byte
+        name_node = find_named_descendant(
+            declarator, {"identifier", "field_identifier"}) if declarator is not None else None
+        if name_node is None:
+            ptype = _collapse(content[p.start_byte:end].decode("utf-8", "replace"))
+            out.append({"name": "", "type": ptype, "default": default})
+            continue
+        pre = content[p.start_byte:name_node.start_byte].decode("utf-8", "replace")
+        post = content[name_node.end_byte:end].decode("utf-8", "replace")
+        out.append({
+            "name": _node_text(name_node, content),
+            "type": _collapse(pre + post),
+            "default": default,
+        })
+    return out
+
+
+def _cpp_callable_fields(node, type_field, fd, content: bytes,
+                          type_params: list[str] | None = None) -> dict:
+    end = _cpp_end_before_body(node)
+    fields: dict = {"signature": _collapse(
+        content[node.start_byte:end].decode("utf-8", "replace"))}
+    params = _cpp_params(fd.child_by_field_name("parameters"), content)
+    if params:
+        fields["params"] = params
+    if type_field is not None:
+        returns = _collapse(content[type_field.start_byte:fd.start_byte].decode("utf-8", "replace"))
+        if returns:
+            fields["returns"] = returns
+    if type_params:
+        fields["type_params"] = type_params
+    return fields
+
+
+def _cpp_template_type_params(template_node, content: bytes) -> list[str]:
+    tp_list = _find_first(template_node, "template_parameter_list")
+    if tp_list is None:
+        return []
+    return [_collapse(_node_text(c, content)) for c in tp_list.children if c.is_named]
+
+
 def _find_first(node, kind: str):
     for ch in node.children:
         if ch.is_named and ch.type == kind:
@@ -187,22 +283,34 @@ def _function_name(declarator, content: bytes) -> tuple[str | None, str | None]:
 
 def _emit_class_methods(class_node, content: bytes, class_name: str,
                         ns_qual: str, items: list[dict]) -> None:
-    """Walk a class/struct/union body for nested types and methods."""
+    """Walk a class/struct/union body for nested types and methods.
+
+    Visibility tracking: an ``access_specifier`` (``public:``/``private:``/
+    ``protected:``) toggles the label applied to every subsequent member in
+    this same body — explicit written evidence only; a member appearing
+    before the first label gets no ``visibility`` field (never defaulted
+    from the enclosing ``class``/``struct``/``union`` keyword).
+    """
     body = _find_first(class_node, "field_declaration_list")
     if body is None:
         return
+    current_vis: str | None = None
     for ch in body.children:
         if not ch.is_named:
             continue
+        if ch.type == "access_specifier":
+            current_vis = _node_text(ch, content)
+            continue
         # A method body or signature.
         if ch.type == "function_definition":
-            decl = _find_first(ch, "function_declarator")
+            decl = _cpp_unwrap_to_function_declarator(ch.child_by_field_name("declarator"))
             simple, qual = _function_name(decl, content)
             if simple:
                 kind = "constructor" if simple == class_name else "method"
                 if simple.startswith("~"):
                     kind = "destructor"
-                items.append({
+                fd = decl
+                item = {
                     "kind": kind,
                     "name": simple,
                     "parent": class_name,
@@ -211,7 +319,13 @@ def _emit_class_methods(class_node, content: bytes, class_name: str,
                     "line_end": ch.end_point[0] + 1,
                     "byte_start": ch.start_byte,
                     "byte_end": ch.end_byte,
-                })
+                }
+                if fd is not None:
+                    item.update(_cpp_callable_fields(
+                        ch, ch.child_by_field_name("type"), fd, content))
+                if current_vis is not None:
+                    item["visibility"] = current_vis
+                items.append(item)
         elif ch.type == "field_declaration":
             # Declaration-only methods: `void foo() const;` — the
             # function_declarator is a child of the field_declaration.
@@ -224,7 +338,7 @@ def _emit_class_methods(class_node, content: bytes, class_name: str,
             kind = "constructor" if simple == class_name else "method"
             if simple.startswith("~"):
                 kind = "destructor"
-            items.append({
+            item = {
                 "kind": kind,
                 "name": simple,
                 "parent": class_name,
@@ -233,7 +347,12 @@ def _emit_class_methods(class_node, content: bytes, class_name: str,
                 "line_end": ch.end_point[0] + 1,
                 "byte_start": ch.start_byte,
                 "byte_end": ch.end_byte,
-            })
+            }
+            item.update(_cpp_callable_fields(
+                ch, ch.child_by_field_name("type"), decl, content))
+            if current_vis is not None:
+                item["visibility"] = current_vis
+            items.append(item)
         elif ch.type in _TYPE_NODE_TYPES:
             # Nested type — recurse.
             _emit_type(ch, content, parent_class=class_name, ns_qual=ns_qual,
@@ -241,7 +360,8 @@ def _emit_class_methods(class_node, content: bytes, class_name: str,
 
 
 def _emit_type(type_node, content: bytes, parent_class: str | None,
-               ns_qual: str, items: list[dict]) -> None:
+               ns_qual: str, items: list[dict],
+               type_params: list[str] | None = None) -> None:
     name_node = _find_first(type_node, "type_identifier")
     if name_node is None:
         # Anonymous struct/union — skip.
@@ -269,6 +389,13 @@ def _emit_type(type_node, content: bytes, parent_class: str | None,
         item["extends"] = ext
     if impl:
         item["implements"] = impl
+    if ext is not None or impl:
+        item["bases"] = ([ext] if ext is not None else []) + impl
+    body = _find_first(type_node, "field_declaration_list") or _find_first(type_node, "enumerator_list")
+    end = body.start_byte if body is not None else type_node.end_byte
+    item["signature"] = _collapse(content[type_node.start_byte:end].decode("utf-8", "replace"))
+    if type_params:
+        item["type_params"] = type_params
     items.append(item)
     # Recurse into the body for methods + nested types.
     if kind in ("class", "struct", "union"):
@@ -280,9 +407,14 @@ def _namespace_qual(parts: list[str]) -> str:
 
 
 def _walk_tu(node, content: bytes, ns_stack: list[str],
-             items: list[dict]) -> None:
+             items: list[dict], type_params: list[str] | None = None) -> None:
     """Walk a translation_unit / declaration_list. ``ns_stack`` is the
     *current* namespace nesting; pushed/popped on namespace boundaries.
+
+    ``type_params`` carries a top-level ``template<...>`` parameter list one
+    level down (from ``template_declaration`` to the class/function it
+    wraps) — not propagated into nested recursion, so a template's own body
+    doesn't leak its parameters onto unrelated siblings.
     """
     if node.type == "namespace_definition":
         # Identify the namespace name (simple or nested).
@@ -307,19 +439,26 @@ def _walk_tu(node, content: bytes, ns_stack: list[str],
     if node.type == "template_declaration":
         # Descend one level — the wrapped class/function is what we
         # actually want to record.
+        tp = _cpp_template_type_params(node, content)
         for ch in node.children:
             if ch.is_named:
-                _walk_tu(ch, content, ns_stack, items)
+                _walk_tu(ch, content, ns_stack, items, type_params=tp)
         return
     if node.type in _TYPE_NODE_TYPES:
         _emit_type(node, content, parent_class=None,
-                   ns_qual=_namespace_qual(ns_stack), items=items)
+                   ns_qual=_namespace_qual(ns_stack), items=items,
+                   type_params=type_params)
         return
     if node.type == "function_definition":
-        decl = _find_first(node, "function_declarator")
+        decl = _cpp_unwrap_to_function_declarator(node.child_by_field_name("declarator"))
         simple, qualifier = _function_name(decl, content)
         if simple is None:
             return
+        callable_fields = (
+            _cpp_callable_fields(node, node.child_by_field_name("type"), decl,
+                                  content, type_params=type_params)
+            if decl is not None else {}
+        )
         if qualifier is not None:
             # Out-of-class method definition: ``Type::method``.
             # Record as a method with parent=Type. The qualifier may
@@ -332,7 +471,7 @@ def _walk_tu(node, content: bytes, ns_stack: list[str],
                 kind = "constructor"
             elif simple.startswith("~"):
                 kind = "destructor"
-            items.append({
+            item = {
                 "kind": kind,
                 "name": simple,
                 "parent": parent_class,
@@ -341,9 +480,11 @@ def _walk_tu(node, content: bytes, ns_stack: list[str],
                 "line_end": node.end_point[0] + 1,
                 "byte_start": node.start_byte,
                 "byte_end": node.end_byte,
-            })
+            }
+            item.update(callable_fields)
+            items.append(item)
         else:
-            items.append({
+            item = {
                 "kind": "function",
                 "name": simple,
                 "parent": None,
@@ -352,7 +493,9 @@ def _walk_tu(node, content: bytes, ns_stack: list[str],
                 "line_end": node.end_point[0] + 1,
                 "byte_start": node.start_byte,
                 "byte_end": node.end_byte,
-            })
+            }
+            item.update(callable_fields)
+            items.append(item)
         return
     if node.type == "declaration":
         # `void foo();` at file scope — prototype only. Same shape as a
@@ -361,7 +504,7 @@ def _walk_tu(node, content: bytes, ns_stack: list[str],
         if decl is not None:
             simple, qualifier = _function_name(decl, content)
             if simple is not None and qualifier is None:
-                items.append({
+                item = {
                     "kind": "function",
                     "name": simple,
                     "parent": None,
@@ -370,7 +513,11 @@ def _walk_tu(node, content: bytes, ns_stack: list[str],
                     "line_end": node.end_point[0] + 1,
                     "byte_start": node.start_byte,
                     "byte_end": node.end_byte,
-                })
+                }
+                item.update(_cpp_callable_fields(
+                    node, node.child_by_field_name("type"), decl, content,
+                    type_params=type_params))
+                items.append(item)
         return
     # Recurse into anything that might contain a namespace_definition or
     # type/function declaration.

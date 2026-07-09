@@ -12,6 +12,176 @@ from ...ts_setup import _TS_LANGS, _TS_QUERIES, _ts_setup
 from ...ts_setup import TS_AVAILABLE, ts
 
 
+_DEF_KINDS = ("function_declaration", "protocol_function_declaration")
+_CONTAINER_KINDS = ("class_declaration", "protocol_declaration")
+_BODY_KINDS = ("class_body", "protocol_body", "enum_class_body")
+_VISIBILITY_WORDS = {"private", "protected", "public", "internal", "fileprivate", "open"}
+
+
+def _sw_node_text(node, content: bytes) -> str:
+    return content[node.start_byte:node.end_byte].decode("utf-8", "replace")
+
+
+def _collapse(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _sw_item(kind: str, name: str, parent: str | None, node) -> dict:
+    return {
+        "kind": kind,
+        "name": name,
+        "parent": parent,
+        "line_start": node.start_point[0] + 1,
+        "line_end": node.end_point[0] + 1,
+        "byte_start": node.start_byte,
+        "byte_end": node.end_byte,
+    }
+
+
+def _sw_modifiers(node, content: bytes) -> str | None:
+    """Explicit visibility keyword only — never derived from naming."""
+    modifiers = next((c for c in node.children if c.type == "modifiers"), None)
+    if modifiers is None:
+        return None
+    for m in modifiers.children:
+        if m.type == "visibility_modifier":
+            word = _sw_node_text(m, content)
+            if word in _VISIBILITY_WORDS:
+                return word
+    return None
+
+
+def _sw_type_params(node, content: bytes) -> list[str]:
+    tp = next((c for c in node.children if c.type == "type_parameters"), None)
+    if tp is None:
+        return []
+    return [_sw_node_text(c, content) for c in tp.children
+            if c.is_named and c.type == "type_parameter"]
+
+
+def _sw_params(func_decl, content: bytes) -> list[dict]:
+    """Expand a function declaration's flat parameter/default children into
+    ordered {name, type, default} records. Swift's grammar has no dedicated
+    parameter-list node: ``(``, ``parameter``, ``,``, ``=``/default-value
+    siblings sit directly among the declaration's own children (mirroring
+    Kotlin's ``function_value_parameters`` layout, minus the wrapper).
+
+    ``name`` is the *internal* parameter name — the second ``simple_identifier``
+    when both an external label and internal name are written, else the sole
+    one. An external label of ``_`` (no label) is simply not that identifier.
+    """
+    children = list(func_decl.children)
+    n = len(children)
+    open_idx = next((i for i, c in enumerate(children) if c.type == "("), None)
+    if open_idx is None:
+        return []
+    close_idx = next((i for i in range(open_idx, n) if children[i].type == ")"), n)
+    out: list[dict] = []
+    i = open_idx + 1
+    while i < close_idx:
+        c = children[i]
+        if c.type != "parameter":
+            i += 1
+            continue
+        idents = [ch for ch in c.children if ch.type == "simple_identifier"]
+        name = _sw_node_text(idents[-1], content) if idents else ""
+        colon_idx = next((j for j, ch in enumerate(c.children) if ch.type == ":"), None)
+        ptype = None
+        if colon_idx is not None:
+            type_nodes = [ch for ch in c.children[colon_idx + 1:] if ch.is_named]
+            if type_nodes:
+                ptype = _collapse(_sw_node_text(type_nodes[0], content))
+        default = None
+        if i + 1 < close_idx and children[i + 1].type == "=":
+            if i + 2 < close_idx and children[i + 2].is_named:
+                default = _collapse(_sw_node_text(children[i + 2], content))
+                i += 2
+        out.append({"name": name, "type": ptype, "default": default})
+        i += 1
+    return out
+
+
+def _sw_callable_fields(node, content: bytes) -> dict:
+    children = list(node.children)
+    close_idx = next((i for i, c in enumerate(children) if c.type == ")"), None)
+    body = node.child_by_field_name("body")
+    end = body.start_byte if body is not None else node.end_byte
+    fields: dict = {"signature": _collapse(
+        _sw_node_text(node, content)[:end - node.start_byte])}
+    if close_idx is not None:
+        params = _sw_params(node, content)
+        if params:
+            fields["params"] = params
+        for i in range(close_idx + 1, len(children)):
+            if children[i].type == "async":
+                fields["is_async"] = True
+            elif children[i].type == "->":
+                for j in range(i + 1, len(children)):
+                    if children[j].is_named and children[j].type != "function_body":
+                        fields["returns"] = _collapse(_sw_node_text(children[j], content))
+                        break
+                break
+    type_params = _sw_type_params(node, content)
+    if type_params:
+        fields["type_params"] = type_params
+    vis = _sw_modifiers(node, content)
+    if vis:
+        fields["visibility"] = vis
+    return fields
+
+
+def _sw_container_fields(node, content: bytes, *, body) -> dict:
+    end = body.start_byte if body is not None else node.end_byte
+    fields: dict = {"signature": _collapse(
+        _sw_node_text(node, content)[:end - node.start_byte])}
+    bases = [
+        _sw_node_text(next(c for c in spec.children if c.type == "user_type"), content)
+        for spec in node.children if spec.type == "inheritance_specifier"
+    ]
+    if bases:
+        fields["bases"] = bases
+    type_params = _sw_type_params(node, content)
+    if type_params:
+        fields["type_params"] = type_params
+    vis = _sw_modifiers(node, content)
+    if vis:
+        fields["visibility"] = vis
+    return fields
+
+
+def _collect_swift_items(root, content: bytes) -> list[dict]:
+    """One item per top-level/member ``func`` and ``class``/``struct``/
+    ``enum``/``protocol``, with byte+line spans (powers L2 chunking + the
+    symbol surface). Iterative (explicit stack over bodies): a deeply-nested
+    or generated Swift file must not overflow the interpreter's recursion
+    limit (see ``_treewalk`` module docstring for the same concern in other
+    analyzers)."""
+    items: list[dict] = []
+    stack: list[tuple] = [(root, None)]
+    while stack:
+        scope, parent = stack.pop()
+        for child in scope.children:
+            if not child.is_named:
+                continue
+            if child.type in _DEF_KINDS:
+                name_node = child.child_by_field_name("name")
+                name = _sw_node_text(name_node, content) if name_node is not None else ""
+                kind = "method" if parent is not None else "function"
+                item = _sw_item(kind, name, parent, child)
+                item.update(_sw_callable_fields(child, content))
+                items.append(item)
+            elif child.type in _CONTAINER_KINDS:
+                name_node = child.child_by_field_name("name")
+                name = _sw_node_text(name_node, content) if name_node is not None else ""
+                cbody = next((c for c in child.children if c.type in _BODY_KINDS), None)
+                item = _sw_item("class", name, parent, child)
+                item.update(_sw_container_fields(child, content, body=cbody))
+                items.append(item)
+                if cbody is not None:
+                    stack.append((cbody, name))
+    return items
+
+
 def extract_swift_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[str]]:
     if not TS_AVAILABLE:
         return None, ["tree_sitter_unavailable"]
@@ -37,11 +207,15 @@ def extract_swift_ast_summary(content: bytes, path: str) -> tuple[dict | None, l
             elif cap == "class_name":
                 classes.append(text)
     imports.sort(key=lambda x: (x["lineno"], x["source"]))
+    items = _collect_swift_items(tree.root_node, content)
+    items.sort(key=lambda x: (x["line_start"], x["kind"],
+                              x.get("parent") or "", x["name"]))
     return {
         "language": "swift",
         "imports": imports,
         "top_level_functions": sorted(set(funcs)),
         "top_level_classes": sorted(set(classes)),
+        "items": items,
     }, errors
 
 def detect_swift_modules(records: list[FileRecord], read: Callable[[str], bytes]) -> dict:

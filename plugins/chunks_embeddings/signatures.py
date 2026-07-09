@@ -26,8 +26,8 @@ Two producer paths feed the contract:
 
   1. AST-direct chunkers (Python here; TS/JS and Rust in chunker.py) extract
      fields from the parse tree at chunk time.
-  2. Items-based chunkers (dart/java/go/clojure/cpp/objc) copy the canonical
-     fields from ``record.ast_summary["items"]`` via
+  2. Items-based chunkers (dart/java/go/clojure/cpp/objc/ruby/c/kotlin/swift)
+     copy the canonical fields from ``record.ast_summary["items"]`` via
      :func:`signature_fields_from_item`; the language analyzers own producing
      them on the item dicts.
 

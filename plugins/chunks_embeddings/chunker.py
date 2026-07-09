@@ -86,6 +86,14 @@ class ChunkExtractor:
             chunks = _chunk_cpp(content, record)
         elif record.language in ("objective-c", "objective-cpp"):
             chunks = _chunk_objc(content, record)
+        elif record.language == "ruby":
+            chunks = _chunk_ruby(content, record)
+        elif record.language == "c":
+            chunks = _chunk_c(content, record)
+        elif record.language == "kotlin":
+            chunks = _chunk_kotlin(content, record)
+        elif record.language == "swift":
+            chunks = _chunk_swift(content, record)
         elif record.language is not None or record.type_ in {"documentation", "configuration", "test_code", "source_code"}:
             # whole-file chunk for any text file we recognize
             chunks = _whole_file_chunk(content, record.path)
@@ -1198,6 +1206,240 @@ def _chunk_objc(content: bytes, record: FileRecord) -> list[dict]:
         chunk_bytes = chunk_text.encode("utf-8")
         chunks.append(apply_signature_fields({
             "kind": _OBJC_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Ruby
+# ---------------------------------------------------------------------------
+
+
+_RUBY_TO_CHUNK_KIND = {
+    "method": "method",
+    "class": "class",
+}
+
+
+def _chunk_ruby(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-symbol chunks from the Ruby analyzer's ``items`` array — one chunk
+    per top-level/nested ``def``/``class``/``module``. Same items-based shape
+    as ``_chunk_go``; the analyzer already normalizes ``singleton_method`` to
+    chunk kind ``method`` and ``module`` to chunk kind ``class``."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _RUBY_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": _RUBY_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# C
+# ---------------------------------------------------------------------------
+
+
+_C_TO_CHUNK_KIND = {
+    "function": "function",
+    "struct": "class",
+    "union": "class",
+    "enum": "class",
+    "typedef": "class",
+}
+
+
+def _chunk_c(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-symbol chunks from the C analyzer's ``items`` array — one chunk
+    per top-level function (definition or prototype), named struct/union/enum,
+    and typedef. Same items-based shape as ``_chunk_go``."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _C_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": _C_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Kotlin
+# ---------------------------------------------------------------------------
+
+
+_KOTLIN_TO_CHUNK_KIND = {
+    "function": "function",
+    "method": "method",
+    "class": "class",
+}
+
+
+def _chunk_kotlin(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-symbol chunks from the Kotlin analyzer's ``items`` array — one
+    chunk per top-level/member ``fun`` and ``class``/``interface``/``object``.
+    Same items-based shape as ``_chunk_go``."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _KOTLIN_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": _KOTLIN_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Swift
+# ---------------------------------------------------------------------------
+
+
+_SWIFT_TO_CHUNK_KIND = {
+    "function": "function",
+    "method": "method",
+    "class": "class",
+}
+
+
+def _chunk_swift(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-symbol chunks from the Swift analyzer's ``items`` array — one
+    chunk per top-level/member ``func`` and ``class``/``struct``/``enum``/
+    ``protocol``. Same items-based shape as ``_chunk_go``."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _SWIFT_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": _SWIFT_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
             "byte_start": item["byte_start"],
