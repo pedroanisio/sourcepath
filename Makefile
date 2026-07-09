@@ -81,6 +81,7 @@ LLM_OFFLINE_VERIFIERS := \
 	$(TESTS_DIR)/verify_llm_enrich_cache.py \
 	$(TESTS_DIR)/verify_llm_enrich_prompts.py \
 	$(TESTS_DIR)/verify_llm_enrich_offline.py \
+	$(TESTS_DIR)/verify_llm_enrich_degradation.py \
 	$(TESTS_DIR)/verify_llm_enrich_cli.py \
 	$(TESTS_DIR)/verify_llm_enrich_ci_determinism.py \
 	$(TESTS_DIR)/verify_bench_llm_models.py

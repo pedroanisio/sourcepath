@@ -40,12 +40,18 @@ Failure modes:
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import os
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+
+# Monotonic sequence making every put() tmp path writer-unique, even for
+# two writes of the same key from the same thread. See Cache.put.
+_TMP_SEQ = itertools.count()
 
 CACHE_SCHEMA_VERSION = 1
 _KEY_SEPARATOR = "\x1f"  # ASCII unit-separator; reserved across all key fields.
@@ -126,7 +132,13 @@ class Cache:
             value = dict(value, v=CACHE_SCHEMA_VERSION)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         p = self._path_for(key)
-        tmp = p.with_suffix(p.suffix + ".tmp")
+        # Writer-unique tmp name: concurrent writers of the *same* key
+        # (the host's parallel enricher pass, two identical files) must
+        # never share a tmp path, or one thread can atomically publish
+        # another's half-written bytes.
+        tmp = p.with_suffix(
+            f"{p.suffix}.{os.getpid()}.{threading.get_ident()}"
+            f".{next(_TMP_SEQ)}.tmp")
         # sort_keys=True so on-disk bytes are stable per (key, value).
         # That property doesn't matter for correctness but it makes
         # cache fingerprinting (Step 10's CI determinism check) trivial.

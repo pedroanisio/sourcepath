@@ -12,7 +12,11 @@ Wiring:
   - On Ollama failure (unreachable or model missing), logs the error
     once and disables further calls for the rest of the run — the
     failure mode the plan calls "degradation, not breakage"
-    (Commitment #7).
+    (Commitment #7). The degradation is disclosed, not silent
+    (PALS's LAW): one entry is registered on
+    ``ctx.scratch["degradations"]`` counting every eligible record
+    left unenriched from the failing call onward, so the manifest
+    can carry a machine-readable record that the layer degraded.
   - Result lands on ``ctx.scratch["llm:file_summary"][record.path]``
     as a dict ``{text, model, prompt_sha, target_sha, generated_at,
     was_cache_hit}``. Step 4 reads from there to emit triples; the
@@ -34,9 +38,10 @@ registration at all.
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from codebase_mapper.shared_kernel.progress import ProgressReporter
 
@@ -63,6 +68,11 @@ CONTENT_BUDGET_CHARS = 4000
 # Scope literal used to opt in to file-level summaries. Mirrored in
 # the CLI flag (`--llm-scope files,...`) and in the docs.
 SCOPE_FILES = "files"
+
+# Budget for the error excerpt mirrored into the degradation entry
+# (ctx.scratch["degradations"]). Mirrored by the assertion in
+# tests/verify_llm_enrich_degradation.py.
+ERROR_EXCERPT_CHARS = 200
 
 # Languages we attempt to summarize. Anything outside this set is
 # skipped (the enricher is opt-in by language). The set deliberately
@@ -105,9 +115,29 @@ class LlmEnricher:
 
     name: str = ENRICHER_NAME
 
+    # Concurrency contract with the host pipeline: enrich() may be called
+    # from multiple threads on distinct records. Shared state is either
+    # guarded (_reporter, below) or benign under the GIL (_disabled is a
+    # latch that only ever flips False→True; ctx.scratch writes are
+    # per-record keys inside a dict obtained via atomic setdefault).
+    parallel_safe: ClassVar[bool] = True
+
     # Set to True if Ollama fails mid-run; subsequent records are
     # skipped without further attempts. Reset on next process.
     _disabled: bool = field(default=False, init=False, repr=False)
+
+    # Degradation disclosure (PALS's LAW): self-disabling silently
+    # would let the run "complete normally" with no machine-readable
+    # record that the enrichment layer degraded. On disable, exactly
+    # one entry is appended to ctx.scratch["degradations"] and kept
+    # here by reference; its "skipped" count is then incremented in
+    # place for every later eligible record, so the end of the run
+    # sees one entry carrying the final tally. The manifest emitter
+    # reads ctx.scratch["degradations"] to surface it in the bundle.
+    _degradation: dict | None = field(default=None, init=False, repr=False)
+
+    _reporter_lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False)
 
     # Throttled progress heartbeat. Created lazily on the first file we
     # actually summarize; its total is the count of *eligible* records
@@ -140,8 +170,47 @@ class LlmEnricher:
 
     # ----------------------------------------------------------------
 
+    def _disable(self, ctx: "PipelineCtx", error: str) -> None:
+        """Self-disable and register the degradation disclosure.
+
+        Called from the except handlers below, i.e. only after the
+        scope gates passed and a real client call failed — so every
+        record counted from here on truly lost its enrichment to the
+        failure. The record whose call just failed counts as the
+        first skip: it produced no enrichment either.
+
+        Thread-safe: enrichment may run on a worker pool, so two
+        records can fail concurrently before either marks the
+        enricher disabled. The lock guarantees exactly one entry is
+        registered; the loser's failed record folds into the tally.
+        """
+        with self._reporter_lock:
+            self._disabled = True
+            if self._degradation is not None:
+                self._degradation["skipped"] += 1
+                return
+            entry = {
+                "component": "llm_enrich",
+                "reason": "client_failure_self_disabled",
+                "kind": "file_summary",
+                "skipped": 1,  # the record whose call just failed
+                "error": error[:ERROR_EXCERPT_CHARS],
+            }
+            ctx.scratch.setdefault("degradations", []).append(entry)
+            self._degradation = entry
+
     def enrich(self, record: "FileRecord", content: bytes,
                ctx: "PipelineCtx") -> None:
+        if self._disabled:
+            # Degraded: count every record that would have been
+            # summarized so the run's single degradation entry
+            # discloses the true blast radius instead of the run
+            # silently "completing normally".
+            if self._degradation is not None and \
+                    self._should_summarize(record):
+                with self._reporter_lock:
+                    self._degradation["skipped"] += 1
+            return
         if not self._file_summary_enabled():
             return
         if not self._should_summarize(record):
@@ -192,7 +261,7 @@ class LlmEnricher:
                 "llm_enrich: Ollama unreachable, disabling file_summary "
                 "for the rest of this run: %s", e,
             )
-            self._disabled = True
+            self._disable(ctx, str(e))
             return
         except OllamaModelMissing as e:
             _log.warning(
@@ -200,15 +269,16 @@ class LlmEnricher:
                 "file_summary for the rest of this run: %s",
                 self.model, e,
             )
-            self._disabled = True
+            self._disable(ctx, str(e))
             return
 
-        if self._reporter is None:
-            eligible = sum(1 for rec in ctx.records
-                           if self._should_summarize(rec))
-            self._reporter = ProgressReporter(
-                "[L4] file_summary", total=eligible)
-        self._reporter.update(record.path, cached=was_hit)
+        with self._reporter_lock:
+            if self._reporter is None:
+                eligible = sum(1 for rec in ctx.records
+                               if self._should_summarize(rec))
+                self._reporter = ProgressReporter(
+                    "[L4] file_summary", total=eligible)
+            self._reporter.update(record.path, cached=was_hit)
 
         # Stash on ctx.scratch under a documented key. Step 4 reads
         # this in LlmGraphWriter.contribute; the artifact emitter

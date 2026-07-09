@@ -21,6 +21,7 @@ cached.
 from __future__ import annotations
 
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -72,18 +73,33 @@ class OllamaClient:
 
     host: str = field(default_factory=lambda: resolve_host())
     timeout: float = DEFAULT_TIMEOUT_SECONDS
+    # Test seam: an httpx transport (e.g. MockTransport) for offline tests.
+    transport: Any | None = None
     _client: httpx.Client | None = field(default=None, init=False, repr=False)
+    # chat() may be called from many threads at once (the host's parallel
+    # enricher pass); httpx.Client is thread-safe for requests, but the
+    # lazy construction below needs the lock so a first-call race can't
+    # build (and leak) multiple clients.
+    _client_lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False)
 
     def _http(self) -> httpx.Client:
         if self._client is None:
-            self._client = httpx.Client(base_url=self.host,
-                                        timeout=self.timeout)
+            with self._client_lock:
+                if self._client is None:
+                    kwargs: dict[str, Any] = {
+                        "base_url": self.host, "timeout": self.timeout,
+                    }
+                    if self.transport is not None:
+                        kwargs["transport"] = self.transport
+                    self._client = httpx.Client(**kwargs)
         return self._client
 
     def close(self) -> None:
-        if self._client is not None:
-            self._client.close()
-            self._client = None
+        with self._client_lock:
+            if self._client is not None:
+                self._client.close()
+                self._client = None
 
     def ping(self) -> bool:
         """Cheap reachability check (used by the offline-degradation

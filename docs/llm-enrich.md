@@ -157,6 +157,15 @@ identical in behavior across them.
 | ``--llm-cache-dir PATH`` | yes | (via $CBM_LLM_CACHE) | (via $CBM_LLM_CACHE) |
 | ``--llm-no-cache`` | yes | — | — |
 | ``--no-llm`` | yes | — | — |
+| ``--skip-shacl`` (skip pySHACL; disclosed in the manifest) | yes | — | — |
+| ``--no-jsonld`` (skip JSON-LD serialization) | yes | — | — |
+
+Concurrency is controlled by environment variables, not flags:
+``$CBM_EXTRACT_WORKERS`` (AST extraction threads, default: all cores)
+and ``$CBM_ENRICH_WORKERS`` (parallel-safe enricher threads — the L4
+LLM calls — default: 4). Output is identical at any worker count; the
+LLM cache keys are content-addressed, so warm-cache determinism is
+unaffected.
 
 For fine-grained control use [scripts/run_l4.py](../scripts/run_l4.py).
 The ``--llm-enrich`` flag on ``run_l3.py``/``run_xrefs.py`` is the

@@ -393,6 +393,7 @@ python tests/verify_llm_enrich_rdf.py       # L4 RDF emission + SHACL + sidecar 
 python tests/verify_llm_enrich_aggregator.py       # L4 concept_description + schema_purpose (requires Ollama)
 python tests/verify_llm_enrich_determinism.py      # L4 warm-cache determinism (requires Ollama)
 python tests/verify_llm_enrich_offline.py   # L4 graceful degradation when Ollama is unreachable
+python tests/verify_llm_enrich_degradation.py       # L4 self-disable disclosure (degradations entry in ctx.scratch)
 python tests/verify_llm_enrich_cli.py       # L4 CLI surface (scripts/run_l4 + --llm-enrich flags)
 python tests/verify_llm_enrich_ci_determinism.py    # L4 warm-cache determinism via committed cache fixture (no Ollama needed)
 python tests/verify_bench_llm_models.py     # L4 model-benchmark harness contract
