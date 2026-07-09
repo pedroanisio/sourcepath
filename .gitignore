@@ -8,6 +8,7 @@ build/
 dist/
 *.egg-info/
 *.egg
+*.zip
 
 # Virtual environments
 .venv/
@@ -29,6 +30,9 @@ frontend/ui/coverage/
 _tmp/
 _explore/
 frontend/ui/node_modules/
+
+# bench_llm_models.py raw per-call outputs (retain out-of-tree or under docs/)
+/bench_results*.jsonl
 
 # Local env config (the committed convention is .env.example)
 .env

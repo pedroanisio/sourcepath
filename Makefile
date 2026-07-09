@@ -25,6 +25,9 @@ TESTS_DIR      := tests
 FRONTEND_DIR   := frontend
 UI_DIR         := $(FRONTEND_DIR)/ui
 
+# `dist-zip` base name; the target appends a UTC timestamp + `.zip`.
+DIST_NAME      ?= code-base-mapper
+
 # Verifier groups — keep in lockstep with tests/verify_*.py and README.md.
 DRIFT_VERIFIERS := \
 	$(TESTS_DIR)/verify_drift_p1.py \
@@ -202,6 +205,15 @@ frontend-down: ## Stop the frontend stack.
 .PHONY: frontend-logs
 frontend-logs: ## Tail logs from the frontend stack.
 	cd $(FRONTEND_DIR) && $(DOCKER) compose logs -f
+
+# ----------------------------------------------------------------- package
+
+.PHONY: dist-zip
+dist-zip: ## Clean, timestamped source zip (git-tracked + new files, honors .gitignore).
+	@TS=$$(date -u +%Y%m%d-%H%M%S); \
+	OUT="$(DIST_NAME)-$$TS.zip"; \
+	git ls-files --cached --others --exclude-standard -z \
+		| $(PYTHON) scripts/pack_clean_zip.py "$$OUT" "$(DIST_NAME)"
 
 # ----------------------------------------------------------------- clean
 
