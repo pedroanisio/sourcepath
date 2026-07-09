@@ -76,10 +76,18 @@ class ConceptsArtifact:
                 "size_bytes": npz_path.stat().st_size,
             }
 
+        # A concept only gets a centroid when at least one of its
+        # lexicalizing files contributed an embedded chunk row; the rest
+        # have no vector source. Legitimate, but it must be visible —
+        # on the Linux bundle 7,418 of 776,716 concepts had no vector and
+        # nothing disclosed it (flaw map F14).
+        n_with_embedding = int(len(cemb_ids)) if cemb_ids else 0
         return {
             "n_concepts": int(len(concepts)),
             "n_cooccurrence": int(len(cooccurrence)),
             "concept_centroids_available": cembs is not None,
+            "n_concepts_with_embedding": n_with_embedding,
+            "n_concepts_without_embedding": int(len(concepts)) - n_with_embedding,
             "files": out_files,
         }
 
