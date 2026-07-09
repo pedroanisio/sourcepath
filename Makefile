@@ -45,7 +45,8 @@ CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_l2.py \
 	$(TESTS_DIR)/verify_l3.py \
 	$(TESTS_DIR)/verify_xrefs.py \
-	$(TESTS_DIR)/verify_repository_summary.py
+	$(TESTS_DIR)/verify_repository_summary.py \
+	$(TESTS_DIR)/verify_ast_coverage.py
 
 VOCAB_VERIFIERS := \
 	$(TESTS_DIR)/verify_vocab.py \
@@ -79,7 +80,8 @@ LLM_OFFLINE_VERIFIERS := \
 	$(TESTS_DIR)/verify_llm_enrich_prompts.py \
 	$(TESTS_DIR)/verify_llm_enrich_offline.py \
 	$(TESTS_DIR)/verify_llm_enrich_cli.py \
-	$(TESTS_DIR)/verify_llm_enrich_ci_determinism.py
+	$(TESTS_DIR)/verify_llm_enrich_ci_determinism.py \
+	$(TESTS_DIR)/verify_bench_llm_models.py
 
 LLM_ONLINE_VERIFIERS := \
 	$(TESTS_DIR)/verify_llm_enrich_file_summary.py \
