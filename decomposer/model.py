@@ -341,6 +341,12 @@ class Decomposition:
     # can build the group file-by-file instead of "all at once". Empty
     # ``file_order`` + a ``note`` means the files are genuinely cyclic too.
     cycle_resolutions: list[dict[str, Any]] = field(default_factory=list)
+    # One entry per single (non-cyclic) part whose files carry their own
+    # non-import ordering evidence (currently: Alembic revision chains). Unlike
+    # cycle_resolutions this is never about SCC members -- always exactly one
+    # part -- so it's kept as a separate, honestly-named field rather than
+    # overloading "cycle" for a non-cyclic construction-order fact.
+    file_orderings: list[dict[str, Any]] = field(default_factory=list)
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -352,6 +358,7 @@ class Decomposition:
             "quality_gates": [q.to_dict() for q in self.quality_gates],
             "build_order": [list(layer) for layer in self.build_order],
             "cycle_resolutions": [dict(c) for c in self.cycle_resolutions],
+            "file_orderings": [dict(f) for f in self.file_orderings],
             "provenance": self.provenance,
         }
 

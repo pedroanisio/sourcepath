@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -55,8 +56,14 @@ class EvidenceGraph:
     rust_items: list[dict[str, Any]] = field(default_factory=list)
     manifest_sha256: str = ""                      # run identity for provenance
     manifest_deps: dict[str, dict[str, Any]] = field(default_factory=dict)
-    # ^ dependency manifests parsed from bundle blobs (Cargo.toml for now):
-    #   {manifest_path: {name, deps, dev_deps, workspace_members}}
+    # ^ dependency manifests parsed from bundle blobs (Cargo.toml, pyproject.toml,
+    #   package.json): {manifest_path: {name, deps, dev_deps, workspace_members,
+    #   manifest_type}}
+    revision_chains: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # ^ Alembic-shaped revision markers parsed from bundle blobs under any
+    #   */versions/*.py path: {file_path: {revision, down_revision}}. These
+    #   never show up as import edges, so build order can't infer them —
+    #   decomposer.migrations turns this into a file_orderings entry.
 
     # ── convenience accessors ────────────────────────────────────────────────
     def code_files(self) -> list[dict[str, Any]]:
@@ -109,6 +116,7 @@ def load_evidence(bundle_dir: str | Path) -> EvidenceGraph:
         rust_items=b.rust_items,
         manifest_sha256=_manifest_sha256(bundle_dir),
         manifest_deps=_read_manifest_deps(bundle_dir),
+        revision_chains=_read_revision_markers(bundle_dir),
     )
 
 
@@ -183,14 +191,20 @@ def _read_phases(bundle_dir: Path) -> dict[str, list[str]]:
     return out
 
 
+_MANIFEST_READERS: dict[str, str] = {
+    "Cargo.toml": "cargo", "pyproject.toml": "python", "package.json": "npm",
+}
+
+
 def _read_manifest_deps(bundle_dir: Path) -> dict[str, dict[str, Any]]:
     """Parse dependency manifests from the bundle's own blob store.
 
     The graph records ``cbm:declaresDependency`` without dev/prod scope, but
     the manifest *contents* are in the bundle (content-addressed blobs), so
-    scope is recoverable without re-extraction. Cargo.toml only for now —
-    the shape is generic: ``{manifest_path: {name, deps, dev_deps,
-    workspace_members}}``. Best-effort: unparseable manifests are skipped.
+    scope is recoverable without re-extraction. Cargo.toml, pyproject.toml
+    (PEP 621 or Poetry) and package.json — the shape is generic:
+    ``{manifest_path: {name, deps, dev_deps, workspace_members,
+    manifest_type}}``. Best-effort: unparseable manifests are skipped.
     """
     jsonld = bundle_dir / "inventory.jsonld"
     if not jsonld.exists():
@@ -199,11 +213,14 @@ def _read_manifest_deps(bundle_dir: Path) -> dict[str, dict[str, Any]]:
         data = json.loads(jsonld.read_text())
     except Exception:  # noqa: BLE001 — optional evidence
         return {}
-    import tomllib
     out: dict[str, dict[str, Any]] = {}
     for node in data.get("@graph") or []:
         path = node.get("cbm:path")
-        if not isinstance(path, str) or not path.endswith("Cargo.toml"):
+        if not isinstance(path, str):
+            continue
+        basename = path.rsplit("/", 1)[-1]
+        manifest_type = _MANIFEST_READERS.get(basename)
+        if manifest_type is None:
             continue
         sha = node.get("cbm:contentSha256")
         if isinstance(sha, dict):
@@ -212,17 +229,136 @@ def _read_manifest_deps(bundle_dir: Path) -> dict[str, dict[str, Any]]:
             continue
         blob = bundle_dir / "blobs" / sha
         try:
-            toml = tomllib.loads(blob.read_text())
+            text = blob.read_text()
+            if manifest_type == "cargo":
+                info = _parse_cargo_toml(text)
+            elif manifest_type == "python":
+                info = _parse_pyproject_toml(text)
+            else:
+                info = _parse_package_json(text)
         except Exception:  # noqa: BLE001 — a bad blob must not sink the load
             continue
-        out[path] = {
-            "name": (toml.get("package") or {}).get("name"),
-            "deps": sorted((toml.get("dependencies") or {})),
-            "dev_deps": sorted((toml.get("dev-dependencies") or {})),
-            "workspace_members": list(
-                (toml.get("workspace") or {}).get("members") or []),
-        }
+        if info is None:
+            continue
+        out[path] = {**info, "manifest_type": manifest_type}
     return out
+
+
+_REVISION_RE = re.compile(r'^revision\s*(?::[^=]+)?=\s*[\'"]([^\'"]+)[\'"]', re.M)
+_DOWN_REVISION_RE = re.compile(
+    r'^down_revision\s*(?::[^=]+)?=\s*(None|[\'"]([^\'"]+)[\'"])', re.M)
+
+
+def _in_versions_dir(path: str) -> bool:
+    return path.startswith("versions/") or "/versions/" in path
+
+
+def _read_revision_markers(bundle_dir: Path) -> dict[str, dict[str, Any]]:
+    """Parse Alembic ``revision``/``down_revision`` markers from ``*/versions/*.py``
+    blobs. These never appear as import edges — Alembic chains revisions by a
+    string id stored in a DB metadata table, not by importing one revision
+    module from another — so build order can't infer them from the graph.
+    Scoped to files that look like Alembic revisions (path under a
+    ``versions/`` directory *and* an actual ``revision =`` assignment);
+    anything else is left alone rather than guessed at. Best-effort:
+    unparseable blobs are skipped.
+    """
+    jsonld = bundle_dir / "inventory.jsonld"
+    if not jsonld.exists():
+        return {}
+    try:
+        data = json.loads(jsonld.read_text())
+    except Exception:  # noqa: BLE001 — optional evidence
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for node in data.get("@graph") or []:
+        path = node.get("cbm:path")
+        if not isinstance(path, str) or not path.endswith(".py") \
+                or not _in_versions_dir(path):
+            continue
+        sha = node.get("cbm:contentSha256")
+        if isinstance(sha, dict):
+            sha = sha.get("@value")
+        if not isinstance(sha, str):
+            continue
+        blob = bundle_dir / "blobs" / sha
+        try:
+            text = blob.read_text()
+        except Exception:  # noqa: BLE001 — a bad blob must not sink the load
+            continue
+        rev_m = _REVISION_RE.search(text)
+        if not rev_m:
+            continue   # versions/ file with no revision marker -- not Alembic
+        down_m = _DOWN_REVISION_RE.search(text)
+        down = None if not down_m or down_m.group(1) == "None" else down_m.group(2)
+        out[path] = {"revision": rev_m.group(1), "down_revision": down}
+    return out
+
+
+def _parse_cargo_toml(text: str) -> dict[str, Any] | None:
+    import tomllib
+    toml = tomllib.loads(text)
+    return {
+        "name": (toml.get("package") or {}).get("name"),
+        "deps": sorted((toml.get("dependencies") or {})),
+        "dev_deps": sorted((toml.get("dev-dependencies") or {})),
+        "workspace_members": list((toml.get("workspace") or {}).get("members") or []),
+    }
+
+
+def _pep508_name(spec: str) -> str | None:
+    """The bare distribution name from a PEP 508 requirement string, e.g.
+    ``"apache-airflow-core>=2.9"`` or ``"boto3[extra]>=1.28"`` -> the prefix
+    before any version/extra/marker/URL syntax."""
+    import re
+    m = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", spec.strip())
+    return m.group(0) if m else None
+
+
+def _parse_pyproject_toml(text: str) -> dict[str, Any] | None:
+    import tomllib
+    toml = tomllib.loads(text)
+    project = toml.get("project") or {}
+    poetry = ((toml.get("tool") or {}).get("poetry")) or {}
+
+    name = project.get("name") or poetry.get("name")
+
+    deps: set[str] = set()
+    for spec in project.get("dependencies") or []:
+        n = _pep508_name(spec)
+        if n:
+            deps.add(n)
+    deps.update(d for d in (poetry.get("dependencies") or {}) if d != "python")
+
+    dev_deps: set[str] = set()
+    for group_specs in (project.get("optional-dependencies") or {}).values():
+        for spec in group_specs:
+            n = _pep508_name(spec)
+            if n:
+                dev_deps.add(n)
+    dev_deps.update(poetry.get("dev-dependencies") or {})
+    groups = (poetry.get("group") or {})
+    for group in groups.values():
+        dev_deps.update((group or {}).get("dependencies") or {})
+
+    # A name in both buckets is a real (prod) dependency first: mirrors
+    # test_only_module_edges's own "dev_deps and NOT deps" precedence, so a
+    # package genuinely needed at runtime is never soft-classified just
+    # because it's also redundantly listed in an optional group.
+    return {
+        "name": name, "deps": sorted(deps),
+        "dev_deps": sorted(dev_deps - deps), "workspace_members": [],
+    }
+
+
+def _parse_package_json(text: str) -> dict[str, Any] | None:
+    pkg = json.loads(text)
+    return {
+        "name": pkg.get("name"),
+        "deps": sorted((pkg.get("dependencies") or {})),
+        "dev_deps": sorted((pkg.get("devDependencies") or {})),
+        "workspace_members": list(pkg.get("workspaces") or []),
+    }
 
 
 def _types(node: dict[str, Any]) -> list[str]:

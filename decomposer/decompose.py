@@ -14,9 +14,10 @@ from pathlib import Path
 
 from .architecture import detect_architecture
 from .crates import CrateMap, _module_crate, build_crate_parts, detect_crates, \
-    test_only_module_edges
+    test_only_module_edges, test_role_module_edges
 from .evidence import EvidenceGraph, load_evidence
 from .metrics import build_order as _build_order, cycles as _cycles
+from .migrations import revision_orderings
 from .model import (
     Confidence, Decomposition, Part, Relationship,
 )
@@ -41,10 +42,12 @@ def decompose_evidence(ev: EvidenceGraph) -> Decomposition:
     """
     mg = build_module_graph(ev)
 
-    # Crate awareness (Cargo workspaces): dev-only cross-crate edges are legal
-    # cycles in Cargo and must not drive SCC/build-order computation.
+    # Distribution awareness (Cargo/pyproject.toml/package.json workspaces):
+    # dev-only cross-distribution edges are legal cycles and must not drive
+    # SCC/build-order computation. Test-role modules are excluded on top,
+    # independent of any manifest -- see crates.test_role_module_edges.
     cm = detect_crates(ev)
-    test_edges = test_only_module_edges(ev, mg, cm)
+    test_edges = test_only_module_edges(ev, mg, cm) | test_role_module_edges(ev, mg)
     crate_of_module = _crate_names_by_module(mg, cm)
     prod_adjacency = _prod_adjacency(ev, mg, cm, test_edges)
 
@@ -97,6 +100,7 @@ def decompose_evidence(ev: EvidenceGraph) -> Decomposition:
         quality_gates=gates,
         build_order=build_order,
         cycle_resolutions=_cycle_resolutions(ev, mg, module_cycles),
+        file_orderings=revision_orderings(ev, mg),
         provenance=provenance,
     )
 
@@ -117,12 +121,13 @@ def _prod_adjacency(
     cm: CrateMap | None = None,
     test_edges: set[tuple[str, str]] | None = None,
 ) -> dict[str, list[str]]:
-    """Module adjacency with dev/test-only cross-crate edges removed — the
-    graph that SCC and build-order math must run on. Identical to
-    ``mg.adjacency`` for repositories without crate manifests."""
+    """Module adjacency with dev/test-only cross-distribution edges and
+    test-role-module edges removed — the graph that SCC and build-order math
+    must run on. Identical to ``mg.adjacency`` for repositories with no
+    manifests and no test-role modules."""
     if test_edges is None:
         cm = cm or detect_crates(ev)
-        test_edges = test_only_module_edges(ev, mg, cm)
+        test_edges = test_only_module_edges(ev, mg, cm) | test_role_module_edges(ev, mg)
     if not test_edges:
         return mg.adjacency
     return {

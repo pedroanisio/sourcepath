@@ -51,6 +51,7 @@ def to_markdown(plan: BuildPlan) -> str:
 
     _intent(L, plan)
     _skipped(L, plan)
+    _unassigned(L, plan)
 
     by_phase: dict[int, list[BuildStep]] = defaultdict(list)
     for s in plan.steps:
@@ -115,6 +116,22 @@ def _skipped(L: list[str], plan: BuildPlan) -> None:
     L.append("## Phases skipped (no evidence)\n")
     for s in plan.skipped_phases:
         L.append(f"- **{s['phase']}** — {s['reason']}")
+    L.append("")
+
+
+def _unassigned(L: list[str], plan: BuildPlan) -> None:
+    if not plan.unassigned_files:
+        return
+    L.append(f"## Unassigned files ({len(plan.unassigned_files)})\n")
+    L.append(
+        "The decomposition carries these files, but no step above creates or "
+        "modifies them. Listed explicitly so the omission is a decision, not "
+        "an accident — resolve each before treating the plan as complete.\n")
+    for u in plan.unassigned_files[:_MAX_LIST]:
+        L.append(f"- `{u['path']}` — {u['reason']}")
+    if len(plan.unassigned_files) > _MAX_LIST:
+        L.append(f"- … (+{len(plan.unassigned_files) - _MAX_LIST} more; "
+                 f"see YAML `unassigned_files`)")
     L.append("")
 
 

@@ -36,6 +36,7 @@ def _document(plan: BuildPlan) -> dict[str, Any]:
         "repository": d["repository"],
         "architecture_intent": d["architecture_intent"],
         "skipped_phases": d["skipped_phases"],
+        "unassigned_files": d["unassigned_files"],
         "steps": d["steps"],
         "open_assumptions": d["open_assumptions"],
         "provenance": d["provenance"],

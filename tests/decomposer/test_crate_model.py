@@ -12,6 +12,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from decomposer.architecture import detect_architecture
+from decomposer.crates import build_crate_parts, detect_crates
+from decomposer.crates import test_only_module_edges as _test_only_module_edges
+from decomposer.decompose import _crate_names_by_module
 from decomposer.evidence import EvidenceGraph
 from decomposer.metrics import cycles
 from decomposer.parts import build_cross_cutting_parts, build_module_graph, build_module_parts
@@ -64,8 +67,18 @@ _MANIFESTS = {
 
 
 def _parts(ev):
+    # Mirrors decompose_evidence()'s real wiring: crate detection feeds both
+    # module-part construction (crate stamp, test-only edge split) and the
+    # dedicated crate parts -- calling build_module_parts alone (no crate_of_module
+    # / test_edges) would silently test the pipeline with crate-awareness off.
     mg = build_module_graph(ev)
-    return build_module_parts(ev, mg, set()) + build_cross_cutting_parts(ev, mg), mg
+    cm = detect_crates(ev)
+    test_edges = _test_only_module_edges(ev, mg, cm)
+    crate_of_module = _crate_names_by_module(mg, cm)
+    parts = (build_module_parts(ev, mg, set(), crate_of_module, test_edges)
+             + build_cross_cutting_parts(ev, mg)
+             + build_crate_parts(ev, mg, cm))
+    return parts, mg
 
 
 def test_workspace_members_become_crate_parts():
