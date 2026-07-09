@@ -27,6 +27,7 @@ frontend/ui/coverage/
 .vscode/
 .DS_Store
 _tmp/
+_explore/
 frontend/ui/node_modules/
 
 # Local env config (the committed convention is .env.example)
