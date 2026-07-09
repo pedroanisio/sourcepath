@@ -161,6 +161,9 @@ blockquote p{margin:.2em 0}
 .conf-medium{color:#8a5a12; background:#fbf1d9; border:1px solid #ecd6a0}
 .conf-low{color:#9c3a22; background:#fbe6df; border:1px solid #eebcab}
 
+/* ---- explicit page break (e.g. let the executive summary own the cover pages) ---- */
+.page-break{break-before:page; height:0; margin:0; border:0}
+
 /* ---- charts (SVG, emitted by report_to_pdf.py) ---- */
 .chart{margin:12px 0 16px; break-inside:avoid; text-align:center}
 .chart svg{width:100%; height:auto; max-width:100%}
