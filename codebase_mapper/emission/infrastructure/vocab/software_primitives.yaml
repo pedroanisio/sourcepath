@@ -29,6 +29,47 @@ kinds:
     - generated_artifact
     - generation_target
     - embedded_contract
+    # Systems-programming domain nouns (flaw map F6). On the Linux
+    # kernel the buckets above matched 24 of 776,716 concepts (<0.1%),
+    # so L4 concept descriptions — scoped to vocab-typed concepts —
+    # described almost nothing. These are additive per the editing
+    # rules; aliases are limited to plurals and unambiguous
+    # abbreviations so no unrelated domain gets mis-collapsed.
+    - device
+    - driver
+    - interrupt
+    - lock
+    - mutex
+    - semaphore
+    - spinlock
+    - buffer
+    - queue
+    - cache
+    - page
+    - socket
+    - packet
+    - protocol
+    - filesystem
+    - inode
+    - scheduler
+    - thread
+    - process
+    - signal
+    - timer
+    - clock
+    - dma
+    - firmware
+    - probe
+    - callback
+    - handler
+    - descriptor
+    - namespace
+    - channel
+    - session
+    - transaction
+    - endpoint
+    - configuration
+    - workqueue
 
   # Universal code structure: nouns that nearly every programming
   # language surfaces in some form. Curated so cross-language queries
@@ -81,6 +122,43 @@ aliases:
   generated_artifact:  [generated_artifacts, artifact, artifacts]
   generation_target:   [generation_targets]
   embedded_contract:   [embedded_contracts]
+
+  # domain-primitive · systems block
+  device:              [devices]
+  driver:              [drivers]
+  interrupt:           [interrupts, irq, irqs]
+  lock:                [locks, locking]
+  mutex:               [mutexes]
+  semaphore:           [semaphores, sem]
+  spinlock:            [spinlocks]
+  buffer:              [buffers, buf, bufs]
+  queue:               [queues]
+  cache:               [caches]
+  page:                [pages]
+  socket:              [sockets]
+  packet:              [packets]
+  protocol:            [protocols, proto]
+  filesystem:          [filesystems]
+  inode:               [inodes]
+  scheduler:           [schedulers, sched]
+  thread:              [threads]
+  process:             [processes]
+  signal:              [signals]
+  timer:               [timers]
+  clock:               [clocks, clk]
+  dma:                 []
+  firmware:            [fw]
+  probe:               [probes]
+  callback:            [callbacks, cb]
+  handler:             [handlers]
+  descriptor:          [descriptors, desc]
+  namespace:           [namespaces, ns]
+  channel:             [channels, chan]
+  session:             [sessions]
+  transaction:         [transactions, txn]
+  endpoint:            [endpoints]
+  configuration:       [configurations, config, configs, cfg]
+  workqueue:           [workqueues]
 
   # structural-primitive
   application:         [applications, app]
