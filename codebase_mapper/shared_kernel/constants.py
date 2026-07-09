@@ -81,6 +81,7 @@ LANG_BY_EXT = {
     ".swift": "swift",
     ".dart": "dart",
     ".clj": "clojure", ".cljs": "clojure", ".cljc": "clojure", ".cljr": "clojure",
+    ".cbl": "cobol", ".cob": "cobol", ".cpy": "cobol", ".cobol": "cobol",
     ".proto": "protobuf",
     ".nix": "nix",
     ".frag": "glsl", ".vert": "glsl", ".comp": "glsl", ".geom": "glsl",

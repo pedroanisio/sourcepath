@@ -21,6 +21,9 @@ from .languages.c import extract_c_ast_summary, resolve_c_includes
 from .languages.clojure import (
     extract_clojure_ast_summary, resolve_clojure_imports,
 )
+from .languages.cobol import (
+    extract_cobol_ast_summary, resolve_cobol_imports,
+)
 from .languages.cpp import extract_cpp_ast_summary
 from .languages.dart import extract_dart_ast_summary, resolve_dart_imports
 from .languages.go import (
@@ -150,6 +153,18 @@ class CAnalyzer:
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
         return extract_c_ast_summary(content, record.path)
+
+
+class CobolAnalyzer:
+    name = "lang_cobol"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        # Column-aware regex reader (no tree-sitter), like Dart / Clojure.
+        return record.language == "cobol"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_cobol_ast_summary(content, record.path)
 
 
 class CppAnalyzer:
@@ -320,6 +335,19 @@ class CResolver:
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
+class CobolResolver:
+    name = "resolve_cobol"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "cobol" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_cobol_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 class CppResolver:
     name = "resolve_cpp"
 
@@ -441,14 +469,14 @@ class ClojureResolver:
 
 
 _BUILTIN_ANALYZERS = (
-    CAnalyzer, ClojureAnalyzer, CppAnalyzer, DartAnalyzer, GoAnalyzer,
-    JavaAnalyzer, KotlinAnalyzer, ObjcAnalyzer, PythonAnalyzer, RubyAnalyzer,
-    RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
+    CAnalyzer, ClojureAnalyzer, CobolAnalyzer, CppAnalyzer, DartAnalyzer,
+    GoAnalyzer, JavaAnalyzer, KotlinAnalyzer, ObjcAnalyzer, PythonAnalyzer,
+    RubyAnalyzer, RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
-    CResolver, ClojureResolver, CppResolver, DartResolver, GoResolver,
-    JavaResolver, KotlinResolver, ObjcResolver, PythonResolver, RubyResolver,
-    RustResolver, SwiftResolver, TsJsResolver,
+    CResolver, ClojureResolver, CobolResolver, CppResolver, DartResolver,
+    GoResolver, JavaResolver, KotlinResolver, ObjcResolver, PythonResolver,
+    RubyResolver, RustResolver, SwiftResolver, TsJsResolver,
 )
 
 

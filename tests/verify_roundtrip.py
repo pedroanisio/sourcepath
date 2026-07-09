@@ -97,6 +97,18 @@ def build_fixture(target: Path) -> None:
         '    print(json.dumps({"hi": "there"}))\n'
     )
 
+    # A COBOL program (fixed-format) — exercises the column-aware analyzer
+    # through map_codebase and confirms COBOL sources roundtrip byte-perfect.
+    (target / "HELLO.cbl").write_text(
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. HELLO.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN-PARA.\n"
+        "           DISPLAY 'HELLO'\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM HELLO.\n"
+    )
+
     (target / "utils.ts").write_text(TS_SRC)
     # Duplicate content -> same content_sha256 -> single blob in the store.
     (target / "utils_copy.ts").write_text(TS_SRC)

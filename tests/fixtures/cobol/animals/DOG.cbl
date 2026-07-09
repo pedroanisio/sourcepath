@@ -1,0 +1,8 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. DOG.
+       PROCEDURE DIVISION.
+       SPEAK.
+           DISPLAY 'WOOF'.
+       MAKE-SOUND.
+           PERFORM SPEAK.
+       END PROGRAM DOG.

@@ -82,6 +82,8 @@ class ChunkExtractor:
             chunks = _chunk_go(content, record)
         elif record.language == "clojure":
             chunks = _chunk_clojure(content, record)
+        elif record.language == "cobol":
+            chunks = _chunk_cobol(content, record)
         elif record.language == "cpp":
             chunks = _chunk_cpp(content, record)
         elif record.language in ("objective-c", "objective-cpp"):
@@ -1040,6 +1042,66 @@ def _chunk_clojure(content: bytes, record: FileRecord) -> list[dict]:
         chunk_bytes = chunk_text.encode("utf-8")
         chunks.append(apply_signature_fields({
             "kind": _CLOJURE_TO_CHUNK_KIND[kind],
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# COBOL
+# ---------------------------------------------------------------------------
+
+
+_COBOL_TO_CHUNK_KIND = {
+    "program": "class",
+    "section": "method",
+    "paragraph": "method",
+}
+
+
+def _chunk_cobol(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-symbol chunks from the COBOL analyzer's ``items`` array — one chunk
+    per program (class-like) and one per PROCEDURE DIVISION section/paragraph
+    (method-like, ``parent_symbol`` = the enclosing program). Same items-based
+    shape as ``_chunk_go``/``_chunk_clojure``; falls back to a whole-file chunk
+    when nothing structural is recovered (e.g. a data-only copybook)."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _COBOL_TO_CHUNK_KIND:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": _COBOL_TO_CHUNK_KIND[kind],
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
             "byte_start": item["byte_start"],

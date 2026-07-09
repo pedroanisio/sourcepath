@@ -19,6 +19,7 @@ from __future__ import annotations
 from .aggregator import XrefAggregator, XREF_INDEX_KEY
 from .artifact import XrefsArtifact, SIDECAR_FILENAME
 from .graph_writer import XrefGraphWriter, XrefShapes, chunk_iri, edge_iri
+from .cobol_resolver import resolve_cobol_calls
 from .cpp_resolver import resolve_cpp_calls
 from .dart_resolver import resolve_dart_calls
 from .java_resolver import resolve_java_calls
@@ -37,6 +38,7 @@ __all__ = [
     "SIDECAR_FILENAME",
     "chunk_iri",
     "edge_iri",
+    "resolve_cobol_calls",
     "resolve_cpp_calls",
     "resolve_dart_calls",
     "resolve_java_calls",
@@ -52,6 +54,7 @@ __all__ = [
 # language string (matches FileRecord.language) -> callable
 # (record, ctx) -> (list[SymbolXrefEdge], list[UnresolvedSymbolRef]).
 _RESOLVERS: dict = {
+    "cobol": resolve_cobol_calls,
     "cpp": resolve_cpp_calls,
     "dart": resolve_dart_calls,
     "java": resolve_java_calls,
