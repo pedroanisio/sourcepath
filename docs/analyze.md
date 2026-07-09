@@ -25,7 +25,9 @@ This runs:
 
 The output directory is a bundle containing `run_manifest.json`,
 `inventory.ttl`, `inventory.jsonld`, `shapes.shacl.ttl`, chunk embedding
-sidecars, concept sidecars, `xrefs.jsonl`, and optional `blobs/`.
+sidecars, concept sidecars, `xrefs.jsonl`, `ast_coverage.json`
+(extraction-coverage honesty table — see
+[ast-coverage.md](ast-coverage.md)), and optional `blobs/`.
 
 ## Local Repositories
 

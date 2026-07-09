@@ -21,6 +21,7 @@ from ..infrastructure.rdf.rdflib_emitter import (
     build_shacl_graph,
 )
 from ...inspection.tests_edges import count_rust_inline_test_files
+from ...inspection.coverage import aggregate_coverage
 
 
 def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = True) -> dict:
@@ -95,6 +96,13 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
     # #[derive(Debug, Clone)]" without re-parsing every ast_summary at
     # query time. Always emitted (zero-byte file when no attributes).
     rust_items_fragment = _emit_rust_items_sidecar(mapped["records"], out_dir)
+
+    # --- AST extraction coverage asset (R2) ---
+    # A mechanically-derived honesty table: per-language symbol yield,
+    # parse errors, zero-AST files, and files that parsed cleanly yet
+    # produced zero symbols (the tree-sitter-macro under-capture signal).
+    # Always emitted so the bundle carries its own stated limitations.
+    coverage_fragment = _emit_coverage_sidecar(mapped["records"], out_dir)
 
     from pyshacl import validate
     conforms, _vg, report_text = validate(
@@ -178,6 +186,9 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
     }
     if extension_fragments:
         manifest["extensions"] = extension_fragments
+    # Always surfaced — the coverage asset is a first-class part of the
+    # bundle contract (it states what extraction did and did not capture).
+    manifest["ast_coverage"] = coverage_fragment
     if rust_items_fragment.get("n_items", 0) > 0:
         # Surface sidecar stats in the manifest so consumers can detect
         # its presence without listing the directory.
@@ -185,6 +196,46 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
     (out_dir / "run_manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return manifest
+
+
+# ---------------------------------------------------------------------------
+# AST extraction coverage asset (R2)
+# ---------------------------------------------------------------------------
+
+
+_AST_COVERAGE_SIDECAR = "ast_coverage.json"
+
+
+def _emit_coverage_sidecar(records: list, out_dir: Path, *,
+                           preview: int = 20) -> dict:
+    """Write ``ast_coverage.json`` (the full, uncapped coverage report)
+    and return a compact manifest fragment.
+
+    The on-disk asset carries the complete silent-zero file list for
+    auditing; the manifest fragment carries the aggregate counts plus a
+    short preview (with a truncation flag) so a consumer can see the
+    headline numbers without reading the file. Always emitted.
+    """
+    report = aggregate_coverage(records, max_listed=len(records) + 1)
+    sidecar = out_dir / _AST_COVERAGE_SIDECAR
+    sidecar.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    sha = hashlib.sha256(sidecar.read_bytes()).hexdigest()
+
+    full_list = report["silent_zero_symbol_file_list"]
+    return {
+        "n_source_files": report["n_source_files"],
+        "totals": report["totals"],
+        "by_language": report["by_language"],
+        "silent_zero_symbol_preview": full_list[:preview],
+        "silent_zero_symbol_preview_truncated": len(full_list) > preview,
+        "files": {
+            _AST_COVERAGE_SIDECAR: {
+                "path": _AST_COVERAGE_SIDECAR,
+                "sha256": sha,
+                "size_bytes": sidecar.stat().st_size,
+            },
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
