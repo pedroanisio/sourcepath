@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import sys
 
 from pathlib import Path
 
@@ -39,6 +40,39 @@ from .models import (
 from .tests_edges import infer_tests_edges
 
 _log = logging.getLogger(__name__)
+
+# Target number of _progress() update lines per pass, independent of how
+# many items that pass has. Picked so a few-hundred-file repo visibly
+# skips items (obviously throttled, not "every other one") while a 94K-file
+# repo still gets a scannable status trickle instead of one line per file.
+_PROGRESS_LINES = 50
+
+
+def _phase(msg: str) -> None:
+    """One-line banner marking entry into a map_codebase() phase. Cheap
+    sub-passes (index building, import resolution) get this instead of
+    per-item progress — they're function calls over already-parsed data,
+    not the raw per-file parsing work that dominates wall-clock time on a
+    large repo."""
+    print(f"[host] {msg}", file=sys.stderr)
+
+
+def _progress(tag: str, i: int, total: int, label: str) -> None:
+    """Throttled per-item progress line to stderr, for map_codebase()'s two
+    genuinely expensive per-file passes (classify+build, AST extraction).
+
+    Always fires on the first and last item, so even a small repo shows
+    start and completion; otherwise capped at roughly ``_PROGRESS_LINES``
+    updates for the whole pass, regardless of ``total`` — a 250-file repo
+    and a 94K-file repo both get a manageable, scannable number of lines,
+    not one line per file (which would itself add measurable print/flush
+    overhead at the high end and just be noise at the low end).
+    """
+    if total <= 0:
+        return
+    interval = max(1, total // _PROGRESS_LINES)
+    if i == 1 or i == total or i % interval == 0:
+        print(f"[host] {tag}  {i}/{total}  {label}", file=sys.stderr)
 
 
 def _safe_extract(analyzer, record, content, ctx):
@@ -104,7 +138,9 @@ def map_codebase(
     # gets parsed by the correct analyzer.
     content_by_path: dict[str, bytes] = {}
     mode_skip_extraction: set[str] = set()
-    for path, blob_sha, mode in blobs:
+    n_blobs = len(blobs)
+    for i, (path, blob_sha, mode) in enumerate(blobs, 1):
+        _progress("classify", i, n_blobs, path)
         if path_excluded(path, exclude_patterns):
             continue
         content = read_blob(repo, blob_sha)
@@ -153,8 +189,12 @@ def map_codebase(
     refine_cpp_header_languages(records)
 
     # Pass 2: AST extraction. Analyzer ``matches()`` reads ``rec.language``,
-    # so the refinement above must be visible here.
-    for rec in records:
+    # so the refinement above must be visible here. Usually the most
+    # expensive pass on a large repo — real per-language parsing, not a
+    # filtered/dict-building sub-index — hence its own progress line.
+    n_records = len(records)
+    for i, rec in enumerate(records, 1):
+        _progress("extract", i, n_records, rec.path)
         if rec.type_ == "binary" or rec.path in mode_skip_extraction:
             rec.phases = refine_phases(rec)
             continue
@@ -168,6 +208,7 @@ def map_codebase(
         rec.phases = refine_phases(rec)
 
     # Indices
+    _phase(f"building language indices ({n_records} records)")
     py_roots = detect_python_source_roots(records, read_path)
     by_module, by_suffix = build_python_module_index(records, py_roots)
     tsconfigs = load_tsconfigs(records, read_path)
@@ -233,6 +274,7 @@ def map_codebase(
     import_ext_edges: set[ImportExternalEdge] = set()
 
     # Import resolution via ImportResolver registry. First-match-wins.
+    _phase("resolving imports")
     resolvers = iter_import_resolvers()
     for r in records:
         if r.ast_summary is None:
@@ -269,9 +311,13 @@ def map_codebase(
 
     # --- Extension hooks: RecordEnrichers + Aggregators ---
     # When no plugins are registered, both loops are no-ops and produce
-    # zero observable change to the host's output.
+    # zero observable change to the host's output. Per-item detail for
+    # this loop is each enricher's own responsibility (e.g. L4's
+    # plugins/llm_enrich/ prints "[L4] file_summary ..." per file) — the
+    # host only announces that the phase started.
     enrichers = iter_record_enrichers()
     if enrichers:
+        _phase(f"running {len(enrichers)} record enricher(s)")
         for r in records:
             if r.type_ == "binary":
                 continue
