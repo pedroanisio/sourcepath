@@ -218,29 +218,76 @@ def extract_c_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[
         "items": items,
     }, errors
 
+def build_c_include_index(paths_set: set[str]) -> dict[str, list[str]]:
+    """Basename → every repo path whose final component is that basename.
+
+    Build this ONCE per repository (the host pipeline stashes it in
+    ``ctx.indices["host:c_basename_index"]``; the C/C++ resolvers lazily
+    build-and-stash it for contexts that bypass the host index phase) and
+    pass it to :func:`resolve_c_includes`. Building is a single O(N) sweep
+    over the repo file list; each include lookup then costs one dict hit
+    plus a filter over the handful of files sharing a basename, instead of
+    an O(N) scan per include. At kernel scale (~95k files × dozens of
+    includes per file) the per-include scan is O(files × includes) ≈ 10^10
+    string comparisons — this index is what makes resolution feasible.
+    """
+    index: dict[str, list[str]] = {}
+    for p in paths_set:
+        index.setdefault(PurePosixPath(p).name, []).append(p)
+    return index
+
+
 def resolve_c_includes(
     src_path: str, summary: dict, paths_set: set[str],
+    basename_index: dict[str, list[str]] | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Resolve local #includes to in-repo files.
+    """Resolve #includes to in-repo files.
 
-    Search order for #include "x.h" from /a/b/file.c:
-    1. /a/b/x.h (relative to including file)
-    2. /a/x.h (one level up — common when src/ uses ../include/foo.h)
-    3. Any in-repo file whose path ends with /x.h or equals x.h
+    #include "x.h" (quoted) from a/b/file.c:
+    1. a/b/x.h — the spec joined onto the including file's directory,
+       with ``.``/``..`` segments normalized (so ``../include/foo.h``
+       works from ``src/``).
+    2. Any in-repo file whose final path component is ``x.h``
        (last resort; ambiguous matches dropped).
+
+    #include <linux/foo.h> (angle) — one in-repo attempt, then external:
+    1. Any in-repo file whose path ends with the full spec as a
+       path suffix (``<linux/foo.h>`` → the path ending in
+       ``/linux/foo.h``, e.g. ``include/linux/foo.h``). Accepted ONLY
+       when exactly one repo path matches: without the compiler's real
+       ``-I`` search order we cannot pick between e.g. the many
+       ``arch/*/include/asm/io.h`` candidates for ``<asm/io.h>``, so an
+       ambiguous suffix is deliberately left unresolved rather than
+       guessed (a wrong edge is worse than a missing one).
+    2. No match (``<stdio.h>``) or an ambiguous match → the
+       external/unresolved bucket, exactly as quoted-fallback misses.
+
+    ``basename_index`` is the once-per-repo product of
+    :func:`build_c_include_index`; when ``None`` (direct/legacy callers)
+    it is rebuilt here, which is correct but O(N) per call — hosts must
+    pass the prebuilt index.
     """
+    if basename_index is None:
+        basename_index = build_c_include_index(paths_set)
     dst: set[str] = set()
     unresolved: set[str] = set()
     src_dir = PurePosixPath(src_path).parent
 
-    # Build a basename → set-of-paths index, computed once per file is cheap
-    # since this is called per-file but uses paths_set.
     for imp in summary.get("imports", []):
-        if imp["kind"] == "system_include":
-            unresolved.add(imp["source"])
-            continue
         spec = imp["source"]
-        # Try relative
+        if imp["kind"] == "system_include":
+            # In-repo attempt: unique path-suffix match (see docstring —
+            # ambiguity is resolved by NOT resolving).
+            candidates = basename_index.get(PurePosixPath(spec).name, [])
+            suffix = "/" + spec
+            matches = [p for p in candidates
+                       if p == spec or p.endswith(suffix)]
+            if len(matches) == 1:
+                dst.add(matches[0])
+            else:
+                unresolved.add(spec)
+            continue
+        # Quoted include. Try relative first.
         raw = src_dir / spec
         norm: list[str] = []
         for part in raw.parts:
@@ -253,13 +300,13 @@ def resolve_c_includes(
         if target in paths_set:
             dst.add(target)
             continue
-        # Suffix match — accept only if unambiguous.
-        basename = PurePosixPath(spec).name
-        matches = [p for p in paths_set
-                   if p == basename or p.endswith("/" + basename)]
+        # Basename match — accept only if unambiguous. The index lists
+        # exactly the paths whose final component equals the basename,
+        # i.e. the same set the previous O(N) scan produced.
+        matches = basename_index.get(PurePosixPath(spec).name, [])
         # The relative path we tried is already in `target` and didn't hit,
-        # so the suffix match is necessarily a different location. Accept only
-        # if exactly one match exists.
+        # so the basename match is necessarily a different location. Accept
+        # only if exactly one match exists.
         if len(matches) == 1:
             dst.add(matches[0])
     return sorted(dst), sorted(unresolved)

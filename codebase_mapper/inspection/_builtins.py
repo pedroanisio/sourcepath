@@ -17,7 +17,9 @@ from ..shared_kernel.extensions import (
     LanguageAnalyzer, ImportResolver, PipelineCtx, ResolveResult,
     register_language_analyzer, register_import_resolver,
 )
-from .languages.c import extract_c_ast_summary, resolve_c_includes
+from .languages.c import (
+    build_c_include_index, extract_c_ast_summary, resolve_c_includes,
+)
 from .languages.clojure import (
     extract_clojure_ast_summary, resolve_clojure_imports,
 )
@@ -322,6 +324,22 @@ class GoResolver:
         return ResolveResult(in_repo=list(in_repo), external=external)
 
 
+def _c_basename_index(ctx: PipelineCtx) -> dict[str, list[str]]:
+    """Once-per-repo basename index shared by the C and C++ resolvers.
+
+    The host pipeline builds it in its index phase; this fallback lazily
+    builds-and-stashes it for contexts that bypass that phase (bare
+    PipelineCtx in tests / plugin hosts), so it is still constructed at
+    most once per ctx — never per file or per include (hard performance
+    constraint at kernel scale, see ``build_c_include_index``).
+    """
+    index = ctx.indices.get("host:c_basename_index")
+    if index is None:
+        index = build_c_include_index(ctx.paths_set)
+        ctx.indices["host:c_basename_index"] = index
+    return index
+
+
 class CResolver:
     name = "resolve_c"
 
@@ -331,6 +349,7 @@ class CResolver:
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         in_repo, external = resolve_c_includes(
             record.path, _summary(record), ctx.paths_set,
+            _c_basename_index(ctx),
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -356,10 +375,12 @@ class CppResolver:
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
         # C++ #include resolution is structurally identical to C's;
-        # share the implementation. Future C++20 `import std;` /
-        # `import :module;` is out of scope for this v1.
+        # share the implementation (and the once-per-repo basename
+        # index). Future C++20 `import std;` / `import :module;` is out
+        # of scope for this v1.
         in_repo, external = resolve_c_includes(
             record.path, _summary(record), ctx.paths_set,
+            _c_basename_index(ctx),
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
