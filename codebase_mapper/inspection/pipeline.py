@@ -5,7 +5,9 @@ import hashlib
 import logging
 import os
 import sys
+import threading
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
@@ -15,7 +17,11 @@ from ..shared_kernel.extensions import (
     PipelineCtx, iter_aggregators, iter_import_resolvers,
     iter_language_analyzers, iter_record_enrichers,
 )
-from .git_plumbing import list_commit_times, list_tree, read_blob, resolve_commit
+from .git_plumbing import (
+    BlobReader, is_shallow_repository, list_commit_times, list_tree, read_blob,
+    resolve_commit,
+)
+from .languages.c import build_c_include_index
 from .languages.cpp import build_cpp_symbol_index, refine_cpp_header_languages
 from .languages.dart import detect_dart_package_name, detect_dart_packages
 from .languages.objc import build_objc_symbol_index, refine_objc_header_languages
@@ -75,6 +81,87 @@ def _progress(tag: str, i: int, total: int, label: str) -> None:
         print(f"[host] {tag}  {i}/{total}  {label}", file=sys.stderr)
 
 
+def _workers_from_env(var: str, default: int) -> int:
+    """Resolve a worker-count knob. Garbage or non-positive values
+    degrade to 1 (serial) with a logged warning — a bad knob must never
+    fail a mapping run, only slow it down (loudly)."""
+    raw = os.environ.get(var, "").strip()
+    if not raw:
+        return default
+    try:
+        n = int(raw)
+    except ValueError:
+        _log.warning("%s=%r is not an integer; running that pass serially",
+                     var, raw)
+        return 1
+    if n < 1:
+        _log.warning("%s=%d is not positive; running that pass serially",
+                     var, n)
+        return 1
+    return n
+
+
+def _extract_workers() -> int:
+    """AST-extraction threads: ``$CBM_EXTRACT_WORKERS``, default every
+    core — the pass is CPU-bound and tree-sitter releases the GIL
+    during parse."""
+    return _workers_from_env("CBM_EXTRACT_WORKERS", os.cpu_count() or 1)
+
+
+def _enrich_workers() -> int:
+    """Record-enricher threads: ``$CBM_ENRICH_WORKERS``, default 4 —
+    the pass is I/O-bound (LLM HTTP calls) and a modest fan-out keeps
+    the inference server busy instead of idle between requests."""
+    return _workers_from_env("CBM_ENRICH_WORKERS", 4)
+
+
+def _run_extraction(records, contents, analyzers, ctx, skip_extraction,
+                    workers):
+    """Pass 2: AST extraction over every record.
+
+    Each file's bytes are popped from ``contents`` at the moment they are
+    consumed, so peak memory is bounded by in-flight files rather than
+    repository size. With ``workers > 1`` records extract concurrently:
+    analyzer ``extract`` implementations are pure per-file functions (no
+    shared ctx mutation) and tree-sitter releases the GIL during parse,
+    so threads deliver multi-core wins without pickling records across
+    processes. Each task mutates only its own record — output is
+    identical to a serial run regardless of worker count.
+    """
+    total = len(records)
+    progress_lock = threading.Lock()
+    done = 0
+
+    def one(rec):
+        nonlocal done
+        content = contents.pop(rec.path, None)
+        with progress_lock:
+            done += 1
+            _progress("extract", done, total, rec.path)
+        if rec.type_ == "binary" or rec.path in skip_extraction:
+            rec.phases = refine_phases(rec)
+            return
+        if content is None:
+            content = ctx.read_path(rec.path)
+        for analyzer in analyzers:
+            if analyzer.matches(rec, ctx):
+                rec.ast_summary, rec.extraction_errors = _safe_extract(
+                    analyzer, rec, content, ctx,
+                )
+                break
+        rec.phases = refine_phases(rec)
+
+    if workers <= 1:
+        for rec in records:
+            one(rec)
+        return
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        # list() drains the iterator so any task exception propagates,
+        # matching serial behavior (extract errors themselves are already
+        # contained per-record by _safe_extract).
+        list(pool.map(one, records))
+
+
 def _safe_extract(analyzer, record, content, ctx):
     """Run ``analyzer.extract`` with any failure contained to this one record.
 
@@ -111,7 +198,13 @@ def map_codebase(
     mode_by_path = {p: mode for p, _sha, mode in blobs}
     # Last-touched commit time per path. One `git log` walk; safe to call
     # once up-front since the commit graph doesn't change during a run.
-    commit_times = list_commit_times(repo, commit)
+    # Shallow clones (repo_source defaults to `--depth 1` for remotes) have
+    # no usable history: `git log` would attribute every path to the lone
+    # parentless tip, stamping every file with one fabricated commit time.
+    # Omit the fact instead, and record the degradation below once the
+    # affected record count is known.
+    shallow = is_shallow_repository(repo)
+    commit_times = {} if shallow else list_commit_times(repo, commit)
 
     records: list[FileRecord] = []
     # Build a stub PipelineCtx now so LanguageAnalyzers receive a ctx with
@@ -120,8 +213,15 @@ def map_codebase(
     # ImportResolvers run.
     paths_set: set[str] = set()
 
+    # One persistent `git cat-file --batch` process serves every blob
+    # read in the run (classify pass + read_path consumers). Previously
+    # each read spawned its own subprocess — at Linux-kernel scale that
+    # was two process spawns per file. The reader lives as long as the
+    # ctx that closes over it.
+    blob_reader = BlobReader(repo)
+
     def read_path(p: str) -> bytes:
-        return read_blob(repo, blob_by_path[p])
+        return blob_reader.read(blob_by_path[p])
 
     ctx = PipelineCtx(
         repo=repo, commit=commit, records=records,
@@ -143,7 +243,7 @@ def map_codebase(
         _progress("classify", i, n_blobs, path)
         if path_excluded(path, exclude_patterns):
             continue
-        content = read_blob(repo, blob_sha)
+        content = blob_reader.read(blob_sha)
         content_by_path[path] = content
         head = content[:8192]
         if mode == "120000":
@@ -152,7 +252,7 @@ def map_codebase(
             mode_skip_extraction.add(path)
         else:
             type_ = classify(path, head)
-            lang = language_of(path)
+            lang = language_of(path, head)
         atime = mtime = ctime = None
         try:
             st = os.lstat(repo / path)
@@ -171,6 +271,21 @@ def map_codebase(
         records.append(rec)
         paths_set.add(rec.path)
 
+    if shallow:
+        # Shared degradation contract: manifest plumbing reads
+        # ctx.scratch["degradations"] and surfaces each entry in the run
+        # manifest. Every mapped record lacks git_commit_time here, so the
+        # affected count is the full record count.
+        _log.warning(
+            "shallow clone: omitting git_commit_time for %d file(s); "
+            "history required to derive it is not present", len(records),
+        )
+        ctx.scratch.setdefault("degradations", []).append({
+            "component": "git_provenance",
+            "reason": "shallow_clone_no_history",
+            "affected_files": len(records),
+        })
+
     # Pass 1.5: cross-file language refinement. ``.h`` files get
     # re-tagged based on cross-file evidence so the right analyzer
     # handles them:
@@ -178,34 +293,26 @@ def map_codebase(
     #   * ObjC retag runs first — ``Foo.h`` next to ``Foo.m`` is ObjC.
     #     Apple's convention is universal across iOS/macOS code; pure-C
     #     repos are unaffected (the retag is a no-op when no ``.m``
-    #     files exist).
+    #     files exist, and its project-wide fallback only fires on
+    #     headers whose own content carries ObjC markers).
     #   * C++ retag runs second — picks up any remaining ``.h`` files
     #     in C++ projects (the cpp grammar is a superset of C and
     #     parses C correctly, so this is safe).
     #
     # New refinements (sibling-aware language decisions across files)
     # belong here, before AST extraction.
-    refine_objc_header_languages(records)
+    refine_objc_header_languages(records, content_by_path.__getitem__)
     refine_cpp_header_languages(records)
 
     # Pass 2: AST extraction. Analyzer ``matches()`` reads ``rec.language``,
     # so the refinement above must be visible here. Usually the most
     # expensive pass on a large repo — real per-language parsing, not a
     # filtered/dict-building sub-index — hence its own progress line.
+    # Runs on _extract_workers() threads and consumes content_by_path
+    # as it goes, so the whole-repo byte map does not outlive this pass.
     n_records = len(records)
-    for i, rec in enumerate(records, 1):
-        _progress("extract", i, n_records, rec.path)
-        if rec.type_ == "binary" or rec.path in mode_skip_extraction:
-            rec.phases = refine_phases(rec)
-            continue
-        content = content_by_path[rec.path]
-        for analyzer in analyzers:
-            if analyzer.matches(rec, ctx):
-                rec.ast_summary, rec.extraction_errors = _safe_extract(
-                    analyzer, rec, content, ctx,
-                )
-                break
-        rec.phases = refine_phases(rec)
+    _run_extraction(records, content_by_path, analyzers, ctx,
+                    mode_skip_extraction, _extract_workers())
 
     # Indices
     _phase(f"building language indices ({n_records} records)")
@@ -239,6 +346,13 @@ def map_codebase(
     # references like ``[NSString …]`` bind even when only a category
     # was imported.
     objc_symbols = build_objc_symbol_index(records)
+    # C/C++ basename index: final path component → all repo paths ending
+    # in it. Powers quoted-include basename fallback AND angle-include
+    # unique path-suffix resolution (#include <linux/foo.h> →
+    # include/linux/foo.h). Built exactly once per run — per-include
+    # scans of paths_set are O(files × includes) and infeasible at
+    # kernel scale (~95k files).
+    c_basename_index = build_c_include_index(ctx.paths_set)
 
     # Dependency manifests -> declared deps (needed early so we can match
     # external imports against them).
@@ -268,6 +382,7 @@ def map_codebase(
     ctx.indices["host:java_source_roots"] = java_source_roots
     ctx.indices["host:cpp_symbols"] = cpp_symbols
     ctx.indices["host:objc_symbols"] = objc_symbols
+    ctx.indices["host:c_basename_index"] = c_basename_index
     ctx.indices["host:declared_pkgs"] = declared_pkgs
 
     import_edges: set[ImportEdge] = set()
@@ -318,12 +433,34 @@ def map_codebase(
     enrichers = iter_record_enrichers()
     if enrichers:
         _phase(f"running {len(enrichers)} record enricher(s)")
-        for r in records:
+        serial = [e for e in enrichers
+                  if not getattr(e, "parallel_safe", False)]
+        par = [e for e in enrichers if getattr(e, "parallel_safe", False)]
+        # Per-record enricher order is the sorted registry order. The
+        # parallel-safe group may only be hoisted into its own pass when
+        # that preserves the order (every parallel enricher sorts after
+        # every serial one — true for the shipped plugins: l2_* < l4_*).
+        # Otherwise: the exact serial path, old behavior.
+        order_preserved = enrichers == serial + par
+        workers = _enrich_workers() if par and order_preserved else 1
+
+        def run_group(group, r):
             if r.type_ == "binary":
-                continue
+                return
             content = read_path(r.path)
-            for enricher in enrichers:
+            for enricher in group:
                 enricher.enrich(r, content, ctx)
+
+        if workers <= 1:
+            for r in records:
+                run_group(enrichers, r)
+        else:
+            for r in records:
+                run_group(serial, r)
+            # I/O-bound (LLM calls): thread fan-out keeps the inference
+            # server saturated instead of one request in flight at a time.
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                list(pool.map(lambda r: run_group(par, r), records))
     for agg in iter_aggregators():
         ctx.indices[agg.name] = agg.run(ctx)
 

@@ -1,6 +1,8 @@
 """codebase_mapper.ts_setup."""
 from __future__ import annotations
 
+import threading
+
 from pathlib import PurePosixPath
 
 try:
@@ -29,9 +31,27 @@ _TS_LANGS: dict[str, "ts.Language"] = {}
 
 _TS_QUERIES: dict[str, "ts.Query"] = {}
 
+# _ts_setup() is called from the pipeline's parallel extraction threads.
+# The ready flag flips only after BOTH tables are fully populated — the
+# previous dict-truthiness guard let a second thread return mid-population
+# and KeyError on a grammar that wasn't loaded yet (observed as silently
+# dropped import edges under machine load).
+_TS_READY = False
+_TS_SETUP_LOCK = threading.Lock()
+
+
 def _ts_setup() -> None:
-    if not TS_AVAILABLE or _TS_LANGS:
+    global _TS_READY
+    if not TS_AVAILABLE or _TS_READY:
         return
+    with _TS_SETUP_LOCK:
+        if _TS_READY:
+            return
+        _ts_populate()
+        _TS_READY = True
+
+
+def _ts_populate() -> None:
     _TS_LANGS["typescript"] = ts.Language(tst.language_typescript())
     _TS_LANGS["tsx"] = ts.Language(tst.language_tsx())
     _TS_LANGS["javascript"] = ts.Language(tsj.language())

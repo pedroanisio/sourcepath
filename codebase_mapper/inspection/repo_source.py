@@ -107,13 +107,43 @@ def _resolve_work_root(work_dir: str | Path | None) -> Path | None:
     return candidate
 
 
-def _clone(git_url: str, clone_dir: Path, state: str) -> str:
+def _unshallow_enabled(unshallow: bool | None) -> bool:
+    """Explicit argument wins; otherwise the ``CBM_UNSHALLOW`` env var opts in."""
+    if unshallow is not None:
+        return unshallow
+    return os.environ.get("CBM_UNSHALLOW", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _try_unshallow(clone_dir: Path) -> None:
+    """Best-effort: deepen a shallow clone to full commit history, blob-free.
+
+    ``--filter=blob:none`` fetches all commits and trees but no historical
+    blobs, so per-file commit-time provenance becomes derivable while the
+    transfer stays a fraction of a full clone; HEAD's blobs already arrived
+    with the initial ``--depth 1`` fetch, which is what the working-tree
+    plumbing (``git cat-file``) reads. Failure is tolerated — servers may
+    refuse filters or ``--unshallow`` (e.g. the clone already holds full
+    history) — and the pipeline then omits ``git_commit_time`` and records
+    the ``git_provenance`` degradation instead.
+    """
+    try:
+        _run_git(["fetch", "--unshallow", "--filter=blob:none", "origin"], cwd=clone_dir)
+    except subprocess.CalledProcessError:
+        pass
+
+
+def _clone(git_url: str, clone_dir: Path, state: str, *, unshallow: bool = False) -> str:
     """Clone ``git_url`` at ``state`` into ``clone_dir``; return the checked-out state.
 
-    Working-tree mappers never read commit history, so we fetch ``--depth 1``.
-    This is the decisive difference for very large repositories (e.g. the Linux
-    kernel is ~11.7M objects at full history but a single-commit working tree is
-    a small fraction of that).
+    Remotes are fetched ``--depth 1`` by default. This is the decisive
+    difference for very large repositories (e.g. the Linux kernel is ~11.7M
+    objects at full history but a single-commit working tree is a small
+    fraction of that). The trade-off: a shallow clone has no commit history,
+    so per-file ``git_commit_time`` provenance cannot be derived from it —
+    the pipeline omits that fact and records a ``git_provenance``
+    degradation (fabricating times from the lone tip commit is worse than
+    omitting them). Pass ``unshallow=True`` (or set ``CBM_UNSHALLOW=1``) to
+    attempt a blob-free history deepen after the shallow clone.
 
     - ``state == "HEAD"``: shallow-clone the remote's default branch tip.
     - a branch or tag name: shallow-clone that ref directly (``--branch`` names
@@ -127,11 +157,15 @@ def _clone(git_url: str, clone_dir: Path, state: str) -> str:
     """
     if state == "HEAD":
         _run_git(["clone", "--depth", "1", "--single-branch", "--", git_url, str(clone_dir)])
+        if unshallow:
+            _try_unshallow(clone_dir)
         return "HEAD"
     try:
         _run_git(
             ["clone", "--depth", "1", "--single-branch", "--branch", state, "--", git_url, str(clone_dir)]
         )
+        if unshallow:
+            _try_unshallow(clone_dir)
         return "HEAD"
     except subprocess.CalledProcessError:
         shutil.rmtree(clone_dir, ignore_errors=True)
@@ -168,6 +202,7 @@ def resolve_repo_source(
     state: str = "HEAD",
     *,
     work_dir: str | Path | None = None,
+    unshallow: bool | None = None,
 ):
     """Yield a local repository path, cloning remote sources into a temp dir.
 
@@ -175,6 +210,11 @@ def resolve_repo_source(
     hosts the temporary clone; when both are unset the system temp dir is used.
     Point it at the same volume as your output directory to avoid exhausting a
     small ``/tmp`` ``tmpfs`` on large clones.
+
+    ``unshallow`` (or the ``CBM_UNSHALLOW`` env var; default off) opts into a
+    best-effort ``git fetch --unshallow --filter=blob:none`` after the default
+    ``--depth 1`` clone, recovering commit history — and with it per-file
+    ``git_commit_time`` provenance — without downloading historical blobs.
     """
     source_str = str(source)
     git_url = normalize_git_source(source_str)
@@ -188,7 +228,9 @@ def resolve_repo_source(
     clone_dir = tmp / repo_name_from_source(source_str)
     try:
         try:
-            effective_state = _clone(git_url, clone_dir, state)
+            effective_state = _clone(
+                git_url, clone_dir, state, unshallow=_unshallow_enabled(unshallow),
+            )
         except subprocess.CalledProcessError as exc:
             free_gib = shutil.disk_usage(tmp).free / 1024**3
             raise RuntimeError(
