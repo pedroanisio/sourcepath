@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 import time
 
@@ -25,9 +26,18 @@ from ...inspection.tests_edges import count_rust_inline_test_files
 from ...inspection.coverage import aggregate_coverage
 
 
+def _flag_from_env(name: str) -> bool | None:
+    """Tri-state env switch: None when unset/blank, else truthiness."""
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return None
+    return raw in ("1", "true", "yes", "on")
+
+
 def emit(repo_name: str, mapped: dict, out_dir: Path,
          emit_blobs_flag: bool = True, *,
-         validate_shacl: bool = True, emit_jsonld: bool = True) -> dict:
+         validate_shacl: bool | None = None,
+         emit_jsonld: bool | None = None) -> dict:
     """Serialize the mapped repository into the bundle directory.
 
     ``validate_shacl=False`` skips the pySHACL self-check and
@@ -35,7 +45,20 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
     cost controls for very large graphs, and both are disclosed in the
     manifest rather than silently absent (PALS's Law: a skipped check
     must never read as a passed one).
+
+    When a flag is not passed explicitly it resolves from the
+    environment — ``CBM_SKIP_SHACL`` truthy skips validation,
+    ``CBM_EMIT_JSONLD`` falsy skips JSON-LD — so every entry point
+    (including the main CLI) is cost-controllable without new flags.
+    Explicit arguments always win; with neither argument nor env var,
+    both steps run, exactly as before.
     """
+    if validate_shacl is None:
+        skip = _flag_from_env("CBM_SKIP_SHACL")
+        validate_shacl = True if skip is None else not skip
+    if emit_jsonld is None:
+        env = _flag_from_env("CBM_EMIT_JSONLD")
+        emit_jsonld = True if env is None else env
     out_dir.mkdir(parents=True, exist_ok=True)
     repo_iri = URIRef(f"{CBMI_NS}repo/{repo_name}")
     inv = build_inventory_graph(

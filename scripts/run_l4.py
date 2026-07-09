@@ -164,10 +164,12 @@ def main(argv: list[str] | None = None) -> int:
         repo_name = args.name or repo.name
         mapped = map_codebase(repo.path, repo.state,
                               exclude_patterns=args.exclude)
+        # Flags win over $CBM_SKIP_SHACL / $CBM_EMIT_JSONLD; when a flag
+        # is absent, None lets emit() resolve the env default.
         manifest = emit(repo_name, mapped, args.out.resolve(),
                         emit_blobs_flag=not args.no_emit_blobs,
-                        validate_shacl=not args.skip_shacl,
-                        emit_jsonld=not args.no_jsonld)
+                        validate_shacl=False if args.skip_shacl else None,
+                        emit_jsonld=False if args.no_jsonld else None)
     _print_l4_summary(manifest)
     print(json.dumps(manifest, indent=2, sort_keys=True))
     sc = manifest.get("shacl_self_check", {})

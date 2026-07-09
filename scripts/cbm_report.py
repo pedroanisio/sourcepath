@@ -1068,7 +1068,7 @@ SHACL self-check (manifest): {man.get('shacl_self_check',{}).get('conforms')}.""
     log("wrote", out + ".md")
 
 # ----------------------------------------------------------------------------
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bundle", required=True)
     ap.add_argument("--abox"); ap.add_argument("--decomposition"); ap.add_argument("--buildplan")
@@ -1078,7 +1078,7 @@ def main():
     ap.add_argument("--validate-shacl", action="store_true",
                     help="independently re-validate inventory against bundled shapes (pyshacl)")
     ap.add_argument("--skip-embeddings", action="store_true", help="skip t-SNE district map")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
 
     found = discover(a.bundle, a)
     if "run_manifest.json" not in found:
@@ -1128,6 +1128,7 @@ def main():
         slim["district_xy"] = None if M["district_xy"] is None else len(M["district_xy"])
         json.dump(slim, open(a.out + ".model.json", "w"), indent=1, default=str)
         log("wrote", a.out + ".model.json")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -1994,7 +1994,7 @@ def build(args):
     doc.multiBuild(st, canvasmaker=sub_ix.getCanvasMaker(nam_ix.getCanvasMaker()))
     return doc.page
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1],
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument("--bundle", required=True, help="bundle directory (run_manifest.json et al.)")
@@ -2007,9 +2007,10 @@ def main():
                     help="directory holding the designed TTF set ($CBM_FONT_DIR)")
     ap.add_argument("--validate-shacl", action="store_true",
                     help="re-validate the graph with pyshacl at typesetting time")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     n = build(a)
     print(f"[dossier] wrote {a.out} · {n} pages")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
