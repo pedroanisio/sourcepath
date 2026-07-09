@@ -42,3 +42,4 @@ _site/
 .claude/settings.json
 _delete/chromium/
 docs/reports/
+.mcp.json
