@@ -36,10 +36,27 @@ dependencies = [
 codebase-mapper = "codebase_mapper.cli:main"
 
 [project.optional-dependencies]
+# Frontend (FastAPI backend + read-only MCP server) runtime dependencies.
+# Single source of truth: mirrors frontend/backend/requirements.txt and
+# frontend/mcp_server/requirements.txt (the Docker images install those
+# directly). Declared here so `pip install -e ".[frontend]"` — and the drift
+# / repository-summary verifiers that import `frontend.mcp_server` — resolve
+# without a ModuleNotFoundError.
+frontend = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "pydantic>=2.7,<3.0",
+    "mcp>=1.27,<2.0",
+    "PyJWT>=2.8,<3.0",
+    "httpx>=0.28,<1.0",
+]
+# `dev` pulls in `frontend` so the full offline verifier suite (which imports
+# the FastAPI/MCP layer) runs after a plain `make install`.
 dev = [
     "import-linter",
     "mypy",
     "types-PyYAML",
+    "codebase-mapper[frontend]",
 ]
 site = [
     "markdown-it-py",

@@ -370,10 +370,17 @@ python tests/verify_doc_hygiene.py         # README disclaimer + active Markdown
 python tests/verify_excludes.py             # --exclude flag + .cbmignore behavior
 python tests/verify_java.py                 # Java analyzer/xref coverage
 python tests/verify_objc.py                 # Objective-C / Objective-C++ coverage
+python tests/verify_clojure.py              # Clojure analyzer/chunker/import-resolution coverage
+python tests/verify_cobol.py                # COBOL analyzer/chunker/xref coverage (fixed + free format)
+python tests/verify_go.py                   # Go analyzer/xref coverage
 python tests/verify_repo_source.py          # local path + Git URL --repo handling
 python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
 python tests/verify_l3.py                   # concept_graph contract + cross-layer
+python tests/verify_ast_coverage.py         # per-language AST-extraction coverage guard
+python tests/verify_golden_repo.py          # multi-language golden-repo end-to-end fixture
+python tests/verify_progress.py             # map_codebase progress-reporting hooks
+python tests/verify_dimension_shapes.py     # SPDX/architecture-dimension SHACL shapes
 python tests/verify_vocab.py                # controlled-vocab loader
 python tests/verify_vocab_emission.py       # controlled-vocab RDF + SHACL
 python tests/verify_vocab_wiring.py         # controlled-vocab aggregator wiring
@@ -388,6 +395,7 @@ python tests/verify_llm_enrich_determinism.py      # L4 warm-cache determinism (
 python tests/verify_llm_enrich_offline.py   # L4 graceful degradation when Ollama is unreachable
 python tests/verify_llm_enrich_cli.py       # L4 CLI surface (scripts/run_l4 + --llm-enrich flags)
 python tests/verify_llm_enrich_ci_determinism.py    # L4 warm-cache determinism via committed cache fixture (no Ollama needed)
+python tests/verify_bench_llm_models.py     # L4 model-benchmark harness contract
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 python tests/verify_xsd_fixture.py          # static/schemas/ classifier coverage
 python tests/verify_proto_fixture.py        # static/proto/ classifier + import coverage

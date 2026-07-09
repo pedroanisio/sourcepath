@@ -253,6 +253,10 @@ def classify(path: str, content_head: bytes) -> str:
     # descriptions. Closer to structured fixture data than configuration.
     if suffix == ".xsd":
         return "data"
+    # *.ttl — RDF Turtle. Serialized graph data (ontologies, SHACL shapes,
+    # ABox fixtures). Structured data, same posture as .xsd above.
+    if suffix == ".ttl":
+        return "data"
     if name in {"tsconfig.json", "tsconfig.base.json", "jsconfig.json",
                 "rollup.config.js", "rollup.config.ts", "rollup.config.mjs",
                 "vite.config.js", "vite.config.ts", "webpack.config.js",
