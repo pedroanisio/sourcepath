@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from pathlib import PurePosixPath
 
-from .models import FileRecord, TestsEdge
+from .models import FileRecord, ImportEdge, TestsEdge
 
 
 # Match attributes that make a Rust function a test:
@@ -97,10 +97,11 @@ def infer_tests_edges(
     *,
     rust_crates: list[dict] | None = None,
     paths_set: set[str] | None = None,
+    import_edges: list[ImportEdge] | None = None,
 ) -> list[TestsEdge]:
     """Produce test→subject edges.
 
-    Two strategies, applied in order:
+    Three strategies, applied in order per test file:
 
       1. **Path-based**: strip test prefixes/suffixes from the file's
          stem (``test_foo`` → ``foo``, ``foo_test`` → ``foo``, etc.)
@@ -115,6 +116,15 @@ def infer_tests_edges(
          it imports. Activated only when ``rust_crates`` and
          ``paths_set`` are passed; absent, only step 1 runs.
 
+      3. **Typed-import fallback** (flaw F17): when neither produced an
+         edge and ``import_edges`` is passed, emit one edge per resolved
+         import from the test file to a ``source_code``-typed target.
+         Test-infrastructure targets (themselves ``test_code``) are not
+         subjects. This generalizes strategy 2 to every language and is
+         what makes kselftest-style suites (flat names mirroring no
+         subject file) produce evidence at all; it is the canonical
+         derivation reports must cite instead of re-deriving their own.
+
     Phase / strategy notes are intentional: a Rust integration test
     typically imports many modules of its parent crate. Emitting one
     edge per imported module is correct — those *are* the subjects the
@@ -128,6 +138,11 @@ def infer_tests_edges(
         if bn in ("__init__", "index", "mod", "lib", "main"):
             continue
         subjects_by_basename[bn].append(r.path)
+
+    source_paths = {r.path for r in records if r.type_ == "source_code"}
+    imports_by_src: dict[str, list[str]] = defaultdict(list)
+    for e in import_edges or ():
+        imports_by_src[e.src_path].append(e.dst_path)
 
     edges: set[TestsEdge] = set()
     for r in records:
@@ -217,5 +232,13 @@ def infer_tests_edges(
         ):
             for subject in _rust_inferred_subjects(r, rust_crates, paths_set):
                 edges.add(TestsEdge(r.path, subject))
+
+        # Typed-import fallback: the test's resolved imports into
+        # source-typed files are its subjects. Only when the two more
+        # precise strategies produced nothing for this test file.
+        if len(edges) == edges_before:
+            for dst in imports_by_src.get(r.path, ()):
+                if dst in source_paths:
+                    edges.add(TestsEdge(r.path, dst))
 
     return sorted(edges, key=lambda e: (e.test_path, e.subject_path))

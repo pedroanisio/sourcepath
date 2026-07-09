@@ -231,3 +231,28 @@ def _strip_quotes(s: str) -> str:
     if len(s) >= 2 and s[0] in ("'", '"', "`"):
         return s[1:-1]
     return s
+
+
+def parse_error_diagnostics(root_node) -> list[str]:
+    """Quantified parse-error diagnostics for a tree-sitter root node.
+
+    Returns ``[]`` on a clean parse, else the backward-compatible
+    ``parse_errors_present`` marker plus ``parse_error_nodes:<N>`` where N
+    counts ERROR and missing nodes. A bare boolean cannot distinguish one
+    recovered GCC-extension hiccup from a file that half-failed to parse —
+    at Linux-kernel scale that flagged 57.7% of C files identically
+    (flaw map F8). Consumers threshold on the count; nothing is hidden.
+    """
+    if not root_node.has_error:
+        return []
+    n = 0
+    cursor = root_node.walk()
+    while True:
+        node = cursor.node
+        if node.is_error or node.is_missing:
+            n += 1
+        if cursor.goto_first_child():
+            continue
+        while not cursor.goto_next_sibling():
+            if not cursor.goto_parent():
+                return ["parse_errors_present", f"parse_error_nodes:{n}"]

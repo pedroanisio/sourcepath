@@ -32,7 +32,7 @@ from typing import Callable
 
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _TS_QUERIES, _ts_setup
-from ...ts_setup import TS_AVAILABLE, ts
+from ...ts_setup import TS_AVAILABLE, parse_error_diagnostics, ts
 from ._treewalk import iter_named_pre_order
 
 
@@ -392,9 +392,7 @@ def extract_java_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
     lang = _TS_LANGS["java"]
     parser = ts.Parser(lang)
     tree = parser.parse(content)
-    errors: list[str] = []
-    if tree.root_node.has_error:
-        errors.append("parse_errors_present")
+    errors = parse_error_diagnostics(tree.root_node)
 
     package_name = _collect_package(tree.root_node, content)
     imports = _collect_imports(tree.root_node, content)

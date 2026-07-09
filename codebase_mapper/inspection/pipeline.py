@@ -472,9 +472,12 @@ def map_codebase(
         "pin_edges": sorted(pin_edges, key=lambda e: (e.lockfile_path, e.package_name, e.package_version)),
         # Pass rust_crates + paths_set so Rust integration tests under
         # ``tests/*.rs`` can fall back to use-analysis when filename
-        # heuristics fail to match a subject by basename.
+        # heuristics fail to match a subject by basename, and the resolved
+        # import edges so any test whose name mirrors no subject still
+        # yields typed-import evidence (kselftest-style suites — F17).
         "tests_edges": infer_tests_edges(
             records, rust_crates=rust_crates, paths_set=paths_set,
+            import_edges=list(import_edges),
         ),
         "python_source_roots": py_roots,
         "rust_crates": rust_crates,

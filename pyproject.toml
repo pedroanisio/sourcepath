@@ -157,3 +157,7 @@ forbidden_modules = [
     "rdflib",
     "yaml",
 ]
+
+[tool.pytest.ini_options]
+# Repo-root imports (`import scripts.run_l4`) work regardless of invocation dir.
+pythonpath = ["."]

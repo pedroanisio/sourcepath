@@ -9,7 +9,7 @@ from typing import Callable
 
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _TS_QUERIES, _ts_setup
-from ...ts_setup import TS_AVAILABLE, ts
+from ...ts_setup import TS_AVAILABLE, parse_error_diagnostics, ts
 
 
 _DEF_KINDS = ("function_declaration", "protocol_function_declaration")
@@ -189,7 +189,7 @@ def extract_swift_ast_summary(content: bytes, path: str) -> tuple[dict | None, l
     lang = _TS_LANGS["swift"]
     parser = ts.Parser(lang)
     tree = parser.parse(content)
-    errors = ["parse_errors_present"] if tree.root_node.has_error else []
+    errors = parse_error_diagnostics(tree.root_node)
     cursor = ts.QueryCursor(_TS_QUERIES["swift"])
     captures = cursor.captures(tree.root_node)
 

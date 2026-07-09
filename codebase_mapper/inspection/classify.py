@@ -121,8 +121,12 @@ def classify(path: str, content_head: bytes) -> str:
     if re.fullmatch(r".*\.min\.(js|cjs|mjs|css)", name, re.IGNORECASE):
         return "generated"
 
-    # Test code — must precede source_code.
-    if "tests" in parts or "test" in parts or "__tests__" in parts or "spec" in parts:
+    # Test code — must precede source_code. ``selftests`` covers the Linux
+    # kernel's kselftest tree (tools/testing/selftests/), whose path
+    # components are ``testing``/``selftests`` and so matched none of the
+    # generic names — 5,161 kernel test files typed source_code (flaw F7).
+    if ("tests" in parts or "test" in parts or "__tests__" in parts
+            or "spec" in parts or "selftests" in parts):
         if suffix in LANG_BY_EXT:
             return "test_code"
     if re.fullmatch(r"test_.*\.py|.*_test\.py", name):
@@ -154,6 +158,14 @@ def classify(path: str, content_head: bytes) -> str:
         stem = p.stem
         if re.fullmatch(r".*_test", stem) \
            or re.fullmatch(r"[A-Z][A-Za-z0-9]+?(?:Test|Tests)", stem):
+            return "test_code"
+    # C (Linux-kernel conventions): KUnit tests are *_test.c / *-test.c /
+    # *_kunit.c; standalone in-tree test programs are test_*.c
+    # (lib/test_bitmap.c). A separator is required, so testmgr.c /
+    # protest.c / latest.c stay source_code.
+    if suffix == ".c":
+        stem = p.stem
+        if re.fullmatch(r"test_.+|.+[_-]test|.+_kunit", stem):
             return "test_code"
     # Objective-C / Objective-C++: FooTests.m / FooTest.m / FooSpec.m
     # (XCTest / Specta / Kiwi conventions). Same Latest-safe CamelCase

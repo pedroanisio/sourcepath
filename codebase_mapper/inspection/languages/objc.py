@@ -39,7 +39,7 @@ from pathlib import PurePosixPath
 from typing import Callable
 
 from ..models import FileRecord
-from ...ts_setup import _TS_LANGS, _ts_setup, TS_AVAILABLE, ts
+from ...ts_setup import _TS_LANGS, _ts_setup, TS_AVAILABLE, parse_error_diagnostics, ts
 from ._treewalk import find_named_descendant, iter_named_pre_order
 
 
@@ -590,9 +590,7 @@ def extract_objc_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
     lang = _TS_LANGS["objc"]
     parser = ts.Parser(lang)
     tree = parser.parse(content)
-    errors: list[str] = []
-    if tree.root_node.has_error:
-        errors.append("parse_errors_present")
+    errors = parse_error_diagnostics(tree.root_node)
 
     imports = _collect_imports(tree.root_node, content)
     items: list[dict] = []

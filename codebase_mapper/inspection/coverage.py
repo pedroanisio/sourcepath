@@ -41,6 +41,8 @@ SYMBOL_ITEMS_KEY = "items"
 IMPORTS_KEY = "imports"
 #: Diagnostic string the analyzers append when the parse tree has errors.
 PARSE_ERROR_MARKER = "parse_errors_present"
+#: Companion diagnostic quantifying the damage: ``parse_error_nodes:<N>``.
+PARSE_ERROR_NODES_PREFIX = "parse_error_nodes:"
 #: Diagnostic prefixes that mean extraction did not complete at all.
 _FAILURE_MARKERS = ("extract_failed", "extract_recursion_error",
                     "tree_sitter_unavailable")
@@ -74,6 +76,21 @@ def _count_imports(ast_summary: dict | None) -> int | None:
     return len(imports) if isinstance(imports, list) else None
 
 
+def parse_error_node_count(extraction_errors: list[str]) -> int:
+    """ERROR/missing-node count from a ``parse_error_nodes:<N>`` diagnostic.
+
+    ``0`` when the diagnostic is absent or malformed — including records
+    from analyzers predating the quantified marker (flaw F8), which carry
+    only ``parse_errors_present``.
+    """
+    for e in extraction_errors:
+        if e.startswith(PARSE_ERROR_NODES_PREFIX):
+            tail = e[len(PARSE_ERROR_NODES_PREFIX):]
+            if tail.isdigit():
+                return int(tail)
+    return 0
+
+
 @dataclass(frozen=True)
 class FileCoverage:
     """Per-file extraction verdict."""
@@ -85,6 +102,7 @@ class FileCoverage:
     had_extraction_failure: bool
     symbol_count: int | None
     import_count: int | None
+    parse_error_nodes: int = 0
 
     @property
     def is_full_body(self) -> bool:
@@ -120,6 +138,7 @@ def classify_file_coverage(record: Any) -> FileCoverage:
         had_extraction_failure=had_failure,
         symbol_count=count_symbols(ast_summary),
         import_count=_count_imports(ast_summary),
+        parse_error_nodes=parse_error_node_count(errors),
     )
 
 
@@ -134,6 +153,10 @@ def _empty_lang_bucket() -> dict[str, int]:
         "silent_zero_symbol_files": 0,
         "symbols_extracted": 0,
         "imports_extracted": 0,
+        # Total ERROR/missing nodes across flagged files — severity signal
+        # the boolean marker cannot carry (F8): 28,581 kernel C files were
+        # indistinguishable whether one node or half the tree failed.
+        "parse_error_nodes": 0,
     }
 
 
@@ -170,6 +193,7 @@ def aggregate_coverage(records: list, *, max_listed: int = DEFAULT_MAX_LISTED) -
                 b["files_zero_ast"] += 1
             if fc.had_parse_error:
                 b["files_with_parse_errors"] += 1
+            b["parse_error_nodes"] += fc.parse_error_nodes
             if fc.had_extraction_failure:
                 b["files_with_extraction_failures"] += 1
             if fc.is_full_body:
