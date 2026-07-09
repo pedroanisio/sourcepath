@@ -46,3 +46,4 @@ docs/reports/
 
 # Claude Code local state (permissions, agent worktrees)
 .claude/
+linux-proc.tar
