@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0.0",
+  "report_id": "7f3a2b10-9c4e-4d2a-8b1f-5e6d7c8a9b0c",
+  "title": "Graphite — Structural Due Diligence",
+  "audience": "due_diligence",
+  "disclaimer_mode": "evidence_basis_banner",
+  "bundle": {
+    "bundle_name": "graphite",
+    "repo_name": "Graphite",
+    "commit_sha": "13abf9fa8c8d6d32f3d2745ddf537c263cc24cdf",
+    "manifest_sha256": "5ac851ec64b1c2e4f90272751b97fb58359fb9654abe7c1c320da99d66dce0d3",
+    "tool_version": "0.5.0"
+  },
+  "provenance": {
+    "generated_by": "Claude Fable 5 via Claude Code",
+    "generated_at": "2026-07-09T22:30:00Z",
+    "author_kind": "llm"
+  },
+  "blocks": [
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000001",
+      "component_id": "repo-overview",
+      "params": {},
+      "renderer": "stat_tiles"
+    },
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000002",
+      "component_id": "bundle-integrity",
+      "params": {},
+      "renderer": "check_list"
+    },
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000003",
+      "component_id": "language-distribution",
+      "params": { "min_files": 1 },
+      "renderer": "treemap"
+    },
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000004",
+      "component_id": "dependency-manifest",
+      "params": { "facet": "both", "limit": 500 },
+      "renderer": "data_table"
+    },
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000005",
+      "component_id": "dependency-pin-gap",
+      "params": {},
+      "renderer": "check_list"
+    },
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000006",
+      "component_id": "test-coverage-edges",
+      "params": { "facet": "untested", "path_prefix": "editor" },
+      "renderer": "data_table"
+    },
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000007",
+      "component_id": "extraction-error-disclosure",
+      "params": {},
+      "renderer": "check_list"
+    },
+    {
+      "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000008",
+      "component_id": "import-hubs",
+      "params": { "direction": "fan_in", "n": 25, "include_external": false },
+      "renderer": "bar_chart",
+      "narrative": {
+        "text": "Fan-in concentration indicates which modules would propagate change most widely; verify top hubs against the team's ownership map before drawing conclusions.",
+        "authored_by": "llm",
+        "model": "claude-fable-5"
+      }
+    }
+  ]
+}

@@ -1,0 +1,864 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codebase-mapper.example.org/schemas/report-spec/1.0.0",
+  "title": "ReportSpec",
+  "description": "Declarative reporting view over a persisted codebase-mapper bundle. A ReportSpec composes ReportBlocks; each block invokes exactly one QueryComponent from the closed v1.0.0 catalog (30 components) and binds it to a renderer compatible with the component's result shape. Execution outputs are ResultEnvelope instances (see $defs/ResultEnvelope; validate via fragment '#/$defs/ResultEnvelope'). Evidence tier (fact | derived | unverified) is structural: every component declares it, every envelope carries it, and renderers must not upgrade it (PALS's Law).",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Semver of this contract. Breaking changes increment major; catalog additions increment minor; annotation-only changes increment patch."
+    },
+    "report_id": { "$ref": "#/$defs/Uuid" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "audience": {
+      "type": "string",
+      "enum": ["engineering", "due_diligence", "onboarding", "operations"],
+      "description": "Closed v1 audience set. Drives tone of authored narrative only; never changes data or evidence tiers."
+    },
+    "disclaimer_mode": {
+      "type": "string",
+      "enum": ["default_notice", "evidence_basis_banner"],
+      "default": "evidence_basis_banner",
+      "description": "default_notice = blanket project disclaimer. evidence_basis_banner = the operator-approved override for commercial reports: structural findings disclosed as mechanically extracted, LLM output disclosed as unverified and confidence-tagged. Both keep unverified content disclosed; neither may present LLM output as verified fact."
+    },
+    "bundle": { "$ref": "#/$defs/BundleRef" },
+    "provenance": { "$ref": "#/$defs/AuthoringProvenance" },
+    "blocks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ReportBlock" },
+      "minItems": 1,
+      "maxItems": 100,
+      "description": "Ordered; rendering order is document order (x-ordering: significant)."
+    }
+  },
+  "required": ["schema_version", "report_id", "title", "audience", "disclaimer_mode", "bundle", "provenance", "blocks"],
+  "additionalProperties": false,
+
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Opaque identifier (UUID, lowercase hex). Set at creation, immutable."
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lowercase hex SHA-256."
+    },
+    "GitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full 40-char git commit SHA (as persisted in cbm:commitSha)."
+    },
+    "IsoDateTimeUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "ISO 8601, UTC-normalized (trailing Z), second precision. Matches persisted xsd:dateTime values (e.g. cbml4:*GeneratedAt, cbm:gitCommitTime)."
+    },
+    "RepoRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^[^/]",
+      "description": "Path relative to repository root, no leading slash, '/' separators — the exact form persisted in cbm:path and used in chunk ids."
+    },
+    "PositiveCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Non-negative count. x-unit: count."
+    },
+    "TopN": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500,
+      "description": "Result size cap for ranked components. Executor row cap (1000, SPARQL read path) still applies."
+    },
+
+    "BundleRef": {
+      "type": "object",
+      "description": "Pin to one persisted bundle. Association (the report references the bundle; neither owns the other's lifecycle). ALWAYS pin explicitly — session-level bundle selection is not honored by the SPARQL read path.",
+      "properties": {
+        "bundle_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "description": "Bundle directory name under the bundles root (as returned by list_bundles). External reference: resolved by the MCP/backend bundle registry."
+        },
+        "repo_name": { "type": "string", "minLength": 1, "description": "Repository name recorded in the bundle (cbm:Repository instance)." },
+        "commit_sha": { "$ref": "#/$defs/GitSha" },
+        "manifest_sha256": {
+          "$ref": "#/$defs/Sha256Hex",
+          "description": "SHA-256 of run_manifest.json at spec-authoring time. Lets executors detect bundle replacement between authoring and execution."
+        },
+        "tool_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "description": "codebase-mapper tool_version that produced the bundle (semver)." }
+      },
+      "required": ["bundle_name", "repo_name", "commit_sha", "manifest_sha256"],
+      "additionalProperties": false
+    },
+
+    "AuthoringProvenance": {
+      "type": "object",
+      "description": "Who/what authored this spec. Immutable after creation.",
+      "properties": {
+        "generated_by": { "type": "string", "minLength": 1, "description": "Model/tool identifier, e.g. 'Claude Fable 5 via Claude Code' or a human username." },
+        "generated_at": { "$ref": "#/$defs/IsoDateTimeUtc" },
+        "author_kind": { "type": "string", "enum": ["human", "llm", "pipeline"] }
+      },
+      "required": ["generated_by", "generated_at", "author_kind"],
+      "additionalProperties": false
+    },
+
+    "Narrative": {
+      "type": "object",
+      "description": "Authored prose attached to a block. LLM-authored narrative is unverified by definition and renders under the disclosure banner; the renderer must not present it as fact.",
+      "properties": {
+        "text": { "type": "string", "minLength": 1, "maxLength": 20000 },
+        "authored_by": { "type": "string", "enum": ["human", "llm"] },
+        "model": { "type": "string", "minLength": 1, "description": "Required when authored_by = llm." }
+      },
+      "required": ["text", "authored_by"],
+      "if": { "properties": { "authored_by": { "const": "llm" } } },
+      "then": { "required": ["text", "authored_by", "model"] },
+      "additionalProperties": false
+    },
+
+    "RenderersForMetricGroup": { "type": "string", "enum": ["stat_tiles", "data_table"] },
+    "RenderersForDistribution": { "type": "string", "enum": ["bar_chart", "donut_chart", "data_table", "treemap"] },
+    "RenderersForRankedList": { "type": "string", "enum": ["bar_chart", "data_table", "badge_list"] },
+    "RenderersForTable": { "type": "string", "enum": ["data_table"] },
+    "RenderersForEdgeList": { "type": "string", "enum": ["network_graph", "adjacency_matrix", "sankey", "data_table"] },
+    "RenderersForTree": { "type": "string", "enum": ["treemap", "sunburst", "indented_tree", "data_table"] },
+    "RenderersForMatrix": { "type": "string", "enum": ["heatmap", "adjacency_matrix", "data_table"] },
+    "RenderersForTimeline": { "type": "string", "enum": ["area_timeline", "bar_chart", "data_table"] },
+    "RenderersForTextCards": { "type": "string", "enum": ["card_grid", "data_table"] },
+    "RenderersForNeighborList": { "type": "string", "enum": ["badge_list", "network_graph", "data_table"] },
+    "RenderersForValidationReport": { "type": "string", "enum": ["check_list", "data_table"] },
+
+    "PathScopeParams": {
+      "type": "object",
+      "properties": {
+        "path_prefix": { "$ref": "#/$defs/RepoRelativePath", "description": "Restrict to files whose cbm:path starts with this prefix. Absent = whole repository (absent and null are equivalent here: no filter)." }
+      },
+      "additionalProperties": false
+    },
+
+    "ReportBlock": {
+      "description": "One placed component. Discriminated on component_id (closed 30-entry catalog, v1.0.0). Each branch fixes the legal params and the renderers compatible with the component's result shape — mix-and-match is any component x any renderer legal for its shape.",
+      "type": "object",
+      "properties": {
+        "block_id": { "$ref": "#/$defs/Uuid" },
+        "component_id": {
+          "type": "string",
+          "enum": [
+            "repo-overview", "language-distribution", "file-type-distribution", "phase-distribution",
+            "largest-files", "directory-rollup", "commit-recency-timeline", "stale-files",
+            "import-edges", "import-hubs", "external-import-surface", "dependency-manifest",
+            "dependency-pin-gap", "orphan-files", "test-coverage-edges", "extraction-error-disclosure",
+            "bundle-integrity", "chunk-kind-distribution", "file-outline", "largest-symbols",
+            "embedding-coverage-disclosure", "public-api-surface", "call-graph", "type-hierarchy",
+            "xref-resolution-disclosure", "top-concepts", "concept-cooccurrence", "concepts-for-path",
+            "semantic-neighbors", "enrichment-cards"
+          ]
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200, "description": "Block heading override; absent = component's default title." },
+        "narrative": { "$ref": "#/$defs/Narrative" },
+        "params": { "type": "object" },
+        "renderer": { "type": "string" }
+      },
+      "required": ["block_id", "component_id", "params", "renderer"],
+      "unevaluatedProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "component_id": { "const": "repo-overview" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForMetricGroup" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "language-distribution" },
+            "params": {
+              "type": "object",
+              "properties": { "min_files": { "$ref": "#/$defs/PositiveCount", "default": 0, "description": "Hide languages with fewer files than this." } },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForDistribution" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "file-type-distribution" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForDistribution" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "phase-distribution" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForDistribution" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "largest-files" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "n": { "$ref": "#/$defs/TopN", "default": 25 },
+                "language": { "type": "string", "minLength": 1, "description": "Filter on cbm:language literal. Data-driven value set (not a schema enum): legal values are whatever the bundle persisted." },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForRankedList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "directory-rollup" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "max_depth": { "type": "integer", "minimum": 1, "maximum": 12, "default": 3, "description": "Directory levels to aggregate. x-unit: path segments." },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTree" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "commit-recency-timeline" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "bucket": { "type": "string", "enum": ["month", "quarter", "year"], "default": "month" },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTimeline" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "stale-files" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "n": { "$ref": "#/$defs/TopN", "default": 25 },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForRankedList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "import-edges" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 500, "description": "Edge cap; capped by the SPARQL read path's 1000-row limit." }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForEdgeList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "import-hubs" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "direction": { "type": "string", "enum": ["fan_in", "fan_out"], "default": "fan_in" },
+                "n": { "$ref": "#/$defs/TopN", "default": 25 },
+                "include_external": { "type": "boolean", "default": false, "description": "Also count cbm:importsExternal edges. Required for cross-package coupling in monorepos, where cross-package edges are persisted as importsExternal, not imports." }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForRankedList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "external-import-surface" },
+            "params": {
+              "type": "object",
+              "properties": { "n": { "$ref": "#/$defs/TopN", "default": 50 } },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForRankedList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "dependency-manifest" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "facet": { "type": "string", "enum": ["declared", "pinned", "both"], "default": "both" },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 500 }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTable" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "dependency-pin-gap" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForValidationReport" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "orphan-files" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" },
+                "include_non_code": { "type": "boolean", "default": false, "description": "false = restrict to files with a cbm:language (code files)." }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTable" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "test-coverage-edges" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "facet": { "type": "string", "enum": ["edges", "untested", "both"], "default": "both" },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTable" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "extraction-error-disclosure" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForValidationReport" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "bundle-integrity" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForValidationReport" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "chunk-kind-distribution" },
+            "params": {
+              "type": "object",
+              "properties": { "path_prefix": { "$ref": "#/$defs/RepoRelativePath" } },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForDistribution" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "file-outline" },
+            "params": {
+              "type": "object",
+              "properties": { "path": { "$ref": "#/$defs/RepoRelativePath" } },
+              "required": ["path"],
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTree" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "largest-symbols" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "n": { "$ref": "#/$defs/TopN", "default": 25 },
+                "kind": { "type": "string", "enum": ["function", "method", "class"], "description": "cbml2:kind filter ('file' chunks excluded from ranking by design)." },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForRankedList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "embedding-coverage-disclosure" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForValidationReport" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "public-api-surface" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" },
+                "item_kind": { "type": "string", "minLength": 1, "description": "Filter on ast item kind (e.g. struct, enum, fn, mod). Data-driven value set from <lang>_items.jsonl; not a schema enum because it is extractor-defined per language." }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTable" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "call-graph" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" },
+                "resolution": { "type": "string", "enum": ["exact", "any"], "default": "exact", "description": "exact = only resolver-confirmed edges; any = include heuristic resolutions (each edge still carries its resolution)." },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 5000, "default": 1000 }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForEdgeList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "type-hierarchy" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "edge_kind": { "type": "string", "enum": ["subclass_of", "overrides", "both"], "default": "both" },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForEdgeList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "xref-resolution-disclosure" },
+            "params": { "type": "object", "additionalProperties": false },
+            "renderer": { "$ref": "#/$defs/RenderersForDistribution" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "top-concepts" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "n": { "$ref": "#/$defs/TopN", "default": 30 },
+                "rank_by": { "type": "string", "enum": ["occurrence_count", "file_count"], "default": "occurrence_count" },
+                "concept_kind": { "type": "string", "minLength": 1, "description": "Filter on cbml3:conceptKind literal (controlled vocabulary maintained by the loader; data-driven here)." }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForRankedList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "concept-cooccurrence" },
+            "params": {
+              "type": "object",
+              "properties": { "top_k": { "type": "integer", "minimum": 2, "maximum": 60, "default": 20, "description": "Matrix rank: top_k concepts by occurrence form both axes." } },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForMatrix" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "concepts-for-path" },
+            "params": {
+              "type": "object",
+              "properties": { "path_prefix": { "$ref": "#/$defs/RepoRelativePath" } },
+              "required": ["path_prefix"],
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTable" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "semantic-neighbors" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "target_kind": { "type": "string", "enum": ["chunk", "concept"] },
+                "target_id": { "type": "string", "minLength": 1, "description": "Chunk id (path#kind:symbol:Lx-Ly form) or concept prefLabel key, matching embeddings ids / concept_embedding_ids." },
+                "k": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+              },
+              "required": ["target_kind", "target_id"],
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForNeighborList" }
+          }
+        },
+        {
+          "properties": {
+            "component_id": { "const": "enrichment-cards" },
+            "params": {
+              "type": "object",
+              "properties": {
+                "kind": { "type": "string", "enum": ["file_summary", "concept_description", "schema_purpose"], "default": "file_summary", "description": "Closed set = cbml4 enrichment kinds persisted in enrichments.jsonl / cbml4:* predicates." },
+                "path_prefix": { "$ref": "#/$defs/RepoRelativePath" },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 50 }
+              },
+              "additionalProperties": false
+            },
+            "renderer": { "$ref": "#/$defs/RenderersForTextCards" }
+          }
+        }
+      ]
+    },
+
+    "EvidenceTier": {
+      "type": "string",
+      "enum": ["fact", "derived", "unverified"],
+      "description": "fact = mechanically extracted (L1 inventory/graph, L2 chunks, xrefs, ast items, manifest). derived = deterministic computation over facts (L3 concepts, embeddings, similarity). unverified = LLM-authored (L4 enrichment, llm narrative). Closed; renderers MUST NOT upgrade a tier."
+    },
+
+    "BundleLayer": {
+      "type": "string",
+      "enum": ["manifest", "l1_inventory", "l2_chunks", "l2_embeddings", "l3_concepts", "l4_enrichment", "xrefs", "ast_items", "blobs"],
+      "description": "Addressable persisted layers of a bundle. Components declare requirements against this set; executors emit layer_absent degradations instead of failing silently."
+    },
+
+    "DegradationNotice": {
+      "type": "object",
+      "description": "Disclosed degradation. An executor that cannot fully answer MUST say so here — silent partial results are a design defect.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["layer_absent", "artifact_missing", "hash_mismatch", "row_limit_truncated", "walltime_exceeded", "resolver_partial"]
+        },
+        "message": { "type": "string", "minLength": 1 },
+        "layer": { "$ref": "#/$defs/BundleLayer" }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    },
+
+    "NumericMetric": {
+      "type": "object",
+      "properties": {
+        "metric_kind": { "const": "numeric" },
+        "key": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" },
+        "unit": { "type": "string", "enum": ["count", "bytes", "milliseconds", "ratio", "lines"], "description": "Mandatory unit for numeric metrics." }
+      },
+      "required": ["metric_kind", "key", "label", "value", "unit"],
+      "additionalProperties": false
+    },
+    "TextMetric": {
+      "type": "object",
+      "properties": {
+        "metric_kind": { "const": "text" },
+        "key": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "value": { "type": "string" }
+      },
+      "required": ["metric_kind", "key", "label", "value"],
+      "additionalProperties": false
+    },
+
+    "TreeNode": {
+      "type": "object",
+      "description": "Strict tree (x-graph-constraint: no cycles; children compose into their parent and die with it).",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "count": { "$ref": "#/$defs/PositiveCount" },
+        "size_bytes": { "type": "integer", "minimum": 0, "description": "x-unit: bytes." },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/TreeNode" }, "description": "x-ordering: significant (render order)." }
+      },
+      "required": ["id", "label", "children"],
+      "additionalProperties": false
+    },
+
+    "ResultData": {
+      "description": "Shape-discriminated result payload. The 'shape' tag is the discriminator; renderers dispatch on it, never on component_id.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "metric_group" },
+            "metrics": {
+              "type": "array",
+              "items": { "oneOf": [{ "$ref": "#/$defs/NumericMetric" }, { "$ref": "#/$defs/TextMetric" }] },
+              "minItems": 1,
+              "maxItems": 24
+            }
+          },
+          "required": ["shape", "metrics"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "distribution" },
+            "dimension": { "type": "string", "minLength": 1, "description": "Predicate/attribute the entries partition, e.g. 'cbm:language'." },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string", "minLength": 1 },
+                  "count": { "$ref": "#/$defs/PositiveCount" },
+                  "weight_bytes": { "type": "integer", "minimum": 0, "description": "Optional byte weight when the dimension aggregates sizes. x-unit: bytes." }
+                },
+                "required": ["key", "count"],
+                "additionalProperties": false
+              },
+              "description": "x-ordering: significant — descending count."
+            }
+          },
+          "required": ["shape", "dimension", "entries"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "ranked_list" },
+            "rank_by": { "type": "string", "minLength": 1 },
+            "unit": { "type": "string", "enum": ["count", "bytes", "milliseconds", "ratio", "lines"] },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rank": { "type": "integer", "minimum": 1 },
+                  "id": { "type": "string", "minLength": 1, "description": "IRI, path, or label key of the ranked entity." },
+                  "label": { "type": "string", "minLength": 1 },
+                  "value": { "type": "number" }
+                },
+                "required": ["rank", "id", "label", "value"],
+                "additionalProperties": false
+              },
+              "description": "x-ordering: significant — ascending rank."
+            }
+          },
+          "required": ["shape", "rank_by", "unit", "items"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "table" },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string", "minLength": 1 },
+                  "label": { "type": "string", "minLength": 1 },
+                  "col_type": { "type": "string", "enum": ["string", "integer", "number", "boolean", "iri", "datetime"] }
+                },
+                "required": ["key", "label", "col_type"],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 20,
+              "description": "x-ordering: significant."
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": ["string", "number", "boolean", "null"], "description": "Cell; null = value absent in the graph (OPTIONAL match), typed per column." }
+              },
+              "description": "Each row array is positionally aligned with columns."
+            }
+          },
+          "required": ["shape", "columns", "rows"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "edge_list" },
+            "edge_kind": {
+              "type": "string",
+              "enum": ["imports", "imports_external", "tests", "calls", "subclass_of", "overrides", "declares_dependency", "pins_dependency", "related"],
+              "description": "Closed union of persisted edge predicates (cbm:imports, cbm:importsExternal, cbm:tests, xrefs kinds, dependency edges, skos:related)."
+            },
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "src": { "type": "string", "minLength": 1 },
+                  "dst": { "type": "string", "minLength": 1 },
+                  "weight": { "type": "number", "description": "Optional multiplicity/count; absent = 1." },
+                  "resolution": { "type": "string", "enum": ["exact", "heuristic", "unresolved"], "description": "Present only for xref-backed edges." }
+                },
+                "required": ["src", "dst"],
+                "additionalProperties": false
+              },
+              "description": "x-ordering: insignificant (a set). Cycles permitted — import/call graphs are cyclic in general; renderers must tolerate them."
+            }
+          },
+          "required": ["shape", "edge_kind", "edges"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "tree" },
+            "root": { "$ref": "#/$defs/TreeNode" }
+          },
+          "required": ["shape", "root"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "matrix" },
+            "row_labels": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "x-ordering: significant." },
+            "col_labels": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "x-ordering: significant." },
+            "cells": {
+              "type": "array",
+              "items": { "type": "array", "items": { "type": "number" } },
+              "description": "Row-major; cells[i][j] aligns with (row_labels[i], col_labels[j])."
+            }
+          },
+          "required": ["shape", "row_labels", "col_labels", "cells"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "timeline" },
+            "bucket": { "type": "string", "enum": ["month", "quarter", "year"] },
+            "points": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "period_start": { "type": "string", "format": "date", "description": "ISO 8601 date, first day of the bucket, UTC." },
+                  "count": { "$ref": "#/$defs/PositiveCount" }
+                },
+                "required": ["period_start", "count"],
+                "additionalProperties": false
+              },
+              "description": "x-ordering: significant — chronological."
+            }
+          },
+          "required": ["shape", "bucket", "points"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "text_cards" },
+            "cards": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "description": "LLM-authored card. Provenance is mandatory and immutable — a card without model + prompt_sha + generated_at is invalid by construction.",
+                "properties": {
+                  "target_id": { "type": "string", "minLength": 1, "description": "File path or concept key the text is about." },
+                  "title": { "type": "string", "minLength": 1 },
+                  "body_text": { "type": "string", "minLength": 1 },
+                  "model": { "type": "string", "minLength": 1 },
+                  "prompt_sha": { "$ref": "#/$defs/Sha256Hex" },
+                  "generated_at": { "$ref": "#/$defs/IsoDateTimeUtc" }
+                },
+                "required": ["target_id", "title", "body_text", "model", "prompt_sha", "generated_at"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["shape", "cards"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "neighbor_list" },
+            "target_id": { "type": "string", "minLength": 1 },
+            "metric": { "const": "cosine", "description": "v1 fixes cosine over the persisted normalized embedding space." },
+            "neighbors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "minLength": 1 },
+                  "label": { "type": "string" },
+                  "similarity": { "type": "number", "minimum": -1, "maximum": 1 }
+                },
+                "required": ["id", "similarity"],
+                "additionalProperties": false
+              },
+              "description": "x-ordering: significant — descending similarity."
+            }
+          },
+          "required": ["shape", "target_id", "metric", "neighbors"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shape": { "const": "validation_report" },
+            "checks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check_id": { "type": "string", "minLength": 1 },
+                  "status": { "type": "string", "enum": ["pass", "fail", "warn", "not_applicable"] },
+                  "detail": { "type": "string" },
+                  "affected": { "type": "array", "items": { "type": "string" }, "description": "Ids (paths/IRIs) the check flags. x-ordering: insignificant." }
+                },
+                "required": ["check_id", "status"],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            }
+          },
+          "required": ["shape", "checks"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "ResultEnvelope": {
+      "type": "object",
+      "description": "Execution output for one block. Validate instances against '#/$defs/ResultEnvelope'. evidence_tier is copied from the component definition (source of truth: the catalog) and MUST NOT be upgraded downstream; it is denormalized here (x-denormalized-from: catalog) so a rendered figure is self-describing.",
+      "properties": {
+        "schema_version": { "type": "string", "const": "1.0.0" },
+        "block_id": { "$ref": "#/$defs/Uuid" },
+        "component_id": { "type": "string", "minLength": 1, "description": "FK → ReportBlock.component_id (catalog id)." },
+        "bundle": { "$ref": "#/$defs/BundleRef" },
+        "params_hash": { "$ref": "#/$defs/Sha256Hex", "description": "SHA-256 of the canonical (sorted-keys, UTF-8) JSON of the resolved params, defaults applied. Cache key together with bundle.manifest_sha256." },
+        "evidence_tier": { "$ref": "#/$defs/EvidenceTier" },
+        "executed_at": { "$ref": "#/$defs/IsoDateTimeUtc" },
+        "duration_ms": { "type": "integer", "minimum": 0, "description": "x-unit: milliseconds." },
+        "degradations": { "type": "array", "items": { "$ref": "#/$defs/DegradationNotice" }, "description": "Empty array = executed with full fidelity. x-ordering: insignificant." },
+        "data": { "$ref": "#/$defs/ResultData" }
+      },
+      "required": ["schema_version", "block_id", "component_id", "bundle", "params_hash", "evidence_tier", "executed_at", "duration_ms", "degradations", "data"],
+      "additionalProperties": false
+    }
+  }
+}

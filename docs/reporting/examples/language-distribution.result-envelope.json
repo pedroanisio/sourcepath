@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "block_id": "0a1b2c3d-1111-4aaa-8bbb-000000000003",
+  "component_id": "language-distribution",
+  "bundle": {
+    "bundle_name": "graphite",
+    "repo_name": "Graphite",
+    "commit_sha": "13abf9fa8c8d6d32f3d2745ddf537c263cc24cdf",
+    "manifest_sha256": "5ac851ec64b1c2e4f90272751b97fb58359fb9654abe7c1c320da99d66dce0d3",
+    "tool_version": "0.5.0"
+  },
+  "params_hash": "1e2ff4c66f2fa9d6589db29237e2f31d0d1d1d51043fbca66b1adf6de6c8f27a",
+  "evidence_tier": "fact",
+  "executed_at": "2026-07-09T22:31:00Z",
+  "duration_ms": 412,
+  "degradations": [],
+  "data": {
+    "shape": "distribution",
+    "dimension": "cbm:language",
+    "entries": [
+      { "key": "rust", "count": 578, "weight_bytes": 5853406 },
+      { "key": "typescript", "count": 42, "weight_bytes": 205166 },
+      { "key": "scss", "count": 24, "weight_bytes": 55218 },
+      { "key": "javascript", "count": 16, "weight_bytes": 90633 },
+      { "key": "nix", "count": 11, "weight_bytes": 16477 },
+      { "key": "html", "count": 10, "weight_bytes": 24943 },
+      { "key": "wgsl", "count": 5, "weight_bytes": 8751 },
+      { "key": "shell", "count": 1, "weight_bytes": 2574 }
+    ]
+  }
+}
