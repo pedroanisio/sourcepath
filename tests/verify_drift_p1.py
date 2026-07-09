@@ -191,6 +191,11 @@ ENV_INVENTORY_EXCLUSIONS: set[str] = {
 def _scan_env_reads() -> set[str]:
     found: set[str] = set()
     name_re = re.compile(r'os\.environ(?:\.get)?\(["\']([A-Z][A-Z0-9_]*)["\']')
+    # ALSO recognize the `*_from_env` helper convention: functions whose
+    # name ends in `_from_env` take the env-var name as a string-literal
+    # first argument and read os.environ internally — e.g.
+    # _workers_from_env("CBM_EXTRACT_WORKERS", default).
+    helper_re = re.compile(r'_from_env\(\s*["\']([A-Z][A-Z0-9_]*)["\']')
     # ALSO follow MODULE_LEVEL constants like JWT_AUDIENCE_ENV = "CBM_..."
     # consumed via os.environ.get(NAME). MULTILINE so `^` anchors to each
     # line, not just the start of the file.
@@ -201,7 +206,7 @@ def _scan_env_reads() -> set[str]:
 
     indirect_alias: dict[str, str] = {}
     for path in REPO_ROOT.rglob("*.py"):
-        if any(part in {"__pycache__", ".venv", "_tmp", "node_modules"}
+        if any(part in {"__pycache__", ".venv", "_tmp", "node_modules", ".claude"}
                for part in path.parts):
             continue
         try:
@@ -210,13 +215,15 @@ def _scan_env_reads() -> set[str]:
             continue
         for m in name_re.finditer(text):
             found.add(m.group(1))
+        for m in helper_re.finditer(text):
+            found.add(m.group(1))
         for m in indirect_re.finditer(text):
             indirect_alias[m.group(1)] = m.group(2)
 
     # Resolve indirect aliases: os.environ.get(JWT_AUDIENCE_ENV) → CBM_MCP_JWT_AUDIENCE
     indirect_use_re = re.compile(r'os\.environ(?:\.get)?\(([A-Z][A-Z0-9_]*_ENV)\b')
     for path in REPO_ROOT.rglob("*.py"):
-        if any(part in {"__pycache__", ".venv", "_tmp", "node_modules"}
+        if any(part in {"__pycache__", ".venv", "_tmp", "node_modules", ".claude"}
                for part in path.parts):
             continue
         try:

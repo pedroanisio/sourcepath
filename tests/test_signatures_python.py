@@ -20,6 +20,10 @@ Run: python -m pytest tests/test_signatures_python.py
 """
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 from plugins.chunks_embeddings.chunker import _chunk_python
 
 
@@ -115,6 +119,11 @@ def test_plain_class_omits_bases():
     assert "bases" not in c
 
 
+@pytest.mark.skipif(sys.version_info < (3, 12),
+                    reason="PEP 695 type-parameter syntax needs the 3.12+ "
+                           "stdlib ast parser; on older interpreters the "
+                           "chunker's documented SyntaxError fallback "
+                           "(whole-file chunk) applies instead")
 def test_pep695_type_params():
     src = b"class Box[T]:\n    pass\n"
     c = _by_symbol(_chunk_python(src, "m.py"))["Box"]
