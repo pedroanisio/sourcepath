@@ -24,6 +24,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
 
 @dataclass
 class EvidenceGraph:
@@ -296,7 +301,6 @@ def _read_revision_markers(bundle_dir: Path) -> dict[str, dict[str, Any]]:
 
 
 def _parse_cargo_toml(text: str) -> dict[str, Any] | None:
-    import tomllib
     toml = tomllib.loads(text)
     return {
         "name": (toml.get("package") or {}).get("name"),
@@ -316,7 +320,6 @@ def _pep508_name(spec: str) -> str | None:
 
 
 def _parse_pyproject_toml(text: str) -> dict[str, Any] | None:
-    import tomllib
     toml = tomllib.loads(text)
     project = toml.get("project") or {}
     poetry = ((toml.get("tool") or {}).get("poetry")) or {}
