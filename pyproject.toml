@@ -62,6 +62,10 @@ site = [
     "markdown-it-py",
     "Pygments",
 ]
+# A4 PDF dossier renderer (scripts/cbm_dossier.py, on top of scripts/cbm_report.py).
+dossier = [
+    "reportlab",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
