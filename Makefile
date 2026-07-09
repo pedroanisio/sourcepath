@@ -46,7 +46,8 @@ CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_l3.py \
 	$(TESTS_DIR)/verify_xrefs.py \
 	$(TESTS_DIR)/verify_repository_summary.py \
-	$(TESTS_DIR)/verify_ast_coverage.py
+	$(TESTS_DIR)/verify_ast_coverage.py \
+	$(TESTS_DIR)/verify_progress.py
 
 VOCAB_VERIFIERS := \
 	$(TESTS_DIR)/verify_vocab.py \

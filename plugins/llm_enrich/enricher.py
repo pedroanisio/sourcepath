@@ -34,10 +34,11 @@ registration at all.
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+
+from codebase_mapper.shared_kernel.progress import ProgressReporter
 
 from .cache import Cache, hash_text
 from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
@@ -108,12 +109,15 @@ class LlmEnricher:
     # skipped without further attempts. Reset on next process.
     _disabled: bool = field(default=False, init=False, repr=False)
 
-    # Running count of file_summary enrichments actually produced this
-    # run (progress indicator). No "/total" — enrich() is called once per
-    # record by the host's streaming RecordEnricher loop, which never
-    # tells a plugin how many records are left to see, so a denominator
-    # here would be a guess, not a fact.
-    _count: int = field(default=0, init=False, repr=False)
+    # Throttled progress heartbeat. Created lazily on the first file we
+    # actually summarize; its total is the count of *eligible* records
+    # (this enricher's own _should_summarize gate applied to ctx.records),
+    # so file_summary shows a real "i/total (pct%)" + ETA rather than a
+    # bare running count. The streaming RecordEnricher loop doesn't hand
+    # the plugin a total, but ctx.records is available, so the plugin
+    # derives its own — honestly, from the same gate it enriches by.
+    _reporter: ProgressReporter | None = field(
+        default=None, init=False, repr=False)
 
     # ----------------------------------------------------------------
 
@@ -199,9 +203,12 @@ class LlmEnricher:
             self._disabled = True
             return
 
-        self._count += 1
-        print(f"[L4] file_summary  #{self._count}  {record.path}"
-              f"{'  (cached)' if was_hit else ''}", file=sys.stderr)
+        if self._reporter is None:
+            eligible = sum(1 for rec in ctx.records
+                           if self._should_summarize(rec))
+            self._reporter = ProgressReporter(
+                "[L4] file_summary", total=eligible)
+        self._reporter.update(record.path, cached=was_hit)
 
         # Stash on ctx.scratch under a documented key. Step 4 reads
         # this in LlmGraphWriter.contribute; the artifact emitter

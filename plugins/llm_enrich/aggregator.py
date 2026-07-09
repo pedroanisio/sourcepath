@@ -31,11 +31,12 @@ Gating:
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
+
+from codebase_mapper.shared_kernel.progress import ProgressReporter
 
 from .cache import Cache, hash_text
 from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
@@ -166,8 +167,9 @@ class LlmAggregator:
         cache = self.cache or Cache()
         tmpl = PROMPT_REGISTRY["concept_description"]
 
-        total = len(typed)
-        for i, name in enumerate(typed, 1):
+        reporter = ProgressReporter("[L4] concept_description",
+                                    total=len(typed))
+        for name in typed:
             if self._disabled:
                 return
             meta = concepts[name]
@@ -229,8 +231,7 @@ class LlmAggregator:
                 self._disabled = True
                 return
 
-            print(f"[L4] concept_description  {i}/{total}  {name}"
-                  f"{'  (cached)' if was_hit else ''}", file=sys.stderr)
+            reporter.update(name, cached=was_hit)
             out[name] = {**record, "was_cache_hit": was_hit}
 
     # ----------------------------------------------------------------
@@ -245,8 +246,9 @@ class LlmAggregator:
         cache = self.cache or Cache()
         tmpl = PROMPT_REGISTRY["schema_purpose"]
 
-        total = len(records)
-        for i, record in enumerate(records, 1):
+        reporter = ProgressReporter("[L4] schema_purpose",
+                                    total=len(records))
+        for record in records:
             if self._disabled:
                 return
 
@@ -305,8 +307,7 @@ class LlmAggregator:
                 self._disabled = True
                 return
 
-            print(f"[L4] schema_purpose  {i}/{total}  {record.path}"
-                  f"{'  (cached)' if was_hit else ''}", file=sys.stderr)
+            reporter.update(record.path, cached=was_hit)
             out[record.path] = {**record_d, "was_cache_hit": was_hit}
 
 
