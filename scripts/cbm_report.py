@@ -785,6 +785,120 @@ footer{{margin-top:34px;border-top:1px solid var(--ink);padding-top:10px;color:v
 def sec(title, tag, body):
     return f"<section><hr/><h2 class='caps'>{ESC(title)}<span class='tag mono'>{ESC(tag)}</span></h2>{body}</section>"
 
+
+# --- Mechanical caveats (flaw map F15/F16) ---------------------------------
+# The X-ray previously printed bundle figures as bare FACT even when the
+# manifest itself proved they were distorted (91,736 import edges shown with
+# no trace of the 407,936 extracted directives). Every caveat below is
+# derived from run_manifest.json / the render's own inputs — no repo-specific
+# knowledge — so a reader of this report alone inherits the disclosures.
+
+IMPORT_RESOLUTION_FLOOR = 0.5   # resolved/extracted below this is a caveat
+PARSE_ERROR_SHARE_FLOOR = 0.10  # flagged source files above this share
+UNLANGUAGED_SHARE_FLOOR = 0.10  # files with no language above this share
+
+
+def mechanical_caveats(man, found=None):
+    """Caveat dicts ({id, severity, text}) computed from the manifest.
+
+    An empty list means the manifest crossed none of the disclosure
+    thresholds — not that nothing is wrong (PALS's Law: these are
+    threshold checks on mechanical figures, not a verification).
+    """
+    caveats = []
+    counts = man.get("counts") or {}
+    cov = man.get("ast_coverage") or {}
+    totals = cov.get("totals") or {}
+
+    extracted = totals.get("imports_extracted") or 0
+    resolved = counts.get("import_edges") or 0
+    if extracted and resolved / extracted < IMPORT_RESOLUTION_FLOOR:
+        caveats.append({
+            "id": "import_resolution", "severity": "serious",
+            "text": (f"The import graph resolves {resolved:,} of "
+                     f"{extracted:,} extracted directives "
+                     f"({resolved / extracted:.0%}). Coupling, centrality and "
+                     f"blast-radius figures understate reality."),
+        })
+
+    n_source = cov.get("n_source_files") or totals.get("files") or 0
+    flagged = totals.get("files_with_parse_errors") or 0
+    if n_source and flagged / n_source > PARSE_ERROR_SHARE_FLOOR:
+        nodes = totals.get("parse_error_nodes")
+        caveats.append({
+            "id": "parse_errors", "severity": "warning",
+            "text": (f"{flagged:,} of {n_source:,} source files "
+                     f"({flagged / n_source:.0%}) carry tree-sitter parse "
+                     f"errors" + (f" ({nodes:,} error nodes)" if nodes else "")
+                     + "; symbol and import counts from them are partial."),
+        })
+
+    by_lang = man.get("files_by_language") or {}
+    n_files = counts.get("files") or 0
+    unlang = by_lang.get("(none)") or 0
+    if n_files and unlang / n_files > UNLANGUAGED_SHARE_FLOOR:
+        caveats.append({
+            "id": "unlanguaged_files", "severity": "warning",
+            "text": (f"{unlang:,} of {n_files:,} files "
+                     f"({unlang / n_files:.0%}) have no language "
+                     f"classification and carry no per-language facts."),
+        })
+
+    l3 = (man.get("extensions") or {}).get("l3_40_concepts_artifact") or {}
+    gap = l3.get("n_concepts_without_embedding") or 0
+    if gap:
+        caveats.append({
+            "id": "concept_embedding_gap", "severity": "warning",
+            "text": (f"{gap:,} of {l3.get('n_concepts', 0):,} concepts have "
+                     f"no centroid vector (no embedded chunk in their "
+                     f"lexicalizing files); semantic-neighbor results skip "
+                     f"them."),
+        })
+
+    if "degradations" not in man:
+        caveats.append({
+            "id": "degradations_unknown", "severity": "warning",
+            "text": ("This manifest predates degradation disclosure: whether "
+                     "any layer self-disabled during the run is unknown."),
+        })
+    else:
+        for d in man["degradations"]:
+            caveats.append({
+                "id": "degradation", "severity": "serious",
+                "text": (f"Layer degradation recorded: "
+                         f"{d.get('component', '?')} — "
+                         f"{d.get('reason', '?')}"
+                         + (f", affecting {d['affected_files']:,} files"
+                            if d.get("affected_files") else "")
+                         + (f", {d['skipped']:,} records skipped"
+                            if d.get("skipped") else "") + "."),
+            })
+
+    for name in ("abox", "decomposition", "buildplan"):
+        if found is not None and not found.get(name):
+            caveats.append({
+                "id": f"companion_missing_{name}", "severity": "note",
+                "text": (f"Rendered without the {name} input — the "
+                         f"corresponding layer reads as absent, not as "
+                         f"nonexistent. Pass --{name} to wire it in."),
+            })
+    return caveats
+
+
+def caveats_html(caveats):
+    if not caveats:
+        return sec("Data caveats", "FACT",
+                   "<p class='fine'>No mechanical caveats: the manifest "
+                   "crossed none of the disclosure thresholds.</p>")
+    rows = "".join(
+        f"<li><b class='caps'>{ESC(c['severity'])}</b> · {ESC(c['text'])}</li>"
+        for c in caveats)
+    return sec("Data caveats", "FACT",
+               "<p class='fine'>Derived from run_manifest.json and the "
+               "render inputs — read every figure below through these.</p>"
+               f"<ul>{rows}</ul>")
+
+
 def emit_html(M, out):
     man = M["manifest"]; G = M["graph"]
     hv = M["hash_rows"]; ok = sum(1 for r in hv if r["ok"]); tot = sum(1 for r in hv if r["ok"] is not None)
@@ -808,6 +922,10 @@ def emit_html(M, out):
         ("rebuild steps", (M.get("build") or {}).get("n_steps", 0)),
         ("L4 receipts", (M.get("enrich") or {}).get("n", 0))])
     body = [head, f"<div class='counters'>{counters}</div>"]
+
+    # Caveats come first: every figure below must be read through them.
+    body.append(caveats_html(M.get("caveats") or
+                             mechanical_caveats(man, M.get("found"))))
 
     rows = "".join(f"<tr><td class='mono'>{ESC(r['artifact'])}</td><td class='mono'>{ESC(r['claimed'])}…</td>"
                    f"<td class='num'>{'match' if r['ok'] else ('<span class=unv>MISMATCH</span>' if r['ok'] is False else 'n/a')}</td></tr>"
@@ -1006,6 +1124,14 @@ generated_by: cbm_report.py
 **Verification (FACT).** Input hashes independently recomputed: **{ok}/{tot} match**.
 SHACL self-check (manifest): {man.get('shacl_self_check',{}).get('conforms')}."""
     + (f" Independent re-validation: **{'conforms' if M['shacl_independent'][0] else 'VIOLATIONS'}** ({M['shacl_independent'][1]:.0f}s)." if M.get('shacl_independent') else ""))
+    caveats = M.get("caveats") or mechanical_caveats(man, M.get("found"))
+    if caveats:
+        L.append("\n**Data caveats (FACT).** Read every figure through these:\n"
+                 + "\n".join(f"- **{c['severity']}** — {c['text']}"
+                             for c in caveats))
+    else:
+        L.append("\n**Data caveats (FACT).** None: the manifest crossed no "
+                 "disclosure threshold.")
     c = man.get("counts", {})
     L.append(f"\n**Headline counts.** files {c.get('files',0):,} · triples {G['triples']:,} · "
              f"import edges {G['edges']:,} · parts {(M.get('decomp') or {}).get('n_parts',0)} · "
@@ -1088,6 +1214,7 @@ def main(argv=None):
          "repo": man.get("repo_name") or os.path.basename(a.bundle.rstrip("/")),
          "commit": man.get("commit_sha", ""),
          "found": {k: bool(v) for k, v in found.items()}}
+    M["caveats"] = mechanical_caveats(man, found)
     M["hash_rows"] = verify_hashes(a.bundle, man, found)
     if found.get("blobs_dir"):
         M["blobs"] = {"on_disk": len(os.listdir(found["blobs_dir"])),
