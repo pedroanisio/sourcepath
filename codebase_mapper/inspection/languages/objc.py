@@ -32,8 +32,11 @@ Public surface:
 """
 from __future__ import annotations
 
+import re
+
 from collections import defaultdict
 from pathlib import PurePosixPath
+from typing import Callable
 
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _ts_setup, TS_AVAILABLE, ts
@@ -43,6 +46,81 @@ from ._treewalk import find_named_descendant, iter_named_pre_order
 # Objective-C dialect tags we accept. Both share the same grammar and
 # analyzer; the resolver / chunker dispatch on either.
 OBJC_LANGUAGE_TAGS = frozenset({"objective-c", "objective-cpp"})
+
+
+# ---------------------------------------------------------------------------
+# Content sniffs — ``.m`` dialect disambiguation and ObjC header evidence
+# ---------------------------------------------------------------------------
+#
+# The ``.m`` extension is claimed by both Objective-C and MATLAB/GNU Octave
+# (observed in the wild: the Linux kernel ships exactly one ``.m`` file,
+# ``tools/testing/selftests/cgroup/memcg_protection.m``, and it is an Octave
+# script). Extension-only tagging therefore over-claims; these sniffs follow
+# the same disambiguation approach GitHub Linguist uses for ``.m``
+# (line-anchored ObjC directives vs ``%`` comments / ``function`` defs).
+
+# Positive Objective-C evidence: ObjC-specific compiler directives at line
+# start. Deliberately EXCLUDES markers shared with plain C (``#include``,
+# ``//``, ``/*``) — this set must be strong enough to retag a ``.h`` file
+# that plain-C headers can never match.
+_OBJC_EVIDENCE_RE = re.compile(
+    rb"^\s*(?:#\s*import\b"
+    rb"|@(?:interface|implementation|protocol|end|class|property"
+    rb"|optional|required|import|synthesize|dynamic)\b)",
+    re.MULTILINE,
+)
+
+# C-family markers that make a ``.m`` file plausibly ObjC even without the
+# directives above (preprocessor lines, C comments). MATLAB/Octave uses
+# ``%`` comments and no preprocessor, so none of these occur at line start
+# in a MATLAB script.
+_C_FAMILY_RE = re.compile(
+    rb"^\s*(?:#\s*(?:include|define|if|ifdef|ifndef|pragma|endif)\b|//|/\*)",
+    re.MULTILINE,
+)
+
+# MATLAB / GNU Octave signals: ``%`` line comments (also covers ``%%`` cell
+# markers and ``%{`` block comments) and MATLAB-style function definitions —
+# ``function name(...)``, ``function out = name(...)``,
+# ``function [a, b] = name(...)``.
+_MATLAB_SIGNAL_RE = re.compile(
+    rb"^\s*(?:%"
+    rb"|function\s+(?:\[[^\]\n]*\]\s*=\s*|[A-Za-z_]\w*\s*=\s*)?"
+    rb"[A-Za-z_]\w*\s*\()",
+    re.MULTILINE,
+)
+
+
+def has_objc_markers(content: bytes) -> bool:
+    """True when *content* carries positive Objective-C evidence — an
+    ObjC-specific directive (``#import``, ``@interface``, ``@protocol``,
+    ``@end``, ...) at the start of a line. Markers shared with plain C
+    (``#include``, ``//`` comments) do NOT count: this predicate gates the
+    retagging of ``.h`` files that plain-C headers must never trip."""
+    return _OBJC_EVIDENCE_RE.search(content) is not None
+
+
+def dot_m_is_objc(content_head: bytes) -> bool:
+    """Sniff a ``.m`` file's dialect: Objective-C vs MATLAB/GNU Octave.
+
+    Decision order:
+
+      1. Any ObjC directive or C-family marker (preprocessor line, ``//`` or
+         ``/*`` comment) at line start → Objective-C.
+      2. Otherwise, any MATLAB/Octave signal (``%`` line comment,
+         ``function`` definition) → NOT Objective-C.
+      3. Otherwise (empty / no evidence either way) → Objective-C, the
+         extension default.
+
+    This is a heuristic over the content head, not a parse; precedence
+    resolves mixed signals in favor of ObjC because ``%`` can appear inside
+    ObjC string literals while ObjC directives cannot appear in MATLAB.
+    """
+    if _OBJC_EVIDENCE_RE.search(content_head) or _C_FAMILY_RE.search(content_head):
+        return True
+    if _MATLAB_SIGNAL_RE.search(content_head):
+        return False
+    return True
 
 
 def _node_text(node, content: bytes) -> str:
@@ -551,7 +629,10 @@ def extract_objc_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
 # ---------------------------------------------------------------------------
 
 
-def refine_objc_header_languages(records: list[FileRecord]) -> None:
+def refine_objc_header_languages(
+    records: list[FileRecord],
+    read_content: Callable[[str], bytes] | None = None,
+) -> None:
     """In-place: re-tag ``.h`` files as ``language="objective-c"`` when
     the project contains ObjC source files (``.m``/``.mm``).
 
@@ -560,9 +641,19 @@ def refine_objc_header_languages(records: list[FileRecord]) -> None:
     / ``@protocol`` / ``#import``; routing those headers to the ObjC
     analyzer is mandatory for Tier-1 coverage.
 
-    Sibling rule first (catches ``Foo.h`` + ``Foo.m`` co-residence);
-    project-wide rule second (covers ``include/`` vs ``src/`` splits)
-    suppressed by a co-resident ``.c`` file at the same directory.
+    Two rules, in order:
+
+      1. Sibling rule — a ``.h`` in a directory that contains ObjC
+         sources is retagged unconditionally (catches ``Foo.h`` +
+         ``Foo.m`` co-residence).
+      2. Project-wide fallback — covers ``include/`` vs ``src/`` splits.
+         It requires ALL of: no co-resident ``.c`` file in the header's
+         directory, AND positive ObjC evidence inside the header itself
+         (``has_objc_markers`` on the content served by *read_content*).
+         Without a content reader the fallback is inert: no evidence
+         available means no retag. (Regression guard: a single stray
+         ``.m`` file — e.g. the Linux kernel's one Octave script — must
+         never flip thousands of header-only-directory C headers.)
 
     Runs BEFORE the C++ retag so that in mixed Apple repos (which is
     rare but possible — e.g. macOS apps mixing ObjC and C++) ObjC takes
@@ -592,7 +683,14 @@ def refine_objc_header_languages(records: list[FileRecord]) -> None:
         if d in objc_dirs:
             r.language = "objective-c"
             continue
-        if d not in c_source_dirs:
+        if d in c_source_dirs or read_content is None:
+            continue
+        try:
+            content = read_content(r.path)
+        except (KeyError, OSError):
+            # No content available for this path — no evidence, no retag.
+            continue
+        if has_objc_markers(content):
             r.language = "objective-c"
 
 

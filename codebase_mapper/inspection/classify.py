@@ -7,6 +7,7 @@ import re
 from pathlib import Path, PurePosixPath
 
 from ..shared_kernel.constants import ASSET_EXT, DATA_EXT, LANG_BY_EXT, MAN_PAGE_EXTS
+from .languages.objc import dot_m_is_objc
 from .models import FileRecord
 
 
@@ -325,9 +326,19 @@ def classify(path: str, content_head: bytes) -> str:
         return "source_code"
     return "unknown"
 
-def language_of(path: str) -> str | None:
+def language_of(path: str, content_head: bytes = b"") -> str | None:
     p = PurePosixPath(path)
-    lang = LANG_BY_EXT.get(p.suffix.lower())
+    suffix = p.suffix.lower()
+    lang = LANG_BY_EXT.get(suffix)
+    # ``.m`` is claimed by both Objective-C and MATLAB/GNU Octave. The
+    # extension default is ObjC; when the caller supplies a content head,
+    # disambiguate by sniff (ObjC/C-family markers win; ``%`` comments /
+    # ``function`` defs with no C-family markers mean MATLAB). A stray
+    # Octave script tagged "objective-c" would otherwise switch on the
+    # project-wide ObjC header retag (refine_objc_header_languages).
+    if lang == "objective-c" and suffix == ".m" and content_head:
+        if not dot_m_is_objc(content_head):
+            return "matlab"
     # config.ru and Rakefile etc. — extensionless Ruby files
     if lang is None and p.name in {"Rakefile", "Gemfile", "config.ru"}:
         return "ruby"
