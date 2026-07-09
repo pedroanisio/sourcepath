@@ -239,6 +239,14 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
         # Provenance of the serialization itself: which engine produced
         # the artifact (oxigraph fast path vs rdflib fallback).
         "emit_engines": {"inventory.ttl": inv_engine},
+        # Degradation disclosures registered by any layer during the run
+        # (shallow-clone provenance, LLM self-disable, ...). Always
+        # present: an empty list is the healthy-run statement, so absence
+        # can never be misread as health (PALS's Law).
+        "degradations": (
+            list(ctx.scratch.get("degradations", []))
+            if ctx is not None else []
+        ),
     }
     if extension_fragments:
         manifest["extensions"] = extension_fragments

@@ -131,6 +131,27 @@ class LlmAggregator:
 
     # ----------------------------------------------------------------
 
+    def _disable_with_disclosure(
+        self, ctx: "PipelineCtx", kind: str, error: str, skipped: int,
+    ) -> None:
+        """Self-disable and register the degradation on ctx.scratch.
+
+        Mirrors LlmEnricher._disable: a layer that stops producing must
+        leave a machine-readable record of its blast radius — the manifest
+        emitter surfaces ctx.scratch["degradations"] (PALS's Law). The
+        aggregator runs single-threaded, so no lock is needed here.
+        """
+        from plugins.llm_enrich.enricher import ERROR_EXCERPT_CHARS
+
+        self._disabled = True
+        ctx.scratch.setdefault("degradations", []).append({
+            "component": "llm_enrich",
+            "reason": "client_failure_self_disabled",
+            "kind": kind,
+            "skipped": skipped,
+            "error": error[:ERROR_EXCERPT_CHARS],
+        })
+
     def _do_concept_descriptions(
         self, ctx: "PipelineCtx", out: dict[str, dict],
     ) -> None:
@@ -169,7 +190,7 @@ class LlmAggregator:
 
         reporter = ProgressReporter("[L4] concept_description",
                                     total=len(typed))
-        for name in typed:
+        for idx, name in enumerate(typed):
             if self._disabled:
                 return
             meta = concepts[name]
@@ -220,7 +241,9 @@ class LlmAggregator:
                     "concept_description for the rest of this run: %s",
                     e,
                 )
-                self._disabled = True
+                # The failed concept plus every one not yet attempted.
+                self._disable_with_disclosure(
+                    ctx, "concept_description", str(e), len(typed) - idx)
                 return
             except OllamaModelMissing as e:
                 _log.warning(
@@ -228,7 +251,8 @@ class LlmAggregator:
                     "concept_description for the rest of this run: %s",
                     self.model, e,
                 )
-                self._disabled = True
+                self._disable_with_disclosure(
+                    ctx, "concept_description", str(e), len(typed) - idx)
                 return
 
             reporter.update(name, cached=was_hit)
@@ -248,7 +272,7 @@ class LlmAggregator:
 
         reporter = ProgressReporter("[L4] schema_purpose",
                                     total=len(records))
-        for record in records:
+        for idx, record in enumerate(records):
             if self._disabled:
                 return
 
@@ -296,7 +320,8 @@ class LlmAggregator:
                     "llm_enrich: Ollama unreachable, disabling "
                     "schema_purpose for the rest of this run: %s", e,
                 )
-                self._disabled = True
+                self._disable_with_disclosure(
+                    ctx, "schema_purpose", str(e), len(records) - idx)
                 return
             except OllamaModelMissing as e:
                 _log.warning(
@@ -304,7 +329,8 @@ class LlmAggregator:
                     "schema_purpose for the rest of this run: %s",
                     self.model, e,
                 )
-                self._disabled = True
+                self._disable_with_disclosure(
+                    ctx, "schema_purpose", str(e), len(records) - idx)
                 return
 
             reporter.update(record.path, cached=was_hit)
