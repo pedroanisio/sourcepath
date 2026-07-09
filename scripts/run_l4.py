@@ -95,6 +95,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-llm", action="store_true",
                    help="Skip L4 entirely. Equivalent to scripts/run_l3.py "
                         "but preserved here for symmetry with --no-l2.")
+
+    # ---- emission cost controls (kernel-scale runs) ----
+    p.add_argument("--skip-shacl", action="store_true",
+                   help="Skip the pySHACL self-check. The manifest records "
+                        "the skip (shacl_self_check.skipped=true) — a "
+                        "skipped check is disclosed, never passed off as "
+                        "conforming.")
+    p.add_argument("--no-jsonld", action="store_true",
+                   help="Skip the JSON-LD serialization of the inventory "
+                        "graph (the most memory-hungry emit step on very "
+                        "large graphs). inventory.ttl remains the "
+                        "authoritative artifact.")
     args = p.parse_args(argv)
 
     # ---- Validation ----
@@ -153,10 +165,16 @@ def main(argv: list[str] | None = None) -> int:
         mapped = map_codebase(repo.path, repo.state,
                               exclude_patterns=args.exclude)
         manifest = emit(repo_name, mapped, args.out.resolve(),
-                        emit_blobs_flag=not args.no_emit_blobs)
+                        emit_blobs_flag=not args.no_emit_blobs,
+                        validate_shacl=not args.skip_shacl,
+                        emit_jsonld=not args.no_jsonld)
     _print_l4_summary(manifest)
     print(json.dumps(manifest, indent=2, sort_keys=True))
-    return 0 if manifest.get("shacl_self_check", {}).get("conforms") else 1
+    sc = manifest.get("shacl_self_check", {})
+    # A skipped self-check (--skip-shacl) is a disclosed cost decision,
+    # not a validation failure; only a run that validated and did not
+    # conform exits non-zero.
+    return 0 if (sc.get("conforms") or sc.get("skipped")) else 1
 
 
 def _parse_scopes(raw: str, *, parser: argparse.ArgumentParser) -> tuple[str, ...]:

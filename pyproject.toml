@@ -28,6 +28,11 @@ dependencies = [
     "tree-sitter-typescript",
     "numpy",
     "sentence-transformers",
+    # Rust-backed RDF engine for inventory serialization: 67M triples
+    # (torvalds/linux) serialize to Turtle in ~40 s / ~24 GB vs tens of
+    # minutes / >100 GB via rdflib alone. emit() degrades gracefully to
+    # rdflib when absent, but at kernel scale this is not optional.
+    "pyoxigraph",
     "pyyaml",
     "tomli; python_version < '3.11'",
 ]

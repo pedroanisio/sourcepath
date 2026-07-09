@@ -15,6 +15,7 @@ from ...shared_kernel.constants import CBMI_NS, TOOL_VERSION, VOCABULARY_VERSION
 from ...shared_kernel.extensions import (
     iter_artifact_emitters, iter_graph_contributors, iter_shape_contributors,
 )
+from ..infrastructure.rdf.fast_serializer import serialize_inventory
 from ..infrastructure.rdf.rdflib_emitter import (
     build_inventory_graph,
     build_ontology_mapping_graph,
@@ -24,7 +25,17 @@ from ...inspection.tests_edges import count_rust_inline_test_files
 from ...inspection.coverage import aggregate_coverage
 
 
-def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = True) -> dict:
+def emit(repo_name: str, mapped: dict, out_dir: Path,
+         emit_blobs_flag: bool = True, *,
+         validate_shacl: bool = True, emit_jsonld: bool = True) -> dict:
+    """Serialize the mapped repository into the bundle directory.
+
+    ``validate_shacl=False`` skips the pySHACL self-check and
+    ``emit_jsonld=False`` skips the JSON-LD serialization — both are
+    cost controls for very large graphs, and both are disclosed in the
+    manifest rather than silently absent (PALS's Law: a skipped check
+    must never read as a passed one).
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     repo_iri = URIRef(f"{CBMI_NS}repo/{repo_name}")
     inv = build_inventory_graph(
@@ -51,31 +62,45 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
     shapes_path = out_dir / "shapes.shacl.ttl"
     jsonld_path = out_dir / "inventory.jsonld"
     mapping_path = out_dir / "ontology-mapping.ttl"
-    inv.serialize(destination=str(inv_path), format="turtle")
+    # The inventory graph is the only artifact that reaches tens of
+    # millions of triples; it goes through the Rust-backed fast path.
+    # Shapes and ontology mapping are tiny — rdflib native is fine.
+    inv_engine = serialize_inventory(inv, inv_path)
     shapes.serialize(destination=str(shapes_path), format="turtle")
-    inv.serialize(destination=str(jsonld_path), format="json-ld",
-                  auto_compact=True, indent=2, sort_keys=True)
     mapping.serialize(destination=str(mapping_path), format="turtle")
 
-    # JSON-LD post-sort for byte-stable determinism
-    try:
-        doc = json.loads(jsonld_path.read_text())
+    if emit_jsonld:
+        # Serialize to a string and canonicalize before the only write —
+        # the old write→read-back→re-sort→rewrite flow put the whole
+        # document on disk and back through memory twice.
+        data = inv.serialize(format="json-ld", auto_compact=True,
+                             indent=2, sort_keys=True)
+        try:
+            doc = json.loads(data)
 
-        def _sort_jsonld(node):
-            if isinstance(node, dict):
-                return {k: _sort_jsonld(v) for k, v in sorted(node.items())}
-            if isinstance(node, list):
-                items = [_sort_jsonld(x) for x in node]
-                def key(x):
-                    if isinstance(x, dict):
-                        return (0, x.get("@id", ""), json.dumps(x, sort_keys=True))
-                    return (1, str(x))
-                return sorted(items, key=key)
-            return node
+            def _sort_jsonld(node):
+                if isinstance(node, dict):
+                    return {k: _sort_jsonld(v) for k, v in sorted(node.items())}
+                if isinstance(node, list):
+                    items = [_sort_jsonld(x) for x in node]
+                    def key(x):
+                        if isinstance(x, dict):
+                            return (0, x.get("@id", ""), json.dumps(x, sort_keys=True))
+                        return (1, str(x))
+                    return sorted(items, key=key)
+                return node
 
-        jsonld_path.write_text(json.dumps(_sort_jsonld(doc), indent=2, sort_keys=True) + "\n")
-    except Exception as e:
-        sys.stderr.write(f"[warn] jsonld canonicalization failed: {e}\n")
+            jsonld_path.write_text(
+                json.dumps(_sort_jsonld(doc), indent=2, sort_keys=True) + "\n")
+            del doc
+        except Exception as e:
+            sys.stderr.write(f"[warn] jsonld canonicalization failed: {e}\n")
+            jsonld_path.write_text(data)
+        del data
+    else:
+        # A stale inventory.jsonld from a previous emit into the same
+        # directory would misrepresent this run's output set.
+        jsonld_path.unlink(missing_ok=True)
 
     blob_count = 0
     if emit_blobs_flag:
@@ -104,11 +129,23 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
     # Always emitted so the bundle carries its own stated limitations.
     coverage_fragment = _emit_coverage_sidecar(mapped["records"], out_dir)
 
-    from pyshacl import validate
-    conforms, _vg, report_text = validate(
-        data_graph=inv, shacl_graph=shapes, inference="none",
-        abort_on_first=False, meta_shacl=False, advanced=False, debug=False,
-    )
+    if validate_shacl:
+        from pyshacl import validate
+        conforms, _vg, report_text = validate(
+            data_graph=inv, shacl_graph=shapes, inference="none",
+            abort_on_first=False, meta_shacl=False, advanced=False, debug=False,
+        )
+        shacl_self_check = {
+            "conforms": bool(conforms),
+            "report_excerpt": report_text[:2000] if not conforms else "",
+        }
+    else:
+        # Skipped ≠ passed: conforms stays None and the skip is stated.
+        shacl_self_check = {
+            "conforms": None,
+            "skipped": True,
+            "report_excerpt": "",
+        }
 
     def sha256_file(p: Path) -> str:
         return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -170,19 +207,15 @@ def emit(repo_name: str, mapped: dict, out_dir: Path, emit_blobs_flag: bool = Tr
             Counter((r.language or "(none)") for r in mapped["records"]).items(),
             key=lambda x: (-x[1], x[0]))),
         "artifacts": {
-            "inventory.ttl": {"path": inv_path.name, "sha256": sha256_file(inv_path),
-                              "size_bytes": inv_path.stat().st_size},
-            "shapes.shacl.ttl": {"path": shapes_path.name, "sha256": sha256_file(shapes_path),
-                                 "size_bytes": shapes_path.stat().st_size},
-            "inventory.jsonld": {"path": jsonld_path.name, "sha256": sha256_file(jsonld_path),
-                                 "size_bytes": jsonld_path.stat().st_size},
-            "ontology-mapping.ttl": {"path": mapping_path.name, "sha256": sha256_file(mapping_path),
-                                     "size_bytes": mapping_path.stat().st_size},
+            p.name: {"path": p.name, "sha256": sha256_file(p),
+                     "size_bytes": p.stat().st_size}
+            for p in ([inv_path, shapes_path, mapping_path]
+                      + ([jsonld_path] if emit_jsonld else []))
         },
-        "shacl_self_check": {
-            "conforms": bool(conforms),
-            "report_excerpt": report_text[:2000] if not conforms else "",
-        },
+        "shacl_self_check": shacl_self_check,
+        # Provenance of the serialization itself: which engine produced
+        # the artifact (oxigraph fast path vs rdflib fallback).
+        "emit_engines": {"inventory.ttl": inv_engine},
     }
     if extension_fragments:
         manifest["extensions"] = extension_fragments
