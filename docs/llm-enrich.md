@@ -167,6 +167,13 @@ LLM calls — default: 4). Output is identical at any worker count; the
 LLM cache keys are content-addressed, so warm-cache determinism is
 unaffected.
 
+``inventory.ttl`` is serialized through a Rust-backed fast path
+(pyoxigraph) via a canonically sorted N-Triples intermediate — on the
+67M-triple torvalds/linux graph this stage takes ~2 minutes instead of
+tens of minutes, and the bytes are a pure function of the triple set.
+``run_manifest.json`` records the engine used under ``emit_engines``;
+when pyoxigraph is unavailable the emitter falls back to rdflib.
+
 For fine-grained control use [scripts/run_l4.py](../scripts/run_l4.py).
 The ``--llm-enrich`` flag on ``run_l3.py``/``run_xrefs.py`` is the
 "just give me the defaults" shorthand: it registers the plugin with

@@ -54,6 +54,10 @@ frontend = [
     "mcp>=1.27,<2.0",
     "PyJWT>=2.8,<3.0",
     "httpx>=0.28,<1.0",
+    # Rust-backed store for the sparql tool; without it the tool falls
+    # back to an rdflib parse that cannot fit the 10 s dispatch budget
+    # on large bundles.
+    "pyoxigraph>=0.5,<1.0",
 ]
 # `dev` pulls in `frontend` so the full offline verifier suite (which imports
 # the FastAPI/MCP layer) runs after a plain `make install`.

@@ -17,8 +17,10 @@ able to hang or DoS the server by mis-using it.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import re
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
@@ -80,10 +82,52 @@ def _validate_query(query: str) -> None:
 # --------------------------------------------------------------------------
 
 
+def _load_pyoxigraph():
+    """Import seam (patched in tests). Returns the module or None."""
+    try:
+        import pyoxigraph
+        return pyoxigraph
+    except ImportError:
+        return None
+
+
+class _OxigraphHandle:
+    """Cached pyoxigraph store for one bundle directory."""
+
+    engine = "oxigraph"
+
+    def __init__(self, store: Any):
+        self.store = store
+
+
 @lru_cache(maxsize=4)
-def _load_graph(path_str: str) -> Graph:
+def _load_graph(path_str: str) -> Any:
+    """Load the bundle graph for querying.
+
+    Preferred engine is a persistent pyoxigraph (Rust) store cached in
+    the system temp dir and keyed on the inventory's path+mtime+size:
+    it builds once per bundle generation and re-opens instantly, where
+    an rdflib parse of a large bundle could never fit the tool's 10 s
+    dispatch budget (a kernel-scale inventory takes rdflib tens of
+    minutes to parse). The first, store-building call on a very large
+    bundle may still exceed the budget — that run warms the cache; the
+    next call answers in milliseconds. Falls back to the original
+    rdflib in-memory parse when pyoxigraph is unavailable.
+    """
+    ttl = Path(path_str) / "inventory.ttl"
+    ox = _load_pyoxigraph()
+    if ox is not None:
+        st = ttl.stat()
+        key = hashlib.sha1(str(ttl.resolve()).encode()).hexdigest()[:12]
+        sdir = (Path(tempfile.gettempdir()) / "cbm_sparql_store"
+                / f"{key}_{int(st.st_mtime)}_{st.st_size}")
+        sdir.parent.mkdir(parents=True, exist_ok=True)
+        store = ox.Store(str(sdir))
+        if len(store) == 0:
+            store.bulk_load(path=str(ttl), format=ox.RdfFormat.TURTLE)
+        return _OxigraphHandle(store)
     g = Graph()
-    g.parse(Path(path_str) / "inventory.ttl", format="turtle")
+    g.parse(ttl, format="turtle")
     return g
 
 
@@ -107,7 +151,61 @@ def run_sparql(query: str, *, bundle_default: str | None = None) -> dict[str, An
     _validate_query(query)
     bundle = backend_bundle_data.get_bundle(bundle_default)
 
-    g = _load_graph(str(bundle.output_dir))
+    handle = _load_graph(str(bundle.output_dir))
+    if getattr(handle, "engine", None) == "oxigraph":
+        return _run_oxigraph(handle, query)
+    return _run_rdflib(handle, query)
+
+
+def _ask_response(answer: bool) -> dict[str, Any]:
+    return {
+        "columns": [], "rows": [], "row_count": 0, "truncated": False,
+        "query_form": "ASK", "ask_result": bool(answer),
+    }
+
+
+def _select_response(columns: list[str], rows: list[dict[str, str | None]],
+                     truncated: bool) -> dict[str, Any]:
+    return {
+        "columns": columns, "rows": rows, "row_count": len(rows),
+        "truncated": truncated, "query_form": "SELECT", "ask_result": None,
+    }
+
+
+def _run_oxigraph(handle: _OxigraphHandle, query: str) -> dict[str, Any]:
+    ox = _load_pyoxigraph()
+    assert ox is not None  # handle exists only when the import succeeded
+    try:
+        result = handle.store.query(query)
+    except Exception as e:  # noqa: BLE001 — engine raises various subclasses
+        raise ToolError(
+            INVALID_ARGUMENT,
+            f"query failed to parse or execute: {type(e).__name__}: {e}",
+        ) from e
+    if isinstance(result, ox.QueryBoolean):
+        return _ask_response(bool(result))
+    if not isinstance(result, ox.QuerySolutions):
+        raise ToolError(
+            INVALID_ARGUMENT,
+            "only SELECT and ASK queries are supported (got CONSTRUCT/DESCRIBE)",
+        )
+    columns = [v.value for v in result.variables]
+    rows: list[dict[str, str | None]] = []
+    truncated = False
+    for i, sol in enumerate(result):
+        if i >= MAX_ROWS:
+            truncated = True
+            break
+        # .value gives the bare lexical form / IRI, matching str() on the
+        # corresponding rdflib terms so both engines answer identically.
+        rows.append({
+            col: (sol[col].value if sol[col] is not None else None)
+            for col in columns
+        })
+    return _select_response(columns, rows, truncated)
+
+
+def _run_rdflib(g: Graph, query: str) -> dict[str, Any]:
     try:
         result = g.query(query)
     except Exception as e:  # noqa: BLE001 — rdflib raises various subclasses
@@ -124,14 +222,7 @@ def run_sparql(query: str, *, bundle_default: str | None = None) -> dict[str, An
         )
 
     if query_form == "ASK":
-        return {
-            "columns": [],
-            "rows": [],
-            "row_count": 0,
-            "truncated": False,
-            "query_form": "ASK",
-            "ask_result": bool(result.askAnswer),
-        }
+        return _ask_response(bool(result.askAnswer))
 
     columns = [str(v) for v in (result.vars or [])]
     rows: list[dict[str, str | None]] = []
@@ -144,11 +235,4 @@ def run_sparql(query: str, *, bundle_default: str | None = None) -> dict[str, An
             col: (str(val) if val is not None else None)
             for col, val in zip(columns, cast("tuple", row))
         })
-    return {
-        "columns": columns,
-        "rows": rows,
-        "row_count": len(rows),
-        "truncated": truncated,
-        "query_form": "SELECT",
-        "ask_result": None,
-    }
+    return _select_response(columns, rows, truncated)

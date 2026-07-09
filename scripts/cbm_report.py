@@ -104,21 +104,147 @@ def resolve_cache_dir(bundle, cache_dir):
 
 # ----------------------------------------------------------------------------
 # loaders
+def _load_pyoxigraph():
+    """Import seam (patched in tests). Returns the module or None."""
+    try:
+        import pyoxigraph
+        return pyoxigraph
+    except ImportError:
+        return None
+
+
+class GraphView:
+    """Read-only, rdflib-compatible view over a pyoxigraph (Rust) store.
+
+    Implements exactly the surface the report/dossier consume — ``len``,
+    ``subject_objects``, ``objects``, plus grouped-count helpers — and
+    converts every term to its rdflib equivalent, so downstream string
+    ops, hashing, set membership, and ``int()`` coercion behave
+    identically to a parsed rdflib graph. Measured on the 67.4M-triple
+    torvalds/linux bundle: the backing store builds once in ~144 s at
+    2.5 GB and re-opens instantly; rdflib needed tens of minutes and
+    ~87 GB for the same load.
+    """
+
+    engine = "oxigraph"
+
+    def __init__(self, store, ox):
+        self._store = store
+        self._ox = ox
+
+    def __len__(self):
+        return len(self._store)
+
+    def _to_rdflib(self, t):
+        import rdflib
+        ox = self._ox
+        if isinstance(t, ox.NamedNode):
+            return rdflib.URIRef(t.value)
+        if isinstance(t, ox.BlankNode):
+            return rdflib.BNode(t.value)
+        if t.language:
+            return rdflib.Literal(t.value, lang=t.language)
+        dt = t.datatype
+        # Simple literals report xsd:string; rdflib's parser yields them
+        # as plain Literals — normalize so equality matches.
+        if dt is None or dt.value == "http://www.w3.org/2001/XMLSchema#string":
+            return rdflib.Literal(t.value)
+        return rdflib.Literal(t.value, datatype=rdflib.URIRef(dt.value))
+
+    def _to_ox(self, t):
+        import rdflib
+        ox = self._ox
+        if t is None:
+            return None
+        if isinstance(t, rdflib.URIRef):
+            return ox.NamedNode(str(t))
+        if isinstance(t, rdflib.BNode):
+            return ox.BlankNode(str(t))
+        raise TypeError(f"unsupported pattern term: {t!r}")
+
+    def subject_objects(self, predicate):
+        for q in self._store.quads_for_pattern(
+                None, self._to_ox(predicate), None, None):
+            yield self._to_rdflib(q.subject), self._to_rdflib(q.object)
+
+    def objects(self, subject, predicate):
+        for q in self._store.quads_for_pattern(
+                self._to_ox(subject), self._to_ox(predicate), None, None):
+            yield self._to_rdflib(q.object)
+
+    def predicate_counts(self):
+        """Counter{URIRef: occurrences} via one Rust-side GROUP BY —
+        replaces a full-graph Python iteration."""
+        from collections import Counter as _C
+        rows = self._store.query(
+            "SELECT ?p (COUNT(*) AS ?n) WHERE { ?s ?p ?o } GROUP BY ?p")
+        return _C({self._to_rdflib(r["p"]): int(r["n"].value) for r in rows})
+
+    def class_counts(self):
+        """Counter{class-term: instances} via Rust-side GROUP BY."""
+        from collections import Counter as _C
+        rows = self._store.query(
+            "SELECT ?t (COUNT(?s) AS ?n) WHERE "
+            "{ ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?t } "
+            "GROUP BY ?t")
+        return _C({self._to_rdflib(r["t"]): int(r["n"].value) for r in rows})
+
+
+# One open view per store dir: RocksDB permits a single writer, so a
+# second load_graph in the same process must reuse the handle.
+_STORE_CACHE: dict[str, "GraphView"] = {}
+
+
 def load_graph(found, cache_dir):
     import rdflib
-    g = rdflib.Graph()
-    # Signature the cache on the source's mtime+size so a regenerated bundle
-    # (same path, new content) never reuses a stale parse.
     st = os.stat(found["inventory.ttl"])
-    nt = os.path.join(cache_dir, f"inv_{int(st.st_mtime)}_{st.st_size}.nt")
     t0 = time.time()
+    ox = _load_pyoxigraph()
+    if ox is not None:
+        # Persistent RocksDB store keyed on the source's mtime+size so a
+        # regenerated bundle never reuses a stale store. Builds once,
+        # re-opens instantly on every later report/dossier run.
+        sdir = os.path.join(cache_dir, f"store_{int(st.st_mtime)}_{st.st_size}")
+        if sdir in _STORE_CACHE:
+            view = _STORE_CACHE[sdir]
+            log(f"graph: {len(view):,} triples (open handle, engine=oxigraph)")
+            return view
+        os.makedirs(cache_dir, exist_ok=True)
+        try:
+            store = ox.Store(sdir)
+        except OSError:
+            # Another process holds the write lock. Reports only read —
+            # attach read-only; if that opener is still mid-build the
+            # store may be empty, in which case fall through to rdflib
+            # rather than analyze a half-loaded graph.
+            store = ox.Store.read_only(sdir)
+            if len(store) == 0:
+                log("store locked by another process and still empty — "
+                    "falling back to rdflib for this run")
+                store = None
+        if store is not None:
+            if len(store) == 0:
+                store.bulk_load(path=found["inventory.ttl"],
+                                format=ox.RdfFormat.TURTLE)
+                src = "ttl→store"
+            else:
+                src = "store-cache"
+            view = GraphView(store, ox)
+            _STORE_CACHE[sdir] = view
+            log(f"graph: {len(view):,} triples ({src}, {time.time()-t0:.1f}s, "
+                "engine=oxigraph)")
+            return view
+    # Fallback: the original rdflib path with its NT parse cache.
+    g = rdflib.Graph()
+    nt = os.path.join(cache_dir, f"inv_{int(st.st_mtime)}_{st.st_size}.nt")
     if os.path.exists(nt):
         g.parse(nt, format="nt"); src = "cache"
     else:
         g.parse(found["inventory.ttl"], format="turtle"); src = "ttl"
         try: g.serialize(nt, format="nt")
         except Exception: pass
-    log(f"graph: {len(g):,} triples ({src}, {time.time()-t0:.1f}s)")
+    log(f"graph: {len(g):,} triples ({src}, {time.time()-t0:.1f}s, "
+        "engine=rdflib)")
     return g
 
 def name_of(u): return urllib.parse.unquote(str(u).split("#file/")[-1])
@@ -126,13 +252,31 @@ def name_of(u): return urllib.parse.unquote(str(u).split("#file/")[-1])
 def graph_analytics(g, man):
     import rdflib
     U = rdflib.URIRef
+    # Whole-graph counters come from grouped counts: one Rust-side
+    # GROUP BY on a GraphView, or a single Python pass on plain rdflib.
+    # Ties in most_common() are broken explicitly (count desc, name asc)
+    # so both engines produce byte-identical analytics.
+    if hasattr(g, "predicate_counts"):
+        pred_counts = g.predicate_counts()
+        cls_counts = g.class_counts()
+    else:
+        pred_counts = Counter(g.predicates())
+        cls_counts = Counter(g.objects(None, rdflib.RDF.type))
     ns = Counter()
-    for p in g.predicates():
+    for p, c in pred_counts.items():
         s = str(p)
         key = s.split("#")[0].rsplit("/", 1)[-1] if "#" in s else s.rsplit("/", 2)[-2]
-        ns[key] += 1
-    classes = Counter(str(o).split("#")[-1] for o in g.objects(None, rdflib.RDF.type))
-    preds = Counter(str(p) for p in g.predicates())
+        ns[key] += c
+    classes = Counter()
+    for o, c in cls_counts.items():
+        classes[str(o).split("#")[-1]] += c
+    preds = Counter()
+    for p, c in pred_counts.items():
+        preds[str(p)] += c
+
+    def _ranked(counter, limit=None):
+        items = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
+        return items[:limit] if limit else items
     ftype = {s: str(o).split("#")[-1] for s, o in g.subject_objects(U(CBM + "type"))}
     src = {s for s, t in ftype.items() if t == "source_code"}
     tst = {s for s, t in ftype.items() if t == "test_code"}
@@ -218,8 +362,8 @@ def graph_analytics(g, man):
                    ("33+", 33, float("inf"))]
         return [(lab, sum(1 for f in pop if lo <= deg[f] <= hi))
                 for lab, lo, hi in buckets]
-    return {"triples": len(g), "ns": ns.most_common(), "classes": classes.most_common(12),
-            "top_preds": [(p, c) for p, c in preds.most_common(12)],
+    return {"triples": len(g), "ns": _ranked(ns), "classes": _ranked(classes, 12),
+            "top_preds": _ranked(preds, 12),
             "n_src": len(src), "n_tst": len(tst),
             "deg_hist": {"in": deg_hist(src, indeg),
                          "out": deg_hist(src | tst, outdeg)},
