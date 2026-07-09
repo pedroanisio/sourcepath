@@ -34,6 +34,7 @@ registration at all.
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -106,6 +107,13 @@ class LlmEnricher:
     # Set to True if Ollama fails mid-run; subsequent records are
     # skipped without further attempts. Reset on next process.
     _disabled: bool = field(default=False, init=False, repr=False)
+
+    # Running count of file_summary enrichments actually produced this
+    # run (progress indicator). No "/total" — enrich() is called once per
+    # record by the host's streaming RecordEnricher loop, which never
+    # tells a plugin how many records are left to see, so a denominator
+    # here would be a guess, not a fact.
+    _count: int = field(default=0, init=False, repr=False)
 
     # ----------------------------------------------------------------
 
@@ -190,6 +198,10 @@ class LlmEnricher:
             )
             self._disabled = True
             return
+
+        self._count += 1
+        print(f"[L4] file_summary  #{self._count}  {record.path}"
+              f"{'  (cached)' if was_hit else ''}", file=sys.stderr)
 
         # Stash on ctx.scratch under a documented key. Step 4 reads
         # this in LlmGraphWriter.contribute; the artifact emitter

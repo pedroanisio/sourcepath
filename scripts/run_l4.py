@@ -154,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
                               exclude_patterns=args.exclude)
         manifest = emit(repo_name, mapped, args.out.resolve(),
                         emit_blobs_flag=not args.no_emit_blobs)
+    _print_l4_summary(manifest)
     print(json.dumps(manifest, indent=2, sort_keys=True))
     return 0 if manifest.get("shacl_self_check", {}).get("conforms") else 1
 
@@ -178,6 +179,18 @@ def _default_cache_dir() -> Path:
     """Match the cache layer's default — honors $CBM_LLM_CACHE."""
     from plugins.llm_enrich.cache import default_cache_dir
     return default_cache_dir()
+
+
+def _print_l4_summary(manifest: dict) -> None:
+    """Final progress line: reuses the counts LlmArtifact already tallied
+    (run_manifest.json["extensions"]["l4_50_artifact"]) rather than
+    recomputing them — one source of truth for "how many enrichments"."""
+    artifact = manifest.get("extensions", {}).get("l4_50_artifact", {})
+    n = artifact.get("n_enrichments", 0)
+    by_kind = artifact.get("by_kind", {})
+    breakdown = ", ".join(f"{k}={v}" for k, v in sorted(by_kind.items()))
+    print(f"[L4] done — {n} enrichment record(s) written"
+          f"{f' ({breakdown})' if breakdown else ''}", file=sys.stderr)
 
 
 if __name__ == "__main__":

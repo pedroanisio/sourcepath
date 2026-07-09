@@ -31,6 +31,7 @@ Gating:
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
@@ -165,7 +166,8 @@ class LlmAggregator:
         cache = self.cache or Cache()
         tmpl = PROMPT_REGISTRY["concept_description"]
 
-        for name in typed:
+        total = len(typed)
+        for i, name in enumerate(typed, 1):
             if self._disabled:
                 return
             meta = concepts[name]
@@ -227,6 +229,8 @@ class LlmAggregator:
                 self._disabled = True
                 return
 
+            print(f"[L4] concept_description  {i}/{total}  {name}"
+                  f"{'  (cached)' if was_hit else ''}", file=sys.stderr)
             out[name] = {**record, "was_cache_hit": was_hit}
 
     # ----------------------------------------------------------------
@@ -236,15 +240,15 @@ class LlmAggregator:
     ) -> None:
         """Generate schema_purpose for every file under SCHEMA_PATH_PREFIXES
         with a known schema-like extension."""
-        records = sorted(ctx.records, key=lambda r: r.path)
+        records = [r for r in sorted(ctx.records, key=lambda r: r.path)
+                   if _is_schema_file(r.path)]
         cache = self.cache or Cache()
         tmpl = PROMPT_REGISTRY["schema_purpose"]
 
-        for record in records:
+        total = len(records)
+        for i, record in enumerate(records, 1):
             if self._disabled:
                 return
-            if not _is_schema_file(record.path):
-                continue
 
             try:
                 raw = ctx.read_path(record.path)
@@ -301,6 +305,8 @@ class LlmAggregator:
                 self._disabled = True
                 return
 
+            print(f"[L4] schema_purpose  {i}/{total}  {record.path}"
+                  f"{'  (cached)' if was_hit else ''}", file=sys.stderr)
             out[record.path] = {**record_d, "was_cache_hit": was_hit}
 
 
