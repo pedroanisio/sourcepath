@@ -1,0 +1,1044 @@
+<title>SourcePath — Code Terrain: __REPO__</title>
+<style>
+  :root {
+    --plane: #fafbfc; --card: #ffffff; --ink: #111418; --ink-2: #4b535e;
+    --muted: #6b7280; --ring: rgba(17,20,24,0.12); --grid: #e5e8ec;
+    --accent: #0ea5ff; --accent-ink: #0284d8; --critical: #d03b3b;
+    --halo: rgba(255,255,255,0.88);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --plane: #111418; --card: #1a1f26; --ink: #f2f4f7; --ink-2: #aeb6c2;
+    --muted: #6b7280; --ring: rgba(242,244,247,0.14); --grid: #2a313a;
+    --accent: #0ea5ff; --accent-ink: #4dbcff; --critical: #e05252;
+    --halo: rgba(17,20,24,0.88);
+    color-scheme: dark;
+  } }
+  :root[data-theme="dark"] {
+    --plane: #111418; --card: #1a1f26; --ink: #f2f4f7; --ink-2: #aeb6c2;
+    --muted: #6b7280; --ring: rgba(242,244,247,0.14); --grid: #2a313a;
+    --accent: #0ea5ff; --accent-ink: #4dbcff; --critical: #e05252;
+    --halo: rgba(17,20,24,0.88);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --plane: #fafbfc; --card: #ffffff; --ink: #111418; --ink-2: #4b535e;
+    --muted: #6b7280; --ring: rgba(17,20,24,0.12); --grid: #e5e8ec;
+    --accent: #0ea5ff; --accent-ink: #0284d8; --critical: #d03b3b;
+    --halo: rgba(255,255,255,0.88);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--plane); color: var(--ink);
+         font: 13.5px/1.5 "Avenir Next", "Nunito Sans", "Segoe UI", system-ui, sans-serif; }
+  .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #gl { touch-action: none; cursor: grab; }
+  #gl.dragging { cursor: grabbing; }
+  #gl.tracing { cursor: crosshair; }
+  #overlay { pointer-events: none; }
+  #hud {
+    position: absolute; top: 16px; left: 16px; width: 322px;
+    background: var(--card); border: 1px solid var(--ring); border-radius: 10px;
+    padding: 14px 16px; box-shadow: 0 6px 24px rgba(17,20,24,0.10); z-index: 4;
+  }
+  #hud .brand { display: flex; align-items: baseline; gap: 8px; margin: 0 0 1px; }
+  #hud .brand b { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  #hud .brand span { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  #hud .tagline { color: var(--accent-ink); font-weight: 600; font-size: 13px; margin: 0 0 6px; }
+  #hud .prov { font-size: 11.5px; color: var(--ink-2); margin: 0 0 10px; }
+  #hud .toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  #hud button {
+    background: none; border: 1px solid var(--grid); border-radius: 999px;
+    color: var(--ink-2); font-size: 11.5px; padding: 3px 10px; cursor: pointer;
+  }
+  #hud button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); }
+  #hud button#t-trace[aria-pressed="true"], #hud button#t-unfold[aria-pressed="true"] {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  #hud input[type="search"] {
+    width: 100%; background: var(--plane); color: var(--ink);
+    border: 1px solid var(--grid); border-radius: 6px; padding: 5px 9px; font-size: 12.5px;
+  }
+  #hud button:focus-visible, #hud input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #hud input[type="search"]:focus { border-color: var(--accent); outline: none; }
+  .lvlrow { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .lvlrow label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .lvlrow input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .lvlrow b { font-size: 11.5px; min-width: 2ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .scale { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .scale .bar { flex: 1; height: 8px; border-radius: 4px; border: 1px solid var(--ring); }
+  .scale span { font-size: 10.5px; color: var(--muted); }
+  #legend { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 8px; }
+  #legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-2); }
+  #legend i { width: 8px; height: 8px; border-radius: 50%; }
+  #legend i.line { width: 14px; height: 0; border-radius: 0; border-top: 2px solid; background: none !important; }
+  .camhint { font-size: 10.5px; color: var(--muted); margin: 8px 0 0; }
+  #detail {
+    position: absolute; top: 16px; right: 16px; width: 324px; display: none;
+    background: var(--card); border: 1px solid var(--ring); border-radius: 10px;
+    padding: 14px 16px; box-shadow: 0 6px 24px rgba(17,20,24,0.10); z-index: 4;
+    max-height: calc(100vh - 48px); overflow-y: auto;
+  }
+  #detail h2 { font-size: 13px; margin: 0 0 2px; word-break: break-all; }
+  #detail .sub { font-size: 11.5px; color: var(--muted); margin: 0 0 8px; }
+  #detail dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px;
+               font-size: 12px; margin: 0; }
+  #detail dt { color: var(--muted); } #detail dd { margin: 0; font-variant-numeric: tabular-nums; }
+  #detail .cyc { color: var(--critical); font-size: 11.5px; margin-top: 6px; }
+  #detail .hop { display: flex; gap: 8px; align-items: baseline; font-size: 12px; padding: 1.5px 0; }
+  #detail .hop .n { color: var(--accent-ink); font-weight: 600; min-width: 2ch; text-align: right; }
+  #detail .hop .w { color: var(--muted); font-size: 10.5px; margin-left: auto; }
+  #detail .note { font-size: 11px; color: var(--muted); margin: 8px 0 0; }
+  #detail .btnrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  #detail button { background: none; border: 1px solid var(--grid);
+                   border-radius: 6px; color: var(--ink-2); padding: 3px 10px;
+                   font-size: 11.5px; cursor: pointer; }
+  #tip { position: absolute; pointer-events: none; z-index: 5; opacity: 0;
+         background: var(--card); border: 1px solid var(--accent); border-radius: 6px;
+         padding: 6px 9px; font-size: 12px; max-width: 260px;
+         box-shadow: 0 3px 12px rgba(17,20,24,0.16); }
+  #tip b { display: block; word-break: break-all; }
+  #tip .row { color: var(--ink-2); font-size: 11.5px; }
+  #foot { position: absolute; left: 16px; bottom: 12px; right: 16px; z-index: 3;
+          font-size: 11px; color: var(--ink-2); max-width: 84ch;
+          text-shadow: 0 0 6px var(--halo), 0 0 2px var(--halo); }
+  #nogl { display: none; position: absolute; inset: 0; place-items: center; z-index: 6;
+          background: var(--plane); color: var(--ink-2); font-size: 14px; text-align: center; }
+  @media (prefers-reduced-motion: no-preference) { #tip { transition: opacity 0.12s; } }
+</style>
+
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <canvas id="overlay"></canvas>
+  <div id="nogl"><p>This 3D terrain needs WebGL2, which this browser doesn't expose.</p></div>
+  <div id="hud">
+    <p class="brand"><b>SourcePath</b><span>code terrain</span></p>
+    <p class="tagline">Unfold your codebase.</p>
+    <p class="prov"><span class="mono">__REPONAME__ @ __COMMIT__</span> · __CHUNKS__ chunks ·
+      __MODS__ code directories · all-MiniLM-L6-v2 (384d), __METHOD__</p>
+    <div class="toggles">
+      <button id="t-labels" aria-pressed="true">Names</button>
+      <button id="t-points" aria-pressed="true">Settlements</button>
+      <button id="t-contours" aria-pressed="true">Contours</button>
+      <button id="t-roads" aria-pressed="true">Roads</button>
+      <button id="t-frontiers" aria-pressed="true">Frontiers</button>
+      <button id="t-stress" aria-pressed="false">⚡ Stress</button>
+      <button id="t-trace" aria-pressed="false">✦ Trace path</button>
+      <button id="t-unfold" aria-pressed="false">⧉ Unfold</button>
+      <button id="resetcam">Reset camera</button>
+    </div>
+    <input type="search" id="q" placeholder="Find a directory…" aria-label="Find a directory">
+    <div class="lvlrow">
+      <label for="lvl">build tide ≤ level</label>
+      <input type="range" id="lvl" min="0" max="13" value="13" step="1">
+      <b id="lvlval">13</b>
+    </div>
+    <div class="scale"><span id="scalelo">sea · little code</span><div class="bar" id="scalebar"></div><span id="scalehi">peaks · dense code</span></div>
+    <div id="legend"></div>
+    <p class="camhint">drag orbit · wheel zoom · shift-drag pan · double-click reset ·
+      trace: click two settlements · click one for details &amp; impact flood</p>
+  </div>
+  <div id="detail"></div>
+  <div id="tip"></div>
+  <p id="foot"><strong>Reading the map.</strong> Position is semantic (t-SNE over mean chunk
+  embeddings — approximate, axes meaningless); elevation is chunk density. __ROLLUP__. <strong>Roads</strong>
+  are the __ROADS__ strongest of __GEDGES__ import routes between charted directories
+  (__DROPPED__ more touch unparsed directories and are not drawn). <strong>⚡ Stress</strong>
+  highlights the __NSTRESS__ most strained routes — strong imports between semantically distant
+  directories (√(w/w<sub>max</sub>)·(d/d<sub>max</sub>)); candidates for misplaced code or leaky
+  seams, not verdicts. <strong>Impact flood</strong> (from a settlement's card) stains the
+  transitive closure over real directed edges. <strong>⧉ Unfold</strong> lifts every directory
+  to its topological build layer — the sectioned view: level 0 is bedrock, applications float
+  on top. <strong>Frontiers</strong> and the flood/stress scores are derived views; roads, tide
+  and floods traverse the mechanical L1 graph only.</p>
+</div>
+
+<script>
+const DATA = __DATA__;
+const GW = DATA.meta.gw, GH = DATA.meta.gh;
+const Hgrid = Uint8Array.from(atob(DATA.grid_b64), c => c.charCodeAt(0));
+const pts = DATA.points;
+const GEDGES = DATA.graph.edges, ROADIDX = DATA.graph.roads, FRONTS = DATA.frontiers;
+const NLAYERS = DATA.meta.layers || 14;
+
+const stage = document.getElementById("stage");
+const glc = document.getElementById("gl");
+const overlay = document.getElementById("overlay");
+const tip = document.getElementById("tip");
+const gl = glc.getContext("webgl2", { antialias: true });
+if (!gl) { document.getElementById("nogl").style.display = "grid"; }
+addEventListener("error", ev => {
+  const n = document.getElementById("nogl");
+  n.style.display = "grid";
+  n.querySelector("p").textContent = "Renderer error: " + ev.message;
+});
+
+// ---- theme palettes ----
+const RAMPS = {
+  light: {
+    sea: [231, 236, 241], stops: [
+      [0.00, [236, 238, 241]], [0.25, [214, 219, 224]], [0.48, [178, 186, 195]],
+      [0.70, [130, 140, 152]], [0.87, [86, 95, 107]], [1.00, [17, 20, 24]]],
+    contour: [17, 20, 24], contourA: 0.28, bg: [250, 251, 252],
+    road: [75, 83, 94, 0.50], frontier: [17, 20, 24, 0.42],
+    planeFill: [75, 83, 94, 0.17], planeLine: [75, 83, 94, 0.62],
+    settle: [55, 63, 74],
+    stress: [208, 59, 59],
+  },
+  dark: {
+    sea: [13, 16, 20], stops: [
+      [0.00, [26, 31, 38]], [0.25, [40, 47, 56]], [0.48, [62, 71, 83]],
+      [0.70, [96, 107, 121]], [0.87, [140, 150, 163]], [1.00, [214, 220, 227]]],
+    contour: [214, 220, 227], contourA: 0.26, bg: [17, 20, 24],
+    road: [174, 182, 194, 0.44], frontier: [214, 220, 227, 0.38],
+    planeFill: [174, 182, 194, 0.13], planeLine: [174, 182, 194, 0.55],
+    settle: [186, 193, 203],
+    stress: [224, 82, 82],
+  },
+};
+const ACCENT = [14 / 255, 165 / 255, 255 / 255];
+const WATER = 0.055;
+function themeMode() {
+  const t = document.documentElement.getAttribute("data-theme");
+  if (t === "dark" || t === "light") return t;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+function rampColor(stops, v) {
+  for (let i = 1; i < stops.length; i++) {
+    if (v <= stops[i][0]) {
+      const [v0, c0] = stops[i - 1], [v1, c1] = stops[i];
+      const t = (v - v0) / (v1 - v0 || 1);
+      return [0, 1, 2].map(k => c0[k] + (c1[k] - c0[k]) * t);
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// ---- tiny mat4 ----
+function perspective(fov, ar, n, f) {
+  const t = 1 / Math.tan(fov / 2), d = 1 / (n - f);
+  return [t / ar, 0, 0, 0, 0, t, 0, 0, 0, 0, (n + f) * d, -1, 0, 0, 2 * n * f * d, 0];
+}
+function lookAt(e, c, u) {
+  let z = norm3(sub3(e, c)), x = norm3(cross3(u, z)), y = cross3(z, x);
+  return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0,
+          -dot3(x, e), -dot3(y, e), -dot3(z, e), 1];
+}
+function mul4(a, b) {
+  const o = new Array(16).fill(0);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++)
+    for (let k = 0; k < 4; k++) o[j * 4 + i] += a[k * 4 + i] * b[j * 4 + k];
+  return o;
+}
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm3 = a => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+
+// ---- terrain mesh ----
+const AR = GW / GH, HSCALE = 0.42, LSTEP = 1.4 / Math.max(1, NLAYERS - 1);
+const hAt = (i, j) => Hgrid[Math.max(0, Math.min(GH - 1, j)) * GW + Math.max(0, Math.min(GW - 1, i))] / 255;
+const land = v => Math.max(0, (v - WATER) / (1 - WATER));
+const worldX = fx => (fx - 0.5) * 2 * AR;
+const worldZ = fy => (fy - 0.5) * 2;
+const worldY = v => land(v) * HSCALE;
+function surfaceY(fx, fy) {
+  const gx = Math.max(0, Math.min(GW - 1.001, fx * (GW - 1)));
+  const gy = Math.max(0, Math.min(GH - 1.001, fy * (GH - 1)));
+  const x0 = Math.floor(gx), y0 = Math.floor(gy);
+  const fxr = gx - x0, fyr = gy - y0;
+  const v = (hAt(x0, y0) * (1 - fxr) + hAt(x0 + 1, y0) * fxr) * (1 - fyr) +
+            (hAt(x0, y0 + 1) * (1 - fxr) + hAt(x0 + 1, y0 + 1) * fxr) * fyr;
+  return worldY(v);
+}
+const layerY = l => (l < 0 ? 0 : l) * LSTEP + 0.02;
+
+const NV = GW * GH;
+const positions = new Float32Array(NV * 3);
+const normals = new Float32Array(NV * 3);
+const elev = new Float32Array(NV);
+const cellX = 2 * AR / (GW - 1), cellZ = 2 / (GH - 1);
+for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
+  const k = j * GW + i, v = hAt(i, j);
+  positions[k * 3] = worldX(i / (GW - 1));
+  positions[k * 3 + 1] = worldY(v);
+  positions[k * 3 + 2] = worldZ(j / (GH - 1));
+  elev[k] = land(v);
+  const dyx = (worldY(hAt(i + 1, j)) - worldY(hAt(i - 1, j)));
+  const dyz = (worldY(hAt(i, j + 1)) - worldY(hAt(i, j - 1)));
+  const n = norm3([-dyx / (2 * cellX), 1, -dyz / (2 * cellZ)]);
+  normals[k * 3] = n[0]; normals[k * 3 + 1] = n[1]; normals[k * 3 + 2] = n[2];
+}
+const indices = new Uint32Array((GW - 1) * (GH - 1) * 6);
+let ii = 0;
+for (let j = 0; j < GH - 1; j++) for (let i = 0; i < GW - 1; i++) {
+  const a = j * GW + i, b = a + 1, c = a + GW, d = c + 1;
+  indices[ii++] = a; indices[ii++] = c; indices[ii++] = b;
+  indices[ii++] = b; indices[ii++] = c; indices[ii++] = d;
+}
+function themeColors(mode) {
+  const R = RAMPS[mode];
+  const cols = new Float32Array(NV * 3);
+  for (let k = 0; k < NV; k++) {
+    const e = elev[k];
+    const c = e <= 0 ? R.sea : rampColor(R.stops, e);
+    cols[k * 3] = c[0] / 255; cols[k * 3 + 1] = c[1] / 255; cols[k * 3 + 2] = c[2] / 255;
+  }
+  return cols;
+}
+
+// ---- graph derived: adjacency, stress, misfit ----
+const adj = pts.map(() => []), radj = pts.map(() => []);
+GEDGES.forEach(([a, b, w]) => { adj[a].push([b, w]); radj[b].push([a, w]); });
+const maxW = Math.max(...GEDGES.map(e => e[2]));
+const maxSd = Math.max(...GEDGES.map(e => e[3] || 0)) || 1;
+const stressScore = e => Math.sqrt(e[2] / maxW) * ((e[3] || 0) / maxSd);
+const N_STRESS = Math.min(150, Math.max(60, Math.round(GEDGES.length * 0.05)));
+const stressIdx = GEDGES.map((e, i) => [stressScore(e), i])
+  .sort((a, b) => b[0] - a[0]).slice(0, N_STRESS).map(x => x[1]);
+const misfit = pts.map((_, i) => {
+  let sw = 0, s = 0;
+  for (const arr of [adj[i], radj[i]]) for (const [, w] of arr) sw += w;
+  GEDGES.forEach(([a, b, w, sd]) => { if (a === i || b === i) s += w * (sd || 0); });
+  return sw ? s / sw : 0;
+});
+const misfitRank = [...misfit.keys()].sort((a, b) => misfit[b] - misfit[a]);
+const rankOf = new Array(pts.length);
+misfitRank.forEach((p, r) => rankOf[p] = r + 1);
+
+// ---- GL programs ----
+let prog, pprog, lprog, vao, pvao;
+let uMVP, uLight, uContour, uContourOn, uPMVP, uPDpr, uPRing;
+let uLMVP, uLColor, uLMaxLvl;
+const colorBufs = {};
+function compile(vs, fs) {
+  const p = gl.createProgram();
+  for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    const s = gl.createShader(t);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+      throw new Error(gl.getShaderInfoLog(s));
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+function buf(target, data, loc, size, dynamic) {
+  const b = gl.createBuffer();
+  gl.bindBuffer(target, b);
+  gl.bufferData(target, data, dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW);
+  if (loc >= 0) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); }
+  return b;
+}
+
+// ---- geometry: roads (ground + unfold), frontiers, stress, planes, route ----
+const ROAD_SAMPLES = 18;
+function drapedLine(ax, ay, bx, by, lift, out, lvl, lvls) {
+  let px = null, py2 = null, pz = null;
+  for (let s = 0; s <= ROAD_SAMPLES; s++) {
+    const t = s / ROAD_SAMPLES;
+    const fx = ax + (bx - ax) * t, fy = ay + (by - ay) * t;
+    const x = worldX(fx), y = surfaceY(fx, fy) + lift, z = worldZ(fy);
+    if (px !== null) { out.push(px, py2, pz, x, y, z); if (lvls) lvls.push(lvl, lvl); }
+    px = x; py2 = y; pz = z;
+  }
+}
+const liftPos = i => [worldX(pts[i].x), layerY(pts[i].l) + 0.012, worldZ(pts[i].y)];
+function straightLine(a, b, out, lvl, lvls) {
+  const A = liftPos(a), B = liftPos(b);
+  out.push(A[0], A[1], A[2], B[0], B[1], B[2]);
+  if (lvls) lvls.push(lvl, lvl);
+}
+function edgeGeom(edgeIdx, ground) {
+  const verts = [], lvls = [];
+  for (const ei of edgeIdx) {
+    const [a, b] = GEDGES[ei];
+    const lvl = Math.max(pts[a].l < 0 ? 0 : pts[a].l, pts[b].l < 0 ? 0 : pts[b].l);
+    if (ground) drapedLine(pts[a].x, pts[a].y, pts[b].x, pts[b].y, 0.006, verts, lvl, lvls);
+    else straightLine(a, b, verts, lvl, lvls);
+  }
+  return { verts: new Float32Array(verts), lvls: new Float32Array(lvls) };
+}
+let frontVerts = [];
+for (const [x1, y1, x2, y2] of FRONTS) {
+  frontVerts.push(worldX(x1), surfaceY(x1, y1) + 0.004, worldZ(y1),
+                  worldX(x2), surfaceY(x2, y2) + 0.004, worldZ(y2));
+}
+// unfold layer planes: quads + outlines, aLvl = layer (build tide filters them)
+const planeTris = [], planeTriLvls = [], planeLines = [], planeLineLvls = [];
+for (let l = 0; l < NLAYERS; l++) {
+  const y = layerY(l), X = AR, Z = 1;
+  planeTris.push(-X, y, -Z, X, y, -Z, -X, y, Z, X, y, -Z, X, y, Z, -X, y, Z);
+  for (let k = 0; k < 6; k++) planeTriLvls.push(l);
+  planeLines.push(-X, y, -Z, X, y, -Z, X, y, -Z, X, y, Z, X, y, Z, -X, y, Z, -X, y, Z, -X, y, -Z);
+  for (let k = 0; k < 8; k++) planeLineLvls.push(l);
+}
+
+let roadVaoG, roadVaoU, roadCountG, roadCountU;
+let stressVaoG, stressVaoU, stressCountG, stressCountU;
+let frontVao, planeTriVao, planeLineVao;
+let routeVao, routeBuf, routeLvlBuf, routeVertCount = 0;
+let beadVao, beadPosBuf, beadSizeBuf, beadColBuf, beadCount = 0;
+
+if (gl) {
+  prog = compile(`#version 300 es
+    in vec3 aPos; in vec3 aNorm; in vec3 aCol; in float aE;
+    uniform mat4 uMVP;
+    out vec3 vN; out vec3 vC; out float vE;
+    void main() { gl_Position = uMVP * vec4(aPos, 1.0); vN = aNorm; vC = aCol; vE = aE; }`,
+    `#version 300 es
+    precision highp float;
+    in vec3 vN; in vec3 vC; in float vE;
+    uniform vec3 uLightDir; uniform vec4 uContour; uniform bool uContourOn;
+    out vec4 frag;
+    void main() {
+      float dif = max(dot(normalize(vN), uLightDir), 0.0);
+      vec3 col = vC * (0.66 + 0.48 * dif);
+      if (uContourOn && vE > 0.002) {
+        float t = vE * 12.0;
+        float d = abs(fract(t) - 0.5);
+        float w = fwidth(t) * 1.2;
+        float line = 1.0 - smoothstep(0.5 - w, 0.5, d);
+        col = mix(col, uContour.rgb, line * uContour.a);
+      }
+      frag = vec4(col, 1.0);
+    }`);
+  uMVP = gl.getUniformLocation(prog, "uMVP");
+  uLight = gl.getUniformLocation(prog, "uLightDir");
+  uContour = gl.getUniformLocation(prog, "uContour");
+  uContourOn = gl.getUniformLocation(prog, "uContourOn");
+  vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  buf(gl.ARRAY_BUFFER, positions, gl.getAttribLocation(prog, "aPos"), 3);
+  buf(gl.ARRAY_BUFFER, normals, gl.getAttribLocation(prog, "aNorm"), 3);
+  buf(gl.ARRAY_BUFFER, elev, gl.getAttribLocation(prog, "aE"), 1);
+  const colLoc = gl.getAttribLocation(prog, "aCol");
+  for (const m of ["light", "dark"]) {
+    colorBufs[m] = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBufs[m]);
+    gl.bufferData(gl.ARRAY_BUFFER, themeColors(m), gl.STATIC_DRAW);
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, colorBufs[themeMode()]);
+  gl.enableVertexAttribArray(colLoc);
+  gl.vertexAttribPointer(colLoc, 3, gl.FLOAT, false, 0, 0);
+  const ib = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+
+  pprog = compile(`#version 300 es
+    in vec3 aPos; in float aSize; in vec4 aCol;
+    uniform mat4 uMVP; uniform float uDpr;
+    out vec4 vCol;
+    void main() {
+      gl_Position = uMVP * vec4(aPos, 1.0);
+      gl_PointSize = aSize * uDpr / max(gl_Position.w, 0.05);
+      vCol = aCol;
+    }`,
+    `#version 300 es
+    precision highp float;
+    in vec4 vCol; uniform float uRing;
+    out vec4 frag;
+    void main() {
+      vec2 d = gl_PointCoord - 0.5;
+      float r = length(d) * 2.0;
+      if (r > 1.0) discard;
+      if (uRing > 0.5 && r < 0.62) discard;
+      frag = vCol;
+      if (frag.a < 0.02) discard;
+    }`);
+  uPMVP = gl.getUniformLocation(pprog, "uMVP");
+  uPDpr = gl.getUniformLocation(pprog, "uDpr");
+  uPRing = gl.getUniformLocation(pprog, "uRing");
+
+  lprog = compile(`#version 300 es
+    in vec3 aPos; in float aLvl;
+    uniform mat4 uMVP;
+    out float vLvl;
+    void main() { gl_Position = uMVP * vec4(aPos, 1.0); vLvl = aLvl; }`,
+    `#version 300 es
+    precision highp float;
+    in float vLvl; uniform vec4 uColor; uniform float uMaxLvl;
+    out vec4 frag;
+    void main() {
+      if (vLvl > uMaxLvl + 0.5) discard;
+      frag = uColor;
+    }`);
+  uLMVP = gl.getUniformLocation(lprog, "uMVP");
+  uLColor = gl.getUniformLocation(lprog, "uColor");
+  uLMaxLvl = gl.getUniformLocation(lprog, "uMaxLvl");
+
+  const lPosLoc = gl.getAttribLocation(lprog, "aPos");
+  const lLvlLoc = gl.getAttribLocation(lprog, "aLvl");
+  function lineVao(verts, lvls) {
+    const v = gl.createVertexArray(); gl.bindVertexArray(v);
+    buf(gl.ARRAY_BUFFER, verts, lPosLoc, 3);
+    buf(gl.ARRAY_BUFFER, lvls, lLvlLoc, 1);
+    gl.bindVertexArray(null);
+    return v;
+  }
+  let g = edgeGeom(ROADIDX, true);
+  roadVaoG = lineVao(g.verts, g.lvls); roadCountG = g.verts.length / 3;
+  g = edgeGeom(ROADIDX, false);
+  roadVaoU = lineVao(g.verts, g.lvls); roadCountU = g.verts.length / 3;
+  g = edgeGeom(stressIdx, true);
+  stressVaoG = lineVao(g.verts, g.lvls); stressCountG = g.verts.length / 3;
+  g = edgeGeom(stressIdx, false);
+  stressVaoU = lineVao(g.verts, g.lvls); stressCountU = g.verts.length / 3;
+  frontVao = lineVao(new Float32Array(frontVerts),
+                     new Float32Array(frontVerts.length / 3).fill(0));
+  planeTriVao = lineVao(new Float32Array(planeTris), new Float32Array(planeTriLvls));
+  planeLineVao = lineVao(new Float32Array(planeLines), new Float32Array(planeLineLvls));
+  gl.bindVertexArray(null);
+  routeVao = gl.createVertexArray(); gl.bindVertexArray(routeVao);
+  routeBuf = buf(gl.ARRAY_BUFFER, new Float32Array(0), lPosLoc, 3, true);
+  routeLvlBuf = buf(gl.ARRAY_BUFFER, new Float32Array(0), lLvlLoc, 1, true);
+  beadVao = gl.createVertexArray(); gl.bindVertexArray(beadVao);
+  beadPosBuf = buf(gl.ARRAY_BUFFER, new Float32Array(0), gl.getAttribLocation(pprog, "aPos"), 3, true);
+  beadSizeBuf = buf(gl.ARRAY_BUFFER, new Float32Array(0), gl.getAttribLocation(pprog, "aSize"), 1, true);
+  beadColBuf = buf(gl.ARRAY_BUFFER, new Float32Array(0), gl.getAttribLocation(pprog, "aCol"), 4, true);
+  gl.bindVertexArray(null);
+  gl.enable(gl.DEPTH_TEST);
+}
+
+// ---- settlements (positions swap between ground and unfold) ----
+const pWorldG = pts.map(p => [worldX(p.x), surfaceY(p.x, p.y) + 0.012, worldZ(p.y)]);
+const pWorldU = pts.map((p, i) => liftPos(i));
+let unfoldOn = false;
+const pW = () => unfoldOn ? pWorldU : pWorldG;
+let pointBufPos, pointBufSize, pointBufCol, fillCol = null, ringCol = null, pvaoReady = false;
+let query = "", maxLvl = 13, traceMode = false, selA = -1, selB = -1;
+let routeSet = new Set(), currentHops = null;
+let floodMap = null, floodSrc = -1, floodDir = "dependents";
+const visibleByLvl = p => p.l < 0 || p.l <= maxLvl;
+function uploadPoints() {
+  const st = RAMPS[themeMode()].settle;
+  const slate = [st[0] / 255, st[1] / 255, st[2] / 255];
+  const W = pW();
+  const pos = new Float32Array(pts.length * 3);
+  const size = new Float32Array(pts.length);
+  fillCol = new Float32Array(pts.length * 4);
+  pts.forEach((p, i) => {
+    pos.set(W[i], i * 3);
+    const match = query && p.m.toLowerCase().includes(query);
+    const onRoute = routeSet.has(i) || i === selA || i === selB;
+    let c = slate, a = 0.92, boost = 1;
+    if (unfoldOn && p.l >= 0) {
+      const t = 0.55 + 0.45 * (p.l / Math.max(1, NLAYERS - 1));
+      const rc = rampColor(RAMPS[themeMode()].stops, t);
+      c = [rc[0] / 255, rc[1] / 255, rc[2] / 255];
+    }
+    if (!visibleByLvl(p)) { a = 0.12; }
+    else if (floodMap) {
+      if (floodMap.has(i)) {
+        c = ACCENT; a = Math.max(0.35, 0.95 - floodMap.get(i) * 0.11);
+        boost = i === floodSrc ? 1.7 : 1.15;
+      } else a = 0.09;
+    }
+    else if (onRoute) { c = ACCENT; a = 0.95; boost = 1.5; }
+    else if (query) { if (match) { c = ACCENT; a = 0.95; boost = 1.5; } else a = 0.11; }
+    size[i] = (4.2 + Math.sqrt(p.c) * 0.24) * boost;
+    fillCol[i * 4] = c[0]; fillCol[i * 4 + 1] = c[1]; fillCol[i * 4 + 2] = c[2];
+    fillCol[i * 4 + 3] = a;
+  });
+  if (!pvaoReady) {
+    pvao = gl.createVertexArray(); gl.bindVertexArray(pvao);
+    pointBufPos = buf(gl.ARRAY_BUFFER, pos, gl.getAttribLocation(pprog, "aPos"), 3, true);
+    pointBufSize = buf(gl.ARRAY_BUFFER, size, gl.getAttribLocation(pprog, "aSize"), 1, true);
+    pointBufCol = buf(gl.ARRAY_BUFFER, fillCol, gl.getAttribLocation(pprog, "aCol"), 4, true);
+    gl.bindVertexArray(null); pvaoReady = true;
+  } else {
+    gl.bindBuffer(gl.ARRAY_BUFFER, pointBufPos); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, pointBufSize); gl.bufferData(gl.ARRAY_BUFFER, size, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, pointBufCol); gl.bufferData(gl.ARRAY_BUFFER, fillCol, gl.DYNAMIC_DRAW);
+  }
+  ringCol = new Float32Array(pts.length * 4);
+  const mode = themeMode();
+  const crit = mode === "dark" ? [224 / 255, 82 / 255, 82 / 255] : [208 / 255, 59 / 255, 59 / 255];
+  pts.forEach((p, i) => {
+    const shown = fillCol[i * 4 + 3] > 0.3;
+    ringCol[i * 4] = crit[0]; ringCol[i * 4 + 1] = crit[1]; ringCol[i * 4 + 2] = crit[2];
+    ringCol[i * 4 + 3] = (p.cy && shown) ? 0.95 : 0.0;
+  });
+}
+
+// ---- path tracing ----
+function dijkstra(src, dst, useAdj) {
+  const dist = new Array(pts.length).fill(Infinity), prev = new Array(pts.length).fill(-1);
+  const prevW = new Array(pts.length).fill(0);
+  dist[src] = 0;
+  const done = new Array(pts.length).fill(false);
+  for (;;) {
+    let u = -1, best = Infinity;
+    for (let i = 0; i < pts.length; i++)
+      if (!done[i] && dist[i] < best) { best = dist[i]; u = i; }
+    if (u < 0 || u === dst) break;
+    done[u] = true;
+    for (const [v, w] of useAdj[u]) {
+      const c = dist[u] + 1 + 1 / (w + 1);
+      if (c < dist[v]) { dist[v] = c; prev[v] = u; prevW[v] = w; }
+    }
+  }
+  if (!isFinite(dist[dst])) return null;
+  const hops = [];
+  for (let v = dst; v !== -1; v = prev[v]) hops.unshift({ i: v, w: prevW[v] });
+  return hops;
+}
+function tracePath(a, b) {
+  let hops = dijkstra(a, b, adj), kind = "directed (A depends on B)";
+  if (!hops) { hops = dijkstra(b, a, adj); if (hops) { hops.reverse(); kind = "reverse direction (B depends on A)"; } }
+  if (!hops) {
+    const und = pts.map((_, i) => [...adj[i], ...radj[i]]);
+    hops = dijkstra(a, b, und); kind = "undirected fallback — no directed chain exists";
+  }
+  return { hops, kind };
+}
+function setRoute(hops) {
+  currentHops = hops;
+  routeSet = new Set(hops ? hops.map(h => h.i) : []);
+  const verts = [], lvls = [];
+  if (hops) for (let k = 0; k + 1 < hops.length; k++) {
+    const a = hops[k].i, b = hops[k + 1].i;
+    if (unfoldOn) straightLine(a, b, verts, 0, lvls);
+    else drapedLine(pts[a].x, pts[a].y, pts[b].x, pts[b].y, 0.016, verts, 0, lvls);
+  }
+  routeVertCount = verts.length / 3;
+  gl.bindBuffer(gl.ARRAY_BUFFER, routeBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ARRAY_BUFFER, routeLvlBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lvls), gl.DYNAMIC_DRAW);
+  beadCount = hops ? hops.length : 0;
+  if (beadCount) {
+    const W = pW();
+    const bp = new Float32Array(beadCount * 3), bs = new Float32Array(beadCount), bc = new Float32Array(beadCount * 4);
+    hops.forEach((h, k) => {
+      bp.set([W[h.i][0], W[h.i][1] + 0.006, W[h.i][2]], k * 3);
+      bs[k] = 5.5;
+      bc.set([...ACCENT, 1], k * 4);
+    });
+    gl.bindBuffer(gl.ARRAY_BUFFER, beadPosBuf); gl.bufferData(gl.ARRAY_BUFFER, bp, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, beadSizeBuf); gl.bufferData(gl.ARRAY_BUFFER, bs, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, beadColBuf); gl.bufferData(gl.ARRAY_BUFFER, bc, gl.DYNAMIC_DRAW);
+  }
+  uploadPoints();
+}
+
+// ---- impact flood ----
+function flood(src, dir) {
+  const use = dir === "dependents" ? radj : adj;
+  const m = new Map([[src, 0]]);
+  let frontier = [src];
+  while (frontier.length) {
+    const next = [];
+    for (const u of frontier) for (const [v] of use[u])
+      if (!m.has(v)) { m.set(v, m.get(u) + 1); next.push(v); }
+    frontier = next;
+  }
+  return m;
+}
+function runFlood(i, dir) {
+  floodSrc = i; floodDir = dir; floodMap = flood(i, dir);
+  selA = selB = -1; setRoute(null);
+  const n = floodMap.size - 1;
+  const maxHop = Math.max(...floodMap.values());
+  const pct = (100 * n / (pts.length - 1)).toFixed(1);
+  detail.style.display = "block";
+  detail.innerHTML = `<h2 class="mono">${pts[i].m}</h2>
+    <p class="sub">impact flood · ${dir === "dependents"
+      ? "who transitively depends on this" : "what this transitively depends on"}</p>
+    <dl><dt>reached</dt><dd>${n} directories (${pct}% of charted)</dd>
+    <dt>longest chain</dt><dd>${maxHop} hops</dd></dl>
+    <p class="note">Stain fades with hop distance. Transitive closure over the
+    ${dir === "dependents" ? "reverse " : ""}directed import graph — mechanical, but
+    only over the ${GEDGES.length} charted edges.</p>
+    <div class="btnrow">
+      <button id="flipflood">Flip direction</button>
+      <button id="clearflood">Clear flood</button>
+    </div>`;
+  document.getElementById("flipflood").onclick = () =>
+    runFlood(i, dir === "dependents" ? "dependencies" : "dependents");
+  document.getElementById("clearflood").onclick = () => {
+    floodMap = null; floodSrc = -1; detail.style.display = "none";
+    uploadPoints(); invalidate();
+  };
+  uploadPoints(); invalidate();
+}
+
+// ---- camera ----
+const CAM0 = { yaw: -0.7, pitch: 0.95, dist: 2.9, tx: 0, tz: 0 };
+let cam = { ...CAM0 };
+let MVP = null, vw = 0, vh = 0;
+function computeMVP() {
+  const eye = [
+    cam.tx + cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw),
+    cam.dist * Math.sin(cam.pitch),
+    cam.tz + cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw)];
+  const view = lookAt(eye, [cam.tx, unfoldOn ? 0.7 : 0.06, cam.tz], [0, 1, 0]);
+  const proj = perspective(0.72, vw / vh, 0.05, 30);
+  MVP = mul4(proj, view);
+}
+function project(w) {
+  const m = MVP;
+  const x = m[0] * w[0] + m[4] * w[1] + m[8] * w[2] + m[12];
+  const y = m[1] * w[0] + m[5] * w[1] + m[9] * w[2] + m[13];
+  const cw = m[3] * w[0] + m[7] * w[1] + m[11] * w[2] + m[15];
+  if (cw <= 0.01) return null;
+  return [(x / cw * 0.5 + 0.5) * vw, (0.5 - y / cw * 0.5) * vh, cw];
+}
+
+// ---- render ----
+let labelsOn = true, pointsOn = true, contoursOn = true, roadsOn = true;
+let frontiersOn = true, stressOn = false;
+const labelPicks = [...pts].map((p, i) => ({ ...p, i })).sort((a, b) => b.c - a.c).slice(0, 30);
+let needsDraw = false;
+function drawLines(vaoX, count, color, lvl, mode) {
+  gl.useProgram(lprog);
+  gl.uniformMatrix4fv(uLMVP, false, MVP);
+  gl.uniform4f(uLColor, color[0] / 255, color[1] / 255, color[2] / 255, color[3]);
+  gl.uniform1f(uLMaxLvl, lvl);
+  gl.bindVertexArray(vaoX);
+  gl.drawArrays(mode || gl.LINES, 0, count);
+  gl.bindVertexArray(null);
+}
+function draw() {
+  needsDraw = false;
+  if (!gl) return;
+  const mode = themeMode(), R = RAMPS[mode];
+  computeMVP();
+  gl.viewport(0, 0, glc.width, glc.height);
+  gl.clearColor(R.bg[0] / 255, R.bg[1] / 255, R.bg[2] / 255, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  if (!unfoldOn) {
+    gl.useProgram(prog);
+    gl.uniformMatrix4fv(uMVP, false, MVP);
+    gl.uniform3fv(uLight, norm3([-0.55, 0.65, -0.45]));
+    gl.uniform4f(uContour, R.contour[0] / 255, R.contour[1] / 255, R.contour[2] / 255, R.contourA);
+    gl.uniform1i(uContourOn, contoursOn ? 1 : 0);
+    gl.bindVertexArray(vao);
+    gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+    gl.bindVertexArray(null);
+  }
+
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  if (unfoldOn) {
+    gl.depthMask(false);
+    drawLines(planeTriVao, planeTris.length / 3, R.planeFill, maxLvl, gl.TRIANGLES);
+    drawLines(planeLineVao, planeLines.length / 3, R.planeLine, maxLvl);
+    gl.depthMask(true);
+  } else if (frontiersOn) {
+    drawLines(frontVao, frontVerts.length / 3, R.frontier, 99);
+  }
+  const rv = unfoldOn ? roadVaoU : roadVaoG, rc = unfoldOn ? roadCountU : roadCountG;
+  if (roadsOn) {
+    const rcol = stressOn ? [R.road[0], R.road[1], R.road[2], R.road[3] * 0.4] : R.road;
+    drawLines(rv, rc, rcol, maxLvl);
+  }
+  if (stressOn) {
+    const sv = unfoldOn ? stressVaoU : stressVaoG, sc = unfoldOn ? stressCountU : stressCountG;
+    drawLines(sv, sc, [R.stress[0], R.stress[1], R.stress[2], 0.85], maxLvl);
+  }
+  if (routeVertCount)
+    drawLines(routeVao, routeVertCount, [ACCENT[0] * 255, ACCENT[1] * 255, ACCENT[2] * 255, 0.95], 99);
+
+  if (pointsOn) {
+    gl.useProgram(pprog);
+    gl.uniformMatrix4fv(uPMVP, false, MVP);
+    gl.uniform1f(uPDpr, devicePixelRatio * 2.5);
+    gl.bindVertexArray(pvao);
+    gl.uniform1f(uPRing, 0);
+    gl.drawArrays(gl.POINTS, 0, pts.length);
+    gl.bindBuffer(gl.ARRAY_BUFFER, pointBufCol);
+    gl.bufferData(gl.ARRAY_BUFFER, ringCol, gl.DYNAMIC_DRAW);
+    gl.uniform1f(uPRing, 1);
+    gl.drawArrays(gl.POINTS, 0, pts.length);
+    gl.bindBuffer(gl.ARRAY_BUFFER, pointBufCol);
+    gl.bufferData(gl.ARRAY_BUFFER, fillCol, gl.DYNAMIC_DRAW);
+    gl.bindVertexArray(null);
+  }
+  if (beadCount) {
+    gl.useProgram(pprog);
+    gl.uniformMatrix4fv(uPMVP, false, MVP);
+    gl.uniform1f(uPDpr, devicePixelRatio * 2.5);
+    gl.uniform1f(uPRing, 0);
+    gl.bindVertexArray(beadVao);
+    gl.drawArrays(gl.POINTS, 0, beadCount);
+    gl.bindVertexArray(null);
+  }
+  gl.disable(gl.BLEND);
+  drawLabels();
+}
+function drawLabels() {
+  const ctx = overlay.getContext("2d");
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.clearRect(0, 0, vw, vh);
+  const halo = css("--halo"), ink2 = css("--ink-2"), muted = css("--muted");
+  if (unfoldOn) {          // layer captions at the left edge of each plane
+    ctx.font = '600 10px ui-monospace, Menlo, monospace';
+    ctx.textAlign = "left";
+    for (let l = 0; l <= Math.min(maxLvl, NLAYERS - 1); l++) {
+      const s = project([-AR, layerY(l), 1]);
+      if (!s) continue;
+      ctx.lineWidth = 3; ctx.strokeStyle = halo;
+      ctx.strokeText("L" + l, s[0] + 4, s[1] - 3);
+      ctx.fillStyle = muted; ctx.fillText("L" + l, s[0] + 4, s[1] - 3);
+    }
+  }
+  if (!labelsOn) return;
+  const W = pW();
+  ctx.font = '600 11px "Avenir Next", "Nunito Sans", "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = "center";
+  const placed = [];
+  for (const p of labelPicks) {
+    if (query && !p.m.toLowerCase().includes(query)) continue;
+    if (!visibleByLvl(p)) continue;
+    if (floodMap && !floodMap.has(p.i)) continue;
+    const s = project(W[p.i]);
+    if (!s || s[0] < 0 || s[0] > vw || s[1] < 0 || s[1] > vh) continue;
+    const name = p.m.split("/").slice(-1)[0].toUpperCase();
+    const wpx = ctx.measureText(name).width;
+    if (placed.some(q => Math.abs(q[0] - s[0]) < (wpx + q[2]) / 2 + 10 && Math.abs(q[1] - s[1]) < 15)) continue;
+    placed.push([s[0], s[1], wpx]);
+    ctx.lineWidth = 3; ctx.strokeStyle = halo;
+    ctx.strokeText(name, s[0], s[1] - 8);
+    ctx.fillStyle = ink2; ctx.fillText(name, s[0], s[1] - 8);
+  }
+}
+function invalidate() { if (!needsDraw) { needsDraw = true; requestAnimationFrame(draw); } }
+
+// ---- resize / theme ----
+function fit() {
+  vw = stage.clientWidth; vh = stage.clientHeight;
+  for (const cv of [glc, overlay]) { cv.width = vw * devicePixelRatio; cv.height = vh * devicePixelRatio; }
+  const bar = document.getElementById("scalebar");
+  const R = RAMPS[themeMode()], cols = [];
+  for (let i = 0; i <= 8; i++)
+    cols.push(`rgb(${rampColor(R.stops, i / 8).map(Math.round).join(",")})`);
+  bar.style.background = `linear-gradient(to right, ${cols.join(",")})`;
+  invalidate();
+}
+function onTheme() {
+  if (gl) {
+    const colLoc = gl.getAttribLocation(prog, "aCol");
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBufs[themeMode()]);
+    gl.enableVertexAttribArray(colLoc);
+    gl.vertexAttribPointer(colLoc, 3, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    uploadPoints();
+  }
+  fit();
+}
+addEventListener("resize", fit);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onTheme);
+new MutationObserver(onTheme).observe(document.documentElement,
+  { attributes: true, attributeFilter: ["data-theme"] });
+
+// ---- camera controls ----
+let drag = null, dragged = false;
+const pointers = new Map();
+glc.addEventListener("pointerdown", ev => {
+  glc.setPointerCapture(ev.pointerId);
+  pointers.set(ev.pointerId, [ev.clientX, ev.clientY]);
+  drag = { x: ev.clientX, y: ev.clientY, cam: { ...cam },
+           pan: ev.shiftKey || ev.button === 2 };
+  glc.classList.add("dragging");
+});
+glc.addEventListener("contextmenu", ev => ev.preventDefault());
+glc.addEventListener("pointermove", ev => {
+  if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, [ev.clientX, ev.clientY]);
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    if (drag.pinch0 == null) { drag.pinch0 = d; drag.dist0 = cam.dist; }
+    cam.dist = Math.max(0.55, Math.min(7, drag.dist0 * drag.pinch0 / d));
+    invalidate(); return;
+  }
+  if (!drag) { hover(ev); return; }
+  const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+  if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragged = true;
+  if (drag.pan) {
+    const s = cam.dist / vh * 1.6;
+    const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
+    cam.tx = drag.cam.tx - (dx * cy) * s - (dy * -sy) * s;
+    cam.tz = drag.cam.tz - (dx * -sy) * s - (dy * cy) * s;
+    cam.tx = Math.max(-AR, Math.min(AR, cam.tx));
+    cam.tz = Math.max(-1, Math.min(1, cam.tz));
+  } else {
+    cam.yaw = drag.cam.yaw - dx * 0.0055;
+    cam.pitch = Math.max(0.12, Math.min(1.45, drag.cam.pitch + dy * 0.005));
+  }
+  invalidate();
+});
+function endPointer(ev) {
+  pointers.delete(ev.pointerId);
+  if (pointers.size < 2 && drag) { drag.pinch0 = null; }
+  if (pointers.size === 0) { drag = null; glc.classList.remove("dragging"); }
+}
+glc.addEventListener("pointerup", endPointer);
+glc.addEventListener("pointercancel", endPointer);
+glc.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  cam.dist = Math.max(0.55, Math.min(7, cam.dist * (ev.deltaY > 0 ? 1.1 : 0.91)));
+  invalidate();
+}, { passive: false });
+glc.addEventListener("dblclick", () => { cam = { ...CAM0 }; invalidate(); });
+document.getElementById("resetcam").addEventListener("click", () => {
+  cam = unfoldOn ? { yaw: -0.7, pitch: 0.42, dist: 3.6, tx: 0, tz: 0 } : { ...CAM0 };
+  invalidate();
+});
+
+// ---- hover / click ----
+function nearest(mx, my) {
+  const W = pW();
+  let bi = -1, bd = 26 * 26;
+  for (let i = 0; i < pts.length; i++) {
+    const s = project(W[i]);
+    if (!s) continue;
+    const d = (s[0] - mx) ** 2 + (s[1] - my) ** 2;
+    if (d < bd) { bd = d; bi = i; }
+  }
+  return bi;
+}
+function hover(ev) {
+  if (!MVP) return;
+  const r = stage.getBoundingClientRect();
+  const i = nearest(ev.clientX - r.left, ev.clientY - r.top);
+  if (i < 0) { tip.style.opacity = 0; return; }
+  const p = pts[i];
+  tip.innerHTML = `<b class="mono">${p.m}</b>
+    <div class="row">${p.c.toLocaleString()} chunks · ${p.f} files · ${p.z} zone</div>
+    <div class="row">build layer ${p.l < 0 ? "—" : p.l}${p.cy ? ` · <span style="color:${css("--critical")}">⚠ cycle</span>` : ""}</div>
+    ${floodMap && floodMap.has(i) && i !== floodSrc ? `<div class="row" style="color:${css("--accent-ink")}">flood hop ${floodMap.get(i)}</div>` : ""}
+    ${traceMode ? `<div class="row" style="color:${css("--accent-ink")}">${selA < 0 ? "click: set route start" : "click: trace route here"}</div>` : ""}`;
+  tip.style.left = Math.min(ev.clientX - r.left + 14, vw - 280) + "px";
+  tip.style.top = (ev.clientY - r.top + 14) + "px";
+  tip.style.opacity = 1;
+}
+glc.addEventListener("mouseleave", () => tip.style.opacity = 0);
+const detail = document.getElementById("detail");
+function showRouteCard(hops, kind) {
+  detail.style.display = "block";
+  const rows = hops.map((h, k) => `<div class="hop"><span class="n">${k}</span>
+      <span class="mono">${pts[h.i].m}</span>
+      ${k > 0 ? `<span class="w">w ${h.w}</span>` : ""}</div>`).join("");
+  detail.innerHTML = `<h2>✦ Dependency route</h2>
+    <p class="sub">${hops.length - 1} hop${hops.length === 2 ? "" : "s"} · ${kind}</p>
+    ${rows}
+    <p class="note">Cost prefers the shortest chain, breaking ties toward stronger
+    import edges. Routes travel real L1 edges — map proximity plays no part.</p>
+    <div class="btnrow"><button id="clearroute">Clear route</button></div>`;
+  document.getElementById("clearroute").onclick = () => {
+    selA = selB = -1; setRoute(null); detail.style.display = "none"; invalidate();
+  };
+}
+glc.addEventListener("click", ev => {
+  if (dragged) { dragged = false; return; }
+  const r = stage.getBoundingClientRect();
+  const i = nearest(ev.clientX - r.left, ev.clientY - r.top);
+  if (traceMode) {
+    if (i < 0) return;
+    floodMap = null; floodSrc = -1;
+    if (selA < 0 || selB >= 0) { selA = i; selB = -1; setRoute(null); detail.style.display = "none"; }
+    else if (i !== selA) {
+      selB = i;
+      const { hops, kind } = tracePath(selA, selB);
+      if (hops) { setRoute(hops); showRouteCard(hops, kind); }
+      else {
+        setRoute(null);
+        detail.style.display = "block";
+        detail.innerHTML = `<h2>✦ Dependency route</h2>
+          <p class="sub">no path — these directories are not connected in the charted import graph</p>
+          <div class="btnrow"><button id="clearroute">Close</button></div>`;
+        document.getElementById("clearroute").onclick = () => {
+          selA = selB = -1; detail.style.display = "none"; invalidate();
+        };
+      }
+    }
+    uploadPoints(); invalidate(); return;
+  }
+  if (i < 0) { detail.style.display = "none"; return; }
+  const p = pts[i];
+  detail.style.display = "block";
+  detail.innerHTML = `<h2 class="mono">${p.m}</h2><p class="sub">${p.z} zone</p>
+    <dl><dt>code chunks</dt><dd>${p.c.toLocaleString()}</dd>
+    <dt>files</dt><dd>${p.f.toLocaleString()}</dd>
+    <dt>build layer</dt><dd>${p.l < 0 ? "no import data" : p.l + " of " + NLAYERS}</dd>
+    <dt>charted edges</dt><dd>${adj[i].length} out · ${radj[i].length} in</dd>
+    <dt>semantic strain</dt><dd>${misfit[i] ? misfit[i].toFixed(3) + " · rank " + rankOf[i] + "/" + pts.length : "—"}</dd></dl>
+    ${p.cy ? '<p class="cyc">⚠ participates in a directory import cycle</p>' : ""}
+    <p class="note">Strain is the import-weighted mean semantic distance to this
+    directory's graph neighbors — high values couple to code that talks about
+    different things.</p>
+    <div class="btnrow">
+      <button id="fl-dep">Flood: who depends on this</button>
+      <button id="fl-use">Flood: what this uses</button>
+      <button id="closedetail">Close</button>
+    </div>`;
+  document.getElementById("fl-dep").onclick = () => runFlood(i, "dependents");
+  document.getElementById("fl-use").onclick = () => runFlood(i, "dependencies");
+  document.getElementById("closedetail").onclick = () => detail.style.display = "none";
+});
+
+// ---- HUD ----
+function bindToggle(id, get, set, after) {
+  const b = document.getElementById(id);
+  b.addEventListener("click", () => {
+    set(!get()); b.setAttribute("aria-pressed", String(get()));
+    if (after) after();
+    invalidate();
+  });
+}
+bindToggle("t-labels", () => labelsOn, v => labelsOn = v);
+bindToggle("t-points", () => pointsOn, v => pointsOn = v);
+bindToggle("t-contours", () => contoursOn, v => contoursOn = v);
+bindToggle("t-roads", () => roadsOn, v => roadsOn = v);
+bindToggle("t-frontiers", () => frontiersOn, v => frontiersOn = v);
+bindToggle("t-stress", () => stressOn, v => stressOn = v);
+bindToggle("t-unfold", () => unfoldOn, v => unfoldOn = v, () => {
+  cam = unfoldOn ? { yaw: -0.7, pitch: 0.42, dist: 3.6, tx: 0, tz: 0 } : { ...CAM0 };
+  document.getElementById("scalelo").textContent = unfoldOn ? "L0 · bedrock" : "sea · little code";
+  document.getElementById("scalehi").textContent = unfoldOn ? "top · apps" : "peaks · dense code";
+  uploadPoints();
+  if (currentHops) setRoute(currentHops);
+});
+document.getElementById("t-trace").addEventListener("click", ev => {
+  traceMode = !traceMode;
+  ev.target.setAttribute("aria-pressed", String(traceMode));
+  glc.classList.toggle("tracing", traceMode);
+  if (!traceMode) { selA = selB = -1; setRoute(null); uploadPoints(); }
+  invalidate();
+});
+document.getElementById("q").addEventListener("input", ev => {
+  query = ev.target.value.trim().toLowerCase();
+  if (gl) uploadPoints();
+  invalidate();
+});
+const lvlEl = document.getElementById("lvl");
+lvlEl.max = String(NLAYERS - 1);
+lvlEl.value = String(NLAYERS - 1);
+maxLvl = NLAYERS - 1;
+document.getElementById("lvlval").textContent = lvlEl.value;
+lvlEl.addEventListener("input", () => {
+  maxLvl = +lvlEl.value;
+  document.getElementById("lvlval").textContent = lvlEl.value;
+  if (gl) uploadPoints();
+  invalidate();
+});
+const legendEl = document.getElementById("legend");
+function leg(html) { const s = document.createElement("span"); s.innerHTML = html; legendEl.appendChild(s); }
+leg(`<i style="background:${css("--muted")}"></i>directory (size = chunks)`);
+leg(`<i style="background:${css("--accent")}"></i>match · route · flood`);
+leg(`<i style="background:none;border:1.4px solid ${css("--critical")}"></i>import cycle`);
+leg(`<i class="line" style="border-color:${css("--muted")}"></i>road (import edge)`);
+leg(`<i class="line" style="border-color:${css("--ink-2")};border-top-style:dashed"></i>zone frontier`);
+leg(`<i class="line" style="border-color:${css("--critical")}"></i>⚡ strained route`);
+leg(`<i class="line" style="border-color:${css("--accent")}"></i>traced path`);
+
+if (gl) { uploadPoints(); }
+fit();
+</script>

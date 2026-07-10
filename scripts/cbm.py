@@ -43,6 +43,8 @@ COMMANDS: dict[str, tuple[str, str]] = {
              "Generate the static bundle-browser site"),
     "repair": ("cbm_repair",
                "Apply post-hoc data-quality fixes to an emitted bundle"),
+    "terrain": ("cbm_terrain",
+                "SourcePath 3D code-terrain map (self-contained HTML)"),
 }
 
 
