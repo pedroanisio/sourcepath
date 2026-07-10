@@ -21,6 +21,7 @@ import hashlib
 import os
 import re
 import tempfile
+import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
@@ -100,6 +101,30 @@ class _OxigraphHandle:
         self.store = store
 
 
+# One live Store per on-disk store dir, per process. RocksDB holds an
+# exclusive lock on the dir for the lifetime of the Store *object*, not of
+# the lru_cache entry: after clear_graph_cache(), any surviving reference
+# (an exception traceback, a result iterator) keeps the lock, and
+# constructing a second Store on the same dir raises
+# "OSError: IO error: lock hold by current process". Reuse, never reopen.
+_STORES: dict[str, Any] = {}
+_STORES_LOCK = threading.Lock()
+
+
+def _open_store(ox: Any, sdir: Path, key: str) -> Any:
+    with _STORES_LOCK:
+        store = _STORES.get(str(sdir))
+        if store is None:
+            # A regenerated inventory maps to a new mtime+size dir; drop
+            # superseded handles for the same inventory path so open
+            # stores don't accumulate across bundle regenerations.
+            for stale in [s for s in _STORES if Path(s).name.startswith(f"{key}_")]:
+                del _STORES[stale]
+            store = ox.Store(str(sdir))
+            _STORES[str(sdir)] = store
+        return store
+
+
 @lru_cache(maxsize=4)
 def _load_graph(path_str: str) -> Any:
     """Load the bundle graph for querying.
@@ -122,7 +147,7 @@ def _load_graph(path_str: str) -> Any:
         sdir = (Path(tempfile.gettempdir()) / "cbm_sparql_store"
                 / f"{key}_{int(st.st_mtime)}_{st.st_size}")
         sdir.parent.mkdir(parents=True, exist_ok=True)
-        store = ox.Store(str(sdir))
+        store = _open_store(ox, sdir, key)
         if len(store) == 0:
             store.bulk_load(path=str(ttl), format=ox.RdfFormat.TURTLE)
         return _OxigraphHandle(store)
@@ -133,7 +158,10 @@ def _load_graph(path_str: str) -> Any:
 
 def clear_graph_cache() -> None:
     """Clear cached graphs. Wired into manifest-change notifications so a
-    re-generated bundle is re-parsed on the next SPARQL call."""
+    re-generated bundle is re-parsed on the next SPARQL call. Live oxigraph
+    stores are NOT closed here — a re-generated inventory gets a new
+    mtime+size store dir, while an unchanged one must reuse the live store
+    (see _STORES) because its dir is still exclusively locked."""
     _load_graph.cache_clear()
 
 
