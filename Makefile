@@ -105,6 +105,7 @@ LLM_ONLINE_VERIFIERS := \
 # site). The Rust crate's own tests run via `test-report-rs`.
 REPORTING_TESTS := \
 	$(TESTS_DIR)/test_cbm_cli.py \
+	$(TESTS_DIR)/test_cbm_walkthrough.py \
 	$(TESTS_DIR)/test_report_caveats.py \
 	$(TESTS_DIR)/test_evidence_banner.py \
 	$(TESTS_DIR)/test_report_to_pdf.py \

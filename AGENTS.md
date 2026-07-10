@@ -42,13 +42,15 @@ python scripts/cbm.py <command> [options]
   dossier    A4 PDF dossier, typeset with the Measured Ink design system
   pdf        Render an authored Markdown report to a themed PDF
   site       Generate the static bundle-browser site
-  repair     Apply post-hoc data-quality fixes to an emitted bundle
-  terrain    SourcePath 3D code-terrain map (self-contained HTML)
+  repair       Apply post-hoc data-quality fixes to an emitted bundle
+  terrain      SourcePath 3D code-terrain map (self-contained HTML)
+  walkthrough  Narrated five-scene customer walkthrough (HTML)
 ```
 
 The dispatcher routes to `scripts/cbm_report.py`, `cbm_report_rs.py`,
-`cbm_dossier.py`, `report_to_pdf.py`, `generate_static_site.py`, and
-`cbm_repair.py`, which all remain independently runnable. Commands
+`cbm_dossier.py`, `report_to_pdf.py`, `generate_static_site.py`,
+`cbm_repair.py`, and `cbm_walkthrough.py`, which all remain
+independently runnable. Commands
 import lazily, so a missing optional dependency (reportlab for
 `dossier`, weasyprint for `pdf`) fails that command only, with an
 install hint.

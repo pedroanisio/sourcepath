@@ -223,6 +223,7 @@ python scripts/cbm.py pdf docs/reports/<name>.md    # authored Markdown -> theme
 python scripts/cbm.py site      --bundle _tmp/out --output _site  # offline static site
 python scripts/cbm.py repair    --bundle _tmp/out   # post-hoc data-quality fixes
 python scripts/cbm.py terrain   --bundle _tmp/out   # 3D code-terrain map (one HTML file)
+python scripts/cbm.py walkthrough --bundle _tmp/out # narrated five-scene demo page
 ```
 
 Two structural read paths exist by design: `report`/`dossier` (Python) load
@@ -240,6 +241,14 @@ distant) fault lines. Directory roll-up auto-fits large bundles
 (kernel-scale ≈ 2 min); the page footer discloses every truncation and marks
 derived views. Keep `--seed` fixed per repo so its geography stays
 recognizable across regenerations.
+
+`walkthrough` freezes five live MCP-surface queries (orientation →
+keystone file → blast radius → concept neighborhood → semantic
+question) into one self-contained demo page — the narrated companion
+to `report`'s evidence-first X-ray. Each scene names the MCP tool that
+answers it live; the only LLM-authored line (the L4 file summary, when
+the bundle has one) is shown with model/prompt provenance, never as
+fact.
 
 Every generator separates evidence tiers (mechanical facts vs derived
 computation vs unverified LLM output) under the shared

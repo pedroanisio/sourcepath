@@ -49,6 +49,8 @@ COMMANDS: dict[str, tuple[str, str]] = {
                "Failing quality gate: recount, hashes, budgets, degradations"),
     "terrain": ("cbm_terrain",
                 "SourcePath 3D code-terrain map (self-contained HTML)"),
+    "walkthrough": ("cbm_walkthrough",
+                    "Narrated five-scene customer walkthrough (HTML)"),
 }
 
 
