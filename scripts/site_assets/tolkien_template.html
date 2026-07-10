@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__REPO__ — a chart of the realm</title>
+<style>
+  :root{
+    --parch:#efe3c2; --parch-deep:#e0cd9f; --desk:#241b10;
+    --ink:#3a2c17; --ink-soft:#6b5636; --oxblood:#7c2f1d; --gold:#9c7c2f;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif;
+  }
+  html,body{margin:0;height:100%;background:var(--desk);overflow:hidden;
+    font-family:var(--serif);color:var(--ink)}
+  #stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  svg#chart{width:100%;height:100%;display:block;cursor:grab}
+  svg#chart.dragging{cursor:grabbing}
+  text{user-select:none}
+  /* decorative & label layers never swallow hovers meant for data marks */
+  #L_names,#L_realms,#L_relief,#L_frontier,#L_coast,#L_glow{pointer-events:none}
+
+  /* ------- HUD ------- */
+  #hud{position:absolute;top:14px;left:14px;width:248px;display:flex;
+    flex-direction:column;gap:10px;z-index:5;font-size:13px}
+  .card{background:rgba(239,227,194,.94);border:1px solid #b49b66;
+    border-radius:3px;box-shadow:0 3px 14px rgba(0,0,0,.45);
+    padding:10px 12px;color:var(--ink)}
+  .card h2{margin:0 0 6px;font-size:12px;letter-spacing:.18em;
+    text-transform:uppercase;font-weight:600;color:var(--ink-soft)}
+  .card label{display:flex;gap:7px;align-items:center;margin:3px 0;cursor:pointer}
+  .card input[type=checkbox]{accent-color:var(--ink)}
+  #search{width:100%;box-sizing:border-box;margin-top:6px;padding:5px 8px;
+    font:inherit;font-style:italic;color:var(--ink);background:#f7eed6;
+    border:1px solid #b49b66;border-radius:2px;outline:none}
+  #search:focus{border-color:var(--ink)}
+  #searchMsg{font-size:11px;font-style:italic;color:var(--ink-soft);
+    margin-top:4px;min-height:14px}
+  .btnrow{display:flex;gap:8px;margin-top:8px}
+  .btnrow button{flex:1;font:inherit;font-size:12px;padding:5px 4px;cursor:pointer;
+    background:#e6d5aa;color:var(--ink);border:1px solid #b49b66;border-radius:2px}
+  .btnrow button:hover{background:#dcc891}
+  details.card summary{cursor:pointer;font-size:12px;letter-spacing:.14em;
+    text-transform:uppercase;font-weight:600;color:var(--ink-soft);list-style:none}
+  details.card summary::before{content:"❧ "}
+  details.card[open] summary{margin-bottom:6px}
+  #epist{max-height:52vh;overflow:auto;line-height:1.45;font-size:12px}
+  #epist p{margin:6px 0}
+  #epist ul{margin:4px 0 6px;padding-left:16px}
+  #epist li{margin:2px 0}
+  #epist .refs{font-size:11px;color:var(--ink-soft)}
+  #epist code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}
+
+  /* ------- tooltip ------- */
+  #tip{position:absolute;z-index:9;pointer-events:none;display:none;max-width:320px;
+    background:rgba(247,238,214,.97);border:1px solid #8a6f3d;border-radius:2px;
+    padding:7px 10px;font-size:12.5px;line-height:1.4;color:var(--ink);
+    box-shadow:0 3px 12px rgba(0,0,0,.5)}
+  #tip .t{font-style:italic;font-weight:600;font-size:13px}
+  #tip .d{color:var(--ink-soft)}
+  #tip .peril{color:var(--oxblood);font-weight:600}
+  @media (max-width:760px){#hud{width:200px;font-size:12px}}
+</style>
+</head>
+<body>
+<div id="stage"><svg id="chart" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+<div id="hud">
+  <div class="card">
+    <h2>The chart</h2>
+    <label><input type="checkbox" id="tglRoads" checked> Roads <span id="cRoads" style="color:var(--ink-soft)"></span></label>
+    <label><input type="checkbox" id="tglNames" checked> Settlement names</label>
+    <label><input type="checkbox" id="tglRealms" checked> Realm names</label>
+    <label><input type="checkbox" id="tglFront" checked> Frontiers</label>
+    <label><input type="checkbox" id="tglRelief" checked> Relief (peaks &amp; hills)</label>
+    <label><input type="checkbox" id="tglPerils" checked> Perils <span style="color:var(--oxblood)">⚔</span></label>
+    <label><input type="checkbox" id="tglWater" checked> Waters &amp; shore</label>
+    <input id="search" type="search" placeholder="seek a settlement… (Enter)" spellcheck="false">
+    <div id="searchMsg"></div>
+    <div class="btnrow">
+      <button id="btnReset" type="button">Reset view</button>
+      <button id="btnSvg" type="button">Download SVG</button>
+    </div>
+  </div>
+
+  <details class="card">
+    <summary>Cartographer's note</summary>
+    <div id="epist">
+      <p><strong>__REPONAME__</strong> at commit <code>__COMMIT__</code> —
+        __CHUNKS__ chunks across __MODS__ charted settlements.</p>
+      <p>__ROLLUP__</p>
+      <p><strong>Geography is a derived view.</strong> Positions come from
+        <em>__METHOD__</em> over per-group mean chunk embeddings; the projection
+        preserves neighbourhoods, not global distances, so the compass and any
+        sense of scale are decorative tradition, not measurement.</p>
+      <p><strong>What each mark traverses:</strong></p>
+      <ul>
+        <li><em>Relief</em> — elevation is chunk density on the projected plane
+          (Gaussian-smoothed, gamma-mapped); peaks mean many parsed chunks, sea
+          means none.</li>
+        <li><em>Roads</em> — the __ROADS__ strongest of __GEDGES__ inter-group
+          import edges from the mechanical L1 graph (__DROPPED__ chart-less
+          edges dropped; intra-group edges are cohesion, not coupling, and are
+          rolled away).</li>
+        <li><em>Crossed swords</em> — the top __NSTRESS__ routes by
+          import-weight × semantic distance: strongly coupled yet semantically
+          far apart.</li>
+        <li><em>Wyrms</em> — settlements inside an import cycle of the L1
+          graph.</li>
+        <li><em>Frontiers</em> — nearest-settlement realm boundaries on a
+          half-resolution grid; realms are top-level directories.</li>
+        <li><em>Decorative only</em> — parchment, border, cartouche, compass,
+          sea-serpent, and the hand-wobble of every line.</li>
+      </ul>
+      <p class="refs">References: van der Maaten &amp; Hinton, “Visualizing Data
+        using t-SNE”, JMLR 9 (2008) · Wattenberg, Viégas &amp; Johnson, “How to
+        Use t-SNE Effectively”, Distill (2016) — on why projected distances
+        mislead · marching squares for the coastline · mulberry32 PRNG
+        (T.&nbsp;Ettinger, public domain), seeded from repo+commit so the wobble
+        is reproducible.</p>
+    </div>
+  </details>
+</div>
+
+<div id="tip"></div>
+
+<span id="docTitle" hidden>__REPO__</span>
+
+<script>
+"use strict";
+const DATA = __DATA__;
+
+/* =====================================================================
+   0. Deterministic randomness & small math helpers
+   ===================================================================== */
+function fnv1a(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193);}return h>>>0;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const SEED_STR = DATA.meta.repo+"|"+DATA.meta.commit+"|"+DATA.meta.method;
+const rng = mulberry32(fnv1a(SEED_STR));
+function quantile(sortedAsc,p){
+  if(!sortedAsc.length)return 0;
+  const i=(sortedAsc.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i);
+  return sortedAsc[lo]+(sortedAsc[hi]-sortedAsc[lo])*(i-lo);
+}
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const fmt=n=>n.toLocaleString("en-US");
+
+/* =====================================================================
+   1. Geometry constants — world = the projected unit square, scaled
+   ===================================================================== */
+const GW=DATA.meta.gw, GH=DATA.meta.gh;
+const WU=1500, HU=Math.round(WU*GH/GW);       // world units
+const MARGIN=54;                               // frame margin (view units)
+const VW=WU+2*MARGIN, VH=HU+2*MARGIN;          // fixed viewBox
+const CW=WU/GW, CH=HU/GH;                      // grid-cell size in world units
+const wx=x=>x*WU, wy=y=>y*HU;                  // unit-square → world
+
+const INK="#3a2c17", SOFT="#6b5636", OX="#7c2f1d", PARCH="#efe3c2", GOLD="#9c7c2f";
+
+/* =====================================================================
+   2. Decode elevation grid  (row-major uint8, H[j*GW+i])
+   ===================================================================== */
+const HGT=(()=>{const bin=atob(DATA.grid_b64),a=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a;})();
+const hAt=(i,j)=>HGT[j*GW+i];
+function hBilinear(fx,fy){                     // fx∈[0,GW-1], fy∈[0,GH-1]
+  const i=clamp(Math.floor(fx),0,GW-2), j=clamp(Math.floor(fy),0,GH-2);
+  const u=fx-i, v=fy-j;
+  return hAt(i,j)*(1-u)*(1-v)+hAt(i+1,j)*u*(1-v)+hAt(i,j+1)*(1-u)*v+hAt(i+1,j+1)*u*v;
+}
+
+/* Thresholds: sea is (near) zero density; hills/peaks from land quantiles. */
+const SEA_ISO=8;
+const landVals=[];let landCells=0;
+for(let k=0;k<HGT.length;k++){if(HGT[k]>SEA_ISO){landCells++;landVals.push(HGT[k]);}}
+landVals.sort((a,b)=>a-b);
+const landFrac=landCells/HGT.length;
+const HAS_SEA=landFrac<0.93 && landFrac>0.005;
+let T_HILL=quantile(landVals,0.60), T_MTN=quantile(landVals,0.85);
+if(T_MTN-T_HILL<10){T_HILL=Math.max(SEA_ISO+8,T_MTN-24);}
+
+/* =====================================================================
+   3. SVG scaffolding
+   ===================================================================== */
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("chart");
+svg.setAttribute("viewBox",`0 0 ${VW} ${VH}`);
+svg.setAttribute("preserveAspectRatio","xMidYMid meet");
+function el(name,attrs,parent){const n=document.createElementNS(NS,name);
+  for(const k in attrs)n.setAttribute(k,attrs[k]);
+  if(parent)parent.appendChild(n);return n;}
+function txt(node,s){node.appendChild(document.createTextNode(s));return node;}
+
+/* ---- defs: parchment, vignette, wobble ---- */
+const defs=el("defs",{},svg);
+defs.innerHTML=`
+  <radialGradient id="vign" cx="50%" cy="46%" r="72%">
+    <stop offset="60%" stop-color="rgba(90,60,20,0)"/>
+    <stop offset="88%" stop-color="rgba(90,60,20,.16)"/>
+    <stop offset="100%" stop-color="rgba(70,45,15,.38)"/>
+  </radialGradient>
+  <filter id="mottle" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="4" seed="7"/>
+    <feColorMatrix type="matrix"
+      values="0 0 0 0 0.34  0 0 0 0 0.25  0 0 0 0 0.12  0 0 0 0.55 0"/>
+  </filter>
+  <filter id="grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" seed="11"/>
+    <feColorMatrix type="matrix"
+      values="0 0 0 0 0.30  0 0 0 0 0.22  0 0 0 0 0.10  0 0 0 0.22 0"/>
+  </filter>
+  <filter id="wobble" x="-4%" y="-4%" width="108%" height="108%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="2" seed="3" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5"
+      xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <clipPath id="mapClip">
+    <rect x="${MARGIN-16}" y="${MARGIN-16}" width="${WU+32}" height="${HU+32}"/>
+  </clipPath>`;
+
+/* ---- background (static) ---- */
+const gBg=el("g",{id:"gBg"},svg);
+el("rect",{x:0,y:0,width:VW,height:VH,fill:PARCH},gBg);
+el("rect",{x:0,y:0,width:VW,height:VH,filter:"url(#mottle)",opacity:.5},gBg);
+el("rect",{x:0,y:0,width:VW,height:VH,filter:"url(#grain)",opacity:.28},gBg);
+el("rect",{x:0,y:0,width:VW,height:VH,fill:"url(#vign)"},gBg);
+
+/* ---- world (pans & zooms) ---- */
+const gClip=el("g",{"clip-path":"url(#mapClip)"},svg);
+const gWorld=el("g",{id:"gWorld"},gClip);
+const L={}; // named layers, painted back → front
+for(const name of ["water","coast","frontier","roads","relief","swords",
+                   "towns","wyrms","names","realms","glow"])
+  L[name]=el("g",{id:"L_"+name},gWorld);
+L.coast.setAttribute("filter","url(#wobble)");
+L.frontier.setAttribute("filter","url(#wobble)");
+L.roads.setAttribute("filter","url(#wobble)");
+
+/* ---- UI frame (fixed) ---- */
+const gUi=el("g",{id:"gUi","pointer-events":"none"},svg);
+
+/* =====================================================================
+   4. Waters: coastline (marching squares) + shore hatching + serpent
+   ===================================================================== */
+function marchingSquares(iso){
+  const segs=[];
+  const pt=(x,y)=>x.toFixed(1)+" "+y.toFixed(1);
+  const lerp=(a,b)=>(iso-a)/(b-a);
+  for(let j=0;j<GH-1;j++)for(let i=0;i<GW-1;i++){
+    const a=hAt(i,j),b=hAt(i+1,j),c=hAt(i+1,j+1),d=hAt(i,j+1);
+    const idx=(a>iso?1:0)|(b>iso?2:0)|(c>iso?4:0)|(d>iso?8:0);
+    if(idx===0||idx===15)continue;
+    const x0=i*CW,y0=j*CH;
+    const T=[x0+lerp(a,b)*CW, y0], R=[x0+CW, y0+lerp(b,c)*CH],
+          B=[x0+lerp(d,c)*CW, y0+CH], Lf=[x0, y0+lerp(a,d)*CH];
+    const put=(p,q)=>segs.push("M"+pt(p[0],p[1])+"L"+pt(q[0],q[1]));
+    switch(idx){
+      case 1: put(Lf,T);break;   case 2: put(T,R);break;
+      case 3: put(Lf,R);break;   case 4: put(R,B);break;
+      case 5: put(Lf,T);put(R,B);break;
+      case 6: put(T,B);break;    case 7: put(Lf,B);break;
+      case 8: put(Lf,B);break;   case 9: put(T,B);break;
+      case 10:put(T,R);put(Lf,B);break;
+      case 11:put(R,B);break;    case 12:put(Lf,R);break;
+      case 13:put(T,R);break;    case 14:put(Lf,T);break;
+    }
+  }
+  return segs.join("");
+}
+
+/* integer chessboard distance from sea cells to nearest land (2-pass) */
+function seaDistance(){
+  const INF=1e9, D=new Float32Array(GW*GH);
+  for(let k=0;k<D.length;k++)D[k]=HGT[k]>SEA_ISO?0:INF;
+  for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){
+    const k=j*GW+i;let v=D[k];
+    if(i>0)v=Math.min(v,D[k-1]+1);
+    if(j>0)v=Math.min(v,D[k-GW]+1);
+    if(i>0&&j>0)v=Math.min(v,D[k-GW-1]+1);
+    if(i<GW-1&&j>0)v=Math.min(v,D[k-GW+1]+1);
+    D[k]=v;}
+  for(let j=GH-1;j>=0;j--)for(let i=GW-1;i>=0;i--){
+    const k=j*GW+i;let v=D[k];
+    if(i<GW-1)v=Math.min(v,D[k+1]+1);
+    if(j<GH-1)v=Math.min(v,D[k+GW]+1);
+    if(i<GW-1&&j<GH-1)v=Math.min(v,D[k+GW+1]+1);
+    if(i>0&&j<GH-1)v=Math.min(v,D[k+GW-1]+1);
+    D[k]=v;}
+  return D;
+}
+
+let serpentSpot=null;
+if(HAS_SEA){
+  el("path",{d:marchingSquares(SEA_ISO),stroke:INK,"stroke-width":1.5,
+    fill:"none","stroke-linecap":"round",opacity:.92},L.coast);
+  const D=seaDistance();
+  const dens=[.55,.40,.28,.18,.11,.06,.03];
+  let hatch="",best=-1;
+  for(let j=0;j<GH;j++)for(let i=0;i<GW;i++){
+    const d=D[j*GW+i];
+    if(d>=1&&d<=7&&rng()<dens[d-1]){
+      const x=(i+.5+(rng()-.5)*.8)*CW, y=(j+.5+(rng()-.5)*.8)*CH,
+            l=2.2+rng()*3.4;
+      hatch+=`M${(x-l).toFixed(1)} ${y.toFixed(1)}h${(2*l).toFixed(1)}`;
+    }
+    if(d>best&&d<1e8){best=d;serpentSpot=[(i+.5)*CW,(j+.5)*CH,d];}
+  }
+  el("path",{d:hatch,stroke:INK,"stroke-width":.8,opacity:.5,
+    "stroke-linecap":"round",fill:"none","pointer-events":"none"},L.water);
+
+  if(serpentSpot&&serpentSpot[2]>=10){         // decorative — disclosed
+    const [sx,sy]=serpentSpot,g=el("g",{opacity:.85,stroke:INK,fill:"none",
+      "stroke-width":1.6,"stroke-linecap":"round",
+      transform:`translate(${sx.toFixed(1)} ${sy.toFixed(1)})`,
+      "data-tip":"deco"},L.water);
+    el("path",{d:"M-30 4 q6 -14 13 0 M-8 4 q6 -16 13 0 M14 4 q5 -12 11 0"},g);
+    el("path",{d:"M25 4 q6 -9 13 -5 q4 2 3 6 l-6 1"},g); // neck+head
+    el("circle",{cx:39,cy:2.6,r:.9,fill:INK,stroke:"none"},g);
+    el("path",{d:"M-30 4 q-6 -8 -12 -3"},g);              // tail
+  }
+}
+
+/* =====================================================================
+   5. Relief: hand-set peak & hill glyphs from the elevation field
+   ===================================================================== */
+(function relief(){
+  const glyphs=[];
+  const stride=Math.max(3,Math.round(Math.min(GW,GH)/36));
+  for(let gj=1;gj<GH-1;gj+=stride)for(let gi=1;gi<GW-1;gi+=stride){
+    const fx=clamp(gi+(rng()-.5)*stride*.9,0,GW-1.01),
+          fy=clamp(gj+(rng()-.5)*stride*.9,0,GH-1.01),
+          v=hBilinear(fx,fy);
+    if(v>=T_MTN){
+      const t=(v-T_MTN)/Math.max(1,255-T_MTN);
+      glyphs.push({x:fx*CW,y:fy*CH,s:9+15*t,kind:"m"});
+    }else if(v>=T_HILL){
+      const t=(v-T_HILL)/Math.max(1,T_MTN-T_HILL);
+      if(rng()<.75)glyphs.push({x:fx*CW,y:fy*CH,s:3.5+4.5*t,kind:"h"});
+    }
+  }
+  glyphs.sort((a,b)=>a.y-b.y);                 // back → front
+  for(const g of glyphs){
+    const j=(rng()-.5), s=g.s;
+    if(g.kind==="m"){
+      const h=s*(1.15+rng()*.35), px=g.x+s*j*.35;
+      const flank=`M${(g.x-s).toFixed(1)} ${g.y.toFixed(1)} `+
+        `Q${(g.x-s*.38).toFixed(1)} ${(g.y-h*.52).toFixed(1)} ${px.toFixed(1)} ${(g.y-h).toFixed(1)} `+
+        `Q${(g.x+s*.42).toFixed(1)} ${(g.y-h*.48).toFixed(1)} ${(g.x+s).toFixed(1)} ${g.y.toFixed(1)}`;
+      el("path",{d:flank+" Z",fill:PARCH,stroke:"none"},L.relief);
+      el("path",{d:flank,fill:"none",stroke:INK,
+        "stroke-width":1.25,"stroke-linecap":"round"},L.relief);
+      let hd="";                                // shading on the east flank
+      for(let k=1;k<=3;k++){
+        const f=k/4, hx=px+(g.x+s-px)*f*.72, hy=(g.y-h)+h*f*.74;
+        hd+=`M${hx.toFixed(1)} ${hy.toFixed(1)} l${(s*.24).toFixed(1)} ${(h*.16).toFixed(1)}`;
+      }
+      el("path",{d:hd,stroke:INK,"stroke-width":.75,opacity:.65,fill:"none"},L.relief);
+    }else{
+      const d=`M${(g.x-s).toFixed(1)} ${g.y.toFixed(1)} `+
+        `Q${g.x.toFixed(1)} ${(g.y-s*(1.0+j*.3)).toFixed(1)} ${(g.x+s).toFixed(1)} ${g.y.toFixed(1)}`;
+      el("path",{d:d+" Z",fill:PARCH,stroke:"none"},L.relief);
+      el("path",{d,fill:"none",stroke:INK,"stroke-width":.9,
+        "stroke-linecap":"round",opacity:.9},L.relief);
+    }
+  }
+})();
+
+/* =====================================================================
+   6. Frontiers between realms (given as unit-square segments)
+   ===================================================================== */
+{
+  let d="";
+  for(const s of DATA.frontiers)
+    d+=`M${wx(s[0]).toFixed(1)} ${wy(s[1]).toFixed(1)}L${wx(s[2]).toFixed(1)} ${wy(s[3]).toFixed(1)}`;
+  el("path",{d,stroke:OX,"stroke-width":1,"stroke-dasharray":"1.5 5",
+    "stroke-linecap":"round",opacity:.55,fill:"none"},L.frontier);
+}
+
+/* =====================================================================
+   7. Settlements, roads, perils
+   ===================================================================== */
+const P=DATA.points, E=DATA.graph.edges, ROADS=DATA.graph.roads;
+const px=i=>wx(P[i].x), py=i=>wy(P[i].y);
+const cSorted=P.map(p=>p.c).sort((a,b)=>a-b);
+const C50=quantile(cSorted,.5), C85=quantile(cSorted,.85);
+const capitalOf={};                            // zone → point index
+P.forEach((p,i)=>{if(!(p.z in capitalOf)||p.c>P[capitalOf[p.z]].c)capitalOf[p.z]=i;});
+const isCapital=new Set(Object.values(capitalOf));
+const sClass=i=>isCapital.has(i)?3:(P[i].c>C85?2:(P[i].c>C50?1:0));
+
+/* ---- roads (drawn beneath relief? no — beneath settlements, over relief
+        would hide them; classic charts run roads under the peaks) ---- */
+const roadSet=new Set(ROADS);
+const wSorted=ROADS.map(i=>E[i][2]).sort((a,b)=>a-b);
+const W_GREAT=quantile(wSorted,.9);
+for(const ei of ROADS){
+  const [a,b,w]=E[ei];
+  const x1=px(a),y1=py(a),x2=px(b),y2=py(b);
+  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1;
+  const off=clamp(len*.11,4,26)*((rng()-.5)*2);
+  const mx=(x1+x2)/2-dy/len*off, my=(y1+y2)/2+dx/len*off;
+  const d=`M${x1.toFixed(1)} ${y1.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+  const great=w>=W_GREAT;
+  el("path",{d,fill:"none",stroke:INK,opacity:great?.85:.62,
+    "stroke-width":great?1.7:1.0,
+    "stroke-dasharray":great?"9 4":"2.4 3.6",
+    "stroke-linecap":"round","data-tip":"road","data-e":ei},L.roads);
+  el("path",{d,fill:"none",stroke:"rgba(0,0,0,0)","stroke-width":9,
+    "data-tip":"road","data-e":ei},L.roads);   // fat hit target
+}
+
+/* ---- crossed swords: top-N by weight × semantic distance ---- */
+const NSTRESS=Math.min(150,Math.max(60,Math.round(E.length*0.05)));
+const stressIdx=E.map((e,i)=>i)
+  .sort((i,j)=>E[j][2]*E[j][3]-E[i][2]*E[i][3]).slice(0,Math.min(NSTRESS,E.length));
+for(const ei of stressIdx){
+  const [a,b]=E[ei], x=(px(a)+px(b))/2,y=(py(a)+py(b))/2, r=(rng()-.5)*30;
+  const g=el("g",{transform:`translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${r.toFixed(0)})`,
+    stroke:OX,"stroke-width":1.5,"stroke-linecap":"round",
+    "data-tip":"stress","data-e":ei},L.swords);
+  el("path",{d:"M-4.5 -4.5 L4.5 4.5 M-4.5 4.5 L4.5 -4.5"},g);
+  el("circle",{cx:0,cy:0,r:8,fill:"rgba(0,0,0,0)",stroke:"none"},g);
+}
+
+/* ---- settlement glyphs ---- */
+for(let i=0;i<P.length;i++){
+  const x=px(i),y=py(i),cls=sClass(i);
+  const g=el("g",{transform:`translate(${x.toFixed(1)} ${y.toFixed(1)})`,
+    "data-tip":"town","data-i":i},L.towns);
+  if(cls===3){
+    el("circle",{r:5,fill:PARCH,stroke:INK,"stroke-width":1.3},g);
+    el("circle",{r:1.9,fill:INK},g);
+    el("path",{d:"M0 -5 V-13 l6 2 -6 2",fill:INK,stroke:INK,
+      "stroke-width":.8,"stroke-linejoin":"round"},g);       // pennant
+  }else if(cls===2){
+    el("circle",{r:3.5,fill:PARCH,stroke:INK,"stroke-width":1.15},g);
+    el("circle",{r:1.2,fill:INK},g);
+  }else if(cls===1){
+    el("circle",{r:2.4,fill:INK},g);
+  }else{
+    el("circle",{r:1.4,fill:INK},g);
+  }
+  el("circle",{r:7,fill:"rgba(0,0,0,0)"},g);                 // hit target
+  if(P[i].cy){                                               // wyrm: cycle
+    const w=el("g",{transform:`translate(${(x+6).toFixed(1)} ${(y-7).toFixed(1)})`,
+      stroke:OX,fill:"none","stroke-width":1.3,"stroke-linecap":"round",
+      "data-tip":"wyrm","data-i":i},L.wyrms);
+    el("path",{d:"M0 0 q3 -4.5 6 0 q3 4.5 6 0"},w);
+    el("circle",{cx:12.6,cy:-1.4,r:1,fill:OX,stroke:"none"},w);
+    el("circle",{cx:0,cy:0,r:7,fill:"rgba(0,0,0,0)",stroke:"none"},w);
+  }
+}
+
+/* ---- settlement names with greedy collision avoidance ---- */
+(function names(){
+  const order=P.map((p,i)=>i).sort((i,j)=>P[j].c-P[i].c);
+  const budget=Math.min(150,P.length), placed=[];
+  const last=m=>m.slice(m.lastIndexOf("/")+1);
+  const seen={};for(const i of order.slice(0,budget)){const n=last(P[i].m);
+    seen[n]=(seen[n]||0)+1;}
+  const overlaps=r=>placed.some(q=>r.x<q.x+q.w&&q.x<r.x+r.w&&r.y<q.y+q.h&&q.y<r.y+r.h);
+  let shown=0;
+  for(const i of order){
+    if(shown>=budget)break;
+    const cls=sClass(i);
+    let name=last(P[i].m);
+    if(seen[name]>1){const parts=P[i].m.split("/");
+      if(parts.length>1)name=parts[parts.length-2]+"/"+name;}
+    const fs=cls===3?13.5:cls===2?11:9.5;
+    const w=name.length*fs*.52, h=fs*1.15, x=px(i),y=py(i);
+    const cand=[[7,-4,"start"],[-7,-4,"end"],[7,9,"start"],[-7,9,"end"],[0,-9,"middle"]];
+    let done=false;
+    for(const [ox,oy,anc] of cand){
+      const rx=anc==="start"?x+ox:anc==="end"?x+ox-w:x-w/2;
+      const r={x:rx,y:y+oy-h*.8,w,h};
+      if(overlaps(r))continue;
+      const t=el("text",{x:(x+ox).toFixed(1),y:(y+oy).toFixed(1),
+        "text-anchor":anc,fill:INK,"font-size":fs,
+        "font-style":"italic","font-weight":cls===3?600:400,
+        "paint-order":"stroke",stroke:PARCH,"stroke-width":3,
+        "stroke-linejoin":"round"},L.names);
+      txt(t,name);placed.push(r);done=true;break;
+    }
+    if(done)shown++;
+    else if(cls<2&&shown>budget*.6)continue;   // crowded lowlands stay quiet
+  }
+})();
+
+/* ---- realm names: ghosted capitals along each zone's grain ---- */
+(function realms(){
+  const zones={};
+  P.forEach(p=>{(zones[p.z]??=(zones[p.z]={pts:[],c:0})).pts.push(p);zones[p.z].c+=p.c;});
+  const total=DATA.meta.chunks||1;
+  for(const z in zones){
+    const Z=zones[z];let cx=0,cy=0;
+    for(const p of Z.pts){cx+=p.x*p.c;cy+=p.y*p.c;}
+    cx=wx(cx/Z.c);cy=wy(cy/Z.c);
+    let sxx=0,syy=0,sxy=0;
+    for(const p of Z.pts){const dx=wx(p.x)-cx,dy=wy(p.y)-cy;
+      sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;}
+    let ang=Z.pts.length>2?0.5*Math.atan2(2*sxy,sxx-syy)*180/Math.PI:0;
+    ang=clamp(ang,-28,28);
+    const fs=clamp(16+Math.sqrt(Z.c/total)*86,18,58);
+    const t=el("text",{x:cx.toFixed(1),y:cy.toFixed(1),"text-anchor":"middle",
+      fill:INK,opacity:.30,"font-size":fs.toFixed(1),
+      "letter-spacing":(fs*.34).toFixed(1),
+      transform:`rotate(${ang.toFixed(1)} ${cx.toFixed(1)} ${cy.toFixed(1)})`},
+      L.realms);
+    txt(t,z.toUpperCase());
+  }
+})();
+
+/* =====================================================================
+   8. Frame, cartouche, compass, legend, scale note (fixed UI layer)
+   ===================================================================== */
+const TITLE=(document.getElementById("docTitle").textContent||DATA.meta.repo).trim();
+(function frame(){
+  el("rect",{x:20,y:20,width:VW-40,height:VH-40,fill:"none",
+    stroke:INK,"stroke-width":2.6},gUi);
+  el("rect",{x:34,y:34,width:VW-68,height:VH-68,fill:"none",
+    stroke:INK,"stroke-width":.9},gUi);
+  for(const [cx,cy] of [[20,20],[VW-20,20],[20,VH-20],[VW-20,VH-20]])
+    el("rect",{x:cx-7,y:cy-7,width:14,height:14,fill:PARCH,stroke:INK,
+      "stroke-width":1.6,transform:`rotate(45 ${cx} ${cy})`},gUi);
+})();
+
+(function cartouche(){
+  const fs=Math.min(34,1300/Math.max(8,TITLE.length));
+  const w=Math.max(430,TITLE.length*fs*.78+140),h=96,x=(VW-w)/2,y=8;
+  el("rect",{x,y,width:w,height:h,fill:PARCH,stroke:INK,"stroke-width":2},gUi);
+  el("rect",{x:x+7,y:y+7,width:w-14,height:h-14,fill:"none",stroke:INK,
+    "stroke-width":.8},gUi);
+  const t1=el("text",{x:VW/2,y:y+42,"text-anchor":"middle",fill:INK,
+    "font-size":fs,"letter-spacing":Math.min(10,fs*.28),
+    "font-weight":600},gUi);
+  txt(t1,"A MAP OF "+TITLE.toUpperCase());
+  const t2=el("text",{x:VW/2,y:y+63,"text-anchor":"middle",fill:SOFT,
+    "font-size":12,"font-style":"italic"},gUi);
+  txt(t2,`being a chart of ${fmt(DATA.meta.modules)} settlements, `+
+    `${fmt(ROADS.length)} roads & the perils that dwell therein`);
+  const t3=el("text",{x:VW/2,y:y+80,"text-anchor":"middle",fill:SOFT,
+    "font-size":10},gUi);
+  txt(t3,`surveyed at commit ${DATA.meta.commit||"unknown"} · `+
+    `${fmt(DATA.meta.chunks)} chunks · ${DATA.meta.layers} build layers`);
+})();
+
+(function compass(){
+  const cx=VW-118,cy=158,r=40;
+  const g=el("g",{stroke:INK,fill:INK},gUi);
+  el("circle",{cx,cy,r,fill:"none","stroke-width":1.1},g);
+  el("circle",{cx,cy,r:r-7,fill:"none","stroke-width":.6},g);
+  const spike=(a,len,wd)=>{const ax=Math.sin(a),ay=-Math.cos(a);
+    el("path",{d:`M${cx+ax*len} ${cy+ay*len} L${cx-ay*wd} ${cy+ax*wd} `+
+      `L${cx+ay*wd} ${cy-ax*wd} Z`,"stroke-width":.5},g);};
+  for(let k=0;k<4;k++)spike(k*Math.PI/2,r-2,5);
+  for(let k=0;k<4;k++)spike(Math.PI/4+k*Math.PI/2,r*0.55,3.4);
+  el("circle",{cx,cy,r:3.2,fill:PARCH,"stroke-width":1.2},g);
+  const n=el("text",{x:cx,y:cy-r-8,"text-anchor":"middle",fill:INK,
+    "font-size":15,"font-weight":600,stroke:"none"},g);txt(n,"N");
+})();
+
+(function legend(){
+  const w=272,x=40,h=232,y=VH-40-h;
+  el("rect",{x,y,width:w,height:h,fill:"rgba(239,227,194,.92)",
+    stroke:INK,"stroke-width":1.4},gUi);
+  el("rect",{x:x+5,y:y+5,width:w-10,height:h-10,fill:"none",stroke:INK,
+    "stroke-width":.6},gUi);
+  const T=el("text",{x:x+w/2,y:y+22,"text-anchor":"middle",fill:INK,
+    "font-size":12,"letter-spacing":3,"font-weight":600},gUi);
+  txt(T,"L E G E N D");
+  let ly=y+42;const gx=x+26,tx=x+48;
+  const label=(s,dy=0,fill=INK,fsz=10.5,ital=false)=>{
+    const t=el("text",{x:tx,y:ly+3.5+dy,fill,"font-size":fsz,
+      "font-style":ital?"italic":"normal"},gUi);txt(t,s);};
+  // settlements
+  el("circle",{cx:gx-8,cy:ly,r:4.4,fill:PARCH,stroke:INK,"stroke-width":1.2},gUi);
+  el("circle",{cx:gx-8,cy:ly,r:1.6,fill:INK},gUi);
+  el("circle",{cx:gx+4,cy:ly,r:3.2,fill:PARCH,stroke:INK,"stroke-width":1},gUi);
+  el("circle",{cx:gx+4,cy:ly,r:1.1,fill:INK},gUi);
+  el("circle",{cx:gx+13,cy:ly,r:2.2,fill:INK},gUi);
+  el("circle",{cx:gx+20,cy:ly,r:1.3,fill:INK},gUi);
+  label("capital · city · town · village",0);ly+=19;
+  el("path",{d:`M${x+12} ${ly}h30`,stroke:INK,"stroke-width":1.7,
+    "stroke-dasharray":"9 4"},gUi);
+  label(`great road (top imports)`);ly+=16;
+  el("path",{d:`M${x+12} ${ly}h30`,stroke:INK,"stroke-width":1,
+    "stroke-dasharray":"2.4 3.6"},gUi);
+  label(`road — ${fmt(ROADS.length)} strongest of ${fmt(E.length)} edges`);ly+=16;
+  el("path",{d:`M${x+12} ${ly}h30`,stroke:OX,"stroke-width":1,
+    "stroke-dasharray":"1.5 5"},gUi);
+  label("realm frontier (top-level dirs)");ly+=17;
+  el("path",{d:`M${x+13} ${ly+3} Q${x+21} ${ly-8} ${x+29} ${ly+3} `+
+    `Q${x+34} ${ly-3} ${x+41} ${ly+3}`,fill:"none",stroke:INK,
+    "stroke-width":1.1},gUi);
+  label("peaks & hills = chunk density");ly+=17;
+  el("path",{d:`M${gx-6} ${ly-4} l9 9 M${gx-6} ${ly+5} l9 -9`,stroke:OX,
+    "stroke-width":1.4,"stroke-linecap":"round"},gUi);
+  label("contested route — heavy imports,",-4,OX);
+  label("distant meaning (×"+NSTRESS+")",8,OX,9.5);ly+=25;
+  el("path",{d:`M${gx-8} ${ly} q3 -4.5 6 0 q3 4.5 6 0`,fill:"none",
+    stroke:OX,"stroke-width":1.3,"stroke-linecap":"round"},gUi);
+  el("circle",{cx:gx+5,cy:ly-1.4,r:.9,fill:OX},gUi);
+  label("wyrm — import cycle",0,OX);ly+=17;
+  label("compass, serpent & wobble are",-3,SOFT,9.5,true);
+  label("decorative — see cartographer's note",8,SOFT,9.5,true);
+})();
+
+(function scaleNote(){
+  const x=VW-330,y=VH-52;
+  el("path",{d:`M${x} ${y}h90 M${x} ${y-4}v8 M${x+45} ${y-3}v6 M${x+90} ${y-4}v8`,
+    stroke:INK,"stroke-width":1},gUi);
+  el("path",{d:`M${x-6} ${y+5} L${x+96} ${y-6}`,stroke:OX,"stroke-width":1.1},gUi);
+  const t=el("text",{x:x+110,y:y+3.5,fill:SOFT,"font-size":10,
+    "font-style":"italic"},gUi);
+  txt(t,"here fail all scales — the projection keeps neighbours, not distances");
+})();
+
+/* =====================================================================
+   9. Interaction: pan / zoom / tooltip / search / toggles / export
+   ===================================================================== */
+let view={k:1,tx:MARGIN,ty:MARGIN};
+const BASE={k:1,tx:MARGIN,ty:MARGIN};
+function applyView(){gWorld.setAttribute("transform",
+  `translate(${view.tx} ${view.ty}) scale(${view.k})`);}
+applyView();
+function svgPoint(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());}
+
+svg.addEventListener("wheel",ev=>{
+  ev.preventDefault();
+  const p=svgPoint(ev),f=Math.pow(1.0016,-ev.deltaY),
+        k=clamp(view.k*f,0.75,16),r=k/view.k;
+  view={k,tx:p.x-(p.x-view.tx)*r,ty:p.y-(p.y-view.ty)*r};applyView();
+},{passive:false});
+
+let drag=null;
+svg.addEventListener("pointerdown",ev=>{
+  drag={x:ev.clientX,y:ev.clientY,tx:view.tx,ty:view.ty};
+  svg.classList.add("dragging");svg.setPointerCapture(ev.pointerId);});
+svg.addEventListener("pointermove",ev=>{
+  if(!drag)return;
+  const ctm=svg.getScreenCTM(),s=1/ctm.a;
+  view.tx=drag.tx+(ev.clientX-drag.x)*s;
+  view.ty=drag.ty+(ev.clientY-drag.y)*s;applyView();});
+const endDrag=ev=>{drag=null;svg.classList.remove("dragging");};
+svg.addEventListener("pointerup",endDrag);
+svg.addEventListener("pointercancel",endDrag);
+
+function animateView(target,ms=450){
+  const from={...view},t0=performance.now();
+  (function step(t){const u=clamp((t-t0)/ms,0,1),e=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+    view={k:from.k+(target.k-from.k)*e,tx:from.tx+(target.tx-from.tx)*e,
+          ty:from.ty+(target.ty-from.ty)*e};applyView();
+    if(u<1)requestAnimationFrame(step);})(t0);
+}
+
+/* ---- tooltip ---- */
+const tip=document.getElementById("tip");
+function tipHTML(kind,node){
+  if(kind==="town"||kind==="wyrm"){
+    const p=P[+node.dataset.i],cls=["village","town","city","capital of "+p.z]
+      [sClass(+node.dataset.i)];
+    return `<div class="t">${p.m}</div>
+      <div class="d">${cls} · realm <b>${p.z}</b></div>
+      <div class="d">${fmt(p.c)} chunks · ${fmt(p.f)} files · build layer
+        ${p.l<0?"—":p.l+1} of ${DATA.meta.layers}</div>`+
+      (p.cy?`<div class="peril">here be dragons — sits in an import cycle</div>`:"");
+  }
+  if(kind==="road"||kind==="stress"){
+    const e=E[+node.dataset.e],a=P[e[0]],b=P[e[1]];
+    const head=kind==="stress"
+      ?`<div class="peril">contested route</div>`:`<div class="t">road</div>`;
+    return head+`<div class="d"><b>${a.m}</b> → <b>${b.m}</b></div>
+      <div class="d">${fmt(e[2])} import${e[2]===1?"":"s"} ·
+        semantic distance ${e[3].toFixed(2)}</div>`;
+  }
+  return `<div class="d">sea-serpent — decorative; open water carries no code</div>`;
+}
+svg.addEventListener("pointerover",ev=>{
+  const n=ev.target.closest("[data-tip]");if(!n)return;
+  tip.innerHTML=tipHTML(n.dataset.tip,n);tip.style.display="block";});
+svg.addEventListener("pointermove",ev=>{
+  if(tip.style.display!=="block")return;
+  const pad=14,r=tip.getBoundingClientRect();
+  let x=ev.clientX+pad,y=ev.clientY+pad;
+  if(x+r.width>innerWidth-8)x=ev.clientX-r.width-pad;
+  if(y+r.height>innerHeight-8)y=ev.clientY-r.height-pad;
+  tip.style.left=x+"px";tip.style.top=y+"px";});
+svg.addEventListener("pointerout",ev=>{
+  if(!ev.target.closest("[data-tip]"))return;tip.style.display="none";});
+
+/* ---- toggles ---- */
+const tie=(id,layers)=>{const box=document.getElementById(id);
+  const f=()=>layers.forEach(l=>L[l].style.display=box.checked?"":"none");
+  box.addEventListener("change",f);f();};
+tie("tglRoads",["roads"]);tie("tglNames",["names"]);tie("tglRealms",["realms"]);
+tie("tglFront",["frontier"]);tie("tglRelief",["relief"]);
+tie("tglPerils",["swords","wyrms"]);tie("tglWater",["water","coast"]);
+document.getElementById("cRoads").textContent="("+fmt(ROADS.length)+")";
+
+/* ---- search ---- */
+const sEl=document.getElementById("search"),sMsg=document.getElementById("searchMsg");
+let ring=null;
+function seek(q){
+  q=q.trim().toLowerCase();
+  if(ring){ring.remove();ring=null;}
+  if(!q){sMsg.textContent="";return;}
+  const hits=P.map((p,i)=>i).filter(i=>P[i].m.toLowerCase().includes(q));
+  if(!hits.length){sMsg.textContent="no such settlement on this chart";return;}
+  hits.sort((i,j)=>P[j].c-P[i].c);
+  const i=hits[0],x=px(i),y=py(i);
+  sMsg.textContent=(hits.length>1?hits.length+" found — showing ":"")+P[i].m;
+  ring=el("g",{},L.glow);
+  el("circle",{cx:x,cy:y,r:14,fill:"none",stroke:GOLD,"stroke-width":2.4,
+    opacity:.95},ring);
+  el("circle",{cx:x,cy:y,r:22,fill:"none",stroke:GOLD,"stroke-width":1,
+    opacity:.6},ring);
+  const k=5;
+  animateView({k,tx:VW/2-x*k,ty:VH/2-y*k});
+}
+sEl.addEventListener("keydown",ev=>{if(ev.key==="Enter")seek(sEl.value);
+  if(ev.key==="Escape"){sEl.value="";seek("");}});
+
+document.getElementById("btnReset").addEventListener("click",()=>{
+  if(ring){ring.remove();ring=null;}sMsg.textContent="";
+  animateView(BASE);});
+
+/* ---- export the chart as standalone SVG ---- */
+document.getElementById("btnSvg").addEventListener("click",()=>{
+  const c=svg.cloneNode(true);
+  c.querySelector("#gWorld").setAttribute("transform",
+    `translate(${MARGIN} ${MARGIN}) scale(1)`);
+  c.setAttribute("width",VW);c.setAttribute("height",VH);
+  c.setAttribute("font-family","'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif");
+  const blob=new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+
+    new XMLSerializer().serializeToString(c)],{type:"image/svg+xml"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=DATA.meta.repo+"-tolkien-map.svg";
+  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+});
+
+svg.style.fontFamily="var(--serif)";
+</script>
+</body>
+</html>
