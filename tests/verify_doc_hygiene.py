@@ -32,7 +32,8 @@ def _active_markdown_files() -> list[Path]:
         elif root.is_dir():
             for path in root.rglob("*.md"):
                 parts = path.relative_to(REPO_ROOT).parts
-                if any(x in parts for x in ("node_modules", "archive", "_tmp", ".claude")):
+                if any(x in parts for x in ("node_modules", "archive", "_tmp",
+                                            "_explore", "_site", ".claude")):
                     continue
                 files.append(path)
     return sorted(files)
@@ -42,7 +43,9 @@ def _check_readme_disclaimers() -> list[str]:
     failures: list[str] = []
     for path in sorted(REPO_ROOT.rglob("README.md")):
         rel_parts = path.relative_to(REPO_ROOT).parts
-        if any(part.startswith(".") or part in {"node_modules", "archive", "_tmp"} for part in rel_parts):
+        if any(part.startswith(".") or part in
+               {"node_modules", "archive", "_tmp", "_explore", "_site"}
+               for part in rel_parts):
             continue
         text = path.read_text(encoding="utf-8")
         match = README_DISCLAIMER_RE.search(text)
