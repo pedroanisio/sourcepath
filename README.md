@@ -333,6 +333,31 @@ doc closes with a **"Worked example: Rust (Stages 1-8)"** appendix
 that maps every part of the contract to a concrete in-tree file —
 copy-from-here when adding the next tree-sitter language.
 
+## Inventory schema
+
+`inventory.ttl` has one typed definition with three synchronized surfaces:
+
+- **SHACL shapes** — `build_shacl_graph()` in
+  [`rdflib_emitter.py`](codebase_mapper/emission/infrastructure/rdf/rdflib_emitter.py)
+  is the enforcement authority: every emit validates the inventory graph
+  against it and serializes it into the bundle as `shapes.shacl.ttl`.
+- **Canonical Pydantic schema** —
+  [`codebase_mapper/emission/domain/inventory_schema.py`](codebase_mapper/emission/domain/inventory_schema.py)
+  is the typed mirror for Python consumers: the same cardinalities,
+  datatypes, patterns, closed vocabularies, and edge-target classes,
+  expressed as Pydantic validation.
+  [`inventory_reader.py`](codebase_mapper/emission/infrastructure/rdf/inventory_reader.py)
+  (`read_inventory()`) parses a bundle's inventory graph into it, raising
+  `ValidationError` on any shape-violating content.
+- **Drift guard** —
+  [`tests/test_inventory_schema.py`](tests/test_inventory_schema.py)
+  holds the two definitions in lockstep: the schema's predicate registry
+  must equal the live shapes graph's `sh:path` set, the `FileType`/`Phase`
+  enums must equal the controlled vocabularies in
+  [`shared_kernel/vocabulary.py`](codebase_mapper/shared_kernel/vocabulary.py),
+  and a roundtrip through the real emitter must validate. Runs with the
+  pytest tree (`make test-units`).
+
 ## Extension model
 
 `codebase_mapper.extensions` exposes seven protocols:

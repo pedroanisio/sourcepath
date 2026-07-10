@@ -29,6 +29,12 @@ sidecars, concept sidecars, `xrefs.jsonl`, `ast_coverage.json`
 (extraction-coverage honesty table — see
 [ast-coverage.md](ast-coverage.md)), and optional `blobs/`.
 
+`inventory.ttl` is typed by the SHACL shapes shipped alongside it as
+`shapes.shacl.ttl`; the canonical Pydantic mirror for Python consumers
+is
+[`codebase_mapper/emission/domain/inventory_schema.py`](../codebase_mapper/emission/domain/inventory_schema.py)
+(see [README § Inventory schema](../README.md#inventory-schema)).
+
 ## Local Repositories
 
 The `--repo` value can be any local Git worktree:

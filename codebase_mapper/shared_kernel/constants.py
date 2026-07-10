@@ -3,28 +3,28 @@ from __future__ import annotations
 
 from rdflib import Namespace
 
+# Pure (framework-free) namespace strings and controlled vocabularies
+# live in vocabulary.py so domain-layer code can import them without
+# pulling rdflib; re-exported here for every existing consumer.
+from .vocabulary import (  # noqa: F401
+    CBM_NS,
+    CBMI_NS,
+    CBML4_NS,
+    CBMP_NS,
+    CBMT_NS,
+    CBMXR_NS,
+    PHASE_VOCABULARY,
+    SPDX_CORE_NS,
+    SPDX_SOFTWARE_NS,
+    TYPE_VOCABULARY,
+)
+
 
 TOOL_VERSION = "0.5.0"
 
 # v2 (semver: additive): cbm:possibleImport edge tier + concept
 # embedding_source provenance (error-free-mapping E4/E7).
 VOCABULARY_VERSION = "v2"
-
-CBM_NS = "https://codebase-mapper.example.org/cbm#"
-
-CBMT_NS = "https://codebase-mapper.example.org/cbm/type#"
-
-CBMP_NS = "https://codebase-mapper.example.org/cbm/phase#"
-
-CBMI_NS = "https://codebase-mapper.example.org/cbm/instance#"
-
-CBMXR_NS = "https://codebase-mapper.example.org/cbmxr#"
-
-CBML4_NS = "https://codebase-mapper.example.org/cbml4#"
-
-SPDX_SOFTWARE_NS = "https://spdx.org/rdf/3.0.1/terms/Software/"
-
-SPDX_CORE_NS = "https://spdx.org/rdf/3.0.1/terms/Core/"
 
 CBM = Namespace(CBM_NS)
 
@@ -51,15 +51,6 @@ XREF_UNRESOLVED_REASONS = (
     "dynamic_dispatch",
     "language_unsupported",
 )
-
-TYPE_VOCABULARY = (
-    "source_code", "test_code", "configuration", "documentation",
-    "environment", "container", "build_script", "dependency_manifest",
-    "lockfile", "ci_cd", "data", "asset", "binary", "generated",
-    "license", "unknown",
-)
-
-PHASE_VOCABULARY = ("build", "compile", "runtime", "test", "ci", "deploy", "dev")
 
 LANG_BY_EXT = {
     ".py": "python", ".pyi": "python",

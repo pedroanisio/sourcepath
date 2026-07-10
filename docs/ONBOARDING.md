@@ -241,6 +241,7 @@ When you wire a new consumer, **carry the provenance object through unchanged**
 | **Import resolver** | Per-language Protocol implementation that resolves a raw import string to a `FileRef`. Lives in `codebase_mapper/inspection/languages/<lang>.py`. |
 | **Symbol xref** | Cross-file edge between a usage site and a definition site, resolved by `plugins/symbol_xrefs/<lang>_resolver.py`. |
 | **SHACL** | The W3C constraint language used to validate the bundle's RDF. `shacl_conforms: true` is a green-light invariant. |
+| **Canonical inventory schema** | The typed Pydantic mirror of the `inventory.ttl` SHACL shapes: [`codebase_mapper/emission/domain/inventory_schema.py`](../codebase_mapper/emission/domain/inventory_schema.py), parsed from a graph via `read_inventory()` and held in lockstep with the shapes by [`tests/test_inventory_schema.py`](../tests/test_inventory_schema.py). See [README § Inventory schema](../README.md#inventory-schema). |
 | **PALS's LAW** | The project's architectural rule: LLM output is untrusted by default; absence of verification is a design defect. See [`CLAUDE.md`](../CLAUDE.md). |
 | **Sidecar** | A JSONL or JSON file inside the bundle that supplements RDF (e.g. `rust_items.jsonl`, `llm/*.json`). |
 | **Round-trip** | Reconstructing source files from `inventory.ttl + blobs/` and verifying byte-equality. See [`codebase_mapper/reconstruct.py`](../codebase_mapper/emission/application/reconstruct.py). |
