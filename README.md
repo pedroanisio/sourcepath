@@ -203,6 +203,7 @@ python scripts/cbm.py dossier   --bundle _tmp/out   # 100+ page typeset A4 PDF d
 python scripts/cbm.py pdf docs/reports/<name>.md    # authored Markdown -> themed PDF
 python scripts/cbm.py site      --bundle _tmp/out --output _site  # offline static site
 python scripts/cbm.py repair    --bundle _tmp/out   # post-hoc data-quality fixes
+python scripts/cbm.py terrain   --bundle _tmp/out   # 3D code-terrain map (one HTML file)
 ```
 
 Two structural read paths exist by design: `report`/`dossier` (Python) load
@@ -212,12 +213,35 @@ streams `inventory.jsonld` from disk and recounts it independently of the
 manifest — built for bundles where a graph load is the bottleneck
 (`cargo build --release --manifest-path tools/cbm-report/Cargo.toml` first).
 
+`terrain` renders one self-contained WebGL2 HTML map: geography is a seeded
+t-SNE projection of per-directory mean chunk embeddings, elevation is chunk
+density, and the L1 import graph supplies roads, build-order layers, impact
+floods, dependency path tracing, and stress (strong-import × semantically-
+distant) fault lines. Directory roll-up auto-fits large bundles
+(kernel-scale ≈ 2 min); the page footer discloses every truncation and marks
+derived views. Keep `--seed` fixed per repo so its geography stays
+recognizable across regenerations.
+
 Every generator separates evidence tiers (mechanical facts vs derived
 computation vs unverified LLM output) under the shared
 "Evidence basis & confidence" framing; the declarative reporting contract
 lives in [docs/reporting/](docs/reporting/) (30-component catalog + JSON
 Schema, pinned by `tests/verify_report_spec.py`). Authored narrative reports
 and their workflow live in [docs/reports/](docs/reports/README.md).
+
+## Decompose & recompose
+
+The decomposer reads a bundle and emits a confidence-tagged structural
+decomposition — parts and roles, Martin instability, cycles, architecture
+hypotheses, quality gates, and a topological build order; the recomposer
+consumes that YAML (never the raw bundle) and emits an ordered
+natural-language rebuild plan. Bundle-derived evidence only; see
+[decomposer/README.md](decomposer/README.md).
+
+```bash
+python -m decomposer _tmp/out --yaml d.yaml --report d.md   # [--symbols s.yaml]
+python -m recomposer d.yaml --plan plan.md                  # [--yaml plan.yaml]
+```
 
 ## Regenerate
 

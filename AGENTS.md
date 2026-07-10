@@ -5,7 +5,7 @@ disclaimer:
     Any statement or premise not backed by a real logical definition
     or verifiable reference may be invalid, erroneous, or a hallucination.
   generated_by: "Claude Fable 5 via Claude Code"
-  date: "2026-07-09"
+  date: "2026-07-10"
 ---
 
 # AGENTS.md — programmatic CLI / tooling reference
@@ -43,6 +43,7 @@ python scripts/cbm.py <command> [options]
   pdf        Render an authored Markdown report to a themed PDF
   site       Generate the static bundle-browser site
   repair     Apply post-hoc data-quality fixes to an emitted bundle
+  terrain    SourcePath 3D code-terrain map (self-contained HTML)
 ```
 
 The dispatcher routes to `scripts/cbm_report.py`, `cbm_report_rs.py`,
@@ -65,6 +66,25 @@ Two structural read paths exist by design — pick by bundle size:
   the question is "render the health/epistemics PDF now". Needs a
   compiled binary — `cargo build --release --manifest-path
   tools/cbm-report/Cargo.toml` — or `CBM_REPORT_BIN=<path>`.
+
+`terrain` (`scripts/cbm_terrain.py`) emits one self-contained WebGL2
+HTML map per bundle: seeded t-SNE geography over per-directory mean
+chunk embeddings, chunk-density elevation, and the L1 graph as roads,
+build-tide layers, impact floods, path tracing, and stress fault
+lines. `--max-segments 0` (default) auto-fits the directory roll-up
+under `--max-points`; keep `--seed` fixed per repo — stable geography
+is the feature. Requires an L2+ bundle (`embeddings.npz` present).
+
+## Analysis (decompose / recompose)
+
+| Command | Consumes | Emits |
+|---|---|---|
+| `python -m decomposer <bundle_dir> [--yaml OUT] [--report OUT.md] [--symbols OUT.yaml]` | bundle dir | confidence-tagged decomposition YAML + Markdown report + symbol-map sidecar |
+| `python -m recomposer <decomposition.yaml> [--plan OUT.md] [--yaml OUT]` | Decomposer YAML only | ordered natural-language build plan |
+
+Both print a short stdout summary when run without output flags. The
+recomposer never reads the bundle — the decomposition YAML is its whole
+evidence surface.
 
 ## Verification
 
