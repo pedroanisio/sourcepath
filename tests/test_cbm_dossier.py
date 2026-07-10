@@ -56,6 +56,23 @@ def test_markup_helpers():
     assert D.FIG["n"] == before + 1
 
 
+def test_empty_index_items_emit_no_tag():
+    """ReportLab's SimpleIndex crashes (IndexError) on an empty index
+    entry at multiBuild time; blank anchors must be dropped, not typeset."""
+    assert D.ixn("") == ""
+    assert D.ixs("   ") == ""
+    assert D.ixn(",,") == ""
+    assert 'item="x"' in D.ixn("x")
+
+
+def test_pin_name_handles_scoped_npm_packages():
+    """Found live: zod's Register D indexed pins via split('@')[0], which
+    is empty for scoped packages and crashed the dossier's index."""
+    assert D.pin_name("@types/node@18.2.3") == "@types/node"
+    assert D.pin_name("lodash@4.17.21") == "lodash"
+    assert D.pin_name("plain-no-version") == "plain-no-version"
+
+
 def test_flowables_tolerate_degenerate_inputs(tmp_path):
     from reportlab.pdfgen.canvas import Canvas
 

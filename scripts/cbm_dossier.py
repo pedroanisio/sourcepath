@@ -800,8 +800,22 @@ def receipt_card(r, w=COL_W):
     return t
 
 def _ixc(t): return str(t).replace(",", " ").replace('"', "'").strip()
-def ixs(t): return f'<index name="subjects" item="{_ixc(t)}"/>'
-def ixn(t): return f'<index name="names" item="{_ixc(t)}"/>'
+# Blank anchors emit no tag at all: ReportLab's SimpleIndex raises
+# IndexError on an empty entry during multiBuild.
+def ixs(t):
+    c = _ixc(t)
+    return f'<index name="subjects" item="{c}"/>' if c.strip(", ") else ""
+def ixn(t):
+    c = _ixc(t)
+    return f'<index name="names" item="{c}"/>' if c.strip(", ") else ""
+
+
+def pin_name(release: str) -> str:
+    """Package name from a pinned-release string. Version is the part
+    after the LAST '@' — scoped npm packages ('@types/node@18.2.3')
+    legitimately start with '@'."""
+    name = release.rsplit("@", 1)[0]
+    return name or release
 
 CH = {"n": 0}
 def chapter(story, title, deck, kicker="CHAPTER", sections=None):
@@ -1259,7 +1273,7 @@ def build(args):
             row = []
             for c_ in range(cols):
                 k = c_ * rows_n + r_
-                row.append(Paragraph(ixn(pins_pairs[k].split("@")[0])
+                row.append(Paragraph(ixn(pin_name(pins_pairs[k]))
                                      + cspan(esc(pins_pairs[k]), "Mono", INK, 6.6), S["cellm"])
                            if k < len(pins_pairs) else "")
             tbl.append(row)

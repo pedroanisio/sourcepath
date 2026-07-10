@@ -61,11 +61,20 @@ KNOWN = ["run_manifest.json", "inventory.ttl", "inventory.jsonld", "ontology-map
 def discover(bundle, args):
     found = {k: os.path.join(bundle, k) for k in KNOWN if os.path.exists(os.path.join(bundle, k))}
     found["blobs_dir"] = os.path.join(bundle, "blobs") if os.path.isdir(os.path.join(bundle, "blobs")) else None
+    stem = os.path.basename(os.path.abspath(bundle.rstrip("/")))
     def auto(explicit, patterns):
         if explicit: return explicit
         for pat in patterns:
             for base in (bundle, os.path.dirname(bundle.rstrip("/")) or ".", "."):
                 hits = sorted(glob.glob(os.path.join(base, pat)))
+                if base != bundle:
+                    # A shared parent directory holds many bundles'
+                    # companions; outside the bundle dir only accept
+                    # files that name this bundle. Attaching another
+                    # repo's decomposition/abox would be silent
+                    # cross-bundle contamination (observed live: a
+                    # 380 MB linux decomposition globbed onto zod).
+                    hits = [h for h in hits if stem in os.path.basename(h)]
                 if hits: return hits[0]
         return None
     found["abox"] = auto(args.abox, ["*abox*.ttl"])
@@ -486,10 +495,127 @@ def load_abox(path):
     return {"dims": dims, "risks": risks, "triples": len(g),
             "creator": str(next(g.objects(None, U("http://purl.org/dc/terms/creator")), ""))}
 
+# ----------------------------------------------------------------------------
+# assets: kind grouping + inline image gallery (bytes from the verified
+# content-addressed blob store — FACT, and self-contained in the HTML)
+
+_ASSET_KINDS = {
+    "image": {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp"},
+    "font": {".woff", ".woff2", ".ttf", ".otf", ".eot"},
+    "audio/video": {".mp3", ".mp4", ".webm", ".wav", ".ogg"},
+    "design": {".ai", ".psd", ".sketch", ".fig"},
+    "document": {".pdf", ".eps"},
+}
+_IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+               ".gif": "image/gif", ".svg": "image/svg+xml",
+               ".ico": "image/x-icon", ".webp": "image/webp"}
+
+
+def asset_kind(path):
+    """Human kind for an asset path: image / font / audio-video /
+    design / document / other."""
+    ext = os.path.splitext(path)[1].lower()
+    for kind, exts in _ASSET_KINDS.items():
+        if ext in exts:
+            return kind
+    return "other"
+
+
+def image_gallery_items(files, blobs_dir, *, limit=60, max_bytes=300_000):
+    """Gallery entries for image assets, smallest first.
+
+    ``files`` is (path, content_sha256, size_bytes) triples; bytes come
+    from the blob store and are embedded as data URIs so the report
+    stays self-contained. Caps are disclosed: returns (items, omitted)
+    where ``omitted`` counts images dropped by the count limit, the
+    per-image byte cap, or a missing blob — never silently (PALS's Law).
+    """
+    import base64
+    candidates = sorted(
+        ((p, sha, size) for p, sha, size in files
+         if os.path.splitext(p)[1].lower() in _IMAGE_MIME),
+        key=lambda t: (t[2], t[0]))
+    items, omitted = [], 0
+    for path, sha, size in candidates:
+        if len(items) >= limit or size > max_bytes:
+            omitted += 1
+            continue
+        blob = os.path.join(blobs_dir, sha)
+        if not os.path.exists(blob):
+            omitted += 1
+            continue
+        with open(blob, "rb") as fh:
+            data = fh.read()
+        mime = _IMAGE_MIME[os.path.splitext(path)[1].lower()]
+        items.append({
+            "path": path, "size_bytes": size, "mime": mime,
+            "data_uri": f"data:{mime};base64,"
+                        + base64.b64encode(data).decode("ascii"),
+        })
+    return items, omitted
+
+
+def asset_inventory(g, found):
+    """Census of asset/binary files by kind (count + bytes) plus the
+    image-gallery entries. Bytes come from the graph's sizeBytes facts;
+    gallery pixels from the blob store when the bundle carries one."""
+    import rdflib
+    U = rdflib.URIRef
+    ftype = {s: str(o).split("#")[-1]
+             for s, o in g.subject_objects(U(CBM + "type"))}
+    paths = {s: str(o) for s, o in g.subject_objects(U(CBM + "path"))}
+    sizes = {s: int(o) for s, o in g.subject_objects(U(CBM + "sizeBytes"))}
+    shas = {s: str(o) for s, o in g.subject_objects(U(CBM + "contentSha256"))}
+    kinds = defaultdict(lambda: {"n": 0, "bytes": 0})
+    files = []
+    for subj, t in ftype.items():
+        if t not in ("asset", "binary"):
+            continue
+        path = paths.get(subj, "")
+        kind = asset_kind(path) if t == "asset" else "binary (unknown)"
+        kinds[kind]["n"] += 1
+        kinds[kind]["bytes"] += sizes.get(subj, 0)
+        if subj in shas:
+            files.append((path, shas[subj], sizes.get(subj, 0)))
+    census = sorted(((k, v["n"], v["bytes"]) for k, v in kinds.items()),
+                    key=lambda x: (-x[1], x[0]))
+    if found.get("blobs_dir"):
+        items, omitted = image_gallery_items(files, found["blobs_dir"])
+    else:
+        items, omitted = [], sum(
+            1 for p, _s, _z in files
+            if os.path.splitext(p)[1].lower() in _IMAGE_MIME)
+    return census, {"items": items, "omitted": omitted}
+
+
+def gallery_html(items, omitted):
+    """The gallery grid fragment for emit_html."""
+    if not items:
+        return "<p class='absent'>No image assets in the blob store.</p>"
+    cells = "".join(
+        f"<figure class='thumb'><img src='{it['data_uri']}' "
+        f"alt='{html.escape(it['path'])}' loading='lazy'/>"
+        f"<figcaption>{html.escape(it['path'])}"
+        f"<span class='sz'>{it['size_bytes']:,} B</span></figcaption></figure>"
+        for it in items)
+    note = (f"<p class='cap'>{omitted} image(s) omitted "
+            "(size/count caps or blob unavailable) — the full set lives in "
+            "the bundle's <code>blobs/</code> store.</p>" if omitted else "")
+    return f"<div class='gallery'>{cells}</div>{note}"
+
+
+def _yaml_load(path):
+    """YAML via libyaml's C loader when present — the pure-Python parser
+    needs hours on kernel-scale decomposition files (380 MB observed)."""
+    import yaml
+    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+    with open(path) as fh:
+        return yaml.load(fh, Loader=loader)
+
+
 def load_decomp(path):
     if not path: return None
-    import yaml
-    D = yaml.safe_load(open(path))
+    D = _yaml_load(path)
     parts = D.get("parts", [])
     return {"n_parts": len(parts),
             "kinds": Counter(p.get("kind") for p in parts).most_common(),
@@ -508,8 +634,7 @@ def load_decomp(path):
 
 def load_buildplan(path):
     if not path: return None
-    import yaml
-    B = yaml.safe_load(open(path))
+    B = _yaml_load(path)
     steps = B.get("steps", [])
     seq, cum, phases = [], 0, {}
     for s in steps:
@@ -771,6 +896,11 @@ tr+tr td{{border-top:1px solid #eee7d6}}
 .receipt{{background:#efe8d8;border-left:3px solid var(--verm);padding:10px 14px;margin:10px 0;font-size:12.5px}}
 .receipt .mono{{font-size:11px;color:var(--grey)}}
 .absent{{color:var(--pale);font-style:italic}}
+.gallery{{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin:12px 0}}
+.thumb{{margin:0;border:1px solid var(--faint);padding:6px;background:#fff}}
+.thumb img{{width:100%;height:90px;object-fit:contain;display:block}}
+.thumb figcaption{{font-size:9px;word-break:break-all;color:var(--grey);margin-top:4px}}
+.thumb .sz{{display:block;color:var(--pale)}}
 .risk{{border-left:3px solid var(--verm);padding-left:12px;margin:10px 0}}
 .risk b{{font-family:ui-monospace,Menlo,monospace;font-size:12px}}
 .fine{{font-size:11px;color:var(--grey)}} .finer{{font-size:10px;color:var(--pale)}}
@@ -984,6 +1114,17 @@ def emit_html(M, out):
                       + (" (truncated)" if ac.get("silent_truncated") else "") if ac["silent_list"] else "") + "</p>")
     body.append(sec("Inventory census", "manifest + ast_coverage.json · FACT",
         f"<div class='grid2'><div><h3 class='caps fine'>By language</h3>{fl}<h3 class='caps fine'>By type</h3>{ft}</div><div>{acrows}</div></div>"))
+
+    census = M.get("assets") or []
+    gal = M.get("_gallery") or {"items": [], "omitted": 0}
+    if census:
+        crow = "".join(
+            f"<tr><td>{ESC(k)}</td><td class='num'>{n:,}</td>"
+            f"<td class='num'>{b:,} B</td></tr>" for k, n, b in census)
+        body.append(sec(
+            "Assets & binaries", "kinds FACT · pixels from the verified blob store",
+            f"<table class='kv'><tr><th>kind</th><th>files</th><th>bytes</th></tr>{crow}</table>"
+            + gallery_html(gal["items"], gal["omitted"])))
 
     om = M.get("ontomap")
     if om and om["rels"]:
@@ -1264,6 +1405,7 @@ def main(argv=None):
         M["shacl_independent"] = (bool(conforms), time.time() - t0)
         log("independent SHACL:", conforms)
     M["graph"] = graph_analytics(g, man)
+    M["assets"], M["_gallery"] = asset_inventory(g, found)
     M["district_xy"] = district_xy(M["graph"]["_district"], a.bundle, cache, a.skip_embeddings)
     M["enrich"] = load_enrichments(found["enrichments.jsonl"]) if found.get("enrichments.jsonl") else None
     M["concepts"] = load_concepts(found["concepts.json"]) if found.get("concepts.json") else None

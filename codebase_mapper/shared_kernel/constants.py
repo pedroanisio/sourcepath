@@ -95,7 +95,11 @@ LANG_BY_EXT = {
 ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
              ".woff", ".woff2", ".ttf", ".otf", ".eot",
              ".mp3", ".mp4", ".webm", ".wav", ".ogg",
-             ".ai", ".psd", ".sketch", ".fig"}
+             ".ai", ".psd", ".sketch", ".fig",
+             # Document/print assets: without these a committed logo PDF
+             # falls through to the null-byte sniff and reads as opaque
+             # "binary" (observed: zod's 8 "binaries" were all logo PDFs).
+             ".pdf", ".eps"}
 
 DATA_EXT = {".csv", ".tsv", ".parquet", ".jsonl", ".xml",
             ".stderr", ".stdout",
