@@ -65,6 +65,8 @@ dev = [
     "import-linter",
     "mypy",
     "types-PyYAML",
+    # tests/verify_report_spec.py validates the reporting contract schema.
+    "jsonschema",
     "codebase-mapper[frontend]",
 ]
 site = [

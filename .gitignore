@@ -49,3 +49,5 @@ docs/reports/
 # Claude Code local state (permissions, agent worktrees)
 .claude/
 linux-proc.tar
+drift-risk-map.svg
+drift-risk-map.md

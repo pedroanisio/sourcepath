@@ -80,3 +80,27 @@ jobs:
       # Backend perimeter: fail-closed auth and narrowed CORS.
       - name: Backend perimeter tests
         run: python -m pytest frontend/backend/tests/test_perimeter.py -q --no-cov
+
+  # The drift suite guards every hand-mirrored contract (docs<->code, env
+  # inventory, API field parity, report predicates, Rust-crate keys). It is
+  # fast and fully offline; running it only via `make test` left every guard
+  # dependent on contributor discipline (drift-risk-map H10).
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m pip install -r frontend/backend/requirements.txt
+
+      - name: Drift verifiers
+        run: make test-drift

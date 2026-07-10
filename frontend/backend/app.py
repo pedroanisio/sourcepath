@@ -273,6 +273,33 @@ class FileDetailResp(BaseModel):
     xrefs_in: list[ChunkResp] = []
 
 
+class _ChunkBlock(BaseModel):
+    """Inner `chunk` block returned by /api/chunk/{idx}. Mirrors
+    api.ts::ChunkDetail.chunk; the underlying bundle row carries more
+    fields (parentSymbol, signature, …) admitted via extra='allow'."""
+    model_config = ConfigDict(extra="allow")
+    idx: int
+    uri: str
+    symbol: str | None = None
+    kind: str | None = None
+    file: str | None = None
+    beginLine: int | None = None
+    endLine: int | None = None
+    embeddingRow: int | None = None
+    contentSha256: str | None = None
+
+
+class ChunkDetailResp(BaseModel):
+    """Mirrors api.ts::ChunkDetail."""
+    model_config = ConfigDict(extra="allow")
+    chunk: _ChunkBlock
+    concepts: list[str]
+    blob_preview: str | None = None
+    # Symbol-level xrefs; absent keys on pre-xref bundles collapse to [].
+    callers: list[ChunkResp] = []
+    callees: list[ChunkResp] = []
+
+
 # -- FastAPI app --------------------------------------------------------------
 
 from codebase_mapper.shared_kernel.constants import TOOL_VERSION as _CBM_TOOL_VERSION
@@ -450,7 +477,7 @@ def impact(
     return ImpactResp(**get_impact_response(path, depth, limit, bundle))
 
 
-@app.get("/api/chunk/{idx}")
+@app.get("/api/chunk/{idx}", response_model=ChunkDetailResp)
 def chunk_detail(idx: int, bundle: str | None = Query(default=None)) -> dict[str, Any]:
     return get_chunk_detail_response(idx, bundle)
 

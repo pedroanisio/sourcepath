@@ -1478,7 +1478,9 @@ def build(args):
         if extp is not None:
             links.append(("importsExternal",
                           {"name": str(extp).split("#pkg/")[-1], "cls": "Package"}))
-        conc = next(g.objects(ex_subj, _U(CR.CBM + "lexicalizes")), None)
+        # lexicalizes is an L3 predicate (cbml3:), not cbm: — the emitter has
+        # only ever written it under CR.C3 (guarded by verify_report_predicates).
+        conc = next(g.objects(ex_subj, _U(CR.C3 + "lexicalizes")), None)
         if conc is not None:
             links.append(("lexicalizes",
                           {"name": str(conc).split("#concept/")[-1][:18],
