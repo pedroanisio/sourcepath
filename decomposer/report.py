@@ -125,10 +125,11 @@ def _parts_by_role(L: list[str], decomp: Decomposition) -> None:
         group = by_role.get(role, [])
         if not group:
             continue
+        rows = _select_role_rows(group)
         L.append(f"### {role} ({len(group)})\n")
         L.append("| part | kind | layer | Ca | Ce | instability | reuse | risk | role conf |")
         L.append("|---|---|---|---:|---:|---:|---|---|---|")
-        for p in sorted(group, key=_part_sort_key)[:40]:
+        for p in rows:
             m = p.metrics
             inst = m.get("instability")
             L.append(
@@ -137,9 +138,29 @@ def _parts_by_role(L: list[str], decomp: Decomposition) -> None:
                 f"{inst if inst is not None else '—'} | "
                 f"{p.classification.reusability} | {p.classification.risk} | "
                 f"{_CONF_ICON.get(p.classification.role_confidence.value)} |")
-        if len(group) > 40:
-            L.append(f"| … {len(group) - 40} more | | | | | | | | |")
+        if len(group) > len(rows):
+            L.append(f"| … {len(group) - len(rows)} more | | | | | | | | |")
         L.append("")
+
+
+def _select_role_rows(group: list, cap: int = 40, kind_floor: int = 5) -> list:
+    """Rows for one role table: the top-``cap`` parts by coupling, plus up to
+    ``kind_floor`` parts of every kind present in the group.
+
+    Coupling-ranked truncation alone lets high-volume kinds starve the rest:
+    application/service and entry-point parts carry no ca/ce metrics, so in a
+    large bundle thousands of coupled modules monopolized all 40 rows and
+    entire kinds silently vanished from the inventory ("meaningful parts"
+    minus the applications). The floor keeps every kind visible; the
+    "… N more" line stays honest about what the table still omits.
+    """
+    picked: list = []
+    per_kind: Counter = Counter()
+    for p in sorted(group, key=_part_sort_key):
+        if len(picked) < cap or per_kind[p.kind] < kind_floor:
+            picked.append(p)
+            per_kind[p.kind] += 1
+    return picked
 
 
 def _coupling_leaderboard(L: list[str], decomp: Decomposition) -> None:

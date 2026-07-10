@@ -111,10 +111,12 @@ def test_report_carries_bundle_provenance(decomp):
 
 def test_report_part_tables_use_unique_ids(decomp):
     md = to_markdown(decomp)
-    # `codebase_mapper` exists both as a module part and an application part;
-    # rows must be distinguishable by part id.
+    # Rows must be distinguishable by part id, and no part kind present in
+    # the decomposition may be crowded out of the role tables by module
+    # volume (regression: tests/decomposer/test_report_kind_diversity.py).
     assert "`module:" in md
-    assert "`app:" in md
+    if any(p.id.startswith("app:") for p in decomp.parts):
+        assert "`app:" in md
 
 
 def test_report_role_tables_exclude_domain_parts(decomp):
