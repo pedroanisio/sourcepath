@@ -389,6 +389,8 @@ def representative_args(live_bundle, bundle_name, representative_file, heavy_con
         "semantic_neighbors": {"bundle": bundle_name, "q": "schema", "k": 5},
         "concept_detail": {"bundle": bundle_name, "name": heavy_concept},
         "concept_neighborhood": {"bundle": bundle_name, "name": heavy_concept, "depth": 1, "limit": 5},
+        "repository_summary": {"bundle": bundle_name},
+        "items_by_attribute": {"bundle": bundle_name, "pattern": "#[derive(", "limit": 5},
     }
 
 
@@ -403,3 +405,51 @@ def test_every_handler_payload_validates(representative_args):
         except Exception as e:  # noqa: BLE001 — we want to report all of them
             failures.append(f"{tool}: {type(e).__name__}: {e}")
     assert not failures, "handler/schema mismatches:\n  " + "\n  ".join(failures)
+
+
+def test_representative_args_covers_every_tool(representative_args):
+    """Live-validation completeness (drift-risk H4): a new tool must join
+    the representative_args matrix — where its output is validated against
+    OUTPUT_SCHEMAS on a real bundle — or be excluded here with a reason.
+    Silent omission is how an advertised schema starts lying."""
+    excluded = {
+        # Env-gated (CBM_ENABLE_SPARQL); hardening + output shape are
+        # exercised directly by test_sparql.py.
+        "sparql",
+    }
+    assert set(representative_args) == set(HANDLERS) - excluded
+
+
+def test_orient_bundle_advertised_predicates_are_emitter_real(live_bundle, bundle_name):
+    """Every predicate orient_bundle's schema_hint advertises must be one
+    the emitter actually writes under the same namespace (drift-risk H4:
+    the advertised map must not lie to agents)."""
+    import re
+    from pathlib import Path
+
+    ns_consts = {"cbm": "CBM", "cbmt": "CBMT", "cbmp": "CBMP", "cbmi": "CBMI",
+                 "cbmxr": "CBMXR", "cbml2": "CBML2", "cbml3": "CBML3",
+                 "cbml4": "CBML4", "skos": "SKOS", "nif": "NIF", "rdf": None,
+                 "rdfs": None, "spdx": None}
+    repo = Path(__file__).resolve().parents[3]
+    sources = "\n".join(
+        p.read_text(errors="ignore")
+        for root in ("codebase_mapper", "plugins")
+        for p in (repo / root).rglob("*.py"))
+
+    payload = dispatch("orient_bundle", {"bundle": bundle_name})
+    bad: list[str] = []
+    for layer in payload["schema_hint"]["layers"]:
+        for curie in layer.get("key_predicates", []):
+            prefix, _, suffix = curie.partition(":")
+            if prefix not in ns_consts:
+                bad.append(f"{curie} (unknown namespace)")
+                continue
+            const = ns_consts[prefix]
+            if const is None:  # framework namespaces: nothing to cross-check
+                continue
+            if not re.search(
+                    rf'\b{const}\.{suffix}\b|\b{const}\["{suffix}"\]'
+                    rf'|"{suffix}"', sources):
+                bad.append(curie)
+    assert not bad, f"advertised but never emitted under that namespace: {bad}"

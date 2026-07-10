@@ -135,6 +135,40 @@ def main() -> int:
                   not bad,
                   "never emitted under that namespace: " + "; ".join(bad))
 
+        # --- drift-risk H6: the decomposer's hand-rolled JSON-LD reader ----
+        # decomposer/evidence.py re-parses inventory.jsonld beside the shared
+        # loader, restating CURIE keys/types as string literals. Pin each
+        # against the fixture bundle's actual JSON-LD keys and @type values.
+        import json as _json
+
+        def jsonld_universe(obj, acc: set[str]) -> set[str]:
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    acc.add(k)
+                    if k == "@type":
+                        for t in (v if isinstance(v, list) else [v]):
+                            if isinstance(t, str):
+                                acc.add(t)
+                    jsonld_universe(v, acc)
+            elif isinstance(obj, list):
+                for v in obj:
+                    jsonld_universe(v, acc)
+            return acc
+
+        universe = jsonld_universe(
+            _json.loads((bundle / "inventory.jsonld").read_text()), set())
+        evidence_src = (REPO_ROOT / "decomposer" / "evidence.py"
+                        ).read_text(encoding="utf-8")
+        curies = set(re.findall(
+            r'"((?:cbm|cbml2|cbml3|cbml4|skos|nif):[A-Za-z0-9_]+)"',
+            evidence_src))
+        check(f"decomposer/evidence.py: extraction floor "
+              f"({len(curies)} CURIEs, need >= 3)", len(curies) >= 3)
+        missing = sorted(c for c in curies if c not in universe)
+        check("decomposer/evidence.py: every restated JSON-LD key is "
+              "emitter-real", not missing,
+              f"absent from emitted inventory.jsonld: {missing}")
+
     if _FAILURES:
         print(f"\n{len(_FAILURES)} check(s) failed", file=sys.stderr)
         return 1

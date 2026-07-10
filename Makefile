@@ -38,7 +38,9 @@ DRIFT_VERIFIERS := \
 	$(TESTS_DIR)/verify_report_spec.py \
 	$(TESTS_DIR)/verify_api_field_parity.py \
 	$(TESTS_DIR)/verify_report_predicates.py \
-	$(TESTS_DIR)/verify_report_rs_contract.py
+	$(TESTS_DIR)/verify_report_rs_contract.py \
+	$(TESTS_DIR)/verify_requirements_mirror.py \
+	$(TESTS_DIR)/verify_make_wiring.py
 
 CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_roundtrip.py \
@@ -51,7 +53,9 @@ CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_xrefs.py \
 	$(TESTS_DIR)/verify_repository_summary.py \
 	$(TESTS_DIR)/verify_ast_coverage.py \
-	$(TESTS_DIR)/verify_progress.py
+	$(TESTS_DIR)/verify_progress.py \
+	$(TESTS_DIR)/verify_golden_repo.py \
+	$(TESTS_DIR)/verify_dimension_shapes.py
 
 VOCAB_VERIFIERS := \
 	$(TESTS_DIR)/verify_vocab.py \
@@ -134,7 +138,7 @@ lint: ## Enforce import boundaries (mirrors .github/workflows/lint.yml).
 # ----------------------------------------------------------------- tests
 
 .PHONY: test
-test: test-core test-vocab test-langs test-rust test-llm-offline test-drift test-reporting test-report-rs ## Run the full offline test surface (skips Ollama-dependent verifiers).
+test: test-core test-vocab test-langs test-rust test-llm-offline test-drift test-units test-backend test-docs test-report-rs ## Run the full offline test surface (skips Ollama-dependent verifiers).
 
 .PHONY: test-core
 test-core: ## Core round-trip, L2/L3, xrefs, repo summary.
@@ -173,8 +177,20 @@ check: ## Goal + drift gate: TIOBE-50 language-support ledger, then the drift ve
 test-drift: ## Drift-risk checks (P1/P2/P3) + shape coverage + dep hygiene.
 	@for v in $(DRIFT_VERIFIERS); do echo "== $$v =="; $(PYTHON) $$v || exit $$?; done
 
+.PHONY: test-units
+test-units: ## Whole pytest tree under tests/ (unit suites incl. decomposer + recomposer).
+	$(PYTEST) $(TESTS_DIR) -q
+
+.PHONY: test-backend
+test-backend: ## Frontend service pytest suites (FastAPI backend + MCP server).
+	$(PYTEST) $(FRONTEND_DIR)/backend/tests $(FRONTEND_DIR)/mcp_server/tests -q --no-cov
+
+.PHONY: test-docs
+test-docs: ## Documentation hygiene (README disclaimers, local links, stale docs).
+	$(PYTHON) $(TESTS_DIR)/verify_doc_hygiene.py
+
 .PHONY: test-reporting
-test-reporting: ## Reporting tools pytest suite (cbm.py, X-ray, banner, PDF, dossier, site).
+test-reporting: ## Focused reporting pytest subset (superset runs via test-units).
 	$(PYTEST) $(REPORTING_TESTS) -q
 
 .PHONY: test-report-rs
