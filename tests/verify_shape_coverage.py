@@ -35,6 +35,9 @@ Exit code: 0 if all pass, 1 otherwise.
 from __future__ import annotations
 
 import argparse
+import ast
+import importlib
+import inspect
 import shutil
 import subprocess
 import sys
@@ -63,6 +66,126 @@ INTENTIONALLY_UNSHAPED: dict[str, str] = {
     # Example (placeholder; remove or fill as needed):
     # f"{CBM_NS}provisional": "experimental field; promoted to shape in vX.Y",
 }
+
+# ---------------------------------------------------------------------------
+# Reverse direction: spec ⊆ writer (canonical-spec era).
+#
+# The forward check below (emitted ⊆ shape-covered) cannot catch the inverse
+# failure: a NodeShapeSpec declaring a predicate no writer ever emits — the
+# advertised-but-never-emitted class (the cbml2:beginIndex bug that shipped
+# in orient_bundle, drift-risk H4). Because the canonical spec is importable
+# data, this direction needs no TTL parsing: for every spec-owning module,
+# each declared sh:path must be referenced by that module's *writer* code.
+#
+# Extraction is AST-based and excludes the spec declarations themselves
+# (SHAPE_SPECS / CORE_SHAPE_SPECS assignments, *Shapes classes, and the
+# spec-builder helpers) — otherwise the check would trivially satisfy
+# itself from its own declaration.
+
+# (module path, spec attribute, names whose bodies are the spec side and
+#  must be excluded from writer-reference extraction, extraction floor)
+SPEC_OWNERS: tuple[tuple[str, str, frozenset[str], int], ...] = (
+    ("codebase_mapper.emission.infrastructure.rdf.rdflib_emitter",
+     "CORE_SHAPE_SPECS",
+     frozenset({"_core_shape_specs", "build_shacl_graph", "CORE_SHAPE_SPECS"}),
+     12),
+    ("plugins.chunks_embeddings.graph_writer", "SHAPE_SPECS",
+     frozenset({"SHAPE_SPECS", "ChunkShapes"}), 12),
+    ("plugins.symbol_xrefs.graph_writer", "SHAPE_SPECS",
+     frozenset({"SHAPE_SPECS", "XrefShapes"}), 5),
+    ("plugins.concept_graph.graph_writer", "SHAPE_SPECS",
+     frozenset({"SHAPE_SPECS", "ConceptShapes"}), 8),
+    ("plugins.llm_enrich.graph_writer", "SHAPE_SPECS",
+     frozenset({"SHAPE_SPECS", "LlmShapes",
+                "_optional_string", "_optional_datetime"}), 12),
+)
+
+# Spec paths legitimately unreferenced by their owning module's writer.
+# Every entry needs a reason.
+SPEC_PATHS_WRITTEN_ELSEWHERE: dict[str, str] = {
+    # skos:related is emitted by ConceptGraphWriter via SKOS.related — it IS
+    # in-module; listed here only if extraction ever misses it. (empty now)
+}
+
+
+def _writer_referenced_iris(module: object, excluded: frozenset[str]) -> set[str]:
+    """Every namespace-attribute IRI the module's writer code references.
+
+    Walks the module AST collecting ``<Name>.<attr>`` accesses outside the
+    excluded spec-side definitions, then resolves ``<Name>`` against the
+    live module namespace (rdflib Namespace instances only).
+    """
+    source = inspect.getsource(module)  # type: ignore[arg-type]
+    tree = ast.parse(source)
+
+    class _Collector(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self.pairs: set[tuple[str, str]] = set()
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            if node.name not in excluded:
+                self.generic_visit(node)
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            if node.name not in excluded:
+                self.generic_visit(node)
+
+        def visit_Assign(self, node: ast.Assign) -> None:
+            names = {t.id for t in node.targets if isinstance(t, ast.Name)}
+            if not (names & excluded):
+                self.generic_visit(node)
+
+        def visit_Attribute(self, node: ast.Attribute) -> None:
+            if isinstance(node.value, ast.Name):
+                self.pairs.add((node.value.id, node.attr))
+            self.generic_visit(node)
+
+    collector = _Collector()
+    collector.visit(tree)
+
+    from rdflib import Namespace
+    iris: set[str] = set()
+    for name, attr in collector.pairs:
+        ns = getattr(module, name, None)
+        if isinstance(ns, Namespace):
+            iris.add(str(ns) + attr)
+    return iris
+
+
+def _spec_paths(specs: tuple) -> set[str]:
+    paths: set[str] = set()
+    for shape in specs:
+        if shape.target_subjects_of is not None:
+            paths.add(shape.target_subjects_of)
+        for prop in shape.properties:
+            paths.add(prop.path)
+    return paths
+
+
+def check_spec_writer_parity(
+    owners: tuple[tuple[str, str, frozenset[str], int], ...],
+) -> None:
+    """Assert every spec-declared sh:path is writer-referenced in-module."""
+    for mod_path, spec_attr, excluded, floor in owners:
+        module = importlib.import_module(mod_path)
+        specs = getattr(module, spec_attr)
+        declared = _spec_paths(specs)
+        referenced = _writer_referenced_iris(module, excluded)
+        check(
+            f"{mod_path}: writer extraction floor "
+            f"({len(referenced)} IRIs, need >= {floor})",
+            len(referenced) >= floor,
+            f"got {sorted(referenced)}",
+        )
+        stale = declared - referenced - set(SPEC_PATHS_WRITTEN_ELSEWHERE)
+        check(
+            f"{mod_path}: every spec sh:path is emitted by the module's "
+            f"writer (no advertised-but-never-emitted predicates)",
+            not stale,
+            "spec-declared but writer never references (remove the spec "
+            "entry, fix the writer, or allowlist with a reason):\n"
+            + "\n".join(sorted(stale)),
+        )
 
 
 PASS = 0
@@ -238,6 +361,12 @@ def main(argv: list[str] | None = None) -> int:
                     pred in covered,
                     f"emitted={pred in emitted} covered={pred in covered}",
                 )
+
+        # --- 6. Reverse direction: every spec-declared sh:path is
+        # writer-referenced in its owning module (static, fixture-
+        # independent — catches optional predicates this fixture never
+        # exercises). ---
+        check_spec_writer_parity(SPEC_OWNERS)
 
         print()
         print(f"passed: {PASS}   failed: {FAIL}")

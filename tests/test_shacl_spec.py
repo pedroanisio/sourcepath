@@ -16,6 +16,12 @@ function:
 - the Pydantic layer actually validates: malformed specs are rejected at
   construction time, not discovered as bad RDF downstream.
 
+After an INTENTIONAL shape change, regenerate the golden with
+``make regen-shacl-golden`` and commit fixture + spec change together —
+the failing golden test is the review gate, not an obstacle. The reverse
+direction (a spec path no writer emits) is guarded separately by
+``tests/verify_shape_coverage.py::check_spec_writer_parity``.
+
 Run: uv run python -m pytest tests/test_shacl_spec.py
 """
 from __future__ import annotations

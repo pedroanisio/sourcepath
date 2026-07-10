@@ -182,6 +182,13 @@ test-drift: ## Drift-risk checks (P1/P2/P3) + shape coverage + dep hygiene.
 test-units: ## Whole pytest tree under tests/ (unit suites incl. decomposer + recomposer).
 	$(PYTEST) $(TESTS_DIR) -q
 
+.PHONY: regen-shacl-golden
+regen-shacl-golden: ## Regenerate the SHACL golden after an INTENTIONAL shape change (tests/test_shacl_spec.py pins against it).
+	$(PYTHON) -c "import sys; sys.path.insert(0, '.'); \
+	from tests.test_shacl_spec import build_full_spec_graph, GOLDEN; \
+	build_full_spec_graph().serialize(destination=str(GOLDEN), format='turtle'); \
+	print(f'regenerated {GOLDEN}')"
+
 .PHONY: test-backend
 test-backend: ## Frontend service pytest suites (FastAPI backend + MCP server).
 	$(PYTEST) $(FRONTEND_DIR)/backend/tests $(FRONTEND_DIR)/mcp_server/tests -q --no-cov

@@ -12,7 +12,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 cbm:CommitShape a sh:NodeShape ;
-    sh:property cbm:_ps_5a41abf4372cb142 ;
+    sh:property cbm:_ps_760f1b0ce339fa3e ;
     sh:targetClass cbm:Commit .
 
 cbm:FileShape a sh:NodeShape ;
@@ -20,31 +20,31 @@ cbm:FileShape a sh:NodeShape ;
         cbm:_importsProp,
         cbm:_phaseProp,
         cbm:_possibleImportProp,
-        cbm:_ps_11bfc2e91d5c43e7,
-        cbm:_ps_1f2cafddaed98924,
-        cbm:_ps_26274b70b62a2a6f,
-        cbm:_ps_26485f671ac86aa3,
-        cbm:_ps_403511560ebad799,
-        cbm:_ps_6415aa1a53f7f9bb,
-        cbm:_ps_7a62e1fdaaf40402,
-        cbm:_ps_9cd356d9f9b05308,
-        cbm:_ps_b6c34a17c04a90fd,
-        cbm:_ps_d1f0eb512912971b,
-        cbm:_ps_e3363e2416dec204,
-        cbm:_ps_f32005586248a8f6,
-        cbm:_ps_f95eedc853190767,
+        cbm:_ps_11fc76c4826f594b,
+        cbm:_ps_217f925c8816a6ae,
+        cbm:_ps_2a302e3a07b0fcbd,
+        cbm:_ps_52a0f5261c9a6670,
+        cbm:_ps_6b27a044ce8f9d23,
+        cbm:_ps_ab21f7a95ffd6036,
+        cbm:_ps_b6076d7a1f3310c8,
+        cbm:_ps_c031df001e1d9189,
+        cbm:_ps_d9658fec659373d3,
+        cbm:_ps_de135225b384dd17,
+        cbm:_ps_ea1520c78d7f5d17,
+        cbm:_ps_eba6d61eb03a7c44,
+        cbm:_ps_f4541ba8acaa68a4,
         cbm:_typeProp ;
     sh:targetClass cbm:File .
 
 cbm:PackageReleaseShape a sh:NodeShape ;
-    sh:property cbm:_ps_1b2e1778e79bdb8c,
-        cbm:_ps_23c2ba54212dad0d,
-        cbm:_ps_fb800cdda51d2168 ;
+    sh:property cbm:_ps_31983192ac045fa5,
+        cbm:_ps_46dd12d1f455e326,
+        cbm:_ps_fe580b52d579051c ;
     sh:targetClass cbm:PackageRelease .
 
 cbm:RepositoryShape a sh:NodeShape ;
-    sh:property cbm:_ps_70598329b4aaa286,
-        cbm:_ps_e93a98227c32eaad ;
+    sh:property cbm:_ps_22ed3f85ac018e37,
+        cbm:_ps_b8535313bdf2141f ;
     sh:targetClass cbm:Repository .
 
 cbm:TestsSubjectShape a sh:NodeShape ;
@@ -53,72 +53,72 @@ cbm:TestsSubjectShape a sh:NodeShape ;
 
 cbml2:ChunkShape a sh:NodeShape ;
     sh:property cbml2:_kindProp,
-        cbml2:_ps_0574376efb75ba0b,
-        cbml2:_ps_0824e56393aa3c6b,
-        cbml2:_ps_3394867a0c5ec2b2,
-        cbml2:_ps_382a5fb6a4718613,
-        cbml2:_ps_4e833519d723faa8,
-        cbml2:_ps_610a0e63243ff8ae,
-        cbml2:_ps_8378be30b9b7aa6b,
-        cbml2:_ps_8713a9a7096314f1,
-        cbml2:_ps_9a8dc76a1cd2d3c6,
-        cbml2:_ps_a0ffe4f22b50d694,
-        cbml2:_ps_a57e5a6c1dec5276,
-        cbml2:_ps_bb84daa1dc10a865,
-        cbml2:_ps_c2b97fef30e4855f,
-        cbml2:_ps_c722454736b4e4eb,
-        cbml2:_ps_dbb39b1a16946c86,
-        cbml2:_ps_dbbe6a3b34a140cc,
-        cbml2:_ps_eefde2ae93f12df2,
-        cbml2:_ps_f1fa660a7b8dc70e,
-        cbml2:_ps_f7fc3bcf835233d3 ;
+        cbml2:_ps_1cf9846fb075c27a,
+        cbml2:_ps_23bc5b36eb4caea9,
+        cbml2:_ps_362ac6bae7cd2b94,
+        cbml2:_ps_41100415d10dd657,
+        cbml2:_ps_4a6e238c3e845ae3,
+        cbml2:_ps_4b9a3e0511542747,
+        cbml2:_ps_6380aa21972ee85e,
+        cbml2:_ps_6e41adc7abc75d58,
+        cbml2:_ps_8a8bd64c3bbc458e,
+        cbml2:_ps_95861fab5b687dd9,
+        cbml2:_ps_9cc08fc37200733f,
+        cbml2:_ps_9dff5ad108b93b41,
+        cbml2:_ps_a4085b5a8ffa7ccd,
+        cbml2:_ps_ad64a93516512345,
+        cbml2:_ps_b841aa308697df8d,
+        cbml2:_ps_c00c8c76d5ab64e9,
+        cbml2:_ps_e45a1613252be493,
+        cbml2:_ps_edfd38e2297c8c84,
+        cbml2:_ps_f7108d2e3bd4d74f ;
     sh:targetClass cbml2:Chunk .
 
 cbml3:ConceptShape a sh:NodeShape ;
-    sh:property cbml3:_ps_0e77248d1e6a7099,
-        cbml3:_ps_21342e58623c5e03,
-        cbml3:_ps_7ae85e36d10c6d34,
-        cbml3:_ps_811a752d0810c983,
-        cbml3:_ps_c5b1f89a1e78ac08,
-        cbml3:_ps_f23cbec6fe037dfb,
-        cbml3:_ps_f6a1982f93e7221f,
-        cbml3:_ps_fb1bf66009a6b6a8,
-        cbml3:_ps_fecf8f3dfaf7210c ;
+    sh:property cbml3:_ps_235b2ca18bbfb8d4,
+        cbml3:_ps_41f9797c82a02031,
+        cbml3:_ps_772bdec8f40b86f9,
+        cbml3:_ps_7d5bf60a51785e5e,
+        cbml3:_ps_7e80be7eb7d850c4,
+        cbml3:_ps_aa246e7c90b3502b,
+        cbml3:_ps_b693c0de944288dc,
+        cbml3:_ps_c4d2985853df474d,
+        cbml3:_ps_ce5dd1fed522fe3e ;
     sh:targetClass skos:Concept .
 
 cbml3:KindCollectionShape a sh:NodeShape ;
-    sh:property cbml3:_ps_04f0f20476024bbb,
-        cbml3:_ps_177a7cbc495f2d8c,
-        cbml3:_ps_ff48a14d70ed3545 ;
+    sh:property cbml3:_ps_17faac3fa2e6782f,
+        cbml3:_ps_18189e4a78dc6077,
+        cbml3:_ps_5672148fa1c2b478 ;
     sh:targetClass skos:Collection .
 
 cbml3:LexicalizesShape a sh:NodeShape ;
-    sh:property cbml3:_ps_6eb4e7826a33e138 ;
+    sh:property cbml3:_ps_69f46b93f70f91f9 ;
     sh:targetSubjectsOf cbml3:lexicalizes .
 
 cbml4:LlmConceptShape a sh:NodeShape ;
-    sh:property cbml4:_ps_46dc8440a5e40ce0,
-        cbml4:_ps_4bf58d9c5dcb9812,
-        cbml4:_ps_5b96b54d0f075ae4,
-        cbml4:_ps_7f7853b415ca3472 ;
+    sh:property cbml4:_ps_9d7834f87dd3ba3a,
+        cbml4:_ps_a4d1f040fd3c6262,
+        cbml4:_ps_bdf12e9e06bd8c64,
+        cbml4:_ps_edefec36b69c5198 ;
     sh:targetClass skos:Concept .
 
 cbml4:LlmFileShape a sh:NodeShape ;
-    sh:property cbml4:_ps_0a033eae041f54eb,
-        cbml4:_ps_1d677df1163081ec,
-        cbml4:_ps_4e063971977cd289,
-        cbml4:_ps_66080c6828bb0682,
-        cbml4:_ps_80d6a17c7b989a4e,
-        cbml4:_ps_c67874ddf6d3c94a,
-        cbml4:_ps_d87f9d55cbcfc297,
-        cbml4:_ps_f3dc6a84b0296ea9 ;
+    sh:property cbml4:_ps_0cd68b972351a623,
+        cbml4:_ps_54277248f97cb4eb,
+        cbml4:_ps_a4c350537884bbd7,
+        cbml4:_ps_bc70898e5c5b044f,
+        cbml4:_ps_c9cccd61a3852c89,
+        cbml4:_ps_d4e748ea1f9d3e97,
+        cbml4:_ps_d991a580b7a62af8,
+        cbml4:_ps_f30ef2389658f1aa ;
     sh:targetClass cbm:File .
 
 cbmxr:EdgeShape a sh:NodeShape ;
     sh:property cbmxr:_kindProp,
-        cbmxr:_ps_80b9fc34fa9f7f4c,
-        cbmxr:_ps_a8f2d4d49c71c653,
-        cbmxr:_ps_ae9d883d3e7244b0,
+        cbmxr:_ps_312a0d0e9aac66af,
+        cbmxr:_ps_541012c99d0500c8,
+        cbmxr:_ps_96e5d142646934d9,
         cbmxr:_resolutionProp ;
     sh:targetClass cbmxr:Edge .
 
@@ -129,7 +129,25 @@ cbm:_importsProp sh:class cbm:File ;
     sh:path cbm:imports .
 
 cbm:_phaseList rdf:first cbmp:build ;
-    rdf:rest ( cbmp:compile cbmp:runtime cbmp:test cbmp:ci cbmp:deploy cbmp:dev ) .
+    rdf:rest cbm:_phaseList-1 .
+
+cbm:_phaseList-1 rdf:first cbmp:compile ;
+    rdf:rest cbm:_phaseList-2 .
+
+cbm:_phaseList-2 rdf:first cbmp:runtime ;
+    rdf:rest cbm:_phaseList-3 .
+
+cbm:_phaseList-3 rdf:first cbmp:test ;
+    rdf:rest cbm:_phaseList-4 .
+
+cbm:_phaseList-4 rdf:first cbmp:ci ;
+    rdf:rest cbm:_phaseList-5 .
+
+cbm:_phaseList-5 rdf:first cbmp:deploy ;
+    rdf:rest cbm:_phaseList-6 .
+
+cbm:_phaseList-6 rdf:first cbmp:dev ;
+    rdf:rest () .
 
 cbm:_phaseProp sh:in cbm:_phaseList ;
     sh:minCount 1 ;
@@ -138,95 +156,140 @@ cbm:_phaseProp sh:in cbm:_phaseList ;
 cbm:_possibleImportProp sh:class cbm:File ;
     sh:path cbm:possibleImport .
 
-cbm:_ps_11bfc2e91d5c43e7 sh:datatype xsd:dateTime ;
+cbm:_ps_11fc76c4826f594b sh:datatype xsd:string ;
     sh:maxCount 1 ;
-    sh:path cbm:ctime .
+    sh:minCount 1 ;
+    sh:path cbm:gitBlobSha .
 
-cbm:_ps_1b2e1778e79bdb8c sh:class cbm:ExternalPackage ;
+cbm:_ps_217f925c8816a6ae sh:datatype xsd:dateTime ;
+    sh:maxCount 1 ;
+    sh:path cbm:mtime .
+
+cbm:_ps_22ed3f85ac018e37 sh:class cbm:Commit ;
+    sh:maxCount 1 ;
+    sh:minCount 1 ;
+    sh:path cbm:atCommit .
+
+cbm:_ps_2a302e3a07b0fcbd sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbm:astSummary .
+
+cbm:_ps_31983192ac045fa5 sh:class cbm:ExternalPackage ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbm:releaseOf .
 
-cbm:_ps_1f2cafddaed98924 sh:datatype xsd:string ;
+cbm:_ps_46dd12d1f455e326 sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:minCount 1 ;
+    sh:path cbm:packageVersion .
+
+cbm:_ps_52a0f5261c9a6670 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:path cbm:language .
 
-cbm:_ps_23c2ba54212dad0d sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:path cbm:packageName .
+cbm:_ps_6b27a044ce8f9d23 sh:class cbm:PackageRelease ;
+    sh:path cbm:pinsDependency .
 
-cbm:_ps_26274b70b62a2a6f sh:datatype xsd:dateTime ;
-    sh:maxCount 1 ;
-    sh:path cbm:mtime .
-
-cbm:_ps_26485f671ac86aa3 sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:path cbm:path .
-
-cbm:_ps_403511560ebad799 sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbm:astSummary .
-
-cbm:_ps_5a41abf4372cb142 sh:datatype xsd:string ;
+cbm:_ps_760f1b0ce339fa3e sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbm:commitSha ;
     sh:pattern "^[0-9a-f]+$" .
 
-cbm:_ps_6415aa1a53f7f9bb sh:datatype xsd:dateTime ;
-    sh:maxCount 1 ;
-    sh:path cbm:atime .
-
-cbm:_ps_70598329b4aaa286 sh:class cbm:Commit ;
-    sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:path cbm:atCommit .
-
-cbm:_ps_7a62e1fdaaf40402 sh:datatype xsd:integer ;
-    sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:minInclusive 0 ;
-    sh:path cbm:sizeBytes .
-
-cbm:_ps_9cd356d9f9b05308 sh:class cbm:ExternalPackage ;
+cbm:_ps_ab21f7a95ffd6036 sh:class cbm:ExternalPackage ;
     sh:path cbm:declaresDependency .
 
-cbm:_ps_b6c34a17c04a90fd sh:datatype xsd:dateTime ;
+cbm:_ps_b6076d7a1f3310c8 sh:datatype xsd:string ;
+    sh:path cbm:extractionError .
+
+cbm:_ps_b8535313bdf2141f sh:class cbm:File ;
+    sh:path cbm:hasFile .
+
+cbm:_ps_c031df001e1d9189 sh:datatype xsd:dateTime ;
     sh:maxCount 1 ;
     sh:path cbm:gitCommitTime .
 
-cbm:_ps_d1f0eb512912971b sh:class cbm:PackageRelease ;
-    sh:path cbm:pinsDependency .
-
-cbm:_ps_e3363e2416dec204 sh:datatype xsd:hexBinary ;
+cbm:_ps_d9658fec659373d3 sh:datatype xsd:hexBinary ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbm:contentSha256 ;
     sh:pattern "^[0-9a-f]{64}$" .
 
-cbm:_ps_e93a98227c32eaad sh:class cbm:File ;
-    sh:path cbm:hasFile .
-
-cbm:_ps_f32005586248a8f6 sh:datatype xsd:string ;
-    sh:path cbm:extractionError .
-
-cbm:_ps_f95eedc853190767 sh:datatype xsd:string ;
+cbm:_ps_de135225b384dd17 sh:datatype xsd:integer ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
-    sh:path cbm:gitBlobSha .
+    sh:minInclusive 0 ;
+    sh:path cbm:sizeBytes .
 
-cbm:_ps_fb800cdda51d2168 sh:datatype xsd:string ;
+cbm:_ps_ea1520c78d7f5d17 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
-    sh:path cbm:packageVersion .
+    sh:path cbm:path .
+
+cbm:_ps_eba6d61eb03a7c44 sh:datatype xsd:dateTime ;
+    sh:maxCount 1 ;
+    sh:path cbm:atime .
+
+cbm:_ps_f4541ba8acaa68a4 sh:datatype xsd:dateTime ;
+    sh:maxCount 1 ;
+    sh:path cbm:ctime .
+
+cbm:_ps_fe580b52d579051c sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:minCount 1 ;
+    sh:path cbm:packageName .
 
 cbm:_testsTypeProp sh:hasValue cbmt:test_code ;
     sh:path cbm:type .
 
 cbm:_typeList rdf:first cbmt:source_code ;
-    rdf:rest ( cbmt:test_code cbmt:configuration cbmt:documentation cbmt:environment cbmt:container cbmt:build_script cbmt:dependency_manifest cbmt:lockfile cbmt:ci_cd cbmt:data cbmt:asset cbmt:binary cbmt:generated cbmt:license cbmt:unknown ) .
+    rdf:rest cbm:_typeList-1 .
+
+cbm:_typeList-1 rdf:first cbmt:test_code ;
+    rdf:rest cbm:_typeList-2 .
+
+cbm:_typeList-10 rdf:first cbmt:data ;
+    rdf:rest cbm:_typeList-11 .
+
+cbm:_typeList-11 rdf:first cbmt:asset ;
+    rdf:rest cbm:_typeList-12 .
+
+cbm:_typeList-12 rdf:first cbmt:binary ;
+    rdf:rest cbm:_typeList-13 .
+
+cbm:_typeList-13 rdf:first cbmt:generated ;
+    rdf:rest cbm:_typeList-14 .
+
+cbm:_typeList-14 rdf:first cbmt:license ;
+    rdf:rest cbm:_typeList-15 .
+
+cbm:_typeList-15 rdf:first cbmt:unknown ;
+    rdf:rest () .
+
+cbm:_typeList-2 rdf:first cbmt:configuration ;
+    rdf:rest cbm:_typeList-3 .
+
+cbm:_typeList-3 rdf:first cbmt:documentation ;
+    rdf:rest cbm:_typeList-4 .
+
+cbm:_typeList-4 rdf:first cbmt:environment ;
+    rdf:rest cbm:_typeList-5 .
+
+cbm:_typeList-5 rdf:first cbmt:container ;
+    rdf:rest cbm:_typeList-6 .
+
+cbm:_typeList-6 rdf:first cbmt:build_script ;
+    rdf:rest cbm:_typeList-7 .
+
+cbm:_typeList-7 rdf:first cbmt:dependency_manifest ;
+    rdf:rest cbm:_typeList-8 .
+
+cbm:_typeList-8 rdf:first cbmt:lockfile ;
+    rdf:rest cbm:_typeList-9 .
+
+cbm:_typeList-9 rdf:first cbmt:ci_cd ;
+    rdf:rest cbm:_typeList-10 .
 
 cbm:_typeProp sh:in cbm:_typeList ;
     sh:maxCount 1 ;
@@ -234,235 +297,277 @@ cbm:_typeProp sh:in cbm:_typeList ;
     sh:path cbm:type .
 
 cbml2:_kindList rdf:first "function" ;
-    rdf:rest ( "class" "method" "file" ) .
+    rdf:rest cbml2:_kindList-1 .
+
+cbml2:_kindList-1 rdf:first "class" ;
+    rdf:rest cbml2:_kindList-2 .
+
+cbml2:_kindList-2 rdf:first "method" ;
+    rdf:rest cbml2:_kindList-3 .
+
+cbml2:_kindList-3 rdf:first "file" ;
+    rdf:rest () .
 
 cbml2:_kindProp sh:in cbml2:_kindList ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbml2:kind .
 
-cbml2:_ps_0574376efb75ba0b sh:datatype xsd:integer ;
+cbml2:_ps_1cf9846fb075c27a sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml2:parentSymbol .
+
+cbml2:_ps_23bc5b36eb4caea9 sh:class cbm:File ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
-    sh:minInclusive 0 ;
-    sh:path nif:beginIndex .
+    sh:path cbml2:inFile .
 
-cbml2:_ps_0824e56393aa3c6b sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbml2:visibility .
-
-cbml2:_ps_3394867a0c5ec2b2 sh:datatype xsd:string ;
-    sh:path cbml2:typeParam .
-
-cbml2:_ps_382a5fb6a4718613 sh:datatype xsd:hexBinary ;
+cbml2:_ps_362ac6bae7cd2b94 sh:datatype xsd:hexBinary ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbml2:contentSha256 ;
     sh:pattern "^[0-9a-f]{64}$" .
 
-cbml2:_ps_4e833519d723faa8 sh:datatype xsd:string ;
-    sh:path cbml2:baseType .
-
-cbml2:_ps_610a0e63243ff8ae sh:datatype xsd:string ;
-    sh:path cbml2:decorator .
-
-cbml2:_ps_8378be30b9b7aa6b sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbml2:signature .
-
-cbml2:_ps_8713a9a7096314f1 sh:datatype xsd:integer ;
-    sh:maxCount 1 ;
-    sh:minInclusive 0 ;
-    sh:path cbml2:embeddingRow .
-
-cbml2:_ps_9a8dc76a1cd2d3c6 sh:datatype xsd:boolean ;
-    sh:maxCount 1 ;
-    sh:path cbml2:truncatedForEmbedding .
-
-cbml2:_ps_a0ffe4f22b50d694 sh:datatype xsd:string ;
+cbml2:_ps_41100415d10dd657 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:path cbml2:embeddingArtifact .
 
-cbml2:_ps_a57e5a6c1dec5276 sh:datatype xsd:integer ;
+cbml2:_ps_4a6e238c3e845ae3 sh:datatype xsd:string ;
+    sh:path cbml2:decorator .
+
+cbml2:_ps_4b9a3e0511542747 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
-    sh:minInclusive 0 ;
-    sh:path nif:endIndex .
+    sh:path cbml2:symbol .
 
-cbml2:_ps_bb84daa1dc10a865 sh:class cbm:File ;
-    sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:path cbml2:inFile .
-
-cbml2:_ps_c2b97fef30e4855f sh:datatype xsd:boolean ;
+cbml2:_ps_6380aa21972ee85e sh:datatype xsd:boolean ;
     sh:maxCount 1 ;
     sh:path cbml2:isAsync .
 
-cbml2:_ps_c722454736b4e4eb sh:datatype xsd:integer ;
+cbml2:_ps_6e41adc7abc75d58 sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml2:returnsType .
+
+cbml2:_ps_8a8bd64c3bbc458e sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml2:signature .
+
+cbml2:_ps_95861fab5b687dd9 sh:datatype xsd:integer ;
+    sh:maxCount 1 ;
+    sh:minCount 1 ;
+    sh:minInclusive 0 ;
+    sh:path nif:beginIndex .
+
+cbml2:_ps_9cc08fc37200733f sh:datatype xsd:boolean ;
+    sh:maxCount 1 ;
+    sh:path cbml2:truncatedForEmbedding .
+
+cbml2:_ps_9dff5ad108b93b41 sh:datatype xsd:integer ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:minInclusive 1 ;
     sh:path cbml2:endLine .
 
-cbml2:_ps_dbb39b1a16946c86 sh:datatype xsd:integer ;
+cbml2:_ps_a4085b5a8ffa7ccd sh:datatype xsd:string ;
+    sh:path cbml2:baseType .
+
+cbml2:_ps_ad64a93516512345 sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml2:visibility .
+
+cbml2:_ps_b841aa308697df8d sh:datatype xsd:integer ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:minInclusive 1 ;
     sh:path cbml2:beginLine .
 
-cbml2:_ps_dbbe6a3b34a140cc sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbml2:returnsType .
-
-cbml2:_ps_eefde2ae93f12df2 sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:path cbml2:symbol .
-
-cbml2:_ps_f1fa660a7b8dc70e sh:datatype xsd:string ;
+cbml2:_ps_c00c8c76d5ab64e9 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:path cbml2:paramsJson .
 
-cbml2:_ps_f7fc3bcf835233d3 sh:datatype xsd:string ;
+cbml2:_ps_e45a1613252be493 sh:datatype xsd:integer ;
     sh:maxCount 1 ;
-    sh:path cbml2:parentSymbol .
+    sh:minCount 1 ;
+    sh:minInclusive 0 ;
+    sh:path nif:endIndex .
 
-cbml3:_ps_04f0f20476024bbb sh:maxCount 1 ;
+cbml2:_ps_edfd38e2297c8c84 sh:datatype xsd:integer ;
+    sh:maxCount 1 ;
+    sh:minInclusive 0 ;
+    sh:path cbml2:embeddingRow .
+
+cbml2:_ps_f7108d2e3bd4d74f sh:datatype xsd:string ;
+    sh:path cbml2:typeParam .
+
+cbml3:_ps_17faac3fa2e6782f sh:datatype xsd:string ;
+    sh:in cbml3:_ps_17faac3fa2e6782f_list ;
+    sh:maxCount 1 ;
+    sh:minCount 1 ;
+    sh:path cbml3:conceptKindBacking .
+
+cbml3:_ps_17faac3fa2e6782f_list rdf:first "domain-primitive" ;
+    rdf:rest cbml3:_ps_17faac3fa2e6782f_list-1 .
+
+cbml3:_ps_17faac3fa2e6782f_list-1 rdf:first "structural-primitive" ;
+    rdf:rest cbml3:_ps_17faac3fa2e6782f_list-2 .
+
+cbml3:_ps_17faac3fa2e6782f_list-2 rdf:first "relational-primitive" ;
+    rdf:rest () .
+
+cbml3:_ps_18189e4a78dc6077 sh:class skos:Concept ;
+    sh:minCount 1 ;
+    sh:path skos:member .
+
+cbml3:_ps_235b2ca18bbfb8d4 sh:datatype xsd:string ;
+    sh:in cbml3:_ps_235b2ca18bbfb8d4_list ;
+    sh:maxCount 1 ;
+    sh:path cbml3:conceptKind .
+
+cbml3:_ps_235b2ca18bbfb8d4_list rdf:first "domain-primitive" ;
+    rdf:rest cbml3:_ps_235b2ca18bbfb8d4_list-1 .
+
+cbml3:_ps_235b2ca18bbfb8d4_list-1 rdf:first "structural-primitive" ;
+    rdf:rest cbml3:_ps_235b2ca18bbfb8d4_list-2 .
+
+cbml3:_ps_235b2ca18bbfb8d4_list-2 rdf:first "relational-primitive" ;
+    rdf:rest () .
+
+cbml3:_ps_41f9797c82a02031 sh:datatype xsd:integer ;
+    sh:maxCount 1 ;
+    sh:minInclusive 0 ;
+    sh:path cbml3:embeddingRow .
+
+cbml3:_ps_5672148fa1c2b478 sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path skos:prefLabel .
 
-cbml3:_ps_0e77248d1e6a7099 sh:datatype xsd:integer ;
+cbml3:_ps_69f46b93f70f91f9 sh:class skos:Concept ;
+    sh:path cbml3:lexicalizes .
+
+cbml3:_ps_772bdec8f40b86f9 sh:class skos:Concept ;
+    sh:path cbml3:composedOf .
+
+cbml3:_ps_7d5bf60a51785e5e sh:datatype xsd:integer ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:minInclusive 1 ;
     sh:path cbml3:occurrenceCount .
 
-cbml3:_ps_177a7cbc495f2d8c sh:class skos:Concept ;
-    sh:minCount 1 ;
-    sh:path skos:member .
-
-cbml3:_ps_21342e58623c5e03 sh:datatype xsd:string ;
-    sh:in ( "domain-primitive" "structural-primitive" "relational-primitive" ) ;
+cbml3:_ps_7e80be7eb7d850c4 sh:datatype xsd:string ;
     sh:maxCount 1 ;
-    sh:path cbml3:conceptKind .
+    sh:path cbml3:embeddingArtifact .
 
-cbml3:_ps_6eb4e7826a33e138 sh:class skos:Concept ;
-    sh:path cbml3:lexicalizes .
-
-cbml3:_ps_7ae85e36d10c6d34 sh:datatype xsd:integer ;
-    sh:maxCount 1 ;
-    sh:minInclusive 0 ;
-    sh:path cbml3:embeddingRow .
-
-cbml3:_ps_811a752d0810c983 sh:class skos:Concept ;
-    sh:path cbml3:composedOf .
-
-cbml3:_ps_c5b1f89a1e78ac08 sh:class skos:Collection ;
+cbml3:_ps_aa246e7c90b3502b sh:class skos:Collection ;
     sh:maxCount 1 ;
     sh:path cbml3:broaderCollection .
 
-cbml3:_ps_f23cbec6fe037dfb sh:datatype xsd:integer ;
+cbml3:_ps_b693c0de944288dc sh:class skos:Concept ;
+    sh:path skos:related .
+
+cbml3:_ps_c4d2985853df474d sh:maxCount 1 ;
+    sh:minCount 1 ;
+    sh:path skos:prefLabel .
+
+cbml3:_ps_ce5dd1fed522fe3e sh:datatype xsd:integer ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:minInclusive 1 ;
     sh:path cbml3:fileCount .
 
-cbml3:_ps_f6a1982f93e7221f sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:path skos:prefLabel .
-
-cbml3:_ps_fb1bf66009a6b6a8 sh:class skos:Concept ;
-    sh:path skos:related .
-
-cbml3:_ps_fecf8f3dfaf7210c sh:datatype xsd:string ;
+cbml4:_ps_0cd68b972351a623 sh:datatype xsd:dateTime ;
     sh:maxCount 1 ;
-    sh:path cbml3:embeddingArtifact .
+    sh:path cbml4:schemaPurposeGeneratedAt .
 
-cbml3:_ps_ff48a14d70ed3545 sh:datatype xsd:string ;
-    sh:in ( "domain-primitive" "structural-primitive" "relational-primitive" ) ;
+cbml4:_ps_54277248f97cb4eb sh:datatype xsd:string ;
     sh:maxCount 1 ;
-    sh:minCount 1 ;
-    sh:path cbml3:conceptKindBacking .
+    sh:path cbml4:fileSummary .
 
-cbml4:_ps_0a033eae041f54eb sh:datatype xsd:dateTime ;
+cbml4:_ps_9d7834f87dd3ba3a sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml4:conceptDescription .
+
+cbml4:_ps_a4c350537884bbd7 sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml4:schemaPurpose .
+
+cbml4:_ps_a4d1f040fd3c6262 sh:datatype xsd:dateTime ;
+    sh:maxCount 1 ;
+    sh:path cbml4:conceptDescriptionGeneratedAt .
+
+cbml4:_ps_bc70898e5c5b044f sh:datatype xsd:dateTime ;
     sh:maxCount 1 ;
     sh:path cbml4:fileSummaryGeneratedAt .
 
-cbml4:_ps_1d677df1163081ec sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:minLength 1 ;
-    sh:path cbml4:fileSummaryModel .
-
-cbml4:_ps_46dc8440a5e40ce0 sh:datatype xsd:string ;
+cbml4:_ps_bdf12e9e06bd8c64 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:minLength 1 ;
     sh:path cbml4:conceptDescriptionModel .
 
-cbml4:_ps_4bf58d9c5dcb9812 sh:datatype xsd:dateTime ;
-    sh:maxCount 1 ;
-    sh:path cbml4:conceptDescriptionGeneratedAt .
-
-cbml4:_ps_4e063971977cd289 sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbml4:fileSummaryPromptSha ;
-    sh:pattern "^[a-f0-9]{64}$" .
-
-cbml4:_ps_5b96b54d0f075ae4 sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbml4:conceptDescriptionPromptSha ;
-    sh:pattern "^[a-f0-9]{64}$" .
-
-cbml4:_ps_66080c6828bb0682 sh:datatype xsd:string ;
+cbml4:_ps_c9cccd61a3852c89 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:path cbml4:schemaPurposePromptSha ;
     sh:pattern "^[a-f0-9]{64}$" .
 
-cbml4:_ps_7f7853b415ca3472 sh:datatype xsd:string ;
+cbml4:_ps_d4e748ea1f9d3e97 sh:datatype xsd:string ;
     sh:maxCount 1 ;
-    sh:path cbml4:conceptDescription .
+    sh:path cbml4:fileSummaryPromptSha ;
+    sh:pattern "^[a-f0-9]{64}$" .
 
-cbml4:_ps_80d6a17c7b989a4e sh:datatype xsd:string ;
+cbml4:_ps_d991a580b7a62af8 sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:minLength 1 ;
+    sh:path cbml4:fileSummaryModel .
+
+cbml4:_ps_edefec36b69c5198 sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml4:conceptDescriptionPromptSha ;
+    sh:pattern "^[a-f0-9]{64}$" .
+
+cbml4:_ps_f30ef2389658f1aa sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:minLength 1 ;
     sh:path cbml4:schemaPurposeModel .
 
-cbml4:_ps_c67874ddf6d3c94a sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbml4:fileSummary .
-
-cbml4:_ps_d87f9d55cbcfc297 sh:datatype xsd:string ;
-    sh:maxCount 1 ;
-    sh:path cbml4:schemaPurpose .
-
-cbml4:_ps_f3dc6a84b0296ea9 sh:datatype xsd:dateTime ;
-    sh:maxCount 1 ;
-    sh:path cbml4:schemaPurposeGeneratedAt .
-
 cbmxr:_kindList rdf:first "calls" ;
-    rdf:rest ( "subclassOf" "overrides" "references" ) .
+    rdf:rest cbmxr:_kindList-1 .
+
+cbmxr:_kindList-1 rdf:first "subclassOf" ;
+    rdf:rest cbmxr:_kindList-2 .
+
+cbmxr:_kindList-2 rdf:first "overrides" ;
+    rdf:rest cbmxr:_kindList-3 .
+
+cbmxr:_kindList-3 rdf:first "references" ;
+    rdf:rest () .
 
 cbmxr:_kindProp sh:in cbmxr:_kindList ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbmxr:kind .
 
-cbmxr:_ps_80b9fc34fa9f7f4c sh:datatype xsd:string ;
+cbmxr:_ps_312a0d0e9aac66af sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbmxr:resolver .
 
-cbmxr:_ps_a8f2d4d49c71c653 sh:class cbml2:Chunk ;
+cbmxr:_ps_541012c99d0500c8 sh:class cbml2:Chunk ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbmxr:src .
 
-cbmxr:_ps_ae9d883d3e7244b0 sh:class cbml2:Chunk ;
+cbmxr:_ps_96e5d142646934d9 sh:class cbml2:Chunk ;
     sh:maxCount 1 ;
     sh:minCount 1 ;
     sh:path cbmxr:dst .
 
 cbmxr:_resolutionList rdf:first "exact" ;
-    rdf:rest ( "heuristic" "ambiguous" ) .
+    rdf:rest cbmxr:_resolutionList-1 .
+
+cbmxr:_resolutionList-1 rdf:first "heuristic" ;
+    rdf:rest cbmxr:_resolutionList-2 .
+
+cbmxr:_resolutionList-2 rdf:first "ambiguous" ;
+    rdf:rest () .
 
 cbmxr:_resolutionProp sh:in cbmxr:_resolutionList ;
     sh:maxCount 1 ;
