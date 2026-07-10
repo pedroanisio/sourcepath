@@ -86,6 +86,11 @@ def load_env(path: Path | None = None, *, override: bool = False) -> dict[str, s
             raise ValueError(f"{path}: line {lineno} is not KEY=VALUE: {raw!r}")
         key, value = line.split("=", 1)
         key = key.strip()
+        if key.endswith("_*"):
+            # Wildcard family entry (e.g. CBM_MCP_TIMEOUT_*=): documents a
+            # dynamically-named group for the env-inventory drift guard;
+            # never a loadable variable.
+            continue
         if not _KEY_RE.match(key):
             raise ValueError(f"{path}: line {lineno} has invalid key {key!r}")
         value = value.strip()
