@@ -850,7 +850,7 @@
         "block_id": { "$ref": "#/$defs/Uuid" },
         "component_id": { "type": "string", "minLength": 1, "description": "FK → ReportBlock.component_id (catalog id)." },
         "bundle": { "$ref": "#/$defs/BundleRef" },
-        "params_hash": { "$ref": "#/$defs/Sha256Hex", "description": "SHA-256 of the canonical (sorted-keys, UTF-8) JSON of the resolved params, defaults applied. Cache key together with bundle.manifest_sha256." },
+        "params_hash": { "$ref": "#/$defs/Sha256Hex", "description": "SHA-256 of the canonical JSON of the resolved params (defaults applied): UTF-8, keys sorted lexicographically, compact separators (',' and ':'), no insignificant whitespace, no trailing newline — i.e. Python json.dumps(params, sort_keys=True, separators=(',', ':')).encode('utf-8'). Example: params {\"min_files\": 1} → canonical b'{\"min_files\":1}' → 31b510524c5e37a249edfd7e1b5ded854be4797a68e2eee2a0956909f38a5828. Cache key together with bundle.manifest_sha256." },
         "evidence_tier": { "$ref": "#/$defs/EvidenceTier" },
         "executed_at": { "$ref": "#/$defs/IsoDateTimeUtc" },
         "duration_ms": { "type": "integer", "minimum": 0, "description": "x-unit: milliseconds." },
