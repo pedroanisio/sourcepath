@@ -74,6 +74,13 @@ dev = [
     "types-PyYAML",
     # tests/verify_report_spec.py validates the reporting contract schema.
     "jsonschema",
+    # The Makefile's test targets invoke `pytest ... --no-cov`; both must be
+    # declared or a lock-driven `uv sync` strips them and `make test` breaks.
+    "pytest",
+    "pytest-cov",
+    # scripts/report_to_pdf.py's renderer; declared here so
+    # tests/test_report_to_pdf.py runs instead of importorskip-skipping.
+    "weasyprint",
     "codebase-mapper[frontend]",
 ]
 site = [
