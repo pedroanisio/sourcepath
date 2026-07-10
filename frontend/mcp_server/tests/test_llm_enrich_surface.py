@@ -192,10 +192,12 @@ def test_concept_detail_returns_llm_description_when_typed():
     assert len(prov["prompt_sha"]) == 64
 
 
-def test_concept_detail_omits_llm_description_for_untyped():
-    """Uncurated concepts shouldn't have a description (the aggregator
-    only enriches typed concepts)."""
-    # Pick a non-curated concept name from the bundle.
+def test_concept_detail_untyped_description_carries_provenance():
+    """Untyped concepts MAY be enriched since E6 wave 2 (the corpus-top
+    tier describes the top-N uncurated concepts by frequency/spread). On
+    this tiny fixture every concept falls inside the default top-N, so an
+    untyped concept's description must be present and fully provenanced —
+    never an anonymous blob."""
     from frontend.mcp_server.handlers import _get_bundle
     b = _get_bundle("bundle")
     untyped = next(
@@ -207,10 +209,16 @@ def test_concept_detail_omits_llm_description_for_untyped():
         pytest.skip("no untyped concepts in this fixture")
     payload = _dispatch("concept_detail",
                         {"bundle": "bundle", "name": untyped})
-    assert "llm_description" not in payload, (
-        f"untyped concept {untyped!r} unexpectedly enriched: "
-        f"{payload.get('llm_description')}"
+    assert "llm_description" in payload, (
+        f"untyped concept {untyped!r} not enriched — corpus tier "
+        f"(CBM_CONCEPT_TOP_N) should cover every concept on this fixture"
     )
+    enr = payload["llm_description"]
+    assert isinstance(enr.get("text"), str) and enr["text"].strip()
+    prov = enr["provenance"]
+    assert prov["model"] == RESOLVED_MODEL
+    assert len(prov["prompt_sha"]) == 64
+    assert prov["generated_at"]
 
 
 def test_repository_summary_central_files_carry_llm_summary():
@@ -239,9 +247,16 @@ def test_repository_summary_key_concepts_carry_llm_description():
         f"no key_concepts entry carries llm_description; "
         f"got: {payload['key_concepts']}"
     )
+    # E6 two-tier selection: every typed (curated-vocab) concept is
+    # described, and untyped concepts may be too (corpus-top tier) — so
+    # enrichment no longer implies kind. The vocab tier must stay whole:
+    # a typed key concept without a description is a regression.
+    for c in payload["key_concepts"]:
+        if c.get("kind"):
+            assert "llm_description" in c, (
+                f"typed concept {c['name']!r} lost its description"
+            )
     for c in enriched:
-        # Every enriched concept should also be typed (only curated
-        # concepts get descriptions).
-        assert c.get("kind"), (
-            f"concept {c['name']!r} has llm_description but no kind"
-        )
+        # repository_summary flattens the description to its text.
+        assert isinstance(c["llm_description"], str)
+        assert c["llm_description"].strip()
