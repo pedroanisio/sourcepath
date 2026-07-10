@@ -318,6 +318,16 @@ def map_codebase(
                 harvest_macros(content, macro_table)
     ctx.scratch["macro_table"] = macro_table
 
+    # Build-evidence include roots (plan E4): a shipped compilation database
+    # names the compiler's real -I roots, resolving angle includes exactly.
+    cc = content_by_path.get("compile_commands.json")
+    if cc:
+        from .languages.c import include_roots_from_compile_commands
+        roots = include_roots_from_compile_commands(
+            cc.decode("utf-8", "replace"))
+        if roots:
+            ctx.indices["host:c_include_roots"] = roots
+
     # Pass 2: AST extraction. Analyzer ``matches()`` reads ``rec.language``,
     # so the refinement above must be visible here. Usually the most
     # expensive pass on a large repo — real per-language parsing, not a
@@ -482,6 +492,10 @@ def map_codebase(
         "commit": commit, "records": records,
         "import_edges": sorted(import_edges, key=lambda e: (e.src_path, e.dst_path)),
         "import_ext_edges": sorted(import_ext_edges, key=lambda e: (e.src_path, e.package_name)),
+        # Disclosed multi-candidate include resolution (plan E4).
+        "possible_import_edges": sorted(
+            ctx.scratch.get("possible_import_edges", set()),
+            key=lambda e: (e.src_path, e.dst_path)),
         "dep_edges": sorted(dep_edges, key=lambda e: (e.manifest_path, e.package_name)),
         "pin_edges": sorted(pin_edges, key=lambda e: (e.lockfile_path, e.package_name, e.package_version)),
         # Pass rust_crates + paths_set so Rust integration tests under

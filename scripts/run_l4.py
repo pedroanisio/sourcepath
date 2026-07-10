@@ -107,6 +107,15 @@ def main(argv: list[str] | None = None) -> int:
                         "graph (the most memory-hungry emit step on very "
                         "large graphs). inventory.ttl remains the "
                         "authoritative artifact.")
+
+    # ---- quality gate (error-free-mapping E9) ----
+    p.add_argument("--no-verify", action="store_true",
+                   help="Skip the verify-bundle gate. Default: a run whose "
+                        "bundle violates the error budgets exits non-zero.")
+    p.add_argument("--accept-degradation", action="append", default=[],
+                   metavar="COMPONENT",
+                   help="Acknowledge a recorded degradation by component "
+                        "name so the gate does not fail on it.")
     args = p.parse_args(argv)
 
     # ---- Validation ----
@@ -176,7 +185,28 @@ def main(argv: list[str] | None = None) -> int:
     # A skipped self-check (--skip-shacl) is a disclosed cost decision,
     # not a validation failure; only a run that validated and did not
     # conform exits non-zero.
-    return 0 if (sc.get("conforms") or sc.get("skipped")) else 1
+    if not (sc.get("conforms") or sc.get("skipped")):
+        return 1
+
+    if not args.no_verify:
+        # Errors fail the run instead of describing it (E9). A --skip-shacl
+        # run acknowledged that cost decision above, so the gate honors it.
+        from codebase_mapper.verification.bundle_gate import Budgets, check_bundle
+        violations = check_bundle(
+            args.out.resolve(),
+            Budgets(allow_skipped_shacl=bool(args.skip_shacl)),
+            accept_degradations=set(args.accept_degradation),
+            skip_hashes=False,
+        )
+        for v in violations:
+            print(f"[verify-bundle] FAIL {v['id']}: {v['text']}",
+                  file=sys.stderr)
+        if violations:
+            print(f"[verify-bundle] {len(violations)} violation(s) — "
+                  f"bundle rejected", file=sys.stderr)
+            return 2
+        print("[verify-bundle] PASS — every check green", file=sys.stderr)
+    return 0
 
 
 def _parse_scopes(raw: str, *, parser: argparse.ArgumentParser) -> tuple[str, ...]:

@@ -67,6 +67,7 @@ def build_inventory_graph(
     dep_edges: list[DeclaresDependencyEdge], pin_edges: list[PinsDependencyEdge],
     tests_edges: list[TestsEdge],
     truncated_ast_paths: list[str] | None = None,
+    possible_import_edges: list = (),
 ) -> Graph:
     g = Graph()
     g.bind("cbm", CBM); g.bind("cbmt", CBMT); g.bind("cbmp", CBMP)
@@ -114,6 +115,10 @@ def build_inventory_graph(
 
     for e in import_edges:
         g.add((file_iri(e.src_path), CBM.imports, file_iri(e.dst_path)))
+    for e in possible_import_edges:
+        # Disclosed candidates of an ambiguous include (plan E4): a separate
+        # property so hard cbm:imports consumers keep 100% precision.
+        g.add((file_iri(e.src_path), CBM.possibleImport, file_iri(e.dst_path)))
     for te in tests_edges:
         g.add((file_iri(te.test_path), CBM.tests, file_iri(te.subject_path)))
 
@@ -226,6 +231,11 @@ def build_shacl_graph() -> Graph:
     g.add((file_shape, SH.property, imports_prop))
     g.add((imports_prop, SH.path, CBM.imports))
     g.add((imports_prop, URIRef(SH + "class"), CBM.File))
+
+    possible_imp_prop = URIRef(f"{CBM_NS}_possibleImportProp")
+    g.add((file_shape, SH.property, possible_imp_prop))
+    g.add((possible_imp_prop, SH.path, CBM.possibleImport))
+    g.add((possible_imp_prop, URIRef(SH + "class"), CBM.File))
 
     imports_ext_prop = URIRef(f"{CBM_NS}_importsExtProp")
     g.add((file_shape, SH.property, imports_ext_prop))

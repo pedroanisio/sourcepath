@@ -82,7 +82,12 @@ SUPPORTED_LANGUAGES: frozenset[str] = frozenset((
     "python",
     "typescript", "javascript",
     "rust", "go",
-    "ruby", "kotlin", "swift", "dart", "c",
+    "ruby", "kotlin", "swift", "dart",
+    # C family (error-free-mapping E6): cpp and objective-c were excluded
+    # while c was included — genuine C++/ObjC projects silently got no
+    # file summaries.
+    "c", "cpp", "objective-c",
+    "cfml",
 ))
 
 

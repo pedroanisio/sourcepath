@@ -160,9 +160,13 @@ def main(argv: list[str] | None = None) -> int:
             is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
             count = git_out(c.path, "rev-list", "--count", "HEAD")
             head_v = (c.path / "a.py").read_text()
+            # E5 (error-free-mapping plan): the clone starts --depth 1 and
+            # then deepens history blob-free BY DEFAULT, so commit-time
+            # provenance is correct without opting in (CBM_UNSHALLOW=0 is
+            # the opt-out for air-gapped runs).
             check(
-                "HEAD clone is shallow (depth 1, single commit)",
-                is_shallow == "true" and count == "1",
+                "HEAD clone recovers full history by default",
+                is_shallow == "false" and count != "1",
                 f"is_shallow={is_shallow} count={count}",
             )
             check("HEAD clone checks out the latest commit", head_v == "V = 3\n", head_v)
@@ -170,7 +174,8 @@ def main(argv: list[str] | None = None) -> int:
         with resolve_repo_source(deep_url, "v1") as c:
             is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
             tag_v = (c.path / "a.py").read_text()
-            check("tag --state is shallow-cloned directly", is_shallow == "true", is_shallow)
+            check("tag --state recovers history by default",
+                  is_shallow == "false", is_shallow)
             check("tag --state checks out the tagged tree", tag_v == "V = 2\n", tag_v)
 
         with resolve_repo_source(deep_url, first_sha) as c:

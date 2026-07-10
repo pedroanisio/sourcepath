@@ -141,6 +141,10 @@ def test_run_l4_offline_degrades_gracefully(work: Path) -> None:
         "--no-emit-blobs",
         "--llm-host", "http://127.0.0.1:11435",   # unreachable
         "--llm-cache-dir", str(cache),
+        # This scenario runs offline ON PURPOSE: the L4 degradation is
+        # expected and acknowledged, so the verify-bundle gate (E9) does
+        # not reject the run. An unacknowledged degradation still fails.
+        "--accept-degradation", "llm_enrich",
     )
     check("run_l4.py offline: exit 0", r.returncode == 0,
           r.stderr[-400:])

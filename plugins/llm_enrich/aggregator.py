@@ -31,6 +31,7 @@ Gating:
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
@@ -41,6 +42,45 @@ from codebase_mapper.shared_kernel.progress import ProgressReporter
 from .cache import Cache, hash_text
 from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
 from .model_resolver import DEFAULT_MODEL
+
+#: Corpus-tier size: top-N concepts by (frequency, file spread) described in
+#: addition to every curated-vocab match (error-free-mapping E6 wave 2).
+#: 0 disables the corpus tier. Env: CBM_CONCEPT_TOP_N.
+DEFAULT_CONCEPT_TOP_N = 200
+
+
+def _concept_top_n() -> int:
+    raw = os.environ.get("CBM_CONCEPT_TOP_N", "").strip()
+    if not raw:
+        return DEFAULT_CONCEPT_TOP_N
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_CONCEPT_TOP_N
+
+
+def select_concepts_for_description(
+    concepts: dict, top_n: int,
+) -> list[tuple[str, str]]:
+    """Two deliberate description tiers, each tagged with its provenance.
+
+    Tier 1 ("vocab"): every concept carrying a curated cbml3:conceptKind —
+    the typed backbone, always described. Tier 2 ("corpus_top"): the top-N
+    remaining concepts by occurrence count then file spread — the corpus's
+    own dominant language, so a domain the vocabulary barely covers (24 of
+    776,716 on the kernel, flaw F6) still gets meaningful descriptions.
+    Deterministic order: vocab tier sorted by name, then corpus tier by
+    (-frequency, -file_count, name).
+    """
+    vocab = sorted(n for n, meta in concepts.items() if "kind" in meta)
+    selected: list[tuple[str, str]] = [(n, "vocab") for n in vocab]
+    if top_n > 0:
+        rest = sorted(
+            (n for n, meta in concepts.items() if "kind" not in meta),
+            key=lambda n: (-int(concepts[n].get("frequency", 0)),
+                           -int(concepts[n].get("file_count", 0)), n))
+        selected += [(n, "corpus_top") for n in rest[:top_n]]
+    return selected
 from .prompts import PROMPT_REGISTRY
 
 if TYPE_CHECKING:
@@ -131,7 +171,7 @@ class LlmAggregator:
 
     # ----------------------------------------------------------------
 
-    def _disable_with_disclosure(
+    def _disable_with_disclosure(  # noqa: D401 — see module docstring
         self, ctx: "PipelineCtx", kind: str, error: str, skipped: int,
     ) -> None:
         """Self-disable and register the degradation on ctx.scratch.
@@ -179,18 +219,16 @@ class LlmAggregator:
         for n in files_for:
             files_for[n].sort()
 
-        # Iterate curated concepts in deterministic order so re-emits
-        # produce identical cache writes.
-        typed = sorted(
-            n for n, meta in concepts.items() if "kind" in meta
-        )
+        # Deterministic two-tier selection (E6 wave 2): every vocab match
+        # plus the corpus's own top concepts, each tagged with provenance.
+        typed = select_concepts_for_description(concepts, _concept_top_n())
 
         cache = self.cache or Cache()
         tmpl = PROMPT_REGISTRY["concept_description"]
 
         reporter = ProgressReporter("[L4] concept_description",
                                     total=len(typed))
-        for idx, name in enumerate(typed):
+        for idx, (name, selection) in enumerate(typed):
             if self._disabled:
                 return
             meta = concepts[name]
@@ -256,7 +294,8 @@ class LlmAggregator:
                 return
 
             reporter.update(name, cached=was_hit)
-            out[name] = {**record, "was_cache_hit": was_hit}
+            out[name] = {**record, "was_cache_hit": was_hit,
+                         "selection": selection}
 
     # ----------------------------------------------------------------
 

@@ -258,5 +258,5 @@ languages:
   - tiobe_name: "CFML"
     tiobe_rank_at_first_seen: 50
     first_seen: "2026-07"
-    mapper_key: null
-    status: none
+    mapper_key: cfml
+    status: first_class

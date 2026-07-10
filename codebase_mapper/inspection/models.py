@@ -33,6 +33,15 @@ class ImportEdge:
 
 
 @dataclass(frozen=True)
+class PossibleImportEdge:
+    """Disclosed multi-candidate include resolution (plan E4, schema v2):
+    the hard cbm:imports tier stays 100% precise; each surviving candidate
+    of an ambiguous angle include becomes one of these edges."""
+    src_path: str
+    dst_path: str
+
+
+@dataclass(frozen=True)
 class ImportExternalEdge:
     src_path: str
     package_name: str

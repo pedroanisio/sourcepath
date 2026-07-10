@@ -110,6 +110,10 @@ class EmbeddingComputer:
                 "dimension": self.backend.dimension,
                 "normalized": self.backend.normalized,
             },
+            # Downstream layers may embed their own short texts through the
+            # same backend (L3 concept label fallback — plan E7), keeping
+            # every vector in one space.
+            "encode_texts": self.backend.encode,
         }
         return ctx.indices["l2_20_embeddings"]
 

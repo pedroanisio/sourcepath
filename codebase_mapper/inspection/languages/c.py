@@ -282,9 +282,63 @@ def build_c_include_index(paths_set: set[str]) -> dict[str, list[str]]:
     return index
 
 
+#: Ambiguous-candidate cap per include spec — a pathological basename shared
+#: by hundreds of files must not explode the possible-import tier. Drops are
+#: logged by the caller's edge count vs this cap, never silent.
+MAX_AMBIGUOUS_CANDIDATES = 16
+
+
+def include_roots_from_compile_commands(text: str) -> list[str]:
+    """Repo-relative ``-I``/``-isystem`` roots from a compile_commands.json.
+
+    Build evidence beats convention (plan E4): when a project ships its
+    compilation database, the compiler's real include roots resolve angle
+    includes exactly. Absolute (out-of-repo) roots are skipped — they can
+    never name in-repo files. Malformed input yields [] (the caller falls
+    back to suffix matching), never an exception.
+    """
+    import json as _json
+    import shlex
+
+    try:
+        entries = _json.loads(text)
+    except ValueError:
+        return []
+    roots: list[str] = []
+    seen: set[str] = set()
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        args = entry.get("arguments")
+        if not args:
+            try:
+                args = shlex.split(entry.get("command", ""))
+            except ValueError:
+                continue
+        i = 0
+        while i < len(args):
+            a = args[i]
+            root = None
+            if a in ("-I", "-isystem") and i + 1 < len(args):
+                root = args[i + 1]
+                i += 1
+            elif a.startswith("-I") and len(a) > 2:
+                root = a[2:]
+            elif a.startswith("-isystem") and len(a) > len("-isystem"):
+                root = a[len("-isystem"):]
+            if root and not root.startswith("/") and root not in seen:
+                seen.add(root)
+                roots.append(root.rstrip("/"))
+            i += 1
+    return roots
+
+
 def resolve_c_includes(
     src_path: str, summary: dict, paths_set: set[str],
     basename_index: dict[str, list[str]] | None = None,
+    *,
+    include_roots: list[str] | None = None,
+    ambiguous_out: dict[str, list[str]] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Resolve #includes to in-repo files.
 
@@ -321,8 +375,17 @@ def resolve_c_includes(
     for imp in summary.get("imports", []):
         spec = imp["source"]
         if imp["kind"] == "system_include":
+            # Evidence first (plan E4): the project's own include roots
+            # (compile_commands.json) resolve the spec exactly.
+            if include_roots:
+                rooted = next(
+                    (f"{root}/{spec}" for root in include_roots
+                     if f"{root}/{spec}" in paths_set), None)
+                if rooted is not None:
+                    dst.add(rooted)
+                    continue
             # In-repo attempt: unique path-suffix match (see docstring —
-            # ambiguity is resolved by NOT resolving).
+            # ambiguity is resolved by NOT resolving in the hard tier).
             candidates = basename_index.get(PurePosixPath(spec).name, [])
             suffix = "/" + spec
             matches = [p for p in candidates
@@ -331,6 +394,11 @@ def resolve_c_includes(
                 dst.add(matches[0])
             else:
                 unresolved.add(spec)
+                # Multi-candidate: recall becomes queryable data instead of
+                # absent — the caller emits cbm:possibleImport candidates.
+                if ambiguous_out is not None and 1 < len(matches):
+                    ambiguous_out[spec] = sorted(
+                        matches)[:MAX_AMBIGUOUS_CANDIDATES]
             continue
         # Quoted include. Try relative first.
         raw = src_dir / spec

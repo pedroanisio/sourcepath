@@ -17,6 +17,7 @@ from ...shared_kernel.extensions import (
     iter_artifact_emitters, iter_graph_contributors, iter_shape_contributors,
 )
 from ..infrastructure.rdf.fast_serializer import serialize_inventory
+from ..infrastructure.rdf.streaming_jsonld import write_jsonld_streaming
 from ...shared_kernel.json_safety import dump_ast_summary
 from ..infrastructure.rdf.rdflib_emitter import (
     build_inventory_graph,
@@ -69,6 +70,7 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
         import_ext_edges=mapped["import_ext_edges"],
         dep_edges=mapped["dep_edges"], pin_edges=mapped["pin_edges"],
         tests_edges=mapped["tests_edges"],
+        possible_import_edges=mapped.get("possible_import_edges", []),
         truncated_ast_paths=truncated_ast_paths,
     )
     if truncated_ast_paths:
@@ -106,34 +108,14 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
     shapes.serialize(destination=str(shapes_path), format="turtle")
     mapping.serialize(destination=str(mapping_path), format="turtle")
 
+    jsonld_engine = None
     if emit_jsonld:
-        # Serialize to a string and canonicalize before the only write —
-        # the old write→read-back→re-sort→rewrite flow put the whole
-        # document on disk and back through memory twice.
-        data = inv.serialize(format="json-ld", auto_compact=True,
-                             indent=2, sort_keys=True)
-        try:
-            doc = json.loads(data)
-
-            def _sort_jsonld(node):
-                if isinstance(node, dict):
-                    return {k: _sort_jsonld(v) for k, v in sorted(node.items())}
-                if isinstance(node, list):
-                    items = [_sort_jsonld(x) for x in node]
-                    def key(x):
-                        if isinstance(x, dict):
-                            return (0, x.get("@id", ""), json.dumps(x, sort_keys=True))
-                        return (1, str(x))
-                    return sorted(items, key=key)
-                return node
-
-            jsonld_path.write_text(
-                json.dumps(_sort_jsonld(doc), indent=2, sort_keys=True) + "\n")
-            del doc
-        except Exception as e:
-            sys.stderr.write(f"[warn] jsonld canonicalization failed: {e}\n")
-            jsonld_path.write_text(data)
-        del data
+        # Streaming canonical writer (plan E8): N-Triples → external sort →
+        # node-by-node emission. Peak memory is one subject group, not the
+        # document — the step class that failed kernel-scale emits (F9/F19)
+        # is gone. Byte-identical to the legacy rdflib path (parity suite:
+        # tests/test_streaming_jsonld.py); blank-node graphs fall back.
+        jsonld_engine = write_jsonld_streaming(inv, jsonld_path)
     else:
         # A stale inventory.jsonld from a previous emit into the same
         # directory would misrepresent this run's output set.
@@ -222,6 +204,7 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
             "files": len(mapped["records"]),
             "import_edges": len(mapped["import_edges"]),
             "import_external_edges": len(mapped["import_ext_edges"]),
+            "possible_import_edges": len(mapped.get("possible_import_edges", [])),
             "declares_dependency_edges": len(mapped["dep_edges"]),
             "pins_dependency_edges": len(mapped["pin_edges"]),
             "tests_edges": len(mapped["tests_edges"]),
@@ -251,8 +234,11 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
         },
         "shacl_self_check": shacl_self_check,
         # Provenance of the serialization itself: which engine produced
-        # the artifact (oxigraph fast path vs rdflib fallback).
-        "emit_engines": {"inventory.ttl": inv_engine},
+        # each artifact (fast path vs rdflib fallback).
+        "emit_engines": {
+            "inventory.ttl": inv_engine,
+            **({"inventory.jsonld": jsonld_engine} if jsonld_engine else {}),
+        },
         # Degradation disclosures registered by any layer during the run
         # (shallow-clone provenance, LLM self-disable, ...). Always
         # present: an empty list is the healthy-run statement, so absence

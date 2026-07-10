@@ -20,6 +20,9 @@ from ..shared_kernel.extensions import (
 from .languages.c import (
     build_c_include_index, extract_c_ast_summary, resolve_c_includes,
 )
+from .languages.cfml import (
+    CFML_TS_AVAILABLE, extract_cfml_ast_summary, resolve_cfml_imports,
+)
 from .languages.clojure import (
     extract_clojure_ast_summary, resolve_clojure_imports,
 )
@@ -162,6 +165,23 @@ class CAnalyzer:
             content, record.path,
             macro_table=ctx.scratch.get("macro_table"),
         )
+
+
+class CfmlAnalyzer:
+    """CFML — tag syntax and cfscript, via the ``tree-sitter-cfml`` wheel.
+
+    The grammar package is imported by ``languages/cfml.py`` itself (not
+    ts_setup's all-or-nothing block), so ``matches`` gates on the module's
+    own availability flag rather than the global ``TS_AVAILABLE``.
+    """
+    name = "lang_cfml"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "cfml" and CFML_TS_AVAILABLE
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_cfml_ast_summary(content, record.path)
 
 
 class CobolAnalyzer:
@@ -347,6 +367,28 @@ def _c_basename_index(ctx: PipelineCtx) -> dict[str, list[str]]:
     return index
 
 
+def _resolve_c_family(record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+    """Shared C/C++ include resolution with the E4 additions: build-evidence
+    include roots (host:c_include_roots) sharpen the hard tier; ambiguous
+    angle includes land on ctx.scratch["possible_import_edges"] as disclosed
+    candidate edges instead of vanishing."""
+    from .models import PossibleImportEdge
+
+    ambiguous: dict[str, list[str]] = {}
+    in_repo, external = resolve_c_includes(
+        record.path, _summary(record), ctx.paths_set,
+        _c_basename_index(ctx),
+        include_roots=ctx.indices.get("host:c_include_roots"),
+        ambiguous_out=ambiguous,
+    )
+    if ambiguous:
+        bucket = ctx.scratch.setdefault("possible_import_edges", set())
+        for candidates in ambiguous.values():
+            for dst in candidates:
+                bucket.add(PossibleImportEdge(record.path, dst))
+    return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 class CResolver:
     name = "resolve_c"
 
@@ -354,11 +396,7 @@ class CResolver:
         return record.language == "c" and record.ast_summary is not None
 
     def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
-        in_repo, external = resolve_c_includes(
-            record.path, _summary(record), ctx.paths_set,
-            _c_basename_index(ctx),
-        )
-        return ResolveResult(in_repo=list(in_repo), external=list(external))
+        return _resolve_c_family(record, ctx)
 
 
 class CobolResolver:
@@ -384,12 +422,8 @@ class CppResolver:
         # C++ #include resolution is structurally identical to C's;
         # share the implementation (and the once-per-repo basename
         # index). Future C++20 `import std;` / `import :module;` is out
-        # of scope for this v1.
-        in_repo, external = resolve_c_includes(
-            record.path, _summary(record), ctx.paths_set,
-            _c_basename_index(ctx),
-        )
-        return ResolveResult(in_repo=list(in_repo), external=list(external))
+        # of scope.
+        return _resolve_c_family(record, ctx)
 
 
 class KotlinResolver:
@@ -535,15 +569,15 @@ class MakeAnalyzer(_LightweightAnalyzer):
 
 
 _BUILTIN_ANALYZERS = (
-    AsmAnalyzer, CAnalyzer, ClojureAnalyzer, CobolAnalyzer, CppAnalyzer,
-    DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, JavaAnalyzer,
+    AsmAnalyzer, CAnalyzer, CfmlAnalyzer, ClojureAnalyzer, CobolAnalyzer,
+    CppAnalyzer, DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, JavaAnalyzer,
     KconfigAnalyzer, KotlinAnalyzer, MakeAnalyzer, ObjcAnalyzer,
     PythonAnalyzer, RubyAnalyzer, RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
-    CResolver, ClojureResolver, CobolResolver, CppResolver, DartResolver,
-    GoResolver, JavaResolver, KotlinResolver, ObjcResolver, PythonResolver,
-    RubyResolver, RustResolver, SwiftResolver, TsJsResolver,
+    CResolver, CfmlResolver, ClojureResolver, CobolResolver, CppResolver,
+    DartResolver, GoResolver, JavaResolver, KotlinResolver, ObjcResolver,
+    PythonResolver, RubyResolver, RustResolver, SwiftResolver, TsJsResolver,
 )
 
 

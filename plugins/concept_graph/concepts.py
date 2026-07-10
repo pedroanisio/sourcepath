@@ -299,41 +299,12 @@ class ConceptAggregator:
             if c >= MIN_COOCCURRENCE
         ]
 
-        # ----- Optional: per-concept embedding centroids from L2 vectors -----
-        concept_embeddings: np.ndarray | None = None
-        concept_embedding_ids: list[str] | None = None
+        # ----- Optional: per-concept embedding vectors from L2 -----
         l2_idx = cast(dict, ctx.indices.get("l2_20_embeddings") or {})
         l2_chunks = cast(list, ctx.indices.get("l2_10_chunks") or [])
-        if l2_idx.get("vectors") is not None and len(l2_idx.get("row_to_chunk_id", [])) > 0:
-            vecs = cast(np.ndarray, l2_idx["vectors"])
-            dim = int(vecs.shape[1])
-            # Map chunk row -> set of concept canonical_forms via the chunk's
-            # path. Compute centroids.
-            concept_rows: dict[str, list[int]] = defaultdict(list)
-            for c in l2_chunks:
-                row = c.get("row")
-                path = c.get("path")
-                if row is None or path is None:
-                    continue
-                for cn in per_path_concepts.get(path, []):
-                    concept_rows[cn].append(int(row))
-
-            concept_embedding_ids = sorted(cn for cn in concepts if concept_rows.get(cn))
-            if concept_embedding_ids:
-                centroids = np.zeros(
-                    (len(concept_embedding_ids), dim), dtype=np.float32
-                )
-                for i, cn in enumerate(concept_embedding_ids):
-                    rows = concept_rows[cn]
-                    centroid = vecs[rows].mean(axis=0)
-                    norm = np.linalg.norm(centroid)
-                    if norm > 0:
-                        centroid = centroid / norm
-                    centroids[i] = centroid
-                    concepts[cn]["embedding_row"] = i
-                concept_embeddings = centroids
-            else:
-                concept_embedding_ids = None
+        concept_embeddings, concept_embedding_ids, _sources = (
+            compute_concept_embeddings(concepts, per_path_concepts,
+                                       l2_idx, l2_chunks))
 
         return {
             "concepts": concepts,
@@ -342,6 +313,80 @@ class ConceptAggregator:
             "concept_embeddings": concept_embeddings,
             "concept_embedding_ids": concept_embedding_ids,
         }
+
+
+def compute_concept_embeddings(
+    concepts: dict,
+    per_path_concepts: dict[str, list[str]],
+    l2_idx: dict,
+    l2_chunks: list,
+) -> tuple["np.ndarray | None", "list[str] | None", dict[str, str]]:
+    """Per-concept vectors: chunk centroids, with a label-embedding fallback.
+
+    A concept whose lexicalizing files contributed embedded chunk rows gets
+    the mean of those rows (``embedding_source: centroid``). A concept with
+    no vector source — 7,394 on linux-v23, previously a silent gap (plan
+    E7) — gets its own label text (prefLabel + alt labels) embedded through
+    the same backend (``embedding_source: label``) when the L2 index exposes
+    ``encode_texts``. Every returned row is L2-normalized; each concept's
+    ``embedding_row`` / ``embedding_source`` fields are updated in place.
+
+    Returns ``(matrix, ids, sources)``; ``(None, None, {})`` when L2
+    embeddings are absent entirely.
+    """
+    if l2_idx.get("vectors") is None or not len(l2_idx.get("row_to_chunk_id", [])):
+        return None, None, {}
+    vecs = cast(np.ndarray, l2_idx["vectors"])
+    dim = int(vecs.shape[1])
+
+    concept_rows: dict[str, list[int]] = defaultdict(list)
+    for c in l2_chunks:
+        row = c.get("row")
+        path = c.get("path")
+        if row is None or path is None:
+            continue
+        for cn in per_path_concepts.get(path, []):
+            concept_rows[cn].append(int(row))
+
+    centroid_ids = sorted(cn for cn in concepts if concept_rows.get(cn))
+    encode = l2_idx.get("encode_texts")
+    orphan_ids = (sorted(cn for cn in concepts if not concept_rows.get(cn))
+                  if callable(encode) else [])
+
+    ids = centroid_ids + orphan_ids
+    if not ids:
+        return None, None, {}
+
+    matrix = np.zeros((len(ids), dim), dtype=np.float32)
+    sources: dict[str, str] = {}
+
+    for i, cn in enumerate(centroid_ids):
+        centroid = vecs[concept_rows[cn]].mean(axis=0)
+        norm = np.linalg.norm(centroid)
+        if norm > 0:
+            centroid = centroid / norm
+        matrix[i] = centroid
+        sources[cn] = "centroid"
+
+    if orphan_ids:
+        texts = []
+        for cn in orphan_ids:
+            meta = concepts[cn]
+            texts.append(" ".join(
+                [str(meta.get("label", cn))] + list(meta.get("alt_labels", []))))
+        label_vecs = np.asarray(encode(texts), dtype=np.float32)
+        for j, cn in enumerate(orphan_ids):
+            v = label_vecs[j]
+            norm = np.linalg.norm(v)
+            if norm > 0:
+                v = v / norm
+            matrix[len(centroid_ids) + j] = v
+            sources[cn] = "label"
+
+    for i, cn in enumerate(ids):
+        concepts[cn]["embedding_row"] = i
+        concepts[cn]["embedding_source"] = sources[cn]
+    return matrix, ids, sources
 
 
 def _alt_form(canon: str, tokens: list[str], raw: str) -> str:

@@ -16,6 +16,10 @@ dependencies = [
     "pyshacl",
     "tree-sitter",
     "tree-sitter-c",
+    # CFML tag + cfscript grammars (cfmleditor/tree-sitter-cfml). Imported
+    # module-locally by languages/cfml.py — NOT via ts_setup's shared import
+    # block — so its absence degrades only CFML files.
+    "tree-sitter-cfml",
     "tree-sitter-cpp",
     "tree-sitter-go",
     "tree-sitter-java",

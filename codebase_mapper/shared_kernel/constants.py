@@ -6,7 +6,9 @@ from rdflib import Namespace
 
 TOOL_VERSION = "0.5.0"
 
-VOCABULARY_VERSION = "v1"
+# v2 (semver: additive): cbm:possibleImport edge tier + concept
+# embedding_source provenance (error-free-mapping E4/E7).
+VOCABULARY_VERSION = "v2"
 
 CBM_NS = "https://codebase-mapper.example.org/cbm#"
 
@@ -96,16 +98,19 @@ LANG_BY_EXT = {
     ".yaml": "yaml", ".yml": "yaml",
     ".json": "json",
     ".rst": "restructuredtext",
+    ".md": "markdown", ".markdown": "markdown",
     ".txt": "text",
     ".s": "asm",  # .S normalizes to .s (suffix lookups lowercase)
     ".dts": "devicetree", ".dtsi": "devicetree", ".dtso": "devicetree",
     ".mk": "make",
+    ".cfm": "cfml", ".cfc": "cfml",
 }
 
 #: Languages that are data or prose, not executable code. They get a
 #: language for census correctness but must not trip code-shaped rules
 #: (e.g. a YAML fixture under tests/ is not test_code).
-DATA_DOC_LANGUAGES = frozenset({"yaml", "json", "restructuredtext", "text"})
+DATA_DOC_LANGUAGES = frozenset(
+    {"yaml", "json", "restructuredtext", "markdown", "text"})
 
 ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
              ".woff", ".woff2", ".ttf", ".otf", ".eot",

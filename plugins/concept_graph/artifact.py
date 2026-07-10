@@ -106,6 +106,9 @@ def _concept_payload(v: dict) -> dict:
         "file_count": v["file_count"],
         "embedding_row": v.get("embedding_row"),
     }
+    if v.get("embedding_source"):
+        # centroid | label — vector provenance (plan E7); consumers filter.
+        out["embedding_source"] = v["embedding_source"]
     if "kind" in v:
         out["kind"] = v["kind"]
     if "broader" in v:
