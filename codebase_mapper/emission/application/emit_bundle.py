@@ -149,15 +149,42 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
     coverage_fragment = _emit_coverage_sidecar(mapped["records"], out_dir)
 
     if validate_shacl:
-        from pyshacl import validate
-        conforms, _vg, report_text = validate(
-            data_graph=inv, shacl_graph=shapes, inference="none",
-            abort_on_first=False, meta_shacl=False, advanced=False, debug=False,
-        )
-        shacl_self_check = {
-            "conforms": bool(conforms),
-            "report_excerpt": report_text[:2000] if not conforms else "",
-        }
+        # Engine selection (plan E8): the fast structural engine interprets
+        # exactly the SHACL subset our shapes use and is pyshacl-equivalent
+        # by proof (tests/test_fast_shacl.py — healthy + seeded violations).
+        # pySHACL stays the reference: CBM_SHACL_ENGINE=pyshacl forces it,
+        # and any shape feature the fast engine does not support falls back
+        # to pyshacl loudly. The engine used is always disclosed.
+        engine = os.environ.get("CBM_SHACL_ENGINE", "fast").strip().lower()
+        if engine != "pyshacl":
+            from ...verification.fast_shacl import (
+                UnsupportedShaclFeature, validate_fast,
+            )
+            try:
+                conforms, violations = validate_fast(inv, shapes)
+                shacl_self_check = {
+                    "conforms": bool(conforms),
+                    "engine": "fast-structural",
+                    "report_excerpt": "\n".join(violations)[:2000]
+                                      if not conforms else "",
+                }
+            except UnsupportedShaclFeature as e:
+                sys.stderr.write(
+                    f"[emit] fast SHACL engine cannot interpret {e}; "
+                    f"falling back to pyshacl\n")
+                engine = "pyshacl"
+        if engine == "pyshacl":
+            from pyshacl import validate
+            conforms, _vg, report_text = validate(
+                data_graph=inv, shacl_graph=shapes, inference="none",
+                abort_on_first=False, meta_shacl=False, advanced=False,
+                debug=False,
+            )
+            shacl_self_check = {
+                "conforms": bool(conforms),
+                "engine": "pyshacl",
+                "report_excerpt": report_text[:2000] if not conforms else "",
+            }
     else:
         # Skipped ≠ passed: conforms stays None and the skip is stated.
         shacl_self_check = {

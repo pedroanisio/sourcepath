@@ -135,6 +135,45 @@ def test_unsupported_shacl_feature_raises():
     prop = URIRef("https://example.org/p")
     shapes.add((shape, SH.property, prop))
     shapes.add((prop, SH.path, CBM.path))
-    shapes.add((prop, SH.pattern, Literal("^x")))  # not in our subset
+    shapes.add((prop, SH.maxLength, Literal(3)))  # not in our subset
     with pytest.raises(UnsupportedShaclFeature):
         validate_fast(Graph(), shapes)
+
+
+def test_emit_uses_fast_engine_and_discloses_it(tmp_path):
+    from codebase_mapper.emission.application.emit_bundle import emit
+    from codebase_mapper.inspection.pipeline import map_codebase
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.py").write_text("x = 1\n")
+    for cmd in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "one"]):
+        subprocess.run(["git", "-C", str(repo), *cmd], check=True,
+                       capture_output=True, env=_ENV)
+    reset_registries()
+    mapped = map_codebase(repo, "HEAD")
+    manifest = emit("fixture", mapped, tmp_path / "b", emit_blobs_flag=False)
+    sc = manifest["shacl_self_check"]
+    assert sc["conforms"] is True
+    assert sc["engine"] == "fast-structural"
+
+
+def test_emit_pyshacl_engine_via_env(tmp_path, monkeypatch):
+    from codebase_mapper.emission.application.emit_bundle import emit
+    from codebase_mapper.inspection.pipeline import map_codebase
+    from codebase_mapper.shared_kernel.extensions import reset_registries
+
+    monkeypatch.setenv("CBM_SHACL_ENGINE", "pyshacl")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.py").write_text("x = 1\n")
+    for cmd in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "one"]):
+        subprocess.run(["git", "-C", str(repo), *cmd], check=True,
+                       capture_output=True, env=_ENV)
+    reset_registries()
+    mapped = map_codebase(repo, "HEAD")
+    manifest = emit("fixture", mapped, tmp_path / "b", emit_blobs_flag=False)
+    sc = manifest["shacl_self_check"]
+    assert sc["conforms"] is True
+    assert sc["engine"] == "pyshacl"

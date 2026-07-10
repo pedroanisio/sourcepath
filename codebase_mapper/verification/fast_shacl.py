@@ -7,7 +7,8 @@ rule list): it interprets exactly the constraint vocabulary the bundled
 shapes use —
 
     sh:targetClass · sh:targetSubjectsOf · sh:property · sh:path ·
-    sh:minCount · sh:maxCount · sh:datatype · sh:class · sh:in · sh:hasValue
+    sh:minCount · sh:maxCount · sh:datatype · sh:class · sh:in ·
+    sh:hasValue · sh:pattern · sh:minInclusive
 
 — and RAISES on anything else (``UnsupportedShaclFeature``), so a shape
 evolution that outruns the engine fails loudly instead of passing silently.
@@ -16,6 +17,8 @@ and seeded-violation fixtures (PALS's Law: the fast gate ships only with
 that proof).
 """
 from __future__ import annotations
+
+import re
 
 from collections import defaultdict
 
@@ -30,6 +33,7 @@ class UnsupportedShaclFeature(Exception):
 
 _SUPPORTED_PROP_KEYS = {
     SH.path, SH.minCount, SH.maxCount, SH.datatype, SH.hasValue,
+    SH.pattern, SH.minInclusive,
     URIRef(str(SH) + "class"), URIRef(str(SH) + "in"),
 }
 _SUPPORTED_SHAPE_KEYS = {
@@ -64,6 +68,10 @@ def _parse_shapes(shapes: Graph) -> list[dict]:
                     spec["datatype"] = o
                 elif p == SH.hasValue:
                     spec["has_value"] = o
+                elif p == SH.pattern:
+                    spec["pattern"] = re.compile(str(o))
+                elif p == SH.minInclusive:
+                    spec["min_inclusive"] = o.toPython()
                 elif p == URIRef(str(SH) + "class"):
                     spec["cls"] = o
                 elif p == URIRef(str(SH) + "in"):
@@ -139,4 +147,20 @@ def validate_fast(data: Graph, shapes: Graph) -> tuple[bool, list[str]]:
                         if spec["cls"] not in types.get(v, set()):
                             violations.append(
                                 f"{node} {path}: {v} is not a {spec['cls']}")
+                if "pattern" in spec:
+                    for v in values:
+                        if not spec["pattern"].search(str(v)):
+                            violations.append(
+                                f"{node} {path}: {str(v)[:60]!r} fails pattern "
+                                f"{spec['pattern'].pattern}")
+                if "min_inclusive" in spec:
+                    for v in values:
+                        try:
+                            ok = v.toPython() >= spec["min_inclusive"]
+                        except (AttributeError, TypeError):
+                            ok = False
+                        if not ok:
+                            violations.append(
+                                f"{node} {path}: {v} < minInclusive "
+                                f"{spec['min_inclusive']}")
     return not violations, violations
