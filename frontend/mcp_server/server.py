@@ -273,7 +273,10 @@ async def run_stdio() -> None:  # pragma: no cover — exercised by subprocess t
         capabilities=caps,
     )
 
-    bundles_root = Path(os.environ.get("CBM_BUNDLES_ROOT", "_tmp")).resolve()
+    from codebase_mapper.shared_kernel import settings as cbm_settings
+
+    cbm_settings.load_env()
+    bundles_root = cbm_settings.bundles_root()
     interval = float(os.environ.get("CBM_WATCH_INTERVAL", "30"))
     watcher = ManifestWatcher(
         root=bundles_root,

@@ -102,7 +102,8 @@ REPORTING_TESTS := \
 	$(TESTS_DIR)/test_evidence_banner.py \
 	$(TESTS_DIR)/test_report_to_pdf.py \
 	$(TESTS_DIR)/test_cbm_dossier.py \
-	$(TESTS_DIR)/test_static_site.py
+	$(TESTS_DIR)/test_static_site.py \
+	$(TESTS_DIR)/test_env_settings.py
 
 CBM_REPORT_MANIFEST := tools/cbm-report/Cargo.toml
 

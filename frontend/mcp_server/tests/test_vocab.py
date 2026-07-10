@@ -101,23 +101,44 @@ def test_concept_neighborhood_unfiltered_attaches_kind_per_neighbor(
     live_bundle, bundle_name,
 ):
     """Without a filter, every neighbor whose underlying concept is
-    typed should still carry that typing in the row."""
-    name = _pick_typed_concept(live_bundle)
-    if name is None:
+    typed must still carry that typing in the row.
+
+    Verified against the bundle's own concept records: for each typed
+    concept probed, any returned neighbor that the bundle types MUST
+    carry that kind in its row. The previous form asserted that the
+    FIRST typed concept had ≥1 typed neighbor within depth 2 — a data-
+    density assumption that fails on sparsely curated bundles even
+    when the wiring is correct. Skips (disclosed) only when no probed
+    neighborhood contains any bundle-typed neighbor at all.
+    """
+    concepts = live_bundle.concepts.get("concepts", {})
+    typed_names = [n for n, meta in concepts.items() if "kind" in meta]
+    if not typed_names:
         pytest.skip("bundle has no curated-vocab concepts")
-    p = dispatch("concept_neighborhood", {
-        "bundle": bundle_name, "name": name,
-        "depth": 2, "limit": 100,
-    })
-    # The unfiltered response must not echo a kind_filter.
-    assert "kind_filter" not in p
-    # At least one neighbor in a real bundle should carry typing,
-    # otherwise the round-trip isn't being exercised.
-    typed = [n for n in p["neighbors"] if "kind" in n]
-    assert typed, "no typed neighbors surfaced — wiring may be broken"
-    # Every typed neighbor's kind must be a legal literal.
-    for n in typed:
-        assert n["kind"] in _KIND_LITERALS, n
+    exercised = False
+    for name in typed_names[:25]:
+        p = dispatch("concept_neighborhood", {
+            "bundle": bundle_name, "name": name,
+            "depth": 2, "limit": 100,
+        })
+        # The unfiltered response must not echo a kind_filter.
+        assert "kind_filter" not in p
+        for n in p["neighbors"]:
+            expected = concepts.get(n["name"], {}).get("kind")
+            if expected is None:
+                continue
+            exercised = True
+            # A bundle-typed neighbor without typing IS broken wiring.
+            assert n.get("kind") == expected, (
+                f"neighbor {n['name']!r} is typed {expected!r} in the "
+                f"bundle but the row carries {n.get('kind')!r}")
+            assert n["kind"] in _KIND_LITERALS, n
+        if exercised:
+            break
+    if not exercised:
+        pytest.skip("no probed neighborhood contains a bundle-typed "
+                    "neighbor — curated vocab too sparse for the "
+                    "round-trip; rebuild the fixture with denser curation")
 
 
 def test_concept_neighborhood_unknown_kind_rejected_by_schema(

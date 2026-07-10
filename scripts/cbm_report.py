@@ -31,6 +31,13 @@ Examples:
 import argparse, glob, hashlib, html, json, math, os, sys, tempfile, time, urllib.parse
 from collections import Counter, defaultdict
 
+from codebase_mapper.shared_kernel.settings import default_report_path, load_env
+
+
+def default_out(repo, when=None):
+    """Standardized default output stem: <reports_dir>/<repo>__xray__<UTC-ts>."""
+    return str(default_report_path(repo, "xray", when=when))
+
 # ----------------------------------------------------------------------------
 # palette (Measured Ink)
 PAPER, INK, GREY, PALE, FAINT, VERM = "#f4eee1", "#1c1a17", "#6f6a60", "#b7b0a2", "#ded7c7", "#c8371f"
@@ -1370,13 +1377,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bundle", required=True)
     ap.add_argument("--abox"); ap.add_argument("--decomposition"); ap.add_argument("--buildplan")
-    ap.add_argument("--out", default="cbm_report")
+    ap.add_argument("--out", default=None,
+                    help="output stem (default: $CBM_REPORTS_DIR/<repo>__xray__<timestamp>)")
     ap.add_argument("--formats", default="html,md,json")
     ap.add_argument("--cache-dir")
     ap.add_argument("--validate-shacl", action="store_true",
                     help="independently re-validate inventory against bundled shapes (pyshacl)")
     ap.add_argument("--skip-embeddings", action="store_true", help="skip t-SNE district map")
     a = ap.parse_args(argv)
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
 
     found = discover(a.bundle, a)
     if "run_manifest.json" not in found:
@@ -1386,6 +1395,9 @@ def main(argv=None):
          "repo": man.get("repo_name") or os.path.basename(a.bundle.rstrip("/")),
          "commit": man.get("commit_sha", ""),
          "found": {k: bool(v) for k, v in found.items()}}
+    if a.out is None:
+        a.out = default_out(M["repo"])
+        log("out:", a.out)
     M["caveats"] = mechanical_caveats(man, found)
     M["hash_rows"] = verify_hashes(a.bundle, man, found)
     if found.get("blobs_dir"):

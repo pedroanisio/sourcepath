@@ -10,6 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
 from starlette.responses import JSONResponse
 
+from codebase_mapper.shared_kernel.settings import load_env as _cbm_load_env
+
+# Load .env before the module-level os.environ reads below (CORS origins,
+# tokens). The real environment always wins; .env.example is the inventory.
+_cbm_load_env()
+
 try:  # Support both `frontend.backend.app` and test-time `import app`.
     from .serving.application.bundle_data import (
         Bundle,

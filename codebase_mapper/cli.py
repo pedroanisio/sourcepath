@@ -12,9 +12,11 @@ from .emission.application.regenerate import regenerate
 from .inspection.pipeline import map_codebase
 from .inspection.repo_source import resolve_repo_source
 from .self_test import self_test
+from .shared_kernel.settings import load_env
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
     p = argparse.ArgumentParser(description="Map a codebase to RDF + SHACL; optionally roundtrip-verify.")
     p.add_argument("--repo",
                    help="Local repository path or Git URL, including GitHub URLs.")
