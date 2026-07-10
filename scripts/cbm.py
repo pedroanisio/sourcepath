@@ -10,11 +10,12 @@ Usage:
     python scripts/cbm.py <command> --help
 
 Commands:
-    report    Structural report (HTML / MD / JSON) from a bundle
-    dossier   A4 PDF dossier, typeset with the Measured Ink design system
-    pdf       Render an authored Markdown report to a themed PDF
-    site      Generate the static bundle-browser site
-    repair    Apply post-hoc data-quality fixes to an emitted bundle
+    report     Structural report (HTML / MD / JSON) from a bundle
+    report-rs  Rust-rendered PDF report (streams multi-GB inventories)
+    dossier    A4 PDF dossier, typeset with the Measured Ink design system
+    pdf        Render an authored Markdown report to a themed PDF
+    site       Generate the static bundle-browser site
+    repair     Apply post-hoc data-quality fixes to an emitted bundle
 
 Commands import lazily: a missing optional dependency (e.g. reportlab
 for ``dossier``, weasyprint for ``pdf``) breaks only that command, with
@@ -32,6 +33,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 COMMANDS: dict[str, tuple[str, str]] = {
     "report": ("cbm_report",
                "Structural report (HTML / MD / JSON) from a bundle"),
+    "report-rs": ("cbm_report_rs",
+                  "Rust-rendered PDF report (streams multi-GB inventories)"),
     "dossier": ("cbm_dossier",
                 "A4 PDF dossier, typeset with the Measured Ink design system"),
     "pdf": ("report_to_pdf",

@@ -37,22 +37,34 @@ with semantics lives in [.env.example](./.env.example) (enforced by
 ```
 python scripts/cbm.py <command> [options]
 
-  report    Structural report (HTML / MD / JSON) from a bundle
-  dossier   A4 PDF dossier, typeset with the Measured Ink design system
-  pdf       Render an authored Markdown report to a themed PDF
-  site      Generate the static bundle-browser site
-  repair    Apply post-hoc data-quality fixes to an emitted bundle
+  report     Structural report (HTML / MD / JSON) from a bundle
+  report-rs  Rust-rendered PDF report (streams multi-GB inventories)
+  dossier    A4 PDF dossier, typeset with the Measured Ink design system
+  pdf        Render an authored Markdown report to a themed PDF
+  site       Generate the static bundle-browser site
+  repair     Apply post-hoc data-quality fixes to an emitted bundle
 ```
 
-The dispatcher routes to `scripts/cbm_report.py`, `cbm_dossier.py`,
-`report_to_pdf.py`, `generate_static_site.py`, and `cbm_repair.py`,
-which all remain independently runnable. Commands import lazily, so a
-missing optional dependency (reportlab for `dossier`, weasyprint for
-`pdf`) fails that command only, with an install hint.
+The dispatcher routes to `scripts/cbm_report.py`, `cbm_report_rs.py`,
+`cbm_dossier.py`, `report_to_pdf.py`, `generate_static_site.py`, and
+`cbm_repair.py`, which all remain independently runnable. Commands
+import lazily, so a missing optional dependency (reportlab for
+`dossier`, weasyprint for `pdf`) fails that command only, with an
+install hint.
 
-Reports load the inventory through a persistent pyoxigraph store cached
-per bundle (built once, re-opened in seconds); the first run on a very
-large bundle pays the one-time store build.
+Two structural read paths exist by design — pick by bundle size:
+
+- `report` / `dossier` (Python) load the inventory through a persistent
+  pyoxigraph store cached per bundle (built once, re-opened in
+  seconds); the first run on a very large bundle pays the one-time
+  store build. This path does the graph analytics (chokepoints, SHACL,
+  test evidence, t-SNE districts).
+- `report-rs` (Rust, `tools/cbm-report`) never loads a graph store: it
+  streams `inventory.jsonld` in fixed-size blocks and recounts it
+  independently of the manifest. Use it when the bundle is multi-GB and
+  the question is "render the health/epistemics PDF now". Needs a
+  compiled binary — `cargo build --release --manifest-path
+  tools/cbm-report/Cargo.toml` — or `CBM_REPORT_BIN=<path>`.
 
 ## Verification
 

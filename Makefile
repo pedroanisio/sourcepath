@@ -34,7 +34,8 @@ DRIFT_VERIFIERS := \
 	$(TESTS_DIR)/verify_drift_p2.py \
 	$(TESTS_DIR)/verify_drift_p3.py \
 	$(TESTS_DIR)/verify_shape_coverage.py \
-	$(TESTS_DIR)/verify_dependency_hygiene.py
+	$(TESTS_DIR)/verify_dependency_hygiene.py \
+	$(TESTS_DIR)/verify_report_spec.py
 
 CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_roundtrip.py \
@@ -92,6 +93,19 @@ LLM_ONLINE_VERIFIERS := \
 	$(TESTS_DIR)/verify_llm_enrich_aggregator.py \
 	$(TESTS_DIR)/verify_llm_enrich_determinism.py
 
+# Reporting surface — pytest suites for the cbm.py tools (dispatcher, X-ray
+# caveats, evidence banner, authored-report PDF pipeline, dossier, static
+# site). The Rust crate's own tests run via `test-report-rs`.
+REPORTING_TESTS := \
+	$(TESTS_DIR)/test_cbm_cli.py \
+	$(TESTS_DIR)/test_report_caveats.py \
+	$(TESTS_DIR)/test_evidence_banner.py \
+	$(TESTS_DIR)/test_report_to_pdf.py \
+	$(TESTS_DIR)/test_cbm_dossier.py \
+	$(TESTS_DIR)/test_static_site.py
+
+CBM_REPORT_MANIFEST := tools/cbm-report/Cargo.toml
+
 .DEFAULT_GOAL := help
 
 # ---------------------------------------------------------------- help / meta
@@ -116,7 +130,7 @@ lint: ## Enforce import boundaries (mirrors .github/workflows/lint.yml).
 # ----------------------------------------------------------------- tests
 
 .PHONY: test
-test: test-core test-vocab test-langs test-rust test-llm-offline test-drift ## Run the full offline test surface (skips Ollama-dependent verifiers).
+test: test-core test-vocab test-langs test-rust test-llm-offline test-drift test-reporting test-report-rs ## Run the full offline test surface (skips Ollama-dependent verifiers).
 
 .PHONY: test-core
 test-core: ## Core round-trip, L2/L3, xrefs, repo summary.
@@ -148,6 +162,18 @@ test-llm: test-llm-offline test-llm-online ## All L4 verifiers (offline + online
 .PHONY: test-drift
 test-drift: ## Drift-risk checks (P1/P2/P3) + shape coverage + dep hygiene.
 	@for v in $(DRIFT_VERIFIERS); do echo "== $$v =="; $(PYTHON) $$v || exit $$?; done
+
+.PHONY: test-reporting
+test-reporting: ## Reporting tools pytest suite (cbm.py, X-ray, banner, PDF, dossier, site).
+	$(PYTEST) $(REPORTING_TESTS) -q
+
+.PHONY: test-report-rs
+test-report-rs: ## Rust cbm-report crate unit tests (disclosed skip when cargo is absent).
+	@if command -v cargo >/dev/null 2>&1; then \
+		cargo test --manifest-path $(CBM_REPORT_MANIFEST) --quiet; \
+	else \
+		echo "test-report-rs: cargo not found — Rust crate tests SKIPPED (disclosed, not silent)"; \
+	fi
 
 .PHONY: test-ui
 test-ui: ## Frontend (vitest) test suite.
@@ -184,6 +210,10 @@ run-l4: ## scripts/run_l4.py — LLM enrich layer (needs Ollama).
 
 run-xrefs: ## scripts/run_xrefs.py — symbol cross-references.
 	$(PYTHON) scripts/run_xrefs.py $(ARGS)
+
+.PHONY: build-report-rs
+build-report-rs: ## Compile the Rust cbm-report PDF renderer (needed by `cbm.py report-rs`).
+	cargo build --release --manifest-path $(CBM_REPORT_MANIFEST)
 
 # ----------------------------------------------------------------- docker
 

@@ -975,10 +975,11 @@ def build(args):
                            f"{ok}/{tot} match", "MonoB", INK, 8), S["mono"]),
            Paragraph(cspan("MEASURED INK · PLATE SERIES", "Caps", PALE, 8), S["mono"])]
 
-    # ---- provenance / disclaimer
+    # ---- provenance / disclaimer (shared banner label: CR pins the phrase)
     st += [NextPageTemplate("front"), PageBreak(), Spacer(0, 8 * mm)]
     h3(st, "Provenance & candor")
-    p(st, "No statement in this dossier should be taken for granted. Every figure is "
+    p(st, f"<b>{CR.EVIDENCE_BANNER_LABEL}.</b> "
+          "No statement in this dossier should be taken for granted. Every figure is "
           "labeled by its epistemic class: <b>FACT</b> — measured mechanically from the "
           "artifacts and reproducible by query; <b>DERIVED</b> — computed by a disclosed, "
           "seeded procedure (projections, clusterings, layouts); <b>UNVERIFIED</b> — "

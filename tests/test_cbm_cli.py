@@ -26,7 +26,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir, "scripts"))
 import cbm  # noqa: E402
 
-ALL_COMMANDS = ("report", "dossier", "pdf", "site", "repair")
+ALL_COMMANDS = ("report", "report-rs", "dossier", "pdf", "site", "repair")
 
 
 def test_no_args_prints_usage_and_exits_2(capsys):
@@ -103,3 +103,64 @@ def test_subcommand_help_reaches_tool_parser(command, module, capsys):
         cbm.main([command, "--help"])
     assert exc.value.code == 0
     assert "--bundle" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- report-rs
+# The Rust renderer routes through the cbm_report_rs shim: no binary means an
+# actionable build hint (not a traceback); a resolved binary gets argv
+# verbatim and its exit code back.
+
+import cbm_report_rs  # noqa: E402
+
+
+def test_report_rs_without_binary_gives_build_hint(monkeypatch, capsys):
+    monkeypatch.delenv("CBM_REPORT_BIN", raising=False)
+    monkeypatch.setattr(cbm_report_rs, "find_binary", lambda: None)
+    rc = cbm_report_rs.main(["_tmp/some-bundle"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "cargo build --release" in err
+    assert "CBM_REPORT_BIN" in err
+    assert "Traceback" not in err
+
+
+def test_report_rs_env_override_must_exist(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("CBM_REPORT_BIN", str(tmp_path / "missing-binary"))
+    rc = cbm_report_rs.main(["_tmp/some-bundle"])
+    assert rc == 1
+    assert "does not exist" in capsys.readouterr().err
+
+
+def test_report_rs_forwards_argv_and_exit_code(monkeypatch, tmp_path):
+    fake_bin = tmp_path / "cbm-report"
+    fake_bin.write_text("#!/bin/sh\nexit 0\n")
+    fake_bin.chmod(0o755)
+    monkeypatch.setattr(cbm_report_rs, "find_binary", lambda: fake_bin)
+
+    seen = {}
+
+    class _Done:
+        returncode = 9
+
+    def fake_run(cmd):
+        seen["cmd"] = cmd
+        return _Done()
+
+    monkeypatch.setattr(cbm_report_rs.subprocess, "run", fake_run)
+    rc = cbm_report_rs.main(["bundle-dir", "-o", "out.pdf"])
+    assert rc == 9
+    assert seen["cmd"] == [str(fake_bin), "bundle-dir", "-o", "out.pdf"]
+
+
+def test_report_rs_is_routed_by_the_dispatcher(monkeypatch):
+    routed = {}
+
+    def fake_main(argv=None):
+        routed["argv"] = argv
+        return 0
+
+    monkeypatch.setattr(cbm, "_load_command",
+                        lambda name: types.SimpleNamespace(main=fake_main)
+                        if name == "report-rs" else None)
+    assert cbm.main(["report-rs", "bundle-dir"]) == 0
+    assert routed["argv"] == ["bundle-dir"]

@@ -12,7 +12,8 @@ a stable, repeatable level of polish.
 Pipeline:  Markdown  ->  HTML (markdown-it-py, CommonMark + GFM tables, raw HTML)
            ->  PDF (WeasyPrint, theme loaded from file so bundled fonts resolve).
 
-Authoring primitives (all optional; plain Markdown still renders):
+Authoring primitives (the ``disclaimer`` frontmatter block is mandatory —
+rendering refuses without it; everything else is optional):
 
   YAML frontmatter
   ----------------
@@ -465,10 +466,21 @@ def render(src: Path, out: Path, theme: Path, dump_html: bool) -> None:
     meta, body = split_frontmatter(raw)
     md = _md()
 
+    disclaimer = build_disclaimer(meta)
+    if not disclaimer:
+        # keep-disclaimer (__file_meta__, severity error): the banner is
+        # required output — a silent render without it was the defect.
+        sys.exit(
+            f"refusing to render {src}: no disclaimer/provenance frontmatter. "
+            "The 'Evidence basis & confidence' banner is required output "
+            "(PALS's LAW). Add a `disclaimer:` block with notice / "
+            "generated_by / date, or start from docs/reports/_report_template.md."
+        )
+
     content = "\n".join(
         x
         for x in [
-            build_disclaimer(meta),
+            disclaimer,
             build_header(md, meta),
             build_verdict(md, meta),
             render_body(md, parse_blocks(body)),

@@ -191,6 +191,34 @@ backends fall back to substring matching. The bundle is loaded once per
 process — restart to pick up a new output dir. See
 [frontend/backend/README.md](frontend/backend/README.md) for endpoint details.
 
+## Report
+
+One front door for every report generator (each tool also runs standalone;
+its own `--help` is the source of truth):
+
+```bash
+python scripts/cbm.py report    --bundle _tmp/out   # structural X-ray: HTML / MD / JSON
+python scripts/cbm.py report-rs _tmp/out            # Rust-rendered PDF (multi-GB bundles)
+python scripts/cbm.py dossier   --bundle _tmp/out   # 100+ page typeset A4 PDF dossier
+python scripts/cbm.py pdf docs/reports/<name>.md    # authored Markdown -> themed PDF
+python scripts/cbm.py site      --bundle _tmp/out --output _site  # offline static site
+python scripts/cbm.py repair    --bundle _tmp/out   # post-hoc data-quality fixes
+```
+
+Two structural read paths exist by design: `report`/`dossier` (Python) load
+the graph through a per-bundle persistent pyoxigraph store and do the graph
+analytics; `report-rs` ([tools/cbm-report](tools/cbm-report/README.md), Rust)
+streams `inventory.jsonld` from disk and recounts it independently of the
+manifest — built for bundles where a graph load is the bottleneck
+(`cargo build --release --manifest-path tools/cbm-report/Cargo.toml` first).
+
+Every generator separates evidence tiers (mechanical facts vs derived
+computation vs unverified LLM output) under the shared
+"Evidence basis & confidence" framing; the declarative reporting contract
+lives in [docs/reporting/](docs/reporting/) (30-component catalog + JSON
+Schema, pinned by `tests/verify_report_spec.py`). Authored narrative reports
+and their workflow live in [docs/reports/](docs/reports/README.md).
+
 ## Regenerate
 
 `codebase_mapper.regenerate` materializes source from `inventory.ttl` and
@@ -409,6 +437,7 @@ python tests/verify_rust_super_self.py      # Rust self::/super:: use-path resol
 python tests/verify_rust_regenerate.py      # Rust byte-identical regenerate (Stage 6)
 python tests/verify_rust_ast_body_count.py  # Rust ast_full_bodies counter (Stage 7)
 python tests/verify_shape_coverage.py       # drift-risk #4/#5 — emitted RDF predicates ⊆ SHACL shapes
+python tests/verify_report_spec.py          # reporting contract — schema valid, examples pass, doc catalog ↔ schema enum
 python tests/verify_drift_p1.py             # drift-risk HIGH findings — port/env/response_model/concepts.json/version
 python tests/verify_drift_p2.py             # drift-risk MODERATE findings — README↔verifiers, CLI↔README, langs, plugin-names, MCP tools
 python tests/verify_drift_p3.py             # drift-risk LOW findings — meta-presence of cited guards + reinforcement

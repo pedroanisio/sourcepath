@@ -786,6 +786,34 @@ def sec(title, tag, body):
     return f"<section><hr/><h2 class='caps'>{ESC(title)}<span class='tag mono'>{ESC(tag)}</span></h2>{body}</section>"
 
 
+# --- Evidence banner (standing operator override, CLAUDE.md Rule 5) ---------
+# One phrase across every report generator: the Rust crate (tools/cbm-report),
+# the authored-report pipeline (report_to_pdf.py), the reporting contract
+# (docs/reporting/report-spec.schema.json: disclaimer_mode
+# `evidence_basis_banner`), the dossier's provenance page, and the structural
+# reports emitted here. tests/test_evidence_banner.py pins the phrase and the
+# call sites.
+
+EVIDENCE_BANNER_LABEL = "Evidence basis & confidence"
+EVIDENCE_BANNER_TEXT = (
+    "Structural figures are mechanically extracted from the bundle and "
+    "evidence-backed (FACT); projections and clusterings are deterministic, "
+    "disclosed computations over those facts (DERIVED); LLM-authored text is "
+    "untrusted output, confidence-tagged and pending validation (UNVERIFIED). "
+    "Validate interpretive claims before high-stakes decisions."
+)
+
+
+def evidence_banner_html():
+    return ("<div class='banner fine'><b class='caps'>"
+            f"{ESC(EVIDENCE_BANNER_LABEL)}</b> — {ESC(EVIDENCE_BANNER_TEXT)}"
+            "</div>")
+
+
+def evidence_banner_md():
+    return f"\n**{EVIDENCE_BANNER_LABEL}.** {EVIDENCE_BANNER_TEXT}"
+
+
 # --- Mechanical caveats (flaw map F15/F16) ---------------------------------
 # The X-ray previously printed bundle figures as bare FACT even when the
 # manifest itself proved they were distorted (91,736 import edges shown with
@@ -923,7 +951,9 @@ def emit_html(M, out):
         ("L4 receipts", (M.get("enrich") or {}).get("n", 0))])
     body = [head, f"<div class='counters'>{counters}</div>"]
 
-    # Caveats come first: every figure below must be read through them.
+    # The evidence banner frames every figure; caveats follow immediately —
+    # every figure below must be read through both.
+    body.append(evidence_banner_html())
     body.append(caveats_html(M.get("caveats") or
                              mechanical_caveats(man, M.get("found"))))
 
@@ -1124,6 +1154,7 @@ generated_by: cbm_report.py
 **Verification (FACT).** Input hashes independently recomputed: **{ok}/{tot} match**.
 SHACL self-check (manifest): {man.get('shacl_self_check',{}).get('conforms')}."""
     + (f" Independent re-validation: **{'conforms' if M['shacl_independent'][0] else 'VIOLATIONS'}** ({M['shacl_independent'][1]:.0f}s)." if M.get('shacl_independent') else ""))
+    L.append(evidence_banner_md())
     caveats = M.get("caveats") or mechanical_caveats(man, M.get("found"))
     if caveats:
         L.append("\n**Data caveats (FACT).** Read every figure through these:\n"
