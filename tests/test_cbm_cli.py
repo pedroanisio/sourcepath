@@ -142,14 +142,38 @@ def test_report_rs_forwards_argv_and_exit_code(monkeypatch, tmp_path):
     class _Done:
         returncode = 9
 
-    def fake_run(cmd):
+    def fake_run(cmd, env=None):
         seen["cmd"] = cmd
+        seen["env"] = env
         return _Done()
 
     monkeypatch.setattr(cbm_report_rs.subprocess, "run", fake_run)
     rc = cbm_report_rs.main(["bundle-dir", "-o", "out.pdf"])
     assert rc == 9
     assert seen["cmd"] == [str(fake_bin), "bundle-dir", "-o", "out.pdf"]
+
+
+def test_report_rs_bridges_font_dir_env(monkeypatch, tmp_path):
+    """One font knob for both report tools (drift-risk H7): CBM_FONT_DIR is
+    bridged to the crate's CBM_REPORT_FONT_DIR unless the latter is set."""
+    fake_bin = tmp_path / "cbm-report"
+    fake_bin.write_text("#!/bin/sh\nexit 0\n")
+    fake_bin.chmod(0o755)
+    monkeypatch.setattr(cbm_report_rs, "find_binary", lambda: fake_bin)
+    seen = {}
+    monkeypatch.setattr(
+        cbm_report_rs.subprocess, "run",
+        lambda cmd, env=None: (seen.update(env=env),
+                               types.SimpleNamespace(returncode=0))[1])
+
+    monkeypatch.setenv("CBM_FONT_DIR", "/fonts/dossier")
+    monkeypatch.delenv("CBM_REPORT_FONT_DIR", raising=False)
+    cbm_report_rs.main(["bundle-dir", "-o", "x.pdf"])
+    assert seen["env"]["CBM_REPORT_FONT_DIR"] == "/fonts/dossier"
+
+    monkeypatch.setenv("CBM_REPORT_FONT_DIR", "/fonts/explicit")
+    cbm_report_rs.main(["bundle-dir", "-o", "x.pdf"])
+    assert seen["env"]["CBM_REPORT_FONT_DIR"] == "/fonts/explicit"
 
 
 def test_report_rs_is_routed_by_the_dispatcher(monkeypatch):

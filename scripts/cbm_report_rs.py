@@ -98,7 +98,13 @@ def main(argv: list[str] | None = None) -> int:
     forwarded = inject_default_out(argv)
     if len(forwarded) != len(argv):
         print(f"[report-rs] out: {forwarded[-1]}", file=sys.stderr)
-    return subprocess.run([str(binary), *forwarded]).returncode
+    env = os.environ.copy()
+    # One font knob for both report tools (drift-risk H7): the crate reads
+    # CBM_REPORT_FONT_DIR; when only the dossier's CBM_FONT_DIR is set,
+    # bridge it so the two renderers honor the same configuration.
+    if "CBM_REPORT_FONT_DIR" not in env and env.get("CBM_FONT_DIR"):
+        env["CBM_REPORT_FONT_DIR"] = env["CBM_FONT_DIR"]
+    return subprocess.run([str(binary), *forwarded], env=env).returncode
 
 
 if __name__ == "__main__":
