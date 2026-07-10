@@ -10,7 +10,7 @@
   "files": {
     "data.bin": {"language": null, "type": "binary"},
     "gosvc/main.go": {"language": "go", "type": "source_code"},
-    "notes.md": {"language": null, "type": "documentation"},
+    "notes.md": {"language": "markdown", "type": "documentation"},
     "pyapp/__init__.py": {"language": "python", "type": "source_code"},
     "pyapp/main.py": {"language": "python", "type": "source_code"},
     "pyapp/util.py": {"language": "python", "type": "source_code"},
