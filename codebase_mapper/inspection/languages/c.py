@@ -147,8 +147,18 @@ def _collect_c_items(root, content: bytes) -> list[dict]:
                     name = _c_declarator_name(declarator, content)
                     if name:
                         item = _c_item("variable", name, node)
+                        # The signature ends at the declarator: a kernel
+                        # data table's megabyte initializer must never ride
+                        # along (one such literal blew the serializer's
+                        # 16 MiB buffer at emit). Spans keep the full node.
+                        sig_node = declarator
+                        if sig_node.type == "init_declarator":
+                            inner = sig_node.child_by_field_name("declarator")
+                            if inner is not None:
+                                sig_node = inner
                         item["signature"] = _collapse(
-                            content[node.start_byte:node.end_byte].decode("utf-8", "replace"))
+                            content[node.start_byte:sig_node.end_byte]
+                            .decode("utf-8", "replace"))
                         items.append(item)
                 continue
             name = _c_declarator_name(fd.child_by_field_name("declarator"), content)

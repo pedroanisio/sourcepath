@@ -95,3 +95,21 @@ def test_emit_survives_and_discloses_deep_record(tmp_path):
     # the graph carries the stubbed summary, not nothing
     ttl = (tmp_path / "bundle" / "inventory.ttl").read_text()
     assert OMISSION_MARKER in ttl
+
+
+def test_oversized_summary_is_capped_with_disclosure():
+    """A single ast_summary literal larger than the serializer buffer
+    (pyoxigraph: 16 MiB) must be stubbed field-by-field, not crash emit."""
+    from codebase_mapper.shared_kernel.json_safety import (
+        MAX_AST_SUMMARY_BYTES,
+        dump_ast_summary,
+    )
+    huge = {"items": [{"name": f"n{i}", "signature": "x" * 1000}
+                      for i in range(40_000)],
+            "language": "c"}
+    text, truncated = dump_ast_summary(huge)
+    assert truncated
+    assert len(text) <= MAX_AST_SUMMARY_BYTES
+    doc = json.loads(text)
+    assert doc["language"] == "c"          # small fields survive
+    assert doc["items"] == {"omitted": OMISSION_MARKER}

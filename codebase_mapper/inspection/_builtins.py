@@ -399,6 +399,19 @@ class CResolver:
         return _resolve_c_family(record, ctx)
 
 
+class CfmlResolver:
+    name = "resolve_cfml"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "cfml" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_cfml_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 class CobolResolver:
     name = "resolve_cobol"
 

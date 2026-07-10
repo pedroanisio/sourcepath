@@ -26,13 +26,24 @@ DEEP_NESTING_LIMIT = 20_000
 #: Value of the ``omitted`` key that replaces an un-serializable field.
 OMISSION_MARKER = "nesting_exceeds_serialization_depth"
 
+#: Hard ceiling for one serialized ast_summary. pyoxigraph's N-Triples /
+#: Turtle machinery buffers a statement at up to 16 MiB — a single larger
+#: literal kills the emit at its last step (observed live: a kernel data
+#: table). Kept comfortably below that ceiling; oversized fields are
+#: stubbed largest-first with the same disclosed marker.
+MAX_AST_SUMMARY_BYTES = 8 << 20
+
 
 def dump_ast_summary(summary) -> tuple[str, bool]:
-    """``json.dumps(summary, sort_keys=True)`` that cannot raise
-    RecursionError. Returns ``(json_text, truncated)``.
+    """``json.dumps(summary, sort_keys=True)`` that can neither raise
+    RecursionError nor exceed ``MAX_AST_SUMMARY_BYTES``. Returns
+    ``(json_text, truncated)``.
     """
     try:
-        return json.dumps(summary, sort_keys=True), False
+        text = json.dumps(summary, sort_keys=True)
+        if len(text) <= MAX_AST_SUMMARY_BYTES:
+            return text, False
+        return _cap_size(summary), True
     except RecursionError:
         pass
 
@@ -40,7 +51,10 @@ def dump_ast_summary(summary) -> tuple[str, bool]:
     sys.setrecursionlimit(max(old_limit, DEEP_NESTING_LIMIT))
     try:
         try:
-            return json.dumps(summary, sort_keys=True), False
+            text = json.dumps(summary, sort_keys=True)
+            if len(text) <= MAX_AST_SUMMARY_BYTES:
+                return text, False
+            return _cap_size(summary), True
         except RecursionError:
             pass
         if not isinstance(summary, dict):
@@ -52,6 +66,23 @@ def dump_ast_summary(summary) -> tuple[str, bool]:
                 out[key] = summary[key]
             except RecursionError:
                 out[key] = {"omitted": OMISSION_MARKER}
-        return json.dumps(out, sort_keys=True), True
+        text = json.dumps(out, sort_keys=True)
+        if len(text) > MAX_AST_SUMMARY_BYTES:
+            return _cap_size(out), True
+        return text, True
     finally:
         sys.setrecursionlimit(old_limit)
+
+
+def _cap_size(summary) -> str:
+    """Stub top-level fields largest-first until the dump fits the ceiling."""
+    if not isinstance(summary, dict):
+        return json.dumps({"omitted": OMISSION_MARKER})
+    out = dict(summary)
+    sizes = sorted(out, key=lambda k: -len(json.dumps(out[k], sort_keys=True)))
+    for key in sizes:
+        out[key] = {"omitted": OMISSION_MARKER}
+        text = json.dumps(out, sort_keys=True)
+        if len(text) <= MAX_AST_SUMMARY_BYTES:
+            return text
+    return json.dumps({"omitted": OMISSION_MARKER})

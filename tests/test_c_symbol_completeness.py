@@ -80,3 +80,19 @@ def test_existing_extraction_unchanged():
     assert ("function", "bar") in kinds
     assert ("typedef", "u32_t") in kinds
     assert "zero_symbol_reason" not in s
+
+
+def test_variable_signature_excludes_initializer():
+    """A kernel-style data table must not embed its megabyte initializer in
+    the item signature — one such literal blew pyoxigraph's 16 MiB buffer
+    at emit (observed live on sound/usb/quirks-table.h-shaped tables)."""
+    big_init = ", ".join(str(i) for i in range(20_000))
+    src = ("static const struct usb_device_id quirks_table[] = { "
+           + big_init + " };\n").encode()
+    s = _items(src)
+    item = next(i for i in s["items"] if i["name"] == "quirks_table")
+    assert item["kind"] == "variable"
+    assert len(item["signature"]) < 200, len(item["signature"])
+    assert "19999" not in item["signature"]
+    # spans still cover the whole declaration (chunking needs them)
+    assert item["byte_end"] > len(src) - 10
