@@ -101,6 +101,17 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
           python -m pip install -r frontend/backend/requirements.txt
+          # pytest-cov: the backend pytest.ini passes --cov flags unconditionally
+          python -m pip install pytest pytest-cov
 
       - name: Drift verifiers
         run: make test-drift
+
+      # Live handler validation (drift-risk H4): emit a real bundle, then
+      # drive every MCP handler + backend suite against it — output schemas
+      # are validated on live payloads, not hand-written samples.
+      - name: Generate live fixture bundle
+        run: python scripts/run_l3.py --repo tests/fixtures/golden_repo --out _tmp/ci-bundle --backend hash
+
+      - name: Backend + MCP suites against the live bundle
+        run: make test-backend

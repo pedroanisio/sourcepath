@@ -213,7 +213,11 @@ def _orient_bundle(args: dict[str, Any], default: str | None) -> dict[str, Any]:
         {
             "name": "L2 chunks_embeddings",
             "purpose": "Per-function/class/file chunks with NIF spans and embedding vectors.",
-            "key_predicates": ["cbml2:inFile", "cbml2:beginIndex", "cbml2:endIndex", "cbml2:embeddingRow"],
+            # byte offsets live in the NIF namespace (nif:beginIndex /
+            # nif:endIndex) — the cbml2: spellings were advertised-but-never-
+            # emitted drift, caught by
+            # test_orient_bundle_advertised_predicates_are_emitter_real.
+            "key_predicates": ["cbml2:inFile", "nif:beginIndex", "nif:endIndex", "cbml2:embeddingRow"],
         },
         {
             "name": "L3 concept_graph",

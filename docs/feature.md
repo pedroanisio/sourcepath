@@ -27,10 +27,10 @@ surface.
 ## 1. Mapping pipeline (L1)
 
 - One-command mapping: `codebase-mapper --repo <path|git-url> --out <dir>`
-  (console script, [codebase_mapper/cli.py](codebase_mapper/cli.py)).
+  (console script, [codebase_mapper/cli.py](../codebase_mapper/cli.py)).
 - Ingestion from local paths, HTTPS/SSH/`file://` git URLs, and
   `github.com/owner/repo` shorthand; branch/tag/SHA via `--state`
-  ([inspection/repo_source.py](codebase_mapper/inspection/repo_source.py)).
+  ([inspection/repo_source.py](../codebase_mapper/inspection/repo_source.py)).
 - Fast shallow clones by default; opt-in history deepening
   (`CBM_UNSHALLOW=1`) recovers per-file commit-time provenance without
   historical blobs; clone workspace pinning via `CBM_WORK_DIR`.
@@ -42,7 +42,7 @@ surface.
 - Error-free mapping guarantees: per-file crash containment (a pathological
   file becomes a disclosed `extraction_errors` entry, never an aborted run),
   C-macro neutralization derived from the repo's own `#define`s
-  ([inspection/macro_neutralize.py](codebase_mapper/inspection/macro_neutralize.py)),
+  ([inspection/macro_neutralize.py](../codebase_mapper/inspection/macro_neutralize.py)),
   and disclosed AST-depth truncation.
 - Progress banners + throttled per-pass progress lines on stderr.
 
@@ -50,11 +50,11 @@ surface.
 
 - Full AST + import analysis via tree-sitter: Python, TypeScript/JavaScript,
   Rust, Ruby, Go, Java, Kotlin, C, C++, Objective-C/C++, Swift
-  ([inspection/_builtins.py](codebase_mapper/inspection/_builtins.py)).
+  ([inspection/_builtins.py](../codebase_mapper/inspection/_builtins.py)).
 - Grammar-free analyzers: Dart, Clojure (s-expression reader), COBOL
   (column-aware).
 - Lightweight line-oriented extractors: assembly, Kconfig, devicetree, Make
-  ([inspection/languages/lightweight.py](codebase_mapper/inspection/languages/lightweight.py)).
+  ([inspection/languages/lightweight.py](../codebase_mapper/inspection/languages/lightweight.py)).
 - Per-language import resolution against in-repo indices (Python module
   index, tsconfig aliases, Rust workspaces, Go module, Swift/Dart/Java/
   Kotlin/C-family indices), separating `imports` from `importsExternal`.
@@ -70,7 +70,7 @@ surface.
   `shapes.shacl.ttl`, `ontology-mapping.ttl`, `ast_coverage.json`,
   content-addressed `blobs/` (skippable), plus plugin sidecars: chunk and
   embedding artifacts, `concepts.json`, `xrefs.jsonl`, `enrichments.jsonl`
-  ([emission/application/emit_bundle.py](codebase_mapper/emission/application/emit_bundle.py)).
+  ([emission/application/emit_bundle.py](../codebase_mapper/emission/application/emit_bundle.py)).
 - Every artifact self-reports sha256 + size in the manifest; reports
   independently recompute them.
 - SHACL self-validation on every emit; skipping it (`--skip-shacl`) is
@@ -85,19 +85,19 @@ surface.
 
 ## 4. Analysis layers & extension model
 
-- L2 chunks + embeddings ([plugins/chunks_embeddings/](plugins/chunks_embeddings/)):
+- L2 chunks + embeddings ([plugins/chunks_embeddings/](../plugins/chunks_embeddings/)):
   symbol-level chunks (Python/TS/JS) or whole-file chunks; backends
   `sbert` (all-MiniLM-L6-v2, 384-dim normalized) and `hash` (deterministic,
   dependency-free); embedding truncation disclosed per chunk.
-- L3 concept graph ([plugins/concept_graph/](plugins/concept_graph/)):
+- L3 concept graph ([plugins/concept_graph/](../plugins/concept_graph/)):
   identifier splitting → canonical SKOS concept set with co-occurrence
   edges; curated controlled vocabulary (`software_primitives.yaml`) with
   `--concept-vocab` override and `--no-builtin-vocab` opt-out.
-- Symbol xrefs ([plugins/symbol_xrefs/](plugins/symbol_xrefs/)): `calls` /
+- Symbol xrefs ([plugins/symbol_xrefs/](../plugins/symbol_xrefs/)): `calls` /
   `subclassOf` / `overrides` / `references` edges across 8 languages, each
   edge carrying its resolution level (`exact`/`heuristic`/`ambiguous`) and
   unresolved reasons.
-- L4 LLM enrichment, opt-in ([plugins/llm_enrich/](plugins/llm_enrich/)):
+- L4 LLM enrichment, opt-in ([plugins/llm_enrich/](../plugins/llm_enrich/)):
   file summaries, concept descriptions, schema purposes via local Ollama;
   content-addressed cache for offline/CI determinism; per-record provenance
   receipts (model, prompt sha, target sha, timestamp); unreachable backend
@@ -105,7 +105,7 @@ surface.
 - Plugin architecture: seven registry hook points (language analyzer, import
   resolver, record enricher, aggregator, graph contributor, shape
   contributor, artifact emitter) in
-  [shared_kernel/extensions.py](codebase_mapper/shared_kernel/extensions.py).
+  [shared_kernel/extensions.py](../codebase_mapper/shared_kernel/extensions.py).
 
 ## 5. Reconstruction & decomposition
 
@@ -117,43 +117,43 @@ surface.
   datetime normalization, manifest rebuild) at bounded memory.
 - Decomposer (`python -m decomposer <bundle>`): architecture-style
   detection, module cycles, quality gates; emits YAML decomposition,
-  Markdown report, per-part symbol maps ([decomposer/](decomposer/)).
+  Markdown report, per-part symbol maps ([decomposer/](../decomposer/)).
 - Recomposer (`python -m recomposer <decomposition.yaml>`): ordered
   natural-language build plan (Markdown/YAML) with skipped phases and open
-  assumptions disclosed ([recomposer/](recomposer/)).
+  assumptions disclosed ([recomposer/](../recomposer/)).
 
-## 6. Reports & visualization (unified CLI: [scripts/cbm.py](scripts/cbm.py))
+## 6. Reports & visualization (unified CLI: [scripts/cbm.py](../scripts/cbm.py))
 
 - `report` — Structural X-Ray in HTML / Markdown / JSON: hash verification,
   census, graph facts, test evidence, concept districts; loads RDF through
   a persistent per-bundle pyoxigraph store
-  ([scripts/cbm_report.py](scripts/cbm_report.py)).
+  ([scripts/cbm_report.py](../scripts/cbm_report.py)).
 - `report-rs` — Rust-rendered 8-page PDF that streams multi-GB
   `inventory.jsonld` and recounts it independently of the manifest
-  ([tools/cbm-report/](tools/cbm-report/), shim
-  [scripts/cbm_report_rs.py](scripts/cbm_report_rs.py)).
+  ([tools/cbm-report/](../tools/cbm-report/), shim
+  [scripts/cbm_report_rs.py](../scripts/cbm_report_rs.py)).
 - `dossier` — 100+ page typeset A4 PDF ("Measured Ink" design system)
-  ([scripts/cbm_dossier.py](scripts/cbm_dossier.py)).
+  ([scripts/cbm_dossier.py](../scripts/cbm_dossier.py)).
 - `pdf` — authored Markdown → themed print-quality PDF with callouts,
   confidence pills, vector charts; refuses to render without the
-  disclaimer frontmatter ([scripts/report_to_pdf.py](scripts/report_to_pdf.py)).
+  disclaimer frontmatter ([scripts/report_to_pdf.py](../scripts/report_to_pdf.py)).
 - `site` — fully offline static HTML bundle browser reusing the backend's
   loader; provenance tiers on every page
-  ([scripts/generate_static_site.py](scripts/generate_static_site.py)).
+  ([scripts/generate_static_site.py](../scripts/generate_static_site.py)).
 - `terrain` — self-contained WebGL2 3D "code terrain": embedding-projected
   districts, chunk-density elevation, import-graph roads, build-tide
   layers, cycle and impact-flood overlays; seeded for stable spatial memory
-  ([scripts/cbm_terrain.py](scripts/cbm_terrain.py)).
+  ([scripts/cbm_terrain.py](../scripts/cbm_terrain.py)).
 - Shared epistemics: one "Evidence basis & confidence" banner across all
   generators (pinned by tests), FACT / DERIVED / UNVERIFIED tier tags, and
   mechanical caveats computed from the manifest itself.
 - Declarative reporting contract: 30-component query catalog + JSON Schema
-  ([docs/reporting/](docs/reporting/)), contract-tested; executor not yet
+  ([docs/reporting/](../docs/reporting/)), contract-tested; executor not yet
   built (see limits).
 - Standardized output naming: `<source>__<kind>__<UTC-timestamp>` under
   `CBM_REPORTS_DIR`, never overwriting a prior run.
 
-## 7. Backend API ([frontend/backend/app.py](frontend/backend/app.py))
+## 7. Backend API ([frontend/backend/app.py](../frontend/backend/app.py))
 
 - 13 JSON endpoints: bundle list, summary, file/symbol/concept graphs,
   chunk browse + semantic search, chunk blobs, file/concept/chunk detail,
@@ -164,7 +164,7 @@ surface.
   (`CBM_BUNDLES_ROOT`) with per-request `?bundle=` selection.
 - Semantic search over sbert vectors with disclosed lexical fallback.
 
-## 8. MCP server ([frontend/mcp_server/](frontend/mcp_server/))
+## 8. MCP server ([frontend/mcp_server/](../frontend/mcp_server/))
 
 - 16 read-only tools with strict I/O schemas: orientation
   (`orient_bundle`, `bundle_summary`, `repository_summary`), navigation
@@ -185,21 +185,21 @@ surface.
 
 ## 9. UI & deployment
 
-- React UI ([frontend/ui/](frontend/ui/)): Dashboard, file/symbol/concept
+- React UI ([frontend/ui/](../frontend/ui/)): Dashboard, file/symbol/concept
   graph views (Cytoscape), chunk search, file/chunk/concept detail pages,
   bundle picker with persistence, LLM-enrichment card. Vitest suite.
 - Docker: one-command analyzer image (hash backend; `WITH_SBERT=1`
   variant) and a compose stack (nginx-served UI + backend, read-only
-  bundle mount) ([frontend/docker-compose.yml](frontend/docker-compose.yml)).
+  bundle mount) ([frontend/docker-compose.yml](../frontend/docker-compose.yml)).
 - `.env` autoload at every entry point: nearest `.env` walking up to the
   repo boundary, real environment always wins
-  ([shared_kernel/settings.py](codebase_mapper/shared_kernel/settings.py));
-  [.env.example](.env.example) is the enforced canonical env-var inventory.
+  ([shared_kernel/settings.py](../codebase_mapper/shared_kernel/settings.py));
+  [.env.example](../.env.example) is the enforced canonical env-var inventory.
 - Make workflows for install, lint, every test group, analysis runs,
   ontology/ABox validation, Rust-crate build, docker, packaging
-  ([Makefile](Makefile)); clean timestamped source zips (`dist-zip`).
+  ([Makefile](../Makefile)); clean timestamped source zips (`dist-zip`).
 - L4 model benchmarking harness
-  ([scripts/bench_llm_models.py](scripts/bench_llm_models.py)).
+  ([scripts/bench_llm_models.py](../scripts/bench_llm_models.py)).
 
 ## 10. Verification infrastructure
 
@@ -214,7 +214,7 @@ surface.
   regenerate verifiers.
 - FLAM: `__file_meta__` in-file metadata convention (roles, rules,
   severities) on tools with load-bearing constraints.
-- CI ([.github/workflows/lint.yml](.github/workflows/lint.yml)):
+- CI ([.github/workflows/lint.yml](../.github/workflows/lint.yml)):
   import-boundary linting, mypy, and a thin verify job.
 
 ## Known limits (stated, not hidden)

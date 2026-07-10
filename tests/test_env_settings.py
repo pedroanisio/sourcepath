@@ -76,6 +76,16 @@ def test_load_env_parses_comments_blanks_quotes_and_export(tmp_path, clean_env):
     assert os.environ["DQUOTED"] == "quoted value"
 
 
+def test_load_env_skips_wildcard_family_entries(tmp_path, clean_env):
+    """`KEY_*=` lines document dynamic env-var families (CBM_MCP_TIMEOUT_*)
+    for the drift guard; the loader must skip them, not reject the file."""
+    env = tmp_path / ".env"
+    env.write_text("CBM_MCP_TIMEOUT_*=\nREAL=x\n")
+    applied = settings.load_env(env)
+    assert applied == {"REAL": "x"}
+    assert not any(k.endswith("_*") for k in os.environ)
+
+
 def test_load_env_skips_blank_placeholder_values(tmp_path, clean_env):
     """`KEY=` lines (an .env copied from .env.example) must not export empty
     strings — set-but-empty silently disables documented unset-fallbacks
