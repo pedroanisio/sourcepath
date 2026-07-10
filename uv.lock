@@ -347,6 +347,7 @@ dev = [
     { name = "mypy" },
     { name = "pydantic" },
     { name = "pyjwt" },
+    { name = "pyoxigraph" },
     { name = "types-pyyaml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -359,6 +360,7 @@ frontend = [
     { name = "mcp" },
     { name = "pydantic" },
     { name = "pyjwt" },
+    { name = "pyoxigraph" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 site = [
@@ -380,6 +382,7 @@ requires-dist = [
     { name = "pygments", marker = "extra == 'site'" },
     { name = "pyjwt", marker = "extra == 'frontend'", specifier = ">=2.8,<3.0" },
     { name = "pyoxigraph" },
+    { name = "pyoxigraph", marker = "extra == 'frontend'", specifier = ">=0.5,<1.0" },
     { name = "pyshacl" },
     { name = "pyyaml" },
     { name = "rdflib" },
