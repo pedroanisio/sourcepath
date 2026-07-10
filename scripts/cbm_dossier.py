@@ -28,6 +28,13 @@ from collections import Counter, defaultdict
 import rdflib
 import yaml
 
+from codebase_mapper.shared_kernel.settings import default_report_path, load_env
+
+
+def default_out(source, when=None):
+    """Standardized default output: <reports_dir>/<source>__dossier__<UTC-ts>.pdf."""
+    return str(default_report_path(source, "dossier", ext="pdf", when=when))
+
 try:
     from reportlab.lib.pagesizes import A4
 except ImportError:  # pragma: no cover - dependency guidance only
@@ -2016,13 +2023,18 @@ def main(argv=None):
     ap.add_argument("--abox", help="arc4d3 ABox .ttl (auto-discovered when omitted)")
     ap.add_argument("--decomposition", help="decomposition .yaml (auto-discovered when omitted)")
     ap.add_argument("--buildplan", help="buildplan .yaml (auto-discovered when omitted)")
-    ap.add_argument("--out", default="dossier.pdf")
+    ap.add_argument("--out", default=None,
+                    help="output PDF (default: $CBM_REPORTS_DIR/<bundle>__dossier__<timestamp>.pdf)")
     ap.add_argument("--cache-dir", help="parse/layout cache (defaults to a temp dir keyed on the bundle)")
     ap.add_argument("--font-dir", default=FDIR_DEFAULT,
                     help="directory holding the designed TTF set ($CBM_FONT_DIR)")
     ap.add_argument("--validate-shacl", action="store_true",
                     help="re-validate the graph with pyshacl at typesetting time")
     a = ap.parse_args(argv)
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
+    if a.out is None:
+        a.out = default_out(os.path.basename(a.bundle.rstrip("/")) or "bundle")
+        print(f"[dossier] out: {a.out}", file=sys.stderr)
     n = build(a)
     print(f"[dossier] wrote {a.out} · {n} pages")
     return 0

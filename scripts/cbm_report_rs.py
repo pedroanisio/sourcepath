@@ -42,6 +42,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from codebase_mapper.shared_kernel.settings import default_report_path, load_env
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CRATE_DIR = REPO_ROOT / "tools" / "cbm-report"
 _BUILD_HINT = (
@@ -64,7 +66,27 @@ def find_binary() -> Path | None:
     return None
 
 
+def inject_default_out(argv: list[str], when=None) -> list[str]:
+    """Append a standardized ``-o`` when the caller gave none.
+
+    Argv-only manipulation (per this file's ``shim-only`` rule — rendering
+    behavior stays in the crate): when no ``-o``/``--out`` is present and a
+    bundle path is, the destination defaults to
+    ``$CBM_REPORTS_DIR/<bundle>__report__<UTC-timestamp>.pdf``.
+    """
+    if any(tok in ("-o", "--out") or tok.startswith(("-o=", "--out="))
+           for tok in argv):
+        return list(argv)
+    positional = next((tok for tok in argv if not tok.startswith("-")), None)
+    if positional is None:
+        return list(argv)
+    source = os.path.basename(positional.rstrip("/")) or positional
+    out = default_report_path(source, "report", ext="pdf", when=when)
+    return [*argv, "-o", str(out)]
+
+
 def main(argv: list[str] | None = None) -> int:
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
     argv = list(sys.argv[1:] if argv is None else argv)
     binary = find_binary()
     if binary is None:
@@ -73,7 +95,10 @@ def main(argv: list[str] | None = None) -> int:
                  if override else "no compiled cbm-report binary found")
         print(f"error: {where}; {_BUILD_HINT}", file=sys.stderr)
         return 1
-    return subprocess.run([str(binary), *argv]).returncode
+    forwarded = inject_default_out(argv)
+    if len(forwarded) != len(argv):
+        print(f"[report-rs] out: {forwarded[-1]}", file=sys.stderr)
+    return subprocess.run([str(binary), *forwarded]).returncode
 
 
 if __name__ == "__main__":

@@ -27,6 +27,8 @@ import importlib
 import os
 import sys
 
+from codebase_mapper.shared_kernel.settings import load_env
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # command → (module under scripts/, one-line description shown in usage)
@@ -63,6 +65,7 @@ def _load_command(name: str):
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] in ("-h", "--help"):
         print(_usage(), end="")

@@ -644,7 +644,9 @@ def _concept_name_from_uri(uri: str) -> str | None:
 
 
 def _bundles_root() -> Path:
-    return Path(os.environ.get("CBM_BUNDLES_ROOT", "_tmp")).resolve()
+    from codebase_mapper.shared_kernel import settings as cbm_settings
+
+    return cbm_settings.bundles_root()
 
 
 def _validate_bundle_name(name: str) -> None:
