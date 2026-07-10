@@ -125,6 +125,32 @@ def test_seeded_violations_agree_with_pyshacl(healthy_graph, idx):
     assert violations, "a violation must name what failed"
 
 
+def test_min_length_agrees_with_pyshacl():
+    # sh:minLength is used by the L4 plugin's contributed shapes; the two
+    # engines must agree on it or a with-L4 emit silently falls back to
+    # pyshacl and the run manifests diverge (verify_llm_enrich check 2).
+    from rdflib import Graph, RDF
+    from rdflib.namespace import SH
+    shapes = Graph()
+    shape = URIRef("https://example.org/S")
+    shapes.add((shape, RDF.type, SH.NodeShape))
+    shapes.add((shape, SH.targetClass, CBM.File))
+    prop = URIRef("https://example.org/p")
+    shapes.add((shape, SH.property, prop))
+    shapes.add((prop, SH.path, CBM.path))
+    shapes.add((prop, SH.minLength, Literal(1)))
+
+    for path_value, expect in ((Literal("pkg/a.py"), True),
+                               (Literal(""), False)):
+        data = Graph()
+        f = URIRef(f"{CBMI_NS}file/pkg%2Fa.py")
+        data.add((f, RDF.type, CBM.File))
+        data.add((f, CBM.path, path_value))
+        fast_conforms, violations = validate_fast(data, shapes)
+        assert fast_conforms == _pyshacl(data, shapes)
+        assert fast_conforms is expect, violations
+
+
 def test_unsupported_shacl_feature_raises():
     from rdflib import Graph, RDF
     from rdflib.namespace import SH

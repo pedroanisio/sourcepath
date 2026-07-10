@@ -8,7 +8,7 @@ shapes use —
 
     sh:targetClass · sh:targetSubjectsOf · sh:property · sh:path ·
     sh:minCount · sh:maxCount · sh:datatype · sh:class · sh:in ·
-    sh:hasValue · sh:pattern · sh:minInclusive
+    sh:hasValue · sh:pattern · sh:minInclusive · sh:minLength
 
 — and RAISES on anything else (``UnsupportedShaclFeature``), so a shape
 evolution that outruns the engine fails loudly instead of passing silently.
@@ -33,7 +33,7 @@ class UnsupportedShaclFeature(Exception):
 
 _SUPPORTED_PROP_KEYS = {
     SH.path, SH.minCount, SH.maxCount, SH.datatype, SH.hasValue,
-    SH.pattern, SH.minInclusive,
+    SH.pattern, SH.minInclusive, SH.minLength,
     URIRef(str(SH) + "class"), URIRef(str(SH) + "in"),
 }
 _SUPPORTED_SHAPE_KEYS = {
@@ -72,6 +72,8 @@ def _parse_shapes(shapes: Graph) -> list[dict]:
                     spec["pattern"] = re.compile(str(o))
                 elif p == SH.minInclusive:
                     spec["min_inclusive"] = o.toPython()
+                elif p == SH.minLength:
+                    spec["min_length"] = int(o)
                 elif p == URIRef(str(SH) + "class"):
                     spec["cls"] = o
                 elif p == URIRef(str(SH) + "in"):
@@ -163,4 +165,14 @@ def validate_fast(data: Graph, shapes: Graph) -> tuple[bool, list[str]]:
                             violations.append(
                                 f"{node} {path}: {v} < minInclusive "
                                 f"{spec['min_inclusive']}")
+                if "min_length" in spec:
+                    for v in values:
+                        # SHACL MinLengthConstraintComponent: length of the
+                        # string representation; always fails a blank node.
+                        if isinstance(v, (Literal, URIRef)) \
+                                and len(str(v)) >= spec["min_length"]:
+                            continue
+                        violations.append(
+                            f"{node} {path}: {str(v)[:60]!r} shorter than "
+                            f"minLength {spec['min_length']}")
     return not violations, violations
