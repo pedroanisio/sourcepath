@@ -156,21 +156,39 @@ def main(argv: list[str] | None = None) -> int:
         subprocess.run(["git", "clone", "--bare", str(deep), str(deep_bare)], check=True)
         deep_url = deep_bare.resolve().as_uri()
 
+        # E5 (docs/plan/error-free-mapping.md): correct provenance is the
+        # default — the depth-1 transfer is followed by a blob-free history
+        # deepen, so full commit history exists without opting in. The
+        # shallow-transfer property survives behind CBM_UNSHALLOW=0.
         with resolve_repo_source(deep_url, "HEAD") as c:
             is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
             count = git_out(c.path, "rev-list", "--count", "HEAD")
             head_v = (c.path / "a.py").read_text()
             check(
-                "HEAD clone is shallow (depth 1, single commit)",
-                is_shallow == "true" and count == "1",
+                "HEAD clone recovers full history by default (E5)",
+                is_shallow == "false" and int(count) > 1,
                 f"is_shallow={is_shallow} count={count}",
             )
             check("HEAD clone checks out the latest commit", head_v == "V = 3\n", head_v)
 
+        os.environ["CBM_UNSHALLOW"] = "0"
+        try:
+            with resolve_repo_source(deep_url, "HEAD") as c:
+                is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
+                count = git_out(c.path, "rev-list", "--count", "HEAD")
+                check(
+                    "CBM_UNSHALLOW=0 opts out: depth-1 single-commit clone",
+                    is_shallow == "true" and count == "1",
+                    f"is_shallow={is_shallow} count={count}",
+                )
+        finally:
+            del os.environ["CBM_UNSHALLOW"]
+
         with resolve_repo_source(deep_url, "v1") as c:
             is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
             tag_v = (c.path / "a.py").read_text()
-            check("tag --state is shallow-cloned directly", is_shallow == "true", is_shallow)
+            check("tag --state deepens to full history by default (E5)",
+                  is_shallow == "false", is_shallow)
             check("tag --state checks out the tagged tree", tag_v == "V = 2\n", tag_v)
 
         with resolve_repo_source(deep_url, first_sha) as c:
