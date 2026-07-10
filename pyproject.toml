@@ -35,6 +35,11 @@ dependencies = [
     "tree-sitter-typescript",
     "numpy>=2.0,<3.0",
     "sentence-transformers>=3.0,<6.0",
+    # Canonical SHACL shape model (shared_kernel/shacl_spec.py): the emitter
+    # and every plugin shape contributor declare NodeShapeSpec/PropertySpec
+    # instances validated at construction time. Same pin as the frontend
+    # extra / Docker requirements (H8 mirror).
+    "pydantic>=2.7,<3.0",
     # Rust-backed RDF engine for inventory serialization: 67M triples
     # (torvalds/linux) serialize to Turtle in ~40 s / ~24 GB vs tens of
     # minutes / >100 GB via rdflib alone. emit() degrades gracefully to
@@ -74,6 +79,12 @@ dev = [
     "types-PyYAML",
     # tests/verify_report_spec.py validates the reporting contract schema.
     "jsonschema",
+    # The pytest tree (make test-units / test-backend) was previously
+    # runnable only where pytest happened to be installed ad hoc; CI's lint
+    # job even pip-installed it by hand. Declared here so `make install`
+    # yields a complete test environment.
+    "pytest",
+    "pytest-cov",
     "codebase-mapper[frontend]",
 ]
 site = [
