@@ -91,6 +91,12 @@ def load_env(path: Path | None = None, *, override: bool = False) -> dict[str, s
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
+        if not value:
+            # `KEY=` is a placeholder (an .env copied from .env.example),
+            # not a value: exporting "" would make every consumer see the
+            # variable as set-but-empty and silently disable its documented
+            # unset-fallback (e.g. CORS default origins, CBM_UNSHALLOW).
+            continue
         if override or key not in os.environ:
             os.environ[key] = value
             applied[key] = value
