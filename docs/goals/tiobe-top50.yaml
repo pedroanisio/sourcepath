@@ -1,0 +1,262 @@
+# Language-support goal registry — TIOBE top 50, cumulative since 2026.
+#
+# Policy: languages are only ever ADDED to this file (any language that
+# appears in a TIOBE top 50 from 2026 onward stays in the goal set).
+# `status` is the ledger this repo commits to; tests/verify_language_goal.py
+# probes the codebase mechanically and fails on any drift between the two,
+# in either direction. Update deliberately via `--fill`.
+meta:
+  source: https://www.tiobe.com/tiobe-index/
+  snapshot: "2026-07"
+  policy: cumulative-since-2026
+languages:
+  - tiobe_name: "Python"
+    tiobe_rank_at_first_seen: 1
+    first_seen: "2026-07"
+    mapper_key: python
+    status: first_class
+  - tiobe_name: "C"
+    tiobe_rank_at_first_seen: 2
+    first_seen: "2026-07"
+    mapper_key: c
+    status: first_class
+  - tiobe_name: "C++"
+    tiobe_rank_at_first_seen: 3
+    first_seen: "2026-07"
+    mapper_key: cpp
+    status: first_class
+  - tiobe_name: "Java"
+    tiobe_rank_at_first_seen: 4
+    first_seen: "2026-07"
+    mapper_key: java
+    status: partial
+  - tiobe_name: "C#"
+    tiobe_rank_at_first_seen: 5
+    first_seen: "2026-07"
+    mapper_key: csharp
+    status: detected
+  - tiobe_name: "JavaScript"
+    tiobe_rank_at_first_seen: 6
+    first_seen: "2026-07"
+    mapper_key: javascript
+    status: first_class
+  - tiobe_name: "Visual Basic"
+    tiobe_rank_at_first_seen: 7
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "SQL"
+    tiobe_rank_at_first_seen: 8
+    first_seen: "2026-07"
+    mapper_key: sql
+    status: detected
+  - tiobe_name: "R"
+    tiobe_rank_at_first_seen: 9
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Rust"
+    tiobe_rank_at_first_seen: 10
+    first_seen: "2026-07"
+    mapper_key: rust
+    status: first_class
+  - tiobe_name: "Delphi/Object Pascal"
+    tiobe_rank_at_first_seen: 11
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Scratch"
+    tiobe_rank_at_first_seen: 12
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Go"
+    tiobe_rank_at_first_seen: 13
+    first_seen: "2026-07"
+    mapper_key: go
+    status: first_class
+  - tiobe_name: "PHP"
+    tiobe_rank_at_first_seen: 14
+    first_seen: "2026-07"
+    mapper_key: php
+    status: detected
+  - tiobe_name: "Swift"
+    tiobe_rank_at_first_seen: 15
+    first_seen: "2026-07"
+    mapper_key: swift
+    status: first_class
+  - tiobe_name: "Ada"
+    tiobe_rank_at_first_seen: 16
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Assembly language"
+    tiobe_rank_at_first_seen: 17
+    first_seen: "2026-07"
+    mapper_key: asm
+    status: partial
+  - tiobe_name: "MATLAB"
+    tiobe_rank_at_first_seen: 18
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Fortran"
+    tiobe_rank_at_first_seen: 19
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Ruby"
+    tiobe_rank_at_first_seen: 20
+    first_seen: "2026-07"
+    mapper_key: ruby
+    status: first_class
+  - tiobe_name: "Classic Visual Basic"
+    tiobe_rank_at_first_seen: 21
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Perl"
+    tiobe_rank_at_first_seen: 22
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "COBOL"
+    tiobe_rank_at_first_seen: 23
+    first_seen: "2026-07"
+    mapper_key: cobol
+    status: partial
+  - tiobe_name: "Prolog"
+    tiobe_rank_at_first_seen: 24
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "SAS"
+    tiobe_rank_at_first_seen: 25
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "LabVIEW"
+    tiobe_rank_at_first_seen: 26
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Julia"
+    tiobe_rank_at_first_seen: 27
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Kotlin"
+    tiobe_rank_at_first_seen: 28
+    first_seen: "2026-07"
+    mapper_key: kotlin
+    status: first_class
+  - tiobe_name: "VBScript"
+    tiobe_rank_at_first_seen: 29
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Objective-C"
+    tiobe_rank_at_first_seen: 30
+    first_seen: "2026-07"
+    mapper_key: objective-c
+    status: first_class
+  - tiobe_name: "GML"
+    tiobe_rank_at_first_seen: 31
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Dart"
+    tiobe_rank_at_first_seen: 32
+    first_seen: "2026-07"
+    mapper_key: dart
+    status: first_class
+  - tiobe_name: "Lisp"
+    tiobe_rank_at_first_seen: 33
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Lua"
+    tiobe_rank_at_first_seen: 34
+    first_seen: "2026-07"
+    mapper_key: lua
+    status: detected
+  - tiobe_name: "PL/SQL"
+    tiobe_rank_at_first_seen: 35
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "OCaml"
+    tiobe_rank_at_first_seen: 36
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Transact-SQL"
+    tiobe_rank_at_first_seen: 37
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Caml"
+    tiobe_rank_at_first_seen: 38
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "ML"
+    tiobe_rank_at_first_seen: 39
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "ABAP"
+    tiobe_rank_at_first_seen: 40
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "D"
+    tiobe_rank_at_first_seen: 41
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "VHDL"
+    tiobe_rank_at_first_seen: 42
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Ladder Logic"
+    tiobe_rank_at_first_seen: 43
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "X++"
+    tiobe_rank_at_first_seen: 44
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "PowerShell"
+    tiobe_rank_at_first_seen: 45
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Haskell"
+    tiobe_rank_at_first_seen: 46
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "TypeScript"
+    tiobe_rank_at_first_seen: 47
+    first_seen: "2026-07"
+    mapper_key: typescript
+    status: first_class
+  - tiobe_name: "Zig"
+    tiobe_rank_at_first_seen: 48
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "Scala"
+    tiobe_rank_at_first_seen: 49
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none
+  - tiobe_name: "CFML"
+    tiobe_rank_at_first_seen: 50
+    first_seen: "2026-07"
+    mapper_key: null
+    status: none

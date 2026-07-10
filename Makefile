@@ -160,6 +160,12 @@ test-llm-online: ## L4 verifiers that REQUIRE a reachable Ollama instance.
 .PHONY: test-llm
 test-llm: test-llm-offline test-llm-online ## All L4 verifiers (offline + online).
 
+.PHONY: check
+check: ## Goal + drift gate: TIOBE-50 language-support ledger, then the drift verifiers.
+	@echo "== tests/verify_language_goal.py =="
+	@$(PYTHON) $(TESTS_DIR)/verify_language_goal.py || exit $$?
+	@for v in $(DRIFT_VERIFIERS); do echo "== $$v =="; $(PYTHON) $$v || exit $$?; done
+
 .PHONY: test-drift
 test-drift: ## Drift-risk checks (P1/P2/P3) + shape coverage + dep hygiene.
 	@for v in $(DRIFT_VERIFIERS); do echo "== $$v =="; $(PYTHON) $$v || exit $$?; done

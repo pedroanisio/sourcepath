@@ -11,6 +11,25 @@ and infers tests/dependency edges. The pipeline runs through a registry of
 pluggable extension points; companion plugins layer chunks/embeddings and a
 concept graph on top.
 
+## Goals
+
+**Fully support the TIOBE index top 50 languages, cumulative since 2026.**
+Any language that appears in a TIOBE top 50 from 2026 onward joins the goal
+set permanently ([docs/goals/tiobe-top50.yaml](./docs/goals/tiobe-top50.yaml)
+— baseline: the July 2026 index). "Fully support" means first-class per
+[docs/SPEC_FIRST_CLASS_LANGUAGE.md](./docs/SPEC_FIRST_CLASS_LANGUAGE.md):
+detection, AST analyzer, import resolver, symbol-level chunking, LLM summary
+eligibility, and a test suite.
+
+Progress is not claimed in prose — it is measured. `make check` probes the
+codebase mechanically and holds it against the committed ledger, failing on
+fabricated support, stale ledger entries, and regressions of already-shipped
+languages:
+
+```bash
+make check   # language-goal ledger + drift + schema-shape verifiers
+```
+
 ## Layout
 
 ```
@@ -227,7 +246,7 @@ computation vs unverified LLM output) under the shared
 "Evidence basis & confidence" framing; the declarative reporting contract
 lives in [docs/reporting/](docs/reporting/) (30-component catalog + JSON
 Schema, pinned by `tests/verify_report_spec.py`). Authored narrative reports
-and their workflow live in [docs/reports/](docs/reports/README.md).
+and their workflow live in `docs/reports/` (gitignored deliverables).
 
 ## Decompose & recompose
 
@@ -418,6 +437,7 @@ python tests/verify_regenerate.py           # TTL+AST regenerate (Python semanti
 python tests/verify_cpp.py                  # C++ classifier/analyzer/xref coverage
 python tests/verify_dart.py                 # Dart analyzer/xref/generated-file coverage
 python tests/verify_dependency_hygiene.py   # dependency hygiene regression guard
+python tests/verify_language_goal.py        # TIOBE-50 goal ledger vs probed language support
 python tests/verify_doc_hygiene.py         # README disclaimer + active Markdown local links
 python tests/verify_excludes.py             # --exclude flag + .cbmignore behavior
 python tests/verify_java.py                 # Java analyzer/xref coverage

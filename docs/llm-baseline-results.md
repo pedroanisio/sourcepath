@@ -22,10 +22,10 @@ disclaimer:
   125 GB RAM, 1.3 TB disk.
 - **Ollama**: official Linux installer; service running at
   `localhost:11434` under systemd.
-- **Bundle under test**: [_tmp/code-mapper/](../_tmp/code-mapper/) —
+- **Bundle under test**: `_tmp/code-mapper/` (gitignored) —
   the fresh re-emit produced at the end of Stage 8 of the vocabulary
   absorption (68 files, 1,825 concepts, 25 of them curated).
-- **Harness**: [_tmp/llm_baseline_bench.py](../_tmp/llm_baseline_bench.py)
+- **Harness**: `_tmp/llm_baseline_bench.py`
   (gitignored; the harness lives only on this POC branch).
 
 Inputs were chosen deterministically so every model saw the same
