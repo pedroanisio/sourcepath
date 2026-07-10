@@ -197,12 +197,16 @@ def _scan_env_reads() -> set[str]:
     # _workers_from_env("CBM_EXTRACT_WORKERS", default).
     helper_re = re.compile(r'_from_env\(\s*["\']([A-Z][A-Z0-9_]*)["\']')
     # ALSO follow MODULE_LEVEL constants like JWT_AUDIENCE_ENV = "CBM_..."
-    # consumed via os.environ.get(NAME). MULTILINE so `^` anchors to each
-    # line, not just the start of the file.
+    # or MODEL_ENV_VAR = "CBM_..." consumed via os.environ.get(NAME).
+    # MULTILINE so `^` anchors to each line, not just the start of the file.
     indirect_re = re.compile(
-        r'^\s*([A-Z][A-Z0-9_]*_ENV)\s*=\s*"([A-Z][A-Z0-9_]*)"',
+        r'^\s*([A-Z][A-Z0-9_]*(?:_ENV|_ENV_VAR))\s*=\s*"([A-Z][A-Z0-9_]*)"',
         re.MULTILINE,
     )
+    # ALSO catch dynamic env-var *families* built with f-strings, e.g.
+    # key = f"CBM_MCP_TIMEOUT_{tool.upper()}". A family is reported as the
+    # wildcard "PREFIX*" and documented in .env.example the same way.
+    family_re = re.compile(r'f"(CBM_[A-Z0-9_]*_)\{')
 
     indirect_alias: dict[str, str] = {}
     for path in REPO_ROOT.rglob("*.py"):
@@ -219,9 +223,22 @@ def _scan_env_reads() -> set[str]:
             found.add(m.group(1))
         for m in indirect_re.finditer(text):
             indirect_alias[m.group(1)] = m.group(2)
+        if "os.environ" in text:
+            for m in family_re.finditer(text):
+                found.add(m.group(1) + "*")
+
+    # Rust reads count too: tools/ crates consume the same deployment env
+    # (drift-risk H7 — CBM_REPORT_FONT_DIR was read only in canvas.rs).
+    rust_re = re.compile(r'env::var\(\s*"([A-Z][A-Z0-9_]*)"')
+    for path in (REPO_ROOT / "tools").rglob("*.rs"):
+        if "target" in path.parts:
+            continue
+        for m in rust_re.finditer(path.read_text(errors="ignore")):
+            found.add(m.group(1))
 
     # Resolve indirect aliases: os.environ.get(JWT_AUDIENCE_ENV) → CBM_MCP_JWT_AUDIENCE
-    indirect_use_re = re.compile(r'os\.environ(?:\.get)?\(([A-Z][A-Z0-9_]*_ENV)\b')
+    indirect_use_re = re.compile(
+        r'os\.environ(?:\.get)?\(([A-Z][A-Z0-9_]*(?:_ENV|_ENV_VAR))\b')
     for path in REPO_ROOT.rglob("*.py"):
         if any(part in {"__pycache__", ".venv", "_tmp", "node_modules", ".claude"}
                for part in path.parts):
@@ -280,11 +297,12 @@ def check_env_inventory() -> None:
 # each one is on the allowlist when adding.
 ROUTES_WITHOUT_RESPONSE_MODEL_OK: set[str] = {
     # Returns a raw {sha256, text} envelope with truncated blob content;
-    # not part of the typed UI surface (the UI fetches blobs directly).
+    # not part of the typed UI surface (the UI fetches blobs directly and
+    # api.ts declares no type for it).
     "/api/chunk-blob/{sha}",
-    # Returns a chunk-shaped dict whose fields vary by chunk kind. Worth
-    # typing in a follow-up; not flagged in drift-risk-map.md.
-    "/api/chunk/{idx}",
+    # /api/chunk/{idx} gained ChunkDetailResp (drift-risk-map C1) and left
+    # this list; field parity with api.ts::ChunkDetail is enforced by
+    # tests/verify_api_field_parity.py.
     # Liveness probe; intentionally raw.
     "/api/healthz",
 }

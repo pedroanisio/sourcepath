@@ -13,9 +13,17 @@ mechanical L1 graph only; positions, frontiers, and stress scores are
 derived views and the rendered page discloses them as such, together with
 every truncation (roll-up depth, road cap, dropped chart-less edges).
 
+A second renderer, ``--style tolkien``, draws the *same* payload as a 2D
+hand-drawn fantasy chart (self-contained SVG on parchment): peaks are chunk
+density, settlements are directory groups sized by chunks, roads are the
+strongest import edges, dotted frontiers separate top-level realms, crossed
+swords mark high-stress routes and wyrms mark import cycles. The identical
+epistemic disclosures apply and are printed on the chart itself.
+
 Usage:
     python scripts/cbm_terrain.py --bundle _tmp/<repo> [--out map.html]
-        [--max-segments N | 0=auto] [--max-points 4000] [--roads 600]
+        [--style terrain|tolkien] [--max-segments N | 0=auto]
+        [--max-points 4000] [--roads 600]
         [--grid 280x196] [--seed 42] [--title <Display Name>]
 
 Determinism: the projection is seeded (default 42) so a repo's geography
@@ -39,7 +47,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from decomposer.metrics import build_order, cycles as graph_cycles  # noqa: E402
 
-TEMPLATE_PATH = Path(__file__).parent / "site_assets" / "terrain_template.html"
+TEMPLATES = {
+    "terrain": Path(__file__).parent / "site_assets" / "terrain_template.html",
+    "tolkien": Path(__file__).parent / "site_assets" / "tolkien_template.html",
+}
+TEMPLATE_PATH = TEMPLATES["terrain"]  # default for render_html(template_text=None)
 ROOT = "(root)"
 
 
@@ -293,7 +305,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--bundle", required=True, type=Path,
                    help="Bundle directory (contains run_manifest.json).")
     p.add_argument("--out", type=Path, default=None,
-                   help="Output HTML path (default: <bundle>/<repo>-terrain.html).")
+                   help="Output HTML path (default: <bundle>/<repo>-<style>.html).")
+    p.add_argument("--style", choices=sorted(TEMPLATES), default="terrain",
+                   help="Output renderer: 'terrain' = WebGL2 3D terrain "
+                        "(default); 'tolkien' = 2D hand-drawn fantasy chart "
+                        "(pan/zoom SVG, same payload & disclosures).")
     p.add_argument("--max-segments", type=int, default=0,
                    help="Directory roll-up depth; 0 = deepest that keeps "
                         "groups under --max-points (default).")
@@ -325,10 +341,14 @@ def main(argv: list[str] | None = None) -> int:
         ids=ids, vectors=vectors, manifest=manifest, repo=repo,
         max_segments=max_seg, grid=(gw, gh),
         frontier_grid=(gw // 2, gh // 2), roads=args.roads, seed=args.seed)
-    html = render_html(payload, repo_title=args.title or repo.capitalize())
-    out = args.out or (args.bundle / f"{repo}-terrain.html")
+    template = TEMPLATES[args.style]
+    if not template.exists():
+        p.error(f"template for --style {args.style} not found: {template}")
+    html = render_html(payload, repo_title=args.title or repo.capitalize(),
+                       template_text=template.read_text())
+    out = args.out or (args.bundle / f"{repo}-{args.style}.html")
     out.write_text(html)
-    print(f"wrote terrain map -> {out} "
+    print(f"wrote {args.style} map -> {out} "
           f"({len(html) // 1024} KB, {payload['meta']['modules']} settlements, "
           f"{len(payload['graph']['edges'])} edges, "
           f"{payload['meta']['layers']} layers)", file=sys.stderr)

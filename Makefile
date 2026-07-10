@@ -35,7 +35,10 @@ DRIFT_VERIFIERS := \
 	$(TESTS_DIR)/verify_drift_p3.py \
 	$(TESTS_DIR)/verify_shape_coverage.py \
 	$(TESTS_DIR)/verify_dependency_hygiene.py \
-	$(TESTS_DIR)/verify_report_spec.py
+	$(TESTS_DIR)/verify_report_spec.py \
+	$(TESTS_DIR)/verify_api_field_parity.py \
+	$(TESTS_DIR)/verify_report_predicates.py \
+	$(TESTS_DIR)/verify_report_rs_contract.py
 
 CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_roundtrip.py \

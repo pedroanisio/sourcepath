@@ -76,6 +76,18 @@ def test_load_env_parses_comments_blanks_quotes_and_export(tmp_path, clean_env):
     assert os.environ["DQUOTED"] == "quoted value"
 
 
+def test_load_env_skips_blank_placeholder_values(tmp_path, clean_env):
+    """`KEY=` lines (an .env copied from .env.example) must not export empty
+    strings — set-but-empty silently disables documented unset-fallbacks
+    (CORS default origins, unshallow provenance, …)."""
+    env = tmp_path / ".env"
+    env.write_text("BLANK=\nQUOTED_BLANK=''\nREAL=x\n")
+    applied = settings.load_env(env)
+    assert applied == {"REAL": "x"}
+    assert "BLANK" not in os.environ
+    assert "QUOTED_BLANK" not in os.environ
+
+
 def test_load_env_never_overrides_real_environment(tmp_path, clean_env):
     os.environ["PLAIN"] = "from-real-env"
     env = tmp_path / ".env"

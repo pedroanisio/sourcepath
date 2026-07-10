@@ -156,26 +156,38 @@ def main(argv: list[str] | None = None) -> int:
         subprocess.run(["git", "clone", "--bare", str(deep), str(deep_bare)], check=True)
         deep_url = deep_bare.resolve().as_uri()
 
+        # Operator decision (2026-07-10, reverting plan E5): shallow depth-1
+        # transfer is the default; CBM_UNSHALLOW=1 opts into the blob-free
+        # history deepen. Staying shallow is disclosed as a git_provenance
+        # degradation by the pipeline.
         with resolve_repo_source(deep_url, "HEAD") as c:
             is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
             count = git_out(c.path, "rev-list", "--count", "HEAD")
             head_v = (c.path / "a.py").read_text()
-            # E5 (error-free-mapping plan): the clone starts --depth 1 and
-            # then deepens history blob-free BY DEFAULT, so commit-time
-            # provenance is correct without opting in (CBM_UNSHALLOW=0 is
-            # the opt-out for air-gapped runs).
             check(
-                "HEAD clone recovers full history by default",
-                is_shallow == "false" and count != "1",
+                "HEAD clone is shallow by default (depth 1, single commit)",
+                is_shallow == "true" and count == "1",
                 f"is_shallow={is_shallow} count={count}",
             )
             check("HEAD clone checks out the latest commit", head_v == "V = 3\n", head_v)
 
+        os.environ["CBM_UNSHALLOW"] = "1"
+        try:
+            with resolve_repo_source(deep_url, "HEAD") as c:
+                is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
+                count = git_out(c.path, "rev-list", "--count", "HEAD")
+                check(
+                    "CBM_UNSHALLOW=1 opts in: blob-free deepen recovers full history",
+                    is_shallow == "false" and int(count) > 1,
+                    f"is_shallow={is_shallow} count={count}",
+                )
+        finally:
+            del os.environ["CBM_UNSHALLOW"]
+
         with resolve_repo_source(deep_url, "v1") as c:
             is_shallow = git_out(c.path, "rev-parse", "--is-shallow-repository")
             tag_v = (c.path / "a.py").read_text()
-            check("tag --state recovers history by default",
-                  is_shallow == "false", is_shallow)
+            check("tag --state is shallow-cloned directly", is_shallow == "true", is_shallow)
             check("tag --state checks out the tagged tree", tag_v == "V = 2\n", tag_v)
 
         with resolve_repo_source(deep_url, first_sha) as c:

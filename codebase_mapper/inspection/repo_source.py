@@ -108,17 +108,17 @@ def _resolve_work_root(work_dir: str | Path | None) -> Path | None:
 
 
 def _unshallow_enabled(unshallow: bool | None) -> bool:
-    """Explicit argument wins; otherwise ``CBM_UNSHALLOW`` decides, and the
-    UNSET default is True (error-free-mapping E5): correct commit-time
-    provenance by default, with ``CBM_UNSHALLOW=0`` as the explicit opt-out
-    for air-gapped or bandwidth-constrained runs. Failure of the deepen is
-    tolerated and disclosed via the git_provenance degradation."""
+    """Explicit argument wins; otherwise ``CBM_UNSHALLOW`` opts IN.
+
+    Operator decision (2026-07-10, reverting plan E5's opt-out default):
+    an unset variable keeps the fast depth-1 clone; 1/true/yes attempts
+    the blob-free history deepen. Staying shallow is a disclosed
+    degradation — the pipeline omits ``git_commit_time`` and records
+    ``git_provenance`` instead of fabricating times from the tip commit.
+    """
     if unshallow is not None:
         return unshallow
-    raw = os.environ.get("CBM_UNSHALLOW", "").strip().lower()
-    if not raw:
-        return True
-    return raw in {"1", "true", "yes"}
+    return os.environ.get("CBM_UNSHALLOW", "").strip().lower() in {"1", "true", "yes"}
 
 
 def _try_unshallow(clone_dir: Path) -> None:
