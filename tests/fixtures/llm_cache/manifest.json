@@ -1,18 +1,18 @@
 {
   "expected": {
     "by_kind": {
-      "concept_description": 3,
+      "concept_description": 12,
       "file_summary": 3,
       "schema_purpose": 1
     },
-    "n_enrichments": 7,
+    "n_enrichments": 16,
     "shacl_conforms": true
   },
   "instructions": "Regenerate with `python tests/fixtures/llm_cache/regenerate.py` when a prompt SHA, default model, or cache schema version changes. See verify_llm_enrich_ci_determinism.py for the consumer-side contract.",
   "model": "qwen2.5-coder:7b",
   "regenerated_with": {
     "tool_version": "0.5.0",
-    "vocabulary_version": "v1"
+    "vocabulary_version": "v2"
   },
   "scopes": [
     "files",
