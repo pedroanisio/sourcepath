@@ -90,7 +90,22 @@ LANG_BY_EXT = {
     ".sh": "shell", ".bash": "shell", ".zsh": "shell",
     ".html": "html", ".css": "css", ".scss": "scss",
     ".sql": "sql", ".lua": "lua",
+    # error-free-mapping E2: the measured unlanguaged families. Language
+    # tagging is decoupled from AST support — a correct census needs no
+    # parser; asm/devicetree/kconfig/make get line-oriented extractors.
+    ".yaml": "yaml", ".yml": "yaml",
+    ".json": "json",
+    ".rst": "restructuredtext",
+    ".txt": "text",
+    ".s": "asm",  # .S normalizes to .s (suffix lookups lowercase)
+    ".dts": "devicetree", ".dtsi": "devicetree", ".dtso": "devicetree",
+    ".mk": "make",
 }
+
+#: Languages that are data or prose, not executable code. They get a
+#: language for census correctness but must not trip code-shaped rules
+#: (e.g. a YAML fixture under tests/ is not test_code).
+DATA_DOC_LANGUAGES = frozenset({"yaml", "json", "restructuredtext", "text"})
 
 ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
              ".woff", ".woff2", ".ttf", ".otf", ".eot",

@@ -17,6 +17,7 @@ from ...shared_kernel.extensions import (
     iter_artifact_emitters, iter_graph_contributors, iter_shape_contributors,
 )
 from ..infrastructure.rdf.fast_serializer import serialize_inventory
+from ...shared_kernel.json_safety import dump_ast_summary
 from ..infrastructure.rdf.rdflib_emitter import (
     build_inventory_graph,
     build_ontology_mapping_graph,
@@ -61,13 +62,26 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
         emit_jsonld = True if env is None else env
     out_dir.mkdir(parents=True, exist_ok=True)
     repo_iri = URIRef(f"{CBMI_NS}repo/{repo_name}")
+    truncated_ast_paths: list[str] = []
     inv = build_inventory_graph(
         repo_iri=repo_iri, commit_sha=mapped["commit"],
         records=mapped["records"], import_edges=mapped["import_edges"],
         import_ext_edges=mapped["import_ext_edges"],
         dep_edges=mapped["dep_edges"], pin_edges=mapped["pin_edges"],
         tests_edges=mapped["tests_edges"],
+        truncated_ast_paths=truncated_ast_paths,
     )
+    if truncated_ast_paths:
+        # Disclosed through manifest["degradations"] below — a CST too deep
+        # to serialize is dropped per-field, never silently (flaw F19).
+        target = mapped.get("ctx")
+        if target is not None:
+            target.scratch.setdefault("degradations", []).append({
+                "component": "emission",
+                "reason": "ast_summary_depth_truncated",
+                "affected_files": len(truncated_ast_paths),
+                "paths_sample": truncated_ast_paths[:10],
+            })
     shapes = build_shacl_graph()
     mapping = build_ontology_mapping_graph()
 
@@ -180,7 +194,7 @@ def emit(repo_name: str, mapped: dict, out_dir: Path,
     for r in mapped["records"]:
         if r.ast_summary is None:
             continue
-        ast_summary_total_bytes += len(json.dumps(r.ast_summary, sort_keys=True))
+        ast_summary_total_bytes += len(dump_ast_summary(r.ast_summary)[0])
         if r.language == "python" and r.ast_summary.get("ast_json") is not None:
             ast_full_bodies_python += 1
         elif (r.language in ("typescript", "javascript")

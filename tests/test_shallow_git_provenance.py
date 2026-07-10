@@ -173,13 +173,30 @@ def _make_bare(src: Path, tmp_path: Path) -> Path:
     return bare
 
 
-def test_resolve_repo_source_default_stays_shallow(full_repo, tmp_path, monkeypatch):
+def test_resolve_repo_source_default_recovers_history(full_repo, tmp_path, monkeypatch):
+    """E5 (error-free-mapping plan): correct provenance is the default.
+
+    An unset CBM_UNSHALLOW attempts the blob-free history deepen, so
+    per-file commit times exist without opting in; omission remains only
+    as the disclosed fallback when the fetch fails."""
     from codebase_mapper.inspection.git_plumbing import is_shallow_repository
     from codebase_mapper.inspection.repo_source import resolve_repo_source
 
     monkeypatch.delenv("CBM_UNSHALLOW", raising=False)
     bare = _make_bare(full_repo, tmp_path)
     with resolve_repo_source(bare.as_uri(), "HEAD", work_dir=tmp_path / "w1") as c:
+        assert is_shallow_repository(c.path) is False
+        times = list_commit_times(c.path, "HEAD")
+        assert times["app.py"] == TS2
+
+
+def test_resolve_repo_source_optout_forces_shallow(full_repo, tmp_path, monkeypatch):
+    from codebase_mapper.inspection.git_plumbing import is_shallow_repository
+    from codebase_mapper.inspection.repo_source import resolve_repo_source
+
+    monkeypatch.setenv("CBM_UNSHALLOW", "0")
+    bare = _make_bare(full_repo, tmp_path)
+    with resolve_repo_source(bare.as_uri(), "HEAD", work_dir=tmp_path / "w0") as c:
         assert is_shallow_repository(c.path) is True
 
 

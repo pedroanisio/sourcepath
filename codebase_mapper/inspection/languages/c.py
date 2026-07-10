@@ -12,6 +12,9 @@ _DECL_KINDS = (
     "function_definition", "declaration",
     "struct_specifier", "union_specifier", "enum_specifier",
     "type_definition",
+    # Macro definitions ARE symbols — a kernel-style header of #defines
+    # previously extracted zero items (plan E3: 7,380 silent-zero files).
+    "preproc_def", "preproc_function_def",
 )
 _AGGREGATE_KIND = {
     "struct_specifier": "struct", "union_specifier": "union",
@@ -136,6 +139,17 @@ def _collect_c_items(root, content: bytes) -> list[dict]:
             declarator = node.child_by_field_name("declarator")
             fd = _c_unwrap_to_function_declarator(declarator) if declarator is not None else None
             if fd is None:
+                # Not a callable: a top-level object declaration (extern or
+                # otherwise) is still a symbol (plan E3) — a header of
+                # `extern struct alpha_machine_vector alpha_mv;` lines
+                # previously yielded nothing.
+                if nt == "declaration" and declarator is not None:
+                    name = _c_declarator_name(declarator, content)
+                    if name:
+                        item = _c_item("variable", name, node)
+                        item["signature"] = _collapse(
+                            content[node.start_byte:node.end_byte].decode("utf-8", "replace"))
+                        items.append(item)
                 continue
             name = _c_declarator_name(fd.child_by_field_name("declarator"), content)
             if not name:
@@ -143,6 +157,11 @@ def _collect_c_items(root, content: bytes) -> list[dict]:
             item = _c_item("function", name, node)
             item.update(_c_callable_fields(node, node.child_by_field_name("type"), fd, content))
             items.append(item)
+        elif nt in ("preproc_def", "preproc_function_def"):
+            name_node = node.child_by_field_name("name")
+            if name_node is None:
+                continue
+            items.append(_c_item("macro", _node_text(name_node, content), node))
         elif nt in _AGGREGATE_KIND:
             name_node = node.child_by_field_name("name")
             if name_node is None:
@@ -176,7 +195,9 @@ def _collect_c_items(root, content: bytes) -> list[dict]:
     return items
 
 
-def extract_c_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[str]]:
+def extract_c_ast_summary(
+    content: bytes, path: str, macro_table=None,
+) -> tuple[dict | None, list[str]]:
     if not TS_AVAILABLE:
         return None, ["tree_sitter_unavailable"]
     _ts_setup()
@@ -184,6 +205,22 @@ def extract_c_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[
     parser = ts.Parser(lang)
     tree = parser.parse(content)
     errors = parse_error_diagnostics(tree.root_node)
+
+    # E1 retry: when the vanilla grammar chokes and the repo's macro table
+    # is available, re-parse a byte-preserving neutralized buffer and keep
+    # whichever parse has fewer error nodes. Spans stay valid against the
+    # original content; the substitution is disclosed via ``parse_buffer``.
+    neutralized_used = False
+    if errors and macro_table:
+        from ..macro_neutralize import neutralize
+        from ..coverage import parse_error_node_count
+        candidate = neutralize(content, macro_table)
+        if candidate is not content:
+            tree2 = parser.parse(candidate)
+            errors2 = parse_error_diagnostics(tree2.root_node)
+            if parse_error_node_count(errors2) < parse_error_node_count(errors):
+                tree, errors, content = tree2, errors2, candidate
+                neutralized_used = True
     cursor = ts.QueryCursor(_TS_QUERIES["c"])
     captures = cursor.captures(tree.root_node)
 
@@ -210,13 +247,21 @@ def extract_c_ast_summary(content: bytes, path: str) -> tuple[dict | None, list[
     imports.sort(key=lambda x: (x["lineno"], x["source"]))
     items = _collect_c_items(tree.root_node, content)
     items.sort(key=lambda x: (x["line_start"], x["kind"], x["name"]))
-    return {
+    summary = {
         "language": "c",
         "imports": imports,
         "top_level_functions": sorted(set(funcs)),
         "top_level_classes": sorted(set(classes)),
         "items": items,
-    }, errors
+    }
+    if neutralized_used:
+        summary["parse_buffer"] = "macro_neutralized"
+    if not items and not imports:
+        # Zero symbols must be an explained state, never a silent one
+        # (plan E3): with macros/variables now captured, an empty item
+        # list means the file genuinely declares nothing.
+        summary["zero_symbol_reason"] = "no_declarations_found"
+    return summary, errors
 
 def build_c_include_index(paths_set: set[str]) -> dict[str, list[str]]:
     """Basename → every repo path whose final component is that basename.

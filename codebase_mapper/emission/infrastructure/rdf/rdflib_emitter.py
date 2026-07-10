@@ -29,6 +29,7 @@ def _iso_utc(ts: float) -> str:
     return s.replace(".000000Z", "Z")
 
 from ....shared_kernel.constants import CBM, CBMI, CBMI_NS, CBMP, CBMP_NS, CBMT, CBMT_NS, CBM_NS, PHASE_VOCABULARY, SH, SPDX_CORE_NS, SPDX_SOFTWARE_NS, TYPE_VOCABULARY
+from ....shared_kernel.json_safety import dump_ast_summary
 from ....inspection.models import (
     DeclaresDependencyEdge,
     FileRecord,
@@ -65,6 +66,7 @@ def build_inventory_graph(
     import_edges: list[ImportEdge], import_ext_edges: list[ImportExternalEdge],
     dep_edges: list[DeclaresDependencyEdge], pin_edges: list[PinsDependencyEdge],
     tests_edges: list[TestsEdge],
+    truncated_ast_paths: list[str] | None = None,
 ) -> Graph:
     g = Graph()
     g.bind("cbm", CBM); g.bind("cbmt", CBMT); g.bind("cbmp", CBMP)
@@ -90,7 +92,14 @@ def build_inventory_graph(
         for ph in r.phases:
             g.add((f, CBM.hasPhase, phase_iri(ph)))
         if r.ast_summary is not None:
-            g.add((f, CBM.astSummary, _plain(json.dumps(r.ast_summary, sort_keys=True))))
+            # A CST deeper than the recursion ceiling must not kill the
+            # emit at the last step of a completed run (flaw F19); an
+            # out-nested field is stubbed with a disclosed marker and the
+            # path is reported so emit() can register the degradation.
+            text, was_truncated = dump_ast_summary(r.ast_summary)
+            g.add((f, CBM.astSummary, _plain(text)))
+            if was_truncated and truncated_ast_paths is not None:
+                truncated_ast_paths.append(r.path)
         for err in r.extraction_errors:
             g.add((f, CBM.extractionError, _plain(err)))
         if r.atime is not None:

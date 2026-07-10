@@ -6,7 +6,7 @@ import re
 
 from pathlib import Path, PurePosixPath
 
-from ..shared_kernel.constants import ASSET_EXT, DATA_EXT, LANG_BY_EXT, MAN_PAGE_EXTS
+from ..shared_kernel.constants import ASSET_EXT, DATA_DOC_LANGUAGES, DATA_EXT, LANG_BY_EXT, MAN_PAGE_EXTS
 from .languages.objc import dot_m_is_objc
 from .models import FileRecord
 
@@ -127,7 +127,8 @@ def classify(path: str, content_head: bytes) -> str:
     # generic names — 5,161 kernel test files typed source_code (flaw F7).
     if ("tests" in parts or "test" in parts or "__tests__" in parts
             or "spec" in parts or "selftests" in parts):
-        if suffix in LANG_BY_EXT:
+        if suffix in LANG_BY_EXT \
+                and LANG_BY_EXT[suffix] not in DATA_DOC_LANGUAGES:
             return "test_code"
     if re.fullmatch(r"test_.*\.py|.*_test\.py", name):
         return "test_code"
@@ -354,6 +355,15 @@ def language_of(path: str, content_head: bytes = b"") -> str | None:
     # config.ru and Rakefile etc. — extensionless Ruby files
     if lang is None and p.name in {"Rakefile", "Gemfile", "config.ru"}:
         return "ruby"
+    # Name-keyed languages (error-free-mapping E2): Make and Kconfig files
+    # are identified by basename convention, not extension.
+    if lang is None:
+        name = p.name
+        if name.startswith(("Makefile", "GNUmakefile", "makefile")) \
+                or name.startswith("Kbuild"):
+            return "make"
+        if name.startswith("Kconfig"):
+            return "kconfig"
     return lang
 
 def refine_phases(record: FileRecord) -> list[str]:

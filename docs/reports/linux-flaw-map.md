@@ -47,6 +47,8 @@ This work is subject to the methodological caveats and commitments described in 
 | F16 | `linux.html` rendered without the ABox / decomposition / build-plan inputs ("arc4d3 dimensions — absent", 0 parts, 0 rebuild steps) | minor (wiring) | **FIXED 2026-07-09** — missing companions now produce loud caveats; discovery already auto-globs `*abox*.ttl` beside the bundle | no (re-render) |
 | F17 | Test-evidence figures inconsistent across artifacts (139 edges vs 405 typed-import edges vs 5,161 kselftest files; amdgpu.h degree 460 vs 397) | moderate (reconciliation) | **FIXED 2026-07-09** — typed-import fallback is now a pipeline strategy inside `infer_tests_edges` (the canonical number); reports cite it instead of re-deriving | yes |
 | F18 | `linux-architecture-report.pdf` is the pre-refine generation ("UNVERIFIED — PENDING SHACL", D02 Unknown) coexisting with the refined scope-A report (SHACL PASS, D02 High) | minor (housekeeping) | **FIXED 2026-07-09** — moved to `docs/archive/linux-architecture-report-superseded-by-scope-a.pdf` | no |
+| F19 | `emit()` dies with RecursionError on a CST nested past the recursion ceiling (`json.dumps(r.ast_summary)`, `rdflib_emitter.py`) — a completed run lost at its last step | serious | **FIXED 2026-07-10** — `dump_ast_summary()` retries under a raised ceiling, stubs an un-serializable field with a disclosed marker, and emit registers an `ast_summary_depth_truncated` degradation (`tests/test_deep_ast_summary_emit.py`) | re-run emit |
+| F20 | With F1 fixed, the **C++ header retag** claimed the same ~13.5K kernel headers (`cpp: 246 → 13,782` in linux-v23): its project-wide rule needs only one cpp file anywhere + no sibling `.c` | serious | **FIXED 2026-07-10** — pass 2 now requires the header's own C++ content markers (`has_cpp_markers`), mirroring the F1 fix (`tests/test_cpp_header_retag.py`; 42-test cpp verifier green) | yes |
 
 Post-hoc repair (`scripts/cbm_repair.py`, @ `276e70a`) can rebuild
 `run_manifest.json`, `enrichments.jsonl`, `concepts.json` from an existing
@@ -205,6 +207,50 @@ heuristic), and 5,161 kselftest files (PDF/ABox denominator). Also
 table (different metric or pass). Fixing F7 should pick the canonical
 test-evidence derivation (typed-import approach looks strictly better) and
 make every report cite the same numbers.
+
+### F19 — Deep-CST RecursionError kills emit at the last step (fixed 2026-07-10)
+Observed live on a TypeScript re-emit (744 file summaries + 41 concept
+descriptions completed, then `json.dumps(r.ast_summary)` raised
+RecursionError in `build_inventory_graph`): a full-body `cst_json` mirrors
+the parse tree, and one deeply nested expression out-nests Python's
+default ceiling. Fix: `shared_kernel/json_safety.dump_ast_summary()` —
+serialize normally, retry once under a 20,000 ceiling (preserves the
+common overflow band losslessly), and only then stub the offending field
+with `{"omitted": "nesting_exceeds_serialization_depth"}`; the emitter
+collects affected paths and `emit()` registers an
+`emission / ast_summary_depth_truncated` degradation that reaches the
+manifest via the F4 wiring. The byte-count site in `emit_bundle.py` uses
+the same helper.
+
+### F20 — The cpp header retag was F1's twin (fixed 2026-07-10)
+Found by the linux-v23 verification: `objective-c` went to 0 as expected,
+but `c` stayed at 50,012 while `cpp` jumped 246 → 13,782. With the objc
+retag no longer firing, `refine_cpp_header_languages`' project-wide rule
+(any cpp source in the repo + no sibling `.c` → header becomes cpp)
+claimed the same header population — armed by 246 genuine C++ files under
+`tools/`. Less harmful than F1 (the cpp grammar is a C superset, so
+symbols extracted correctly — +78K symbols vs v1), but the census is
+wrong and cpp is outside the L4 allowlist, so those headers still get no
+file summaries. Fix mirrors F1: pass 2 now requires the header's own
+content to carry C++-only markers (`namespace`, `template<`, access
+specifiers, `extern "C++"`…); the sibling rule is unchanged, and genuine
+C++ include/-vs-src/ splits still retag via content evidence.
+
+### linux-v23 verification (2026-07-10)
+Emitted 04:57Z @ `a635d674` after the F1–F18 batch. Deltas vs v1:
+`objective-c` 13,537 → **0**, `matlab` **1**, import edges 91,736 →
+**231,753** (22% → **60%** resolution), `test_code` 626 → **4,763**,
+tests edges 139 → **5,077**, symbols 986,410 → **1,065,186**,
+silent-zero 11,031 → **7,380**, `parse_error_nodes` **354,644** (new),
+manifest `degradations` present (shallow clone disclosed —
+`CBM_UNSHALLOW` was not set), SHACL **conforms**, `emit_engines:
+oxigraph`, concept-embedding gap disclosed (7,394 of 793,210). L4:
+**59 concept descriptions** (24 → 59, the F6 vocabulary working) +
+47,228 file summaries. `cbm-report` recount matches the manifest
+exactly. Two findings: F20 above, and a `cbm-report` parser fix (the F8
+double diagnostic serializes as a JSON-LD array; the crate's
+`extraction_error` field now accepts scalar-or-array — it had silently
+skipped 32,197 file nodes, disclosed by its own skip warning).
 
 ### F18 — Two generations of the dimensional analysis coexist (minor)
 `linux-architecture-report.pdf` is the pre-refine run: cover stamped

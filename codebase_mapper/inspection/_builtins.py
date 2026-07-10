@@ -26,6 +26,10 @@ from .languages.clojure import (
 from .languages.cobol import (
     extract_cobol_ast_summary, resolve_cobol_imports,
 )
+from .languages.lightweight import (
+    extract_asm_summary, extract_devicetree_summary,
+    extract_kconfig_summary, extract_make_summary,
+)
 from .languages.cpp import extract_cpp_ast_summary
 from .languages.dart import extract_dart_ast_summary, resolve_dart_imports
 from .languages.go import (
@@ -154,7 +158,10 @@ class CAnalyzer:
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
-        return extract_c_ast_summary(content, record.path)
+        return extract_c_ast_summary(
+            content, record.path,
+            macro_table=ctx.scratch.get("macro_table"),
+        )
 
 
 class CobolAnalyzer:
@@ -489,10 +496,49 @@ class ClojureResolver:
 # ---------------------------------------------------------------------------
 
 
+class _LightweightAnalyzer:
+    """Shared shape for the E2 line-oriented extractors — no tree-sitter
+    dependency, so ``matches`` never gates on TS_AVAILABLE."""
+    language = ""
+    _extract = None
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == self.language
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return type(self)._extract(content, record.path)
+
+
+class AsmAnalyzer(_LightweightAnalyzer):
+    name = "lang_asm"
+    language = "asm"
+    _extract = staticmethod(extract_asm_summary)
+
+
+class KconfigAnalyzer(_LightweightAnalyzer):
+    name = "lang_kconfig"
+    language = "kconfig"
+    _extract = staticmethod(extract_kconfig_summary)
+
+
+class DevicetreeAnalyzer(_LightweightAnalyzer):
+    name = "lang_devicetree"
+    language = "devicetree"
+    _extract = staticmethod(extract_devicetree_summary)
+
+
+class MakeAnalyzer(_LightweightAnalyzer):
+    name = "lang_make"
+    language = "make"
+    _extract = staticmethod(extract_make_summary)
+
+
 _BUILTIN_ANALYZERS = (
-    CAnalyzer, ClojureAnalyzer, CobolAnalyzer, CppAnalyzer, DartAnalyzer,
-    GoAnalyzer, JavaAnalyzer, KotlinAnalyzer, ObjcAnalyzer, PythonAnalyzer,
-    RubyAnalyzer, RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
+    AsmAnalyzer, CAnalyzer, ClojureAnalyzer, CobolAnalyzer, CppAnalyzer,
+    DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, JavaAnalyzer,
+    KconfigAnalyzer, KotlinAnalyzer, MakeAnalyzer, ObjcAnalyzer,
+    PythonAnalyzer, RubyAnalyzer, RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
     CResolver, ClojureResolver, CobolResolver, CppResolver, DartResolver,

@@ -103,6 +103,7 @@ class FileCoverage:
     symbol_count: int | None
     import_count: int | None
     parse_error_nodes: int = 0
+    zero_reason: str | None = None
 
     @property
     def is_full_body(self) -> bool:
@@ -112,12 +113,15 @@ class FileCoverage:
 
     @property
     def is_silent_zero(self) -> bool:
-        """Clean parse, no AST failure, item-based language, zero symbols
-        — the macro/preprocessor under-capture signal."""
+        """Clean parse, no AST failure, item-based language, zero symbols,
+        and no analyzer-stated reason — the residual under-capture signal.
+        An analyzer that explains its zero (``zero_symbol_reason`` in the
+        ast_summary, plan E3) is not silent."""
         return (
             self.ast_present
             and not self.had_parse_error
             and self.symbol_count == 0
+            and self.zero_reason is None
         )
 
 
@@ -139,6 +143,7 @@ def classify_file_coverage(record: Any) -> FileCoverage:
         symbol_count=count_symbols(ast_summary),
         import_count=_count_imports(ast_summary),
         parse_error_nodes=parse_error_node_count(errors),
+        zero_reason=(ast_summary or {}).get("zero_symbol_reason"),
     )
 
 
@@ -151,6 +156,7 @@ def _empty_lang_bucket() -> dict[str, int]:
         "files_zero_ast": 0,
         "full_body_files": 0,
         "silent_zero_symbol_files": 0,
+        "explained_zero_symbol_files": 0,
         "symbols_extracted": 0,
         "imports_extracted": 0,
         # Total ERROR/missing nodes across flagged files — severity signal
@@ -204,6 +210,8 @@ def aggregate_coverage(records: list, *, max_listed: int = DEFAULT_MAX_LISTED) -
                 b["imports_extracted"] += fc.import_count
             if fc.is_silent_zero:
                 b["silent_zero_symbol_files"] += 1
+            if fc.symbol_count == 0 and fc.zero_reason is not None:
+                b["explained_zero_symbol_files"] += 1
 
         if fc.is_silent_zero:
             silent_files.append({"path": fc.path, "language": lang})

@@ -38,8 +38,11 @@ pub struct GraphNode {
     pub size_bytes: Option<u64>,
     #[serde(rename = "cbm:language")]
     pub language: Option<String>,
+    /// One string in JSON-LD when a node carries a single diagnostic, an
+    /// array when it carries several (e.g. "parse_errors_present" plus the
+    /// quantified "parse_error_nodes:<N>" since flaw-map F8).
     #[serde(rename = "cbm:extractionError")]
-    pub extraction_error: Option<String>,
+    pub extraction_error: Option<OneOrMany<String>>,
     #[serde(rename = "cbm:gitCommitTime")]
     pub git_commit_time: Option<TypedValue>,
     // --- concept fields (skos:Concept) ---
@@ -55,6 +58,24 @@ pub struct GraphNode {
 pub struct TypedValue {
     #[serde(rename = "@value")]
     pub value: String,
+}
+
+/// JSON-LD compacts single-element property arrays to scalars; a property
+/// can therefore arrive as either shape.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> OneOrMany<T> {
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            OneOrMany::One(v) => vec![v],
+            OneOrMany::Many(v) => v,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -205,7 +226,9 @@ impl InventoryStats {
                 *self.bytes_by_language.entry(lang).or_default() += size;
             }
             if let Some(err) = node.extraction_error {
-                *self.extraction_errors.entry(err).or_default() += 1;
+                for e in err.into_vec() {
+                    *self.extraction_errors.entry(e).or_default() += 1;
+                }
             }
             if let Some(t) = node.git_commit_time {
                 if self.distinct_commit_times.len() < MAX_TRACKED_COMMIT_TIMES {
@@ -328,6 +351,21 @@ mod tests {
         assert_eq!(s.distinct_commit_times.len(), 1);
         assert_eq!(s.concept_count, 1);
         assert_eq!(s.top_concepts()[0].label, "mutex");
+    }
+
+    #[test]
+    fn multi_valued_extraction_errors_parse_as_file() {
+        // Since flaw-map F8 a flagged file carries two diagnostics, which
+        // JSON-LD serializes as an array. 32,197 kernel file nodes were
+        // silently skipped when this field only accepted a scalar.
+        let mut s = InventoryStats::default();
+        s.fold(node(
+            r#"{"cbm:path":"fs/ext4/inode.c","cbm:sizeBytes":10,"cbm:language":"c",
+                "cbm:extractionError":["parse_errors_present","parse_error_nodes:37"]}"#,
+        ));
+        assert_eq!(s.file_count, 1);
+        assert_eq!(s.extraction_errors["parse_errors_present"], 1);
+        assert_eq!(s.extraction_errors["parse_error_nodes:37"], 1);
     }
 
     #[test]

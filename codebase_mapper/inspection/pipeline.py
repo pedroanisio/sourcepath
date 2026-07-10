@@ -44,6 +44,7 @@ from .models import (
     PinsDependencyEdge,
 )
 from .tests_edges import infer_tests_edges
+from .macro_neutralize import MacroTable, harvest_macros
 
 _log = logging.getLogger(__name__)
 
@@ -302,7 +303,20 @@ def map_codebase(
     # New refinements (sibling-aware language decisions across files)
     # belong here, before AST extraction.
     refine_objc_header_languages(records, content_by_path.__getitem__)
-    refine_cpp_header_languages(records)
+    refine_cpp_header_languages(records, content_by_path.__getitem__)
+
+    # Pass 1.6: harvest the repo's own #define classification so C-family
+    # extraction can retry a failing parse against a byte-preserving
+    # neutralized buffer (error-free-mapping E1). The table is repo-derived
+    # evidence — no hardcoded macro lists.
+    macro_table = MacroTable()
+    for r in records:
+        if r.language in ("c", "cpp", "objective-c") and r.type_ in (
+                "source_code", "test_code"):
+            content = content_by_path.get(r.path)
+            if content and b"#" in content:
+                harvest_macros(content, macro_table)
+    ctx.scratch["macro_table"] = macro_table
 
     # Pass 2: AST extraction. Analyzer ``matches()`` reads ``rec.language``,
     # so the refinement above must be visible here. Usually the most

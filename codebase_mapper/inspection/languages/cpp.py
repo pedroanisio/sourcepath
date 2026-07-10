@@ -35,8 +35,11 @@ Public surface mirrors the Java module:
 """
 from __future__ import annotations
 
+import re
+
 from collections import defaultdict
 from pathlib import PurePosixPath
+from typing import Callable
 
 from ..models import FileRecord
 from ...ts_setup import _TS_LANGS, _ts_setup, TS_AVAILABLE, parse_error_diagnostics, ts
@@ -580,7 +583,33 @@ def extract_cpp_ast_summary(content: bytes, path: str) -> tuple[dict | None, lis
 # ---------------------------------------------------------------------------
 
 
-def refine_cpp_header_languages(records: list[FileRecord]) -> None:
+#: Positive C++ evidence at the start of a line — constructs plain C can
+#: never contain. Shared C constructs (#include, struct, comments) do NOT
+#: count: this predicate gates the project-wide retag of ``.h`` files that
+#: plain-C headers must never trip (flaw F20: 246 cpp files under the
+#: kernel's tools/ armed the rule and claimed 13,536 pure-C headers).
+_CPP_EVIDENCE_RE = re.compile(
+    rb"(?m)^\s*(?:"
+    rb"namespace\s+\w*\s*\{"
+    rb"|template\s*<"
+    rb"|class\s+\w+[^;{]*[;{:]"
+    rb"|(?:public|private|protected)\s*:"
+    rb"|virtual\s+\w"
+    rb"|extern\s+\"C\+\+\""
+    rb"|using\s+namespace\s"
+    rb")"
+)
+
+
+def has_cpp_markers(content: bytes) -> bool:
+    """True when *content* carries positive C++ evidence."""
+    return _CPP_EVIDENCE_RE.search(content) is not None
+
+
+def refine_cpp_header_languages(
+    records: list[FileRecord],
+    read_content: Callable[[str], bytes] | None = None,
+) -> None:
     """In-place: re-tag ``.h`` files as ``language="cpp"`` based on
     cross-repo evidence of C++ usage.
 
@@ -590,11 +619,14 @@ def refine_cpp_header_languages(records: list[FileRecord]) -> None:
          contains any C++ source/header is C++. Catches the common
          layout where headers and implementations are co-resident
          (``src/foo.h`` + ``src/foo.cpp``).
-      2. **Project-wide rule** — if *any* C++ source exists in the repo
-         AND no sibling C source disambiguates it (no ``.c`` next to
-         the header), the ``.h`` is treated as C++. This catches
-         ``include/`` vs ``src/`` separations where the C++ source
-         lives in a different directory from the public headers.
+      2. **Project-wide rule** — if *any* C++ source exists in the repo,
+         no sibling C source disambiguates the header, AND the header's
+         own content carries C++ markers, the ``.h`` is treated as C++.
+         This catches ``include/`` vs ``src/`` separations without
+         repeating flaw F1's shape: a handful of C++ files elsewhere in
+         a C repo must not flip plain-C headers repo-wide (F20). With no
+         ``read_content`` accessor there is no evidence, so pass 2 does
+         not fire.
 
     Pure-C repos (no ``.cpp/.cc/.cxx``) are completely untouched.
     """
@@ -623,10 +655,16 @@ def refine_cpp_header_languages(records: list[FileRecord]) -> None:
         if d in cpp_dirs:
             r.language = "cpp"
             continue
-        # Pass 2: project-wide rule, suppressed when a sibling .c file
-        # at the same directory level rules it out.
-        if d not in c_source_dirs:
-            r.language = "cpp"
+        # Pass 2: project-wide rule — suppressed when a sibling .c file
+        # rules it out, and gated on the header's own C++ evidence so a
+        # C repo with incidental C++ tooling keeps its headers (F20).
+        if d not in c_source_dirs and read_content is not None:
+            try:
+                content = read_content(r.path)
+            except Exception:
+                continue
+            if has_cpp_markers(content):
+                r.language = "cpp"
 
 
 # ---------------------------------------------------------------------------
