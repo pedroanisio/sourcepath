@@ -31,10 +31,9 @@ surface.
 - Ingestion from local paths, HTTPS/SSH/`file://` git URLs, and
   `github.com/owner/repo` shorthand; branch/tag/SHA via `--state`
   ([inspection/repo_source.py](codebase_mapper/inspection/repo_source.py)).
-- Shallow (`--depth 1`) clone followed by a default blob-free history
-  deepen that recovers per-file commit-time provenance without historical
-  blobs; `CBM_UNSHALLOW=0` opts out and stays shallow; clone workspace
-  pinning via `CBM_WORK_DIR`.
+- Fast shallow clones by default; opt-in history deepening
+  (`CBM_UNSHALLOW=1`) recovers per-file commit-time provenance without
+  historical blobs; clone workspace pinning via `CBM_WORK_DIR`.
 - Excludes: repeatable `--exclude` globs merged with a per-repo
   `.cbmignore`; patterns recorded in the manifest.
 - Parallel AST extraction (`CBM_EXTRACT_WORKERS`, tree-sitter releases the

@@ -141,6 +141,12 @@ angle includes (`<asm/io.h>` exists once per architecture).
 
 ## E5 — Provenance: correct by default
 
+> **Reverted by operator decision (2026-07-10).** The opt-out default
+> shipped and was then inverted back: `CBM_UNSHALLOW` is opt-in again
+> (unset = shallow depth-1 clone; `1/true/yes` attempts the deepen).
+> Staying shallow remains a *disclosed* degradation (`git_provenance`),
+> so the omission is queryable rather than silent.
+
 `CBM_UNSHALLOW` exists but defaults off — the error class survives by
 default. Flip it: default = attempt `git fetch --unshallow
 --filter=blob:none`; on failure fall back to today's disclosed omission;
