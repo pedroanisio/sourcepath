@@ -18,13 +18,15 @@ line and Step 1's back-compat anchor holds.
 """
 from __future__ import annotations
 
-import hashlib
 from typing import TYPE_CHECKING, cast
 
 from rdflib import Graph, Literal, Namespace, URIRef
-from rdflib.namespace import RDF, XSD
+from rdflib.namespace import XSD
 
-from codebase_mapper.shared_kernel.constants import CBMI_NS, CBML4, CBML4_NS
+from codebase_mapper.shared_kernel.constants import CBM_NS, CBMI_NS, CBML4, CBML4_NS
+from codebase_mapper.shared_kernel.shacl_spec import (
+    NodeShapeSpec, PropertySpec, render_shapes,
+)
 from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import file_iri
 
 # Concept subjects come from the L3 concept-graph plugin; we mirror its
@@ -41,8 +43,6 @@ if TYPE_CHECKING:
     from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 
-SH_NS = "http://www.w3.org/ns/shacl#"
-SH = Namespace(SH_NS)
 
 GRAPH_WRITER_NAME = "l4_30_graph"
 SHAPES_NAME = "l4_30_shapes"
@@ -181,72 +181,55 @@ class LlmShapes:
     name = SHAPES_NAME
 
     def contribute(self, shapes: Graph) -> None:
-        # Bind the cbml4 prefix on the shapes graph for readability.
-        shapes.bind("cbml4", CBML4)
-
-        from codebase_mapper.shared_kernel.constants import CBM
-
-        # --- LlmFileShape: file_summary + schema_purpose -----------
-        file_shape = URIRef(f"{CBML4_NS}LlmFileShape")
-        shapes.add((file_shape, RDF.type, SH.NodeShape))
-        shapes.add((file_shape, SH.targetClass, CBM.File))
-
-        _add_optional_string(shapes, file_shape, CBML4.fileSummary)
-        _add_optional_string(shapes, file_shape, CBML4.fileSummaryModel,
-                             min_length=1)
-        _add_optional_string(shapes, file_shape, CBML4.fileSummaryPromptSha,
-                             pattern=r"^[a-f0-9]{64}$")
-        _add_optional_datetime(shapes, file_shape, CBML4.fileSummaryGeneratedAt)
-
-        _add_optional_string(shapes, file_shape, CBML4.schemaPurpose)
-        _add_optional_string(shapes, file_shape, CBML4.schemaPurposeModel,
-                             min_length=1)
-        _add_optional_string(shapes, file_shape, CBML4.schemaPurposePromptSha,
-                             pattern=r"^[a-f0-9]{64}$")
-        _add_optional_datetime(shapes, file_shape,
-                               CBML4.schemaPurposeGeneratedAt)
-
-        # --- LlmConceptShape: concept_description -------------------
-        concept_shape = URIRef(f"{CBML4_NS}LlmConceptShape")
-        shapes.add((concept_shape, RDF.type, SH.NodeShape))
-        # SKOS concept class — match the L3 plugin's targetClass.
-        SKOS = URIRef("http://www.w3.org/2004/02/skos/core#Concept")
-        shapes.add((concept_shape, SH.targetClass, SKOS))
-
-        _add_optional_string(shapes, concept_shape,
-                             CBML4.conceptDescription)
-        _add_optional_string(shapes, concept_shape,
-                             CBML4.conceptDescriptionModel, min_length=1)
-        _add_optional_string(shapes, concept_shape,
-                             CBML4.conceptDescriptionPromptSha,
-                             pattern=r"^[a-f0-9]{64}$")
-        _add_optional_datetime(shapes, concept_shape,
-                               CBML4.conceptDescriptionGeneratedAt)
+        render_shapes(shapes, SHAPE_SPECS, bind={"cbml4": CBML4_NS})
 
 
-def _add_optional_string(g: Graph, parent: URIRef, path: URIRef, *,
-                         min_length: int | None = None,
-                         pattern: str | None = None) -> None:
-    """Add an ``sh:property`` block: maxCount 1, datatype xsd:string,
-    optional minLength + pattern. No ``minCount`` — the predicate is
-    optional, by design."""
-    key = f"{parent}|{path}|str|{min_length}|{pattern}"
-    p_iri = URIRef(f"{CBML4_NS}_ps_{hashlib.sha1(key.encode()).hexdigest()[:16]}")
-    g.add((parent, SH.property, p_iri))
-    g.add((p_iri, SH.path, path))
-    g.add((p_iri, SH.datatype, XSD.string))
-    g.add((p_iri, SH.maxCount, Literal(1)))
-    if min_length is not None:
-        g.add((p_iri, SH.minLength, Literal(min_length)))
-    if pattern is not None:
-        g.add((p_iri, SH.pattern, Literal(pattern)))
+def _optional_string(path: object, *, min_length: int | None = None,
+                     pattern: str | None = None) -> PropertySpec:
+    """maxCount 1, xsd:string, no minCount — optional by design."""
+    return PropertySpec(path=str(path), datatype=str(XSD.string),
+                        max_count=1, min_length=min_length,
+                        pattern=pattern)
 
 
-def _add_optional_datetime(g: Graph, parent: URIRef, path: URIRef) -> None:
-    """Add an optional xsd:dateTime predicate (maxCount 1, no minCount)."""
-    key = f"{parent}|{path}|dt"
-    p_iri = URIRef(f"{CBML4_NS}_ps_{hashlib.sha1(key.encode()).hexdigest()[:16]}")
-    g.add((parent, SH.property, p_iri))
-    g.add((p_iri, SH.path, path))
-    g.add((p_iri, SH.datatype, XSD.dateTime))
-    g.add((p_iri, SH.maxCount, Literal(1)))
+def _optional_datetime(path: object) -> PropertySpec:
+    """maxCount 1, xsd:dateTime, no minCount — optional by design."""
+    return PropertySpec(path=str(path), datatype=str(XSD.dateTime),
+                        max_count=1)
+
+
+_SHA256_PATTERN = r"^[a-f0-9]{64}$"
+
+# Canonical model of the L4 enrichment shapes (rendered by shacl_spec —
+# the single spec→RDF code path). SKOS concept class matches the L3
+# plugin's targetClass.
+SHAPE_SPECS: tuple[NodeShapeSpec, ...] = (
+    # --- LlmFileShape: file_summary + schema_purpose -----------
+    NodeShapeSpec(
+        iri=f"{CBML4_NS}LlmFileShape",
+        target_class=f"{CBM_NS}File", properties=(
+            _optional_string(CBML4.fileSummary),
+            _optional_string(CBML4.fileSummaryModel, min_length=1),
+            _optional_string(CBML4.fileSummaryPromptSha,
+                             pattern=_SHA256_PATTERN),
+            _optional_datetime(CBML4.fileSummaryGeneratedAt),
+            _optional_string(CBML4.schemaPurpose),
+            _optional_string(CBML4.schemaPurposeModel, min_length=1),
+            _optional_string(CBML4.schemaPurposePromptSha,
+                             pattern=_SHA256_PATTERN),
+            _optional_datetime(CBML4.schemaPurposeGeneratedAt),
+        )),
+    # --- LlmConceptShape: concept_description -------------------
+    NodeShapeSpec(
+        iri=f"{CBML4_NS}LlmConceptShape",
+        target_class="http://www.w3.org/2004/02/skos/core#Concept",
+        properties=(
+            _optional_string(CBML4.conceptDescription),
+            _optional_string(CBML4.conceptDescriptionModel, min_length=1),
+            _optional_string(CBML4.conceptDescriptionPromptSha,
+                             pattern=_SHA256_PATTERN),
+            _optional_datetime(CBML4.conceptDescriptionGeneratedAt),
+        )),
+)
+
+

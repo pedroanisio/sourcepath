@@ -34,7 +34,6 @@ The contributor never modifies host triples; it only adds.
 """
 from __future__ import annotations
 
-import hashlib
 import urllib.parse
 from typing import cast
 
@@ -42,6 +41,9 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
 from codebase_mapper.shared_kernel.constants import CBM_NS, CBMI_NS
+from codebase_mapper.shared_kernel.shacl_spec import (
+    NodeShapeSpec, PropertySpec, render_shapes,
+)
 from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import file_iri
 
 from codebase_mapper.shared_kernel.extensions import PipelineCtx
@@ -49,13 +51,11 @@ from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 CBML3_NS = "https://codebase-mapper.example.org/cbml3#"
 SKOS_NS = "http://www.w3.org/2004/02/skos/core#"
-SH_NS = "http://www.w3.org/ns/shacl#"
 # We don't want to hard-import L2's namespace here, so spell it out.
 CBML2_NS = "https://codebase-mapper.example.org/cbml2#"
 
 CBML3 = Namespace(CBML3_NS)
 SKOS = Namespace(SKOS_NS)
-SH = Namespace(SH_NS)
 CBM = Namespace(CBM_NS)
 CBML2 = Namespace(CBML2_NS)
 
@@ -213,112 +213,71 @@ class ConceptGraphWriter:
                     g.add((ciri_chunk, CBML3.lexicalizes, concept_iri(cn)))
 
 
+# Canonical model of the L3 concept shapes (rendered by shacl_spec — the
+# single spec→RDF code path).
+SHAPE_SPECS: tuple[NodeShapeSpec, ...] = (
+    NodeShapeSpec(
+        iri=f"{CBML3_NS}ConceptShape", target_class=str(SKOS.Concept),
+        properties=(
+            PropertySpec(path=str(SKOS.prefLabel), min_count=1, max_count=1),
+            PropertySpec(path=str(CBML3.occurrenceCount),
+                         datatype=str(XSD.integer), min_inclusive=1,
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBML3.fileCount),
+                         datatype=str(XSD.integer), min_inclusive=1,
+                         min_count=1, max_count=1),
+            # any number; targets must be Concept
+            PropertySpec(path=str(CBML3.composedOf),
+                         klass=str(SKOS.Concept)),
+            PropertySpec(path=str(SKOS.related), klass=str(SKOS.Concept)),
+            PropertySpec(path=str(CBML3.embeddingRow),
+                         datatype=str(XSD.integer), min_inclusive=0,
+                         max_count=1),
+            # `cbml3:embeddingArtifact` is the filename of the matrix the
+            # `embeddingRow` indexes into. Optional (only present when an
+            # embedding row was computed), single free-form string literal.
+            PropertySpec(path=str(CBML3.embeddingArtifact),
+                         datatype=str(XSD.string), max_count=1),
+            # Stage 3: curated-vocab typing. Both predicates are optional
+            # (max_count=1, no min) — concepts not in the bundled vocab
+            # are still valid skos:Concept nodes.
+            PropertySpec(path=str(CBML3.conceptKind),
+                         datatype=str(XSD.string), max_count=1,
+                         in_literals=CONCEPT_KIND_LITERALS),
+            PropertySpec(path=str(CBML3.broaderCollection),
+                         klass=str(SKOS.Collection), max_count=1),
+        )),
+    # Stage 3: per-kind collection node shape. A collection is emitted
+    # only when at least one concept carries a `kind`; this shape
+    # validates its required predicates.
+    NodeShapeSpec(
+        iri=f"{CBML3_NS}KindCollectionShape",
+        target_class=str(SKOS.Collection), properties=(
+            PropertySpec(path=str(SKOS.prefLabel), min_count=1, max_count=1),
+            PropertySpec(path=str(CBML3.conceptKindBacking),
+                         datatype=str(XSD.string), min_count=1, max_count=1,
+                         in_literals=CONCEPT_KIND_LITERALS),
+            PropertySpec(path=str(SKOS.member), klass=str(SKOS.Concept),
+                         min_count=1),
+        )),
+    # `cbml3:lexicalizes` connects cbm:File AND cbml2:Chunk subjects to
+    # skos:Concept objects. We don't own either subject's NodeShape
+    # (cbm:File lives in the host, cbml2:Chunk in the L2 plugin), so
+    # target via sh:targetSubjectsOf — every node that has *any*
+    # `cbml3:lexicalizes` edge must point to a skos:Concept. This
+    # closes the gap without cross-plugin shape ownership.
+    NodeShapeSpec(
+        iri=f"{CBML3_NS}LexicalizesShape",
+        target_subjects_of=str(CBML3.lexicalizes), properties=(
+            PropertySpec(path=str(CBML3.lexicalizes),
+                         klass=str(SKOS.Concept)),
+        )),
+)
+
+
 class ConceptShapes:
     name = "l3_30_shapes"
 
     def contribute(self, shapes: Graph) -> None:
-        shapes.bind("cbml3", CBML3)
-        shapes.bind("skos", SKOS)
-        shapes.bind("sh", SH)
-
-        concept_shape = URIRef(f"{CBML3_NS}ConceptShape")
-        shapes.add((concept_shape, RDF.type, SH.NodeShape))
-        shapes.add((concept_shape, SH.targetClass, SKOS.Concept))
-
-        _add_prop(shapes, concept_shape, SKOS.prefLabel,
-                  min_count=1, max_count=1)
-        _add_prop(shapes, concept_shape, CBML3.occurrenceCount,
-                  datatype=XSD.integer, min_inclusive=1,
-                  min_count=1, max_count=1)
-        _add_prop(shapes, concept_shape, CBML3.fileCount,
-                  datatype=XSD.integer, min_inclusive=1,
-                  min_count=1, max_count=1)
-        _add_prop(shapes, concept_shape, CBML3.composedOf,
-                  klass=SKOS.Concept)   # any number; targets must be Concept
-        _add_prop(shapes, concept_shape, SKOS.related,
-                  klass=SKOS.Concept)
-        _add_prop(shapes, concept_shape, CBML3.embeddingRow,
-                  datatype=XSD.integer, min_inclusive=0, max_count=1)
-        # `cbml3:embeddingArtifact` is the filename of the matrix the
-        # `embeddingRow` indexes into. Optional (only present when an
-        # embedding row was computed), single free-form string literal.
-        _add_prop(shapes, concept_shape, CBML3.embeddingArtifact,
-                  datatype=XSD.string, max_count=1)
-
-        # Stage 3: curated-vocab typing. Both predicates are optional
-        # (max_count=1, no min) — concepts not in the bundled vocab are
-        # still valid skos:Concept nodes.
-        _add_prop(shapes, concept_shape, CBML3.conceptKind,
-                  datatype=XSD.string, max_count=1,
-                  in_values=CONCEPT_KIND_LITERALS)
-        _add_prop(shapes, concept_shape, CBML3.broaderCollection,
-                  klass=SKOS.Collection, max_count=1)
-
-        # Stage 3: per-kind collection node shape. A collection is emitted
-        # only when at least one concept carries a `kind`; this shape
-        # validates its required predicates.
-        collection_shape = URIRef(f"{CBML3_NS}KindCollectionShape")
-        shapes.add((collection_shape, RDF.type, SH.NodeShape))
-        shapes.add((collection_shape, SH.targetClass, SKOS.Collection))
-
-        _add_prop(shapes, collection_shape, SKOS.prefLabel,
-                  min_count=1, max_count=1)
-        _add_prop(shapes, collection_shape, CBML3.conceptKindBacking,
-                  datatype=XSD.string, min_count=1, max_count=1,
-                  in_values=CONCEPT_KIND_LITERALS)
-        _add_prop(shapes, collection_shape, SKOS.member,
-                  klass=SKOS.Concept, min_count=1)
-
-        # `cbml3:lexicalizes` connects cbm:File AND cbml2:Chunk subjects to
-        # skos:Concept objects. We don't own either subject's NodeShape
-        # (cbm:File lives in the host, cbml2:Chunk in the L2 plugin), so
-        # target via sh:targetSubjectsOf — every node that has *any*
-        # `cbml3:lexicalizes` edge must point to a skos:Concept. This
-        # closes the gap without cross-plugin shape ownership.
-        lex_shape = URIRef(f"{CBML3_NS}LexicalizesShape")
-        shapes.add((lex_shape, RDF.type, SH.NodeShape))
-        shapes.add((lex_shape, URIRef(SH_NS + "targetSubjectsOf"),
-                    CBML3.lexicalizes))
-        _add_prop(shapes, lex_shape, CBML3.lexicalizes, klass=SKOS.Concept)
-
-
-def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,
-              datatype: URIRef | None = None,
-              klass: URIRef | None = None,
-              min_count: int | None = None,
-              max_count: int | None = None,
-              min_inclusive: int | None = None,
-              pattern: str | None = None,
-              in_values: tuple[str, ...] | None = None) -> None:
-    key = (f"{parent}|{path}|{datatype}|{klass}|{min_count}|{max_count}"
-           f"|{min_inclusive}|{pattern}|{in_values}")
-    p_iri = URIRef(f"{CBML3_NS}_ps_{hashlib.sha1(key.encode()).hexdigest()[:16]}")
-    g.add((parent, SH.property, p_iri))
-    g.add((p_iri, SH.path, path))
-    if datatype is not None:
-        g.add((p_iri, SH.datatype, datatype))
-    if klass is not None:
-        g.add((p_iri, SH["class"], klass))
-    if min_count is not None:
-        g.add((p_iri, SH.minCount, Literal(min_count)))
-    if max_count is not None:
-        g.add((p_iri, SH.maxCount, Literal(max_count)))
-    if min_inclusive is not None:
-        g.add((p_iri, SH.minInclusive, Literal(min_inclusive)))
-    if pattern is not None:
-        g.add((p_iri, SH.pattern, Literal(pattern)))
-    if in_values is not None:
-        # `sh:in` takes an RDF list. Build it as a fresh blank-list head.
-        from rdflib import BNode
-        from rdflib.namespace import RDF as _RDF
-        head: URIRef | BNode = BNode()
-        g.add((p_iri, SH["in"], head))
-        nodes: list[URIRef | BNode] = [head]
-        for _ in range(len(in_values) - 1):
-            nodes.append(BNode())
-        for i, val in enumerate(in_values):
-            g.add((nodes[i], _RDF.first, Literal(val)))
-            if i + 1 < len(in_values):
-                g.add((nodes[i], _RDF.rest, nodes[i + 1]))
-            else:
-                g.add((nodes[i], _RDF.rest, _RDF.nil))
+        render_shapes(shapes, SHAPE_SPECS,
+                      bind={"cbml3": CBML3_NS, "skos": SKOS_NS})

@@ -23,7 +23,6 @@ import urllib.parse
 from typing import cast
 
 from rdflib import Graph, Literal, Namespace, URIRef
-from rdflib.collection import Collection
 from rdflib.namespace import RDF, XSD
 
 from codebase_mapper.shared_kernel.constants import (
@@ -31,13 +30,14 @@ from codebase_mapper.shared_kernel.constants import (
     XREF_KINDS, XREF_RESOLUTIONS,
 )
 from codebase_mapper.shared_kernel.extensions import PipelineCtx
+from codebase_mapper.shared_kernel.shacl_spec import (
+    NodeShapeSpec, PropertySpec, render_shapes,
+)
 from codebase_mapper.emission.models import SymbolXrefEdge
 
 from .aggregator import XREF_INDEX_KEY
 
 
-SH_NS = "http://www.w3.org/ns/shacl#"
-SH = Namespace(SH_NS)
 CBM = Namespace(CBM_NS)
 
 # Chunk class is owned by the L2 plugin; we reference the IRI by name
@@ -78,53 +78,31 @@ class XrefGraphWriter:
             g.add((eiri, CBMXR.resolver, Literal(edge.resolver)))
 
 
+# Canonical model of the xref edge shape (rendered by shacl_spec — the
+# single spec→RDF code path).
+SHAPE_SPECS: tuple[NodeShapeSpec, ...] = (
+    NodeShapeSpec(
+        iri=f"{CBMXR_NS}EdgeShape", target_class=str(CBMXR.Edge),
+        properties=(
+            PropertySpec(path=str(CBMXR.src), klass=str(CBML2.Chunk),
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBMXR.dst), klass=str(CBML2.Chunk),
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBMXR.kind), name="_kindProp",
+                         list_name="_kindList", in_literals=XREF_KINDS,
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBMXR.resolution),
+                         name="_resolutionProp",
+                         list_name="_resolutionList",
+                         in_literals=XREF_RESOLUTIONS, min_count=1, max_count=1),
+            PropertySpec(path=str(CBMXR.resolver),
+                         datatype=str(XSD.string), min_count=1, max_count=1),
+        )),
+)
+
+
 class XrefShapes:
     name = "l3_10_xrefs_shapes"
 
     def contribute(self, shapes: Graph) -> None:
-        shapes.bind("cbmxr", CBMXR)
-
-        edge_shape = URIRef(f"{CBMXR_NS}EdgeShape")
-        shapes.add((edge_shape, RDF.type, SH.NodeShape))
-        shapes.add((edge_shape, SH.targetClass, CBMXR.Edge))
-
-        _add_prop(shapes, edge_shape, CBMXR.src,
-                  klass=CBML2.Chunk, min_count=1, max_count=1)
-        _add_prop(shapes, edge_shape, CBMXR.dst,
-                  klass=CBML2.Chunk, min_count=1, max_count=1)
-        _add_enum_prop(shapes, edge_shape, CBMXR.kind, XREF_KINDS, "kind")
-        _add_enum_prop(shapes, edge_shape, CBMXR.resolution,
-                       XREF_RESOLUTIONS, "resolution")
-        _add_prop(shapes, edge_shape, CBMXR.resolver,
-                  datatype=XSD.string, min_count=1, max_count=1)
-
-
-def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,
-              datatype: URIRef | None = None,
-              klass: URIRef | None = None,
-              min_count: int | None = None,
-              max_count: int | None = None) -> None:
-    key = f"{parent}|{path}|{datatype}|{klass}|{min_count}|{max_count}"
-    p_iri = URIRef(f"{CBMXR_NS}_ps_{hashlib.sha1(key.encode()).hexdigest()[:16]}")
-    g.add((parent, SH.property, p_iri))
-    g.add((p_iri, SH.path, path))
-    if datatype is not None:
-        g.add((p_iri, SH.datatype, datatype))
-    if klass is not None:
-        g.add((p_iri, SH["class"], klass))
-    if min_count is not None:
-        g.add((p_iri, SH.minCount, Literal(min_count)))
-    if max_count is not None:
-        g.add((p_iri, SH.maxCount, Literal(max_count)))
-
-
-def _add_enum_prop(g: Graph, parent: URIRef, path: URIRef,
-                   values: tuple[str, ...], slug: str) -> None:
-    list_iri = URIRef(f"{CBMXR_NS}_{slug}List")
-    Collection(g, list_iri, [Literal(v) for v in values])
-    p_iri = URIRef(f"{CBMXR_NS}_{slug}Prop")
-    g.add((parent, SH.property, p_iri))
-    g.add((p_iri, SH.path, path))
-    g.add((p_iri, SH.minCount, Literal(1)))
-    g.add((p_iri, SH.maxCount, Literal(1)))
-    g.add((p_iri, URIRef(SH_NS + "in"), list_iri))
+        render_shapes(shapes, SHAPE_SPECS, bind={"cbmxr": CBMXR_NS})

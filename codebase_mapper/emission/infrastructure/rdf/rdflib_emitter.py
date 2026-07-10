@@ -5,6 +5,7 @@ import datetime as _dt
 import hashlib
 import json
 import re
+from typing import Sequence
 from urllib.parse import quote
 
 from rdflib import Graph
@@ -30,12 +31,14 @@ def _iso_utc(ts: float) -> str:
 
 from ....shared_kernel.constants import CBM, CBMI, CBMI_NS, CBMP, CBMP_NS, CBMT, CBMT_NS, CBM_NS, PHASE_VOCABULARY, SH, SPDX_CORE_NS, SPDX_SOFTWARE_NS, TYPE_VOCABULARY
 from ....shared_kernel.json_safety import dump_ast_summary
+from ....shared_kernel.shacl_spec import NodeShapeSpec, PropertySpec, render_shapes
 from ....inspection.models import (
     DeclaresDependencyEdge,
     FileRecord,
     ImportEdge,
     ImportExternalEdge,
     PinsDependencyEdge,
+    PossibleImportEdge,
     TestsEdge,
 )
 
@@ -67,7 +70,7 @@ def build_inventory_graph(
     dep_edges: list[DeclaresDependencyEdge], pin_edges: list[PinsDependencyEdge],
     tests_edges: list[TestsEdge],
     truncated_ast_paths: list[str] | None = None,
-    possible_import_edges: list = (),
+    possible_import_edges: Sequence[PossibleImportEdge] = (),
 ) -> Graph:
     g = Graph()
     g.bind("cbm", CBM); g.bind("cbmt", CBMT); g.bind("cbmp", CBMP)
@@ -115,10 +118,11 @@ def build_inventory_graph(
 
     for e in import_edges:
         g.add((file_iri(e.src_path), CBM.imports, file_iri(e.dst_path)))
-    for e in possible_import_edges:
+    for pe_edge in possible_import_edges:
         # Disclosed candidates of an ambiguous include (plan E4): a separate
         # property so hard cbm:imports consumers keep 100% precision.
-        g.add((file_iri(e.src_path), CBM.possibleImport, file_iri(e.dst_path)))
+        g.add((file_iri(pe_edge.src_path), CBM.possibleImport,
+               file_iri(pe_edge.dst_path)))
     for te in tests_edges:
         g.add((file_iri(te.test_path), CBM.tests, file_iri(te.subject_path)))
 
@@ -155,133 +159,118 @@ def build_inventory_graph(
         g.add((phase_iri(p), RDF.type, CBM.Phase))
     return g
 
+def _core_shape_specs() -> tuple[NodeShapeSpec, ...]:
+    """The canonical model of every core (cbm:) node shape.
+
+    This declaration — not the emitted shapes.shacl.ttl — is the source of
+    truth for the L1 validation contract. Plugins declare their tiers the
+    same way in their graph_writer modules; render_shapes() is the only
+    spec→RDF code path.
+    """
+    xsd_string = str(XSD.string)
+    xsd_datetime = str(XSD.dateTime)
+
+    file_shape = NodeShapeSpec(
+        iri=f"{CBM_NS}FileShape", target_class=str(CBM.File), properties=(
+            PropertySpec(path=str(CBM.path), datatype=xsd_string, min_count=1, max_count=1),
+            PropertySpec(path=str(CBM.contentSha256), min_count=1, max_count=1,
+                         datatype=str(XSD.hexBinary),
+                         pattern="^[0-9a-f]{64}$"),
+            PropertySpec(path=str(CBM.gitBlobSha), datatype=xsd_string,
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBM.sizeBytes), min_count=1, max_count=1,
+                         datatype=str(XSD.integer), min_inclusive=0),
+            PropertySpec(path=str(CBM.language), datatype=xsd_string,
+                         max_count=1),
+            # ast_summary is optional (only emitted when the analyzer
+            # produces one), a canonical JSON literal of unbounded length.
+            PropertySpec(path=str(CBM.astSummary), datatype=xsd_string,
+                         max_count=1),
+            # extraction_errors: one literal per error, no count bound.
+            PropertySpec(path=str(CBM.extractionError),
+                         datatype=xsd_string),
+            # Manifest/lockfile edges are optional on cbm:File but their
+            # object class is constrained when present.
+            PropertySpec(path=str(CBM.declaresDependency),
+                         klass=str(CBM.ExternalPackage)),
+            PropertySpec(path=str(CBM.pinsDependency),
+                         klass=str(CBM.PackageRelease)),
+            # Filesystem + git commit times: optional single dateTimes
+            # (None on a non-HEAD map / shallow clone).
+            PropertySpec(path=str(CBM.atime), datatype=xsd_datetime,
+                         max_count=1),
+            PropertySpec(path=str(CBM.mtime), datatype=xsd_datetime,
+                         max_count=1),
+            PropertySpec(path=str(CBM.ctime), datatype=xsd_datetime,
+                         max_count=1),
+            PropertySpec(path=str(CBM.gitCommitTime),
+                         datatype=xsd_datetime, max_count=1),
+            PropertySpec(path=str(CBM.type), name="_typeProp",
+                         list_name="_typeList", min_count=1, max_count=1,
+                         in_iris=tuple(str(type_iri(t))
+                                       for t in TYPE_VOCABULARY)),
+            PropertySpec(path=str(CBM.hasPhase), name="_phaseProp",
+                         list_name="_phaseList", min_count=1,
+                         in_iris=tuple(str(phase_iri(p))
+                                       for p in PHASE_VOCABULARY)),
+            PropertySpec(path=str(CBM.imports), name="_importsProp",
+                         klass=str(CBM.File)),
+            PropertySpec(path=str(CBM.possibleImport),
+                         name="_possibleImportProp", klass=str(CBM.File)),
+            PropertySpec(path=str(CBM.importsExternal),
+                         name="_importsExtProp",
+                         klass=str(CBM.ExternalPackage)),
+        ))
+
+    tests_shape = NodeShapeSpec(
+        iri=f"{CBM_NS}TestsSubjectShape",
+        target_subjects_of=str(CBM.tests), properties=(
+            PropertySpec(path=str(CBM.type), name="_testsTypeProp",
+                         has_value=str(type_iri("test_code"))),
+        ))
+
+    repo_shape = NodeShapeSpec(
+        iri=f"{CBM_NS}RepositoryShape", target_class=str(CBM.Repository),
+        properties=(
+            PropertySpec(path=str(CBM.atCommit), klass=str(CBM.Commit),
+                         min_count=1, max_count=1),
+            # Repository → File edges. No minCount (an empty repo emits no
+            # files but the Repository node is still valid).
+            PropertySpec(path=str(CBM.hasFile), klass=str(CBM.File)),
+        ))
+
+    # The Commit node carries its own SHA. The emitter writes the plain hex
+    # string, so xsd:string with a hex pattern rather than xsd:hexBinary.
+    commit_shape = NodeShapeSpec(
+        iri=f"{CBM_NS}CommitShape", target_class=str(CBM.Commit),
+        properties=(
+            PropertySpec(path=str(CBM.commitSha), datatype=xsd_string,
+                         pattern="^[0-9a-f]+$", min_count=1, max_count=1),
+        ))
+
+    release_shape = NodeShapeSpec(
+        iri=f"{CBM_NS}PackageReleaseShape",
+        target_class=str(CBM.PackageRelease), properties=(
+            PropertySpec(path=str(CBM.packageName), datatype=xsd_string,
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBM.packageVersion),
+                         datatype=xsd_string, min_count=1, max_count=1),
+            PropertySpec(path=str(CBM.releaseOf),
+                         klass=str(CBM.ExternalPackage), min_count=1, max_count=1),
+        ))
+
+    return (file_shape, tests_shape, repo_shape, commit_shape,
+            release_shape)
+
+
+CORE_SHAPE_SPECS = _core_shape_specs()
+
+
 def build_shacl_graph() -> Graph:
-    g = Graph()
-    g.bind("sh", SH); g.bind("cbm", CBM)
-    g.bind("cbmt", CBMT); g.bind("cbmp", CBMP); g.bind("xsd", XSD)
-
-    def prop_uri(kwargs: dict) -> URIRef:
-        key = "|".join(f"{k}={kwargs[k]}" for k in sorted(kwargs))
-        return URIRef(f"{CBM_NS}_ps_{hashlib.sha1(key.encode()).hexdigest()[:16]}")
-
-    def add_prop(parent: URIRef, **kwargs) -> URIRef:
-        b = prop_uri(kwargs)
-        g.add((parent, SH.property, b))
-        for k, v in kwargs.items():
-            g.add((b, URIRef(SH + k), v))
-        return b
-
-    file_shape = URIRef(f"{CBM_NS}FileShape")
-    g.add((file_shape, RDF.type, SH.NodeShape))
-    g.add((file_shape, SH.targetClass, CBM.File))
-
-    add_prop(file_shape, path=CBM.path,
-             minCount=Literal(1), maxCount=Literal(1), datatype=XSD.string)
-    add_prop(file_shape, path=CBM.contentSha256,
-             minCount=Literal(1), maxCount=Literal(1),
-             datatype=XSD.hexBinary, pattern=Literal("^[0-9a-f]{64}$"))
-    add_prop(file_shape, path=CBM.gitBlobSha,
-             minCount=Literal(1), maxCount=Literal(1), datatype=XSD.string)
-    add_prop(file_shape, path=CBM.sizeBytes,
-             minCount=Literal(1), maxCount=Literal(1),
-             datatype=XSD.integer, minInclusive=Literal(0))
-    add_prop(file_shape, path=CBM.language,
-             maxCount=Literal(1), datatype=XSD.string)
-    # ast_summary is optional (only emitted when the analyzer produces one)
-    # and serialized as a canonical JSON literal. Length is not bounded — some
-    # analyzers emit large AST blobs.
-    add_prop(file_shape, path=CBM.astSummary,
-             maxCount=Literal(1), datatype=XSD.string)
-    # extraction_errors is a list, recorded as one literal per error. No count
-    # bound; xsd:string covers the analyzer-emitted message format.
-    add_prop(file_shape, path=CBM.extractionError, datatype=XSD.string)
-    # Dependency-manifest files declare external packages; lockfile records
-    # pin them to specific releases. Both predicates are optional on
-    # cbm:File (most files are neither manifest nor lockfile) but when
-    # present the object class is constrained.
-    add_prop(file_shape, path=CBM.declaresDependency,
-             **{"class": CBM.ExternalPackage})
-    add_prop(file_shape, path=CBM.pinsDependency,
-             **{"class": CBM.PackageRelease})
-    # Filesystem + git commit times are optional (None on a non-HEAD map);
-    # when present, they're single xsd:dateTime literals.
-    for pred in (CBM.atime, CBM.mtime, CBM.ctime, CBM.gitCommitTime):
-        add_prop(file_shape, path=pred,
-                 maxCount=Literal(1), datatype=XSD.dateTime)
-
-    from rdflib.collection import Collection
-    type_list = URIRef(f"{CBM_NS}_typeList")
-    Collection(g, type_list, [type_iri(t) for t in TYPE_VOCABULARY])
-    type_prop = URIRef(f"{CBM_NS}_typeProp")
-    g.add((file_shape, SH.property, type_prop))
-    g.add((type_prop, SH.path, CBM.type))
-    g.add((type_prop, SH.minCount, Literal(1)))
-    g.add((type_prop, SH.maxCount, Literal(1)))
-    g.add((type_prop, URIRef(SH + "in"), type_list))
-
-    phase_list = URIRef(f"{CBM_NS}_phaseList")
-    Collection(g, phase_list, [phase_iri(p) for p in PHASE_VOCABULARY])
-    phase_prop = URIRef(f"{CBM_NS}_phaseProp")
-    g.add((file_shape, SH.property, phase_prop))
-    g.add((phase_prop, SH.path, CBM.hasPhase))
-    g.add((phase_prop, SH.minCount, Literal(1)))
-    g.add((phase_prop, URIRef(SH + "in"), phase_list))
-
-    imports_prop = URIRef(f"{CBM_NS}_importsProp")
-    g.add((file_shape, SH.property, imports_prop))
-    g.add((imports_prop, SH.path, CBM.imports))
-    g.add((imports_prop, URIRef(SH + "class"), CBM.File))
-
-    possible_imp_prop = URIRef(f"{CBM_NS}_possibleImportProp")
-    g.add((file_shape, SH.property, possible_imp_prop))
-    g.add((possible_imp_prop, SH.path, CBM.possibleImport))
-    g.add((possible_imp_prop, URIRef(SH + "class"), CBM.File))
-
-    imports_ext_prop = URIRef(f"{CBM_NS}_importsExtProp")
-    g.add((file_shape, SH.property, imports_ext_prop))
-    g.add((imports_ext_prop, SH.path, CBM.importsExternal))
-    g.add((imports_ext_prop, URIRef(SH + "class"), CBM.ExternalPackage))
-
-    tests_shape = URIRef(f"{CBM_NS}TestsSubjectShape")
-    g.add((tests_shape, RDF.type, SH.NodeShape))
-    g.add((tests_shape, URIRef(SH + "targetSubjectsOf"), CBM.tests))
-    tests_type_prop = URIRef(f"{CBM_NS}_testsTypeProp")
-    g.add((tests_shape, SH.property, tests_type_prop))
-    g.add((tests_type_prop, SH.path, CBM.type))
-    g.add((tests_type_prop, URIRef(SH + "hasValue"), type_iri("test_code")))
-
-    repo_shape = URIRef(f"{CBM_NS}RepositoryShape")
-    g.add((repo_shape, RDF.type, SH.NodeShape))
-    g.add((repo_shape, SH.targetClass, CBM.Repository))
-    add_prop(repo_shape, path=CBM.atCommit,
-             minCount=Literal(1), maxCount=Literal(1),
-             **{"class": CBM.Commit})
-    # Repository → File edges. min_count=0 (an empty repo emits no files but
-    # the Repository node is still valid); object class fixed to cbm:File.
-    add_prop(repo_shape, path=CBM.hasFile,
-             **{"class": CBM.File})
-
-    # The Commit node carries its own SHA. Single value, hexBinary-shaped
-    # (40 chars for SHA-1; the emitter currently writes the plain hex
-    # string so we keep xsd:string and constrain the pattern).
-    commit_shape = URIRef(f"{CBM_NS}CommitShape")
-    g.add((commit_shape, RDF.type, SH.NodeShape))
-    g.add((commit_shape, SH.targetClass, CBM.Commit))
-    add_prop(commit_shape, path=CBM.commitSha,
-             minCount=Literal(1), maxCount=Literal(1),
-             datatype=XSD.string, pattern=Literal("^[0-9a-f]+$"))
-
-    rel_shape = URIRef(f"{CBM_NS}PackageReleaseShape")
-    g.add((rel_shape, RDF.type, SH.NodeShape))
-    g.add((rel_shape, SH.targetClass, CBM.PackageRelease))
-    add_prop(rel_shape, path=CBM.packageName,
-             minCount=Literal(1), maxCount=Literal(1), datatype=XSD.string)
-    add_prop(rel_shape, path=CBM.packageVersion,
-             minCount=Literal(1), maxCount=Literal(1), datatype=XSD.string)
-    add_prop(rel_shape, path=CBM.releaseOf,
-             minCount=Literal(1), maxCount=Literal(1),
-             **{"class": CBM.ExternalPackage})
-    return g
+    return render_shapes(
+        Graph(), CORE_SHAPE_SPECS,
+        bind={"cbm": CBM_NS, "cbmt": CBMT_NS, "cbmp": CBMP_NS,
+              "xsd": str(XSD)})
 
 def build_ontology_mapping_graph() -> Graph:
     """A small RDFS/OWL document mapping cbm: terms to SPDX 3.0.1.

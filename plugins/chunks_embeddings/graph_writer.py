@@ -30,6 +30,9 @@ from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, XSD
 
 from codebase_mapper.shared_kernel.constants import CBM_NS, CBMI_NS
+from codebase_mapper.shared_kernel.shacl_spec import (
+    NodeShapeSpec, PropertySpec, render_shapes,
+)
 from codebase_mapper.emission.infrastructure.rdf.rdflib_emitter import file_iri
 
 from codebase_mapper.shared_kernel.extensions import PipelineCtx
@@ -37,11 +40,9 @@ from codebase_mapper.shared_kernel.extensions import PipelineCtx
 
 CBML2_NS = "https://codebase-mapper.example.org/cbml2#"
 NIF_NS = "http://persistence.uni-leipzig.org/nlp2rdf/ontologies/nif-core#"
-SH_NS = "http://www.w3.org/ns/shacl#"
 
 CBML2 = Namespace(CBML2_NS)
 NIF = Namespace(NIF_NS)
-SH = Namespace(SH_NS)
 CBM = Namespace(CBM_NS)
 
 CHUNK_KINDS = ("function", "class", "method", "file")
@@ -121,89 +122,62 @@ class ChunkGraphWriter:
                        Literal(EMBEDDINGS_ARTIFACT_FILENAME)))
 
 
+# Canonical model of the L2 chunk shape (rendered by shacl_spec — the
+# single spec→RDF code path). One spec per predicate the writer emits.
+SHAPE_SPECS: tuple[NodeShapeSpec, ...] = (
+    NodeShapeSpec(
+        iri=f"{CBML2_NS}ChunkShape", target_class=str(CBML2.Chunk),
+        properties=(
+            PropertySpec(path=str(CBML2.inFile), klass=str(CBM.File),
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBML2.kind), name="_kindProp",
+                         list_name="_kindList", in_literals=CHUNK_KINDS,
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBML2.symbol), datatype=str(XSD.string),
+                         min_count=1, max_count=1),
+            PropertySpec(path=str(CBML2.parentSymbol),
+                         datatype=str(XSD.string), max_count=1),
+            PropertySpec(path=str(NIF.beginIndex), min_inclusive=0,
+                         datatype=str(XSD.integer), min_count=1, max_count=1),
+            PropertySpec(path=str(NIF.endIndex), min_inclusive=0,
+                         datatype=str(XSD.integer), min_count=1, max_count=1),
+            PropertySpec(path=str(CBML2.beginLine), min_inclusive=1,
+                         datatype=str(XSD.integer), min_count=1, max_count=1),
+            PropertySpec(path=str(CBML2.endLine), min_inclusive=1,
+                         datatype=str(XSD.integer), min_count=1, max_count=1),
+            PropertySpec(path=str(CBML2.contentSha256),
+                         datatype=str(XSD.hexBinary),
+                         pattern="^[0-9a-f]{64}$", min_count=1, max_count=1),
+            PropertySpec(path=str(CBML2.embeddingRow), min_inclusive=0,
+                         datatype=str(XSD.integer), max_count=1),
+            PropertySpec(path=str(CBML2.embeddingArtifact),
+                         datatype=str(XSD.string), max_count=1),
+            PropertySpec(path=str(CBML2.truncatedForEmbedding),
+                         datatype=str(XSD.boolean), max_count=1),
+            # signature/type fields — all optional (omission contract)
+            PropertySpec(path=str(CBML2.signature),
+                         datatype=str(XSD.string), max_count=1),
+            PropertySpec(path=str(CBML2.returnsType),
+                         datatype=str(XSD.string), max_count=1),
+            PropertySpec(path=str(CBML2.visibility),
+                         datatype=str(XSD.string), max_count=1),
+            PropertySpec(path=str(CBML2.paramsJson),
+                         datatype=str(XSD.string), max_count=1),
+            PropertySpec(path=str(CBML2.isAsync),
+                         datatype=str(XSD.boolean), max_count=1),
+            PropertySpec(path=str(CBML2.baseType),
+                         datatype=str(XSD.string)),
+            PropertySpec(path=str(CBML2.typeParam),
+                         datatype=str(XSD.string)),
+            PropertySpec(path=str(CBML2.decorator),
+                         datatype=str(XSD.string)),
+        )),
+)
+
+
 class ChunkShapes:
     name = "l2_30_shapes"
 
     def contribute(self, shapes: Graph) -> None:
-        shapes.bind("cbml2", CBML2)
-        shapes.bind("nif", NIF)
-        shapes.bind("sh", SH)
-
-        from rdflib.collection import Collection
-        chunk_shape = URIRef(f"{CBML2_NS}ChunkShape")
-        shapes.add((chunk_shape, RDF.type, SH.NodeShape))
-        shapes.add((chunk_shape, SH.targetClass, CBML2.Chunk))
-
-        # inFile -> cbm:File, exactly one
-        _add_prop(shapes, chunk_shape, CBML2.inFile, klass=CBM.File, min_count=1, max_count=1)
-        # kind in enum
-        kinds_list = URIRef(f"{CBML2_NS}_kindList")
-        Collection(shapes, kinds_list, [Literal(k) for k in CHUNK_KINDS])
-        kind_prop = URIRef(f"{CBML2_NS}_kindProp")
-        shapes.add((chunk_shape, SH.property, kind_prop))
-        shapes.add((kind_prop, SH.path, CBML2.kind))
-        shapes.add((kind_prop, SH.minCount, Literal(1)))
-        shapes.add((kind_prop, SH.maxCount, Literal(1)))
-        shapes.add((kind_prop, URIRef(SH_NS + "in"), kinds_list))
-
-        _add_prop(shapes, chunk_shape, CBML2.symbol,
-                  datatype=XSD.string, min_count=1, max_count=1)
-        _add_prop(shapes, chunk_shape, CBML2.parentSymbol,
-                  datatype=XSD.string, max_count=1)
-        _add_prop(shapes, chunk_shape, NIF.beginIndex,
-                  datatype=XSD.integer, min_count=1, max_count=1, min_inclusive=0)
-        _add_prop(shapes, chunk_shape, NIF.endIndex,
-                  datatype=XSD.integer, min_count=1, max_count=1, min_inclusive=0)
-        _add_prop(shapes, chunk_shape, CBML2.beginLine,
-                  datatype=XSD.integer, min_count=1, max_count=1, min_inclusive=1)
-        _add_prop(shapes, chunk_shape, CBML2.endLine,
-                  datatype=XSD.integer, min_count=1, max_count=1, min_inclusive=1)
-        _add_prop(shapes, chunk_shape, CBML2.contentSha256,
-                  datatype=XSD.hexBinary, min_count=1, max_count=1,
-                  pattern="^[0-9a-f]{64}$")
-        _add_prop(shapes, chunk_shape, CBML2.embeddingRow,
-                  datatype=XSD.integer, max_count=1, min_inclusive=0)
-        _add_prop(shapes, chunk_shape, CBML2.embeddingArtifact,
-                  datatype=XSD.string, max_count=1)
-        _add_prop(shapes, chunk_shape, CBML2.truncatedForEmbedding,
-                  datatype=XSD.boolean, max_count=1)
-        # signature/type fields — all optional (omission contract)
-        _add_prop(shapes, chunk_shape, CBML2.signature,
-                  datatype=XSD.string, max_count=1)
-        _add_prop(shapes, chunk_shape, CBML2.returnsType,
-                  datatype=XSD.string, max_count=1)
-        _add_prop(shapes, chunk_shape, CBML2.visibility,
-                  datatype=XSD.string, max_count=1)
-        _add_prop(shapes, chunk_shape, CBML2.paramsJson,
-                  datatype=XSD.string, max_count=1)
-        _add_prop(shapes, chunk_shape, CBML2.isAsync,
-                  datatype=XSD.boolean, max_count=1)
-        _add_prop(shapes, chunk_shape, CBML2.baseType, datatype=XSD.string)
-        _add_prop(shapes, chunk_shape, CBML2.typeParam, datatype=XSD.string)
-        _add_prop(shapes, chunk_shape, CBML2.decorator, datatype=XSD.string)
-
-
-def _add_prop(g: Graph, parent: URIRef, path: URIRef, *,
-              datatype: URIRef | None = None,
-              klass: URIRef | None = None,
-              min_count: int | None = None,
-              max_count: int | None = None,
-              min_inclusive: int | None = None,
-              pattern: str | None = None) -> None:
-    import hashlib
-    key = f"{parent}|{path}|{datatype}|{klass}|{min_count}|{max_count}|{min_inclusive}|{pattern}"
-    p_iri = URIRef(f"{CBML2_NS}_ps_{hashlib.sha1(key.encode()).hexdigest()[:16]}")
-    g.add((parent, SH.property, p_iri))
-    g.add((p_iri, SH.path, path))
-    if datatype is not None:
-        g.add((p_iri, SH.datatype, datatype))
-    if klass is not None:
-        g.add((p_iri, SH["class"], klass))
-    if min_count is not None:
-        g.add((p_iri, SH.minCount, Literal(min_count)))
-    if max_count is not None:
-        g.add((p_iri, SH.maxCount, Literal(max_count)))
-    if min_inclusive is not None:
-        g.add((p_iri, SH.minInclusive, Literal(min_inclusive)))
-    if pattern is not None:
-        g.add((p_iri, SH.pattern, Literal(pattern)))
+        render_shapes(shapes, SHAPE_SPECS,
+                      bind={"cbml2": CBML2_NS, "nif": NIF_NS})
