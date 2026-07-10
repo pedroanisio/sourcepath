@@ -88,6 +88,20 @@ def test_load_env_skips_blank_placeholder_values(tmp_path, clean_env):
     assert "QUOTED_BLANK" not in os.environ
 
 
+def test_load_env_wildcard_placeholder_is_inert(tmp_path, clean_env):
+    """`PREFIX_*=` documents a dynamic variable family (.env.example
+    convention the drift gate requires as an uncommented line). Blank ⇒
+    inert placeholder, skipped before key validation; giving the wildcard
+    an actual value is still a hard error."""
+    env = tmp_path / ".env"
+    env.write_text("CBM_MCP_TIMEOUT_*=\nREAL=x\n")
+    assert settings.load_env(env) == {"REAL": "x"}
+
+    env.write_text("CBM_MCP_TIMEOUT_*=20\n")
+    with pytest.raises(ValueError, match="invalid key"):
+        settings.load_env(env)
+
+
 def test_load_env_never_overrides_real_environment(tmp_path, clean_env):
     os.environ["PLAIN"] = "from-real-env"
     env = tmp_path / ".env"

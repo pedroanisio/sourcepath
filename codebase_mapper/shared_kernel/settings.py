@@ -86,8 +86,6 @@ def load_env(path: Path | None = None, *, override: bool = False) -> dict[str, s
             raise ValueError(f"{path}: line {lineno} is not KEY=VALUE: {raw!r}")
         key, value = line.split("=", 1)
         key = key.strip()
-        if not _KEY_RE.match(key):
-            raise ValueError(f"{path}: line {lineno} has invalid key {key!r}")
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
@@ -96,7 +94,11 @@ def load_env(path: Path | None = None, *, override: bool = False) -> dict[str, s
             # not a value: exporting "" would make every consumer see the
             # variable as set-but-empty and silently disable its documented
             # unset-fallback (e.g. CORS default origins, CBM_UNSHALLOW).
+            # Skipped BEFORE key validation: .env.example documents dynamic
+            # variable families as `PREFIX_*=` placeholder lines.
             continue
+        if not _KEY_RE.match(key):
+            raise ValueError(f"{path}: line {lineno} has invalid key {key!r}")
         if override or key not in os.environ:
             os.environ[key] = value
             applied[key] = value
