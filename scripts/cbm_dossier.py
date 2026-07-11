@@ -240,13 +240,22 @@ class StatStrip(Flowable):
             c.drawCentredString(x + cw / 2, 3.2 * mm, lab.upper())
 
 class HBars(Flowable):
-    def __init__(self, pairs, w=COL_W, rowh=5.4 * mm, color=GREY, label_w=None):
+    def __init__(self, pairs, w=COL_W, rowh=5.4 * mm, color=GREY, label_w=None,
+                 total=None):
         super().__init__(); self.pairs, self.w, self.rowh, self.color = pairs, w, rowh, color
         self.label_w = label_w or min(58 * mm, w * 0.42)
+        # total: when given, each value also shows its share of that total
+        # (pass the FULL population, not the displayed top-N slice).
+        self.total = total
+    def _val(self, v):
+        if not self.total:
+            return f"{v:,}"
+        pct = 100.0 * v / self.total
+        return f"{v:,} · " + ("<1%" if 0 < pct < 1 else f"{pct:.0f}%")
     def wrap(self, aw, ah): return self.w, self.rowh * len(self.pairs)
     def draw(self):
         c = self.canv; mx = max((v for _, v in self.pairs), default=1)
-        bw = self.w - self.label_w - 18 * mm
+        bw = self.w - self.label_w - (26 * mm if self.total else 18 * mm)
         for i, (k, v) in enumerate(self.pairs):
             y = self.rowh * (len(self.pairs) - 1 - i) + 1.2
             c.setFillColor(INK); c.setFont("Mono", 7.4)
@@ -255,7 +264,7 @@ class HBars(Flowable):
             c.setFillColor(self.color)
             c.rect(self.label_w, y, bw * v / mx, self.rowh - 2.6, 0, 1)
             c.setFillColor(GREY); c.setFont("Mono", 7.4)
-            c.drawRightString(self.w, y + 1, f"{v:,}")
+            c.drawRightString(self.w, y + 1, self._val(v))
 
 class Wheel(Flowable):
     def __init__(self, abox, size=118 * mm): super().__init__(); self.a, self.size = abox, size
@@ -742,6 +751,35 @@ class UMLProfileRL(Flowable):
             c.setFillColor(GREY); c.setFont("Mono", 5.4)
             c.drawString(x + 2 * mm, yt - 7 * mm, "extends " + meta)
 
+class PaletteSwatches(Flowable):
+    """The design system's palette, rendered. Chips and hex labels are both
+    derived from the module constants, so the page cannot disagree with the
+    ink actually used to print it."""
+    ITEMS = (("paper", PAPER), ("carbon ink", INK), ("warm grey", GREY),
+             ("pale", PALE), ("faint", FAINT), ("vermilion", VERM),
+             ("slate", SLATE), ("card", CARD))
+
+    def __init__(self, w=COL_W):
+        super().__init__(); self.w = w
+
+    def wrap(self, aw, ah):
+        return self.w, 17 * mm
+
+    def draw(self):
+        c = self.canv
+        cell = self.w / len(self.ITEMS)
+        for i, (name, col) in enumerate(self.ITEMS):
+            x = i * cell
+            c.setFillColor(col)
+            c.setStrokeColor(PALE); c.setLineWidth(0.4)
+            # hairline border keeps the paper-on-paper chips visible
+            c.rect(x, 7.2 * mm, cell - 2.6 * mm, 8.2 * mm, stroke=1, fill=1)
+            c.setFillColor(INK); c.setFont("Mono", 6.2)
+            c.drawString(x, 4.2 * mm, name)
+            c.setFillColor(GREY)
+            c.drawString(x, 1.6 * mm, "#" + col.hexval()[2:])
+
+
 class ToneScale(Flowable):
     def __init__(self, w=COL_W): super().__init__(); self.w = w
     def wrap(self, aw, ah): return self.w, 7 * mm
@@ -848,6 +886,121 @@ def h2(story, t): story.append(Paragraph(t + ixs(t), S["h2"]))
 def h3(story, t): story.append(Paragraph(t.upper() + ixs(t), S["h3"]))
 def p(story, t, st="body"): story.append(Paragraph(t, S[st]))
 
+
+# ---- Terms used in this dossier -------------------------------------------
+# Reading contract (phase-2 guard, pinned by tests/test_cbm_dossier.py):
+# no term of art may land on the reader before its definition. Two
+# categories are mandatory and both render in front matter, before any
+# chapter uses them:
+#   GLOSSARY_CONCEPTS — ordinary terms of the software trade;
+#   GLOSSARY_HOUSE    — terms this report styles/defines for itself.
+# The three evidence labels (FACT / DERIVED / UNVERIFIED) are house terms
+# too, but their canonical definition lives on the Provenance & candor
+# page (before everything); the glossary points there rather than
+# defining them twice.
+
+GLOSSARY_CONCEPTS = [
+    ("repository / commit",
+     "The codebase at one exact version, named by its commit hash (Git\u2019s "
+     "convention). Every number in this dossier is about that version and no "
+     "other."),
+    ("AST (abstract syntax tree)",
+     "From compiler construction: the parsed structure of a source file \u2014 "
+     "what the parser understood, recorded machine-readably."),
+    ("measured fact (triple)",
+     "An RDF triple \u2014 the W3C\u2019s standard three-part statement, such "
+     "as \u201cfile A imports file B\u201d \u2014 stored in a queryable "
+     "graph. This dossier says \u201cmeasured fact\u201d because that is what "
+     "each one is."),
+    ("import edge / in-degree / out-degree",
+     "Graph-theory terms: an import link between two files; how many files "
+     "import a given file; how many it imports in turn. Imports count "
+     "wherever the statement appears \u2014 top level, guarded (try/if), or "
+     "inside a function \u2014 and the underlying record tags which."),
+    ("dependency pin",
+     "Packaging practice: an exact third-party version recorded by the "
+     "project\u2019s lockfile \u2014 the supply chain, stated precisely."),
+    ("SHA-256 hash",
+     "From NIST\u2019s Secure Hash Standard (FIPS 180-4): a fingerprint of a "
+     "file\u2019s exact bytes. Change one byte and the fingerprint changes; "
+     "used here to verify every input."),
+    ("SHACL",
+     "The W3C\u2019s Shapes Constraint Language (2017): a standard way to "
+     "check that recorded facts have the promised shape. \u201cConforms\u201d "
+     "means the data passed its own schema check."),
+    ("embedding",
+     "From representation learning: a numeric encoding of a piece of code, "
+     "built so that similar code gets nearby numbers."),
+    ("t-SNE projection",
+     "A dimensionality-reduction technique (van der Maaten & Hinton, 2008) "
+     "that flattens embeddings onto a 2-D map. It preserves local "
+     "neighborhoods, not global distances \u2014 which is why positions are "
+     "labeled DERIVED."),
+    ("SKOS",
+     "The W3C\u2019s Simple Knowledge Organization System (2009): a standard "
+     "format for vocabularies, used here to store terms extracted from the "
+     "code\u2019s own names."),
+    ("heuristic",
+     "General usage in computing: a quick rule-of-thumb estimate. Always "
+     "reported as an estimate here, and always beatable by a real "
+     "measurement."),
+    ("UML",
+     "The Object Management Group\u2019s Unified Modeling Language (version "
+     "2.5): the industry-standard diagram language for software structure."),
+]
+
+GLOSSARY_HOUSE = [
+    ("FACT / DERIVED / UNVERIFIED",
+     "This report\u2019s three evidence labels, printed on every figure \u2014 "
+     "defined in full on the Provenance & candor page at the front of this "
+     "volume."),
+    ("bundle",
+     "Local term: the complete set of artifacts the mapper emits for one "
+     "repository \u2014 the only input this dossier reads. No relation to a "
+     "JavaScript bundle."),
+    ("layers L1\u2013L4",
+     "Local staging vocabulary for the mapper\u2019s pipeline: L1 measured "
+     "structure, L2 code chunks and their embeddings, L3 the shared "
+     "vocabulary, L4 AI-written enrichment."),
+    ("concept (as used here)",
+     "Local, narrower than the everyday word: one term extracted from the "
+     "identifiers this team writes (stored as a SKOS concept). A concept "
+     "here is evidence of vocabulary, not a claim about ideas."),
+    ("receipt",
+     "Local term, borrowed from commerce deliberately: the per-sentence "
+     "provenance record on any AI-written text \u2014 model, prompt hash, "
+     "timestamp, target hash \u2014 enough for a person to check the "
+     "sentence."),
+    ("chokepoint",
+     "Local use of an ordinary word: a file imported by many others \u2014 "
+     "where a change ripples widest through the team\u2019s code."),
+    ("interchange",
+     "Local, from the transit metaphor: a file that serves two or more "
+     "subsystems at once \u2014 the connective tissue of the package."),
+    ("metro / line / station",
+     "Local view names, in the tradition of Harry Beck\u2019s 1933 London "
+     "Underground diagram: one line per subsystem; a file earns a station "
+     "by import traffic."),
+    ("district",
+     "Local name for an embedding-space neighborhood \u2014 files that "
+     "resemble each other in content, wherever they sit in the folder tree. "
+     "The civic word is metaphor, nothing more."),
+    ("register",
+     "Local term, borrowed from bookkeeping: an appendix table that lists "
+     "evidence in full, deliberately plain."),
+    ("zero-AST / silent zero",
+     "Local diagnostic terms: a file the parser read without error yet "
+     "produced no structure for \u2014 counted and listed."),
+    ("blob store",
+     "Local name for the bundle\u2019s content-addressed copy of every file "
+     "version (the same technique behind Git\u2019s object store); it is "
+     "what makes byte-exact reconstruction possible."),
+    ("Measured Ink",
+     "The local name of this report\u2019s design system \u2014 paper, inks, "
+     "and type \u2014 reused across every dossier so polish never varies by "
+     "run."),
+]
+
 # ----------------------------------------------------------------------------- build
 def build(args):
     register_fonts(args.font_dir); make_styles()
@@ -927,28 +1080,34 @@ def build(args):
          "Every hash recomputed; the manifest's self-check re-read"
          + (", re-validated with a second engine this run" if shacl_live is not None else "") + "."),
         ("inventory", True, "Inventory census",
-         "Files by language and type; the parser's own coverage confession."),
-        ("graph", True, "Mechanical graph",
-         "Vocabulary, chokepoints, interchanges, external surface, pinned releases."),
+         "Files by language and type, and an honest account of what the parser "
+         "could and could not read."),
+        ("graph", True, "The dependency map",
+         "Which files the rest of the code leans on, what the project pulls in "
+         "from outside, and which versions are pinned."),
         ("tests", True, "Test evidence",
          "Two measurements of test linkage; a precision finding and its fix."),
         ("metro", True, "The metro",
-         "Transit map with measured topology; one dossier per line."),
+         "The codebase drawn as a transit map — one line per subsystem, "
+         "stations where the code actually connects."),
         ("uml", True, "UML views",
          "All 14 UML 2.5 types accounted for: drawn from data or refused with the missing artifact named."),
         ("districts", True, "The districts",
-         "The semantic city; directory demoted to paint."),
-        ("concepts", True, "Concept stratum",
-         "The vocabulary the codebase speaks, ranked by breadth."),
-        ("ai", True, "AI layer",
-         "Receipts: provenance completeness measured across every record."),
+         "Files grouped by what they mean to the people who wrote them, "
+         "not by where they sit in the folder tree."),
+        ("concepts", True, "Shared vocabulary",
+         "The words the team actually uses in this code, ranked by reach."),
+        ("ai", True, "What the AI wrote",
+         "Every AI-written sentence, with the receipts that let a person "
+         "check it."),
         ("abox", bool(abox), f"{len((abox or {}).get('dims', []))} dimensions",
          "Architecture classification, confidence-tagged, unverified by design."),
         ("decomp", bool(decomp), "Decomposition",
          f"{(decomp or {}).get('n_parts', 0)} parts and the complete register."),
         ("bplan", bool(bplan), "Reconstruction",
          f"{(bplan or {}).get('n_steps', 0)} ordered steps; skips explained, violations flagged."),
-        ("findings", True, "Findings", "Actions, evidence-ranked."),
+        ("findings", True, "Findings",
+         "What to do about it, ranked by the strength of the evidence."),
     ]
     chap_no, cn, dm = {}, 2, []
     for key, present, title, what in glance:
@@ -977,14 +1136,16 @@ def build(args):
            Paragraph(repo, ParagraphStyle("cv", fontName="Disp", fontSize=56, leading=58,
                                           textColor=INK)),
            Spacer(0, 4 * mm),
-           Paragraph("A verified account of one repository — every measured fact, every "
-                     "derived view, every AI-written sentence with its receipt.", S["deck"]),
+           Paragraph("A verified account of one repository, written for the people who "
+                     "work on it and decide about it. Every number was measured from the "
+                     "code, every computed view says how it was made, and anything an AI "
+                     "wrote is labeled and traceable.", S["deck"]),
            Spacer(0, 10 * mm),
            StatStrip([(man.get("counts", {}).get("files", 0), "files"),
-                      (G["triples"], "triples"), (G["edges"], "import edges"),
+                      (G["triples"], "measured facts"), (G["edges"], "import edges"),
                       ((decomp or {}).get("n_parts", 0), "parts"),
                       ((bplan or {}).get("n_steps", 0), "rebuild steps"),
-                      ((enrich or {}).get("n", 0), "receipts")]),
+                      ((enrich or {}).get("n", 0), "AI receipts")]),
            Spacer(0, 9 * mm)]
     hero = Wheel(abox, size=104 * mm) if abox else (BarcodeRL(bplan, h=60 * mm) if bplan else Rule())
     hero.hAlign = "CENTER"
@@ -994,6 +1155,9 @@ def build(args):
                            f"codebase-mapper v{meta['tool']}", "Mono", GREY, 8), S["mono"]),
            Paragraph(cspan(f"input hashes independently recomputed at typesetting time: "
                            f"{ok}/{tot} match", "MonoB", INK, 8), S["mono"]),
+           Paragraph(cspan("every figure describes this commit alone — a "
+                           "recount against any other tree will differ",
+                           "Mono", GREY, 8), S["mono"]),
            Paragraph(cspan("MEASURED INK · PLATE SERIES", "Caps", PALE, 8), S["mono"])]
 
     # ---- provenance / disclaimer (shared banner label: CR pins the phrase)
@@ -1001,12 +1165,14 @@ def build(args):
     h3(st, "Provenance & candor")
     p(st, f"<b>{CR.EVIDENCE_BANNER_LABEL}.</b> "
           "No statement in this dossier should be taken for granted. Every figure is "
-          "labeled by its epistemic class: <b>FACT</b> — measured mechanically from the "
-          "artifacts and reproducible by query; <b>DERIVED</b> — computed by a disclosed, "
-          "seeded procedure (projections, clusterings, layouts); <b>UNVERIFIED</b> — "
-          "authored by a language model and pending validation, shipped only with a "
-          "per-sentence receipt (model, prompt hash, timestamp, target hash). Where a "
-          "layer is absent from the run, the dossier says so instead of hiding it.")
+          "labeled by how it came to be known: <b>FACT</b> — measured mechanically from "
+          "the code and reproducible by anyone who re-runs the query; <b>DERIVED</b> — "
+          "computed from those facts by a disclosed, repeatable procedure (projections, "
+          "clusterings, layouts); <b>UNVERIFIED</b> — written by a language model and "
+          "not yet checked by a person, shipped only with a per-sentence receipt "
+          "(model, prompt hash, timestamp, target hash) so a person can check it. "
+          "Where a layer is absent from the run, the dossier says so instead of "
+          "hiding it.")
     p(st, f"Inputs verified at typesetting time: {ok}/{tot} sha-256 recomputations match "
           f"the manifest's claims. SHACL self-check: "
           f"{'conforms' if shacl_manifest else 'see chapter 02'}."
@@ -1031,14 +1197,15 @@ def build(args):
                    if interp_last != chap_no["ai"] else
                    f"Chapter {chap_no['ai']} quotes the interpretive layer "
                    "with its confidence intact")
-    p(st, f"Chapters 01\u2013{chap_no['tests']} establish trust: verification, "
-          f"inventory, and the mechanical graph. Chapters {chap_no['metro']}\u2013"
-          f"{chap_no['concepts']} are the cartography \u2014 four designed views of "
-          f"one measured territory, one of them in UML. {interp_span}; Chapter "
-          f"{chap_no['findings']} states findings and recommendations. The registers "
-          "that follow are the audit trail \u2014 complete, typeset, and dull on "
-          "purpose \u2014 and a remissive index closes the volume with every subject "
-          "and every name.")
+    p(st, f"Chapters 01\u2013{chap_no['tests']} earn your trust first: what was "
+          "verified, what is actually in the repository, and which files the rest "
+          f"of the code depends on. Chapters {chap_no['metro']}\u2013"
+          f"{chap_no['concepts']} are maps \u2014 four designed views of the same "
+          f"measured territory, one of them in UML. {interp_span}; Chapter "
+          f"{chap_no['findings']} says what a maintainer should do about it. The "
+          "registers that follow are the audit trail \u2014 complete, typeset, and "
+          "dull on purpose \u2014 and an index of every subject and every name "
+          "closes the volume.")
     h3(st, "Design system (reusable)")
     p(st, "Paper <b>#f5efe3</b>, carbon ink <b>#1c1a17</b>, warm greys for the derived, "
           "and one vermilion <b>#c8371f</b> reserved for risk and living lines; slate "
@@ -1048,21 +1215,53 @@ def build(args):
           "16/20 mm margins, 03-digit folios, hairline rules. Every component on these "
           "pages — stat strips, tone scales, receipt cards, registers — is a reusable "
           "primitive of the reporting template.")
+    st.append(KeepTogether([Spacer(0, 2.5 * mm),
+        PaletteSwatches(),
+        figcap("The palette itself — every color rendered beside its value, "
+               "drawn from the same constants that ink this page.",
+               "design system")]))
     st.append(KeepTogether([Spacer(0, 3 * mm),
         StatStrip([("A4", "format"), ("5", "typefaces"), ("6", "colors"),
                    ("2", "column grids"), ("03", "folio digits"), ("1", "accent")]),
         figcap("Design tokens at a glance.", "design system")]))
 
+    # ---- terms used in this dossier: both definition categories render
+    # here, in front matter, before any chapter can use them.
+    st += [PageBreak(), Spacer(0, 6 * mm)]
+    h3(st, "Terms used in this dossier")
+    p(st, "Nothing in this volume should hinge on vocabulary you were never "
+          "given, so every term is defined here before any chapter uses it. "
+          "Two kinds appear. Established terms come from a named tradition "
+          "\u2014 a standard, a discipline, a cited paper \u2014 and each "
+          "entry says which. House terms are this report\u2019s own "
+          "coinages; each entry says so, and where a house term reuses an "
+          "ordinary word, the entry says what it does and does not mean "
+          "here.")
+    h3(st, "Terms of the trade")
+    st.append(data_table(["term", "meaning"],
+                         [[term, meaning] for term, meaning in GLOSSARY_CONCEPTS],
+                         [0.26, 0.74]))
+    h3(st, "House terms \u2014 styled by this report")
+    st.append(data_table(["term", "meaning"],
+                         [[term, meaning] for term, meaning in GLOSSARY_HOUSE],
+                         [0.26, 0.74]))
+
     # ================= CH 1 executive summary
     chapter(st, "Executive summary", sections=["What the evidence supports","The repository can be rebuilt on paper","Three risks worth an executive\u2019s minute"],
-            deck=f"One repository, {man.get('counts',{}).get('files',0):,} files, read four ways: "
-            "verified, mapped, decomposed, and rebuilt on paper — with receipts.")
+            deck=f"One repository, {man.get('counts',{}).get('files',0):,} files, "
+            "read so a person can act on it: inputs verified, dependencies "
+            "mapped, and every AI-written sentence labeled.")
     p(st, f"<b>{repo}</b> at commit {cspan(meta['commit'][:12],'Mono')} was mapped by "
-          f"codebase-mapper v{meta['tool']}. The mechanical layer extracted "
-          f"{G['triples']:,} triples including {G['edges']:,} internal import edges; the "
-          f"AI layer wrote {(enrich or {}).get('n',0):,} summaries, every one carrying a "
-          "verifiable receipt. This dossier typesets the complete output set and its "
-          "audit trail.", "lead")
+          f"codebase-mapper v{meta['tool']}. Measured directly from the code: "
+          f"{G['triples']:,} recorded facts, including {G['edges']:,} import links "
+          f"between the project's own files. "
+          + (f"On top of that, an AI wrote {(enrich or {}).get('n',0):,} "
+             "summaries, each carrying a verifiable receipt. "
+             if (enrich or {}).get("n", 0) else
+             "No AI enrichment was run on this bundle, so nothing in this "
+             "dossier is machine-written prose. ")
+          + "This dossier typesets the complete picture and its audit "
+          "trail.", "lead")
     h2(st, "What the evidence supports")
     bullets = [
         f"<b>Integrity holds.</b> {ok}/{tot} artifact hashes recomputed and matched at "
@@ -1073,23 +1272,22 @@ def build(args):
         + ". FACT."]
     if G["chokepoints"] and G["interchanges"]:
         bullets.append(
-            f"<b>The structure has a spine.</b> Import mass concentrates in a small core: "
+            f"<b>The structure has a spine.</b> Most imports point at a small core: "
             f"the top chokepoint is imported {G['chokepoints'][0]['in']} times; "
             f"{len(G['interchanges'])} core files serve two or more subsystems, and "
             f"<b>{G['interchanges'][0]['file'].split('/')[-1]}</b> joins "
             f"{len(G['interchanges'][0]['lines'])}. FACT.")
     if te["n"] and tev["typed_import_edges"] > te["n"]:
         bullets.append(
-            f"<b>Test linkage is under-measured by the shipped heuristic.</b> "
-            f"{te['n']} heuristic edges versus "
-            f"{tev['typed_import_edges']} typed test→source import edges — "
-            "the graph both convicts its heuristic and supplies the replacement. FACT.")
+            f"<b>The tests touch more of the code than the quick estimate shows.</b> "
+            f"The shipped heuristic links {te['n']} test–source pairs; following the "
+            f"tests' actual imports finds {tev['typed_import_edges']} — the measured "
+            "imports are the more reliable picture, and Chapter 05 shows both. FACT.")
     if decomp or bplan or abox:
         bullets.append(
             "<b>The interpretive layers disclose themselves.</b> The decomposition and "
             "the reconstruction tag every judgment with confidence; the architecture "
-            "classification declares itself unverified until validated. That honesty is "
-            "a feature of the artifact, not of this dossier.")
+            "classification declares itself unverified until validated.")
     for t in bullets:
         p(st, t)
     if bplan:
@@ -1121,10 +1319,11 @@ def build(args):
 
     # ================= CH 2 verification
     chapter(st, "Verification", sections=["Hash audit — every claim recomputed","Blob store & byte-exact reconstruction","Schema conformance, two engines"],
-            deck="Before a single chart: every hash recomputed, every self-check re-run. "
-            "The dossier audits its own inputs.")
-    p(st, "The output set makes cryptographic claims about itself. At typesetting time "
-          "this dossier recomputed each one.")
+            deck="Before you read a single chart: every hash was recomputed and every "
+            "self-check re-run, so you don't have to take the inputs on trust.")
+    p(st, "The analysis makes cryptographic claims about its own inputs. At "
+          "typesetting time this dossier recomputed each one, so the reader "
+          "inherits checked numbers, not asserted ones.")
     rows = [[r["artifact"], r["claimed"] + "…",
              "match" if r["ok"] else ("MISMATCH" if r["ok"] is False else "n/a")]
             for r in hash_rows]
@@ -1155,8 +1354,8 @@ def build(args):
                       "chapter the others must survive. Every subsequent figure cites "
                       "artifacts that passed this audit." + ixs("sha-256") + ixs("hash audit")))
     h2(st, "The complete surface")
-    p(st, "Everything the mapper can emit, and what this run contained. Absence is "
-          "reported, never papered over.", "cap")
+    p(st, "Everything the mapper can emit, and what this run contained — "
+          "including what is absent.", "cap")
     ROLE = {"run_manifest.json": "run identity, counts, hash claims, self-checks",
             "inventory.ttl": "the graph — mechanical facts as RDF (Turtle)",
             "inventory.jsonld": "the same graph, JSON-LD serialization",
@@ -1167,7 +1366,7 @@ def build(args):
             "embeddings_meta.json": "embedding model, dimension, artifact hash claim",
             "concepts.json": "L3 concepts, per-path links, co-occurrence",
             "concepts_embeddings.npz": "concept vectors",
-            "ast_coverage.json": "parser coverage confession per language",
+            "ast_coverage.json": "what the parser could read, stated per language",
             "rust_items.jsonl": "Rust item stream (language-specific)",
             "blobs_dir": "content-addressed store of every file version",
             "abox": "arc4d3 dimension classification (companion)",
@@ -1190,21 +1389,33 @@ def build(args):
     st.append(figcap("The output surface of this run, discovered and sized at "
                      "typesetting time.", "FACT"))
 
+    p(st, "With the inputs verified, the numbers can be trusted enough to ask "
+          "the first substantive question: what is actually here?")
+
     # ================= CH 3 inventory
-    chapter(st, "Inventory census", sections=["Files by language","Files by classified type","AST coverage — the parser\u2019s confession"],
-            deck="What the mapper found on disk: files by language and type, and what the "
-            "parser honestly could and could not read.")
+    chapter(st, "Inventory census", sections=["Files by language","Files by classified type","AST coverage — what the parser could read"],
+            deck="What is actually in this repository: files by language and type, and "
+            "an honest account of what the parser could and could not read.")
+    p(st, "Before any judgment about structure or risk, a reader needs the "
+          "plain census: how much code, in which languages, and how much of it "
+          "the tooling could actually see. These counts are the denominators "
+          "every later chapter divides by — a coverage gap here quietly "
+          "weakens every figure downstream, which is why the parser's limits "
+          "are printed beside the totals rather than in a footnote.")
     c1 = sorted(man.get("files_by_language", {}).items(), key=lambda x: -x[1])[:9]
     c2 = sorted(man.get("files_by_type", {}).items(), key=lambda x: -x[1])
+    lang_total = sum(man.get("files_by_language", {}).values()) or 1
+    type_total = sum(man.get("files_by_type", {}).values()) or 1
     h2(st, "Files by language")
-    st.append(HBars(c1)); st.append(figcap("File count per detected language; “(none)” "
-                                           "covers prose and assets.", "FACT"))
+    st.append(HBars(c1, total=lang_total))
+    st.append(figcap("File count and share of the census per detected language; "
+                     "“(none)” covers prose and assets.", "FACT"))
     h2(st, "Files by classified type")
-    st.append(HBars(c2, color=SLATE))
+    st.append(HBars(c2, color=SLATE, total=type_total))
     st.append(figcap("Type classification drives every later split of source vs. test "
                      "vs. documentation.", "FACT"))
     if ast:
-        h2(st, "AST coverage — the parser's own confession")
+        h2(st, "AST coverage — what the parser could and could not read")
         rows = [[l["lang"], str(l["files"]), str(l["files_with_ast"]),
                  str(l["files_zero_ast"]), str(l["files_with_parse_errors"]),
                  str(l["symbols_extracted"]), str(l["imports_extracted"])]
@@ -1221,10 +1432,14 @@ def build(args):
                               "symbol entities were emitted (chunk-level symbol labels "
                               "exist). Configuration or regression; flagged, not hidden."))
 
+    p(st, "The census says what exists. It says nothing about how the pieces "
+          "hold together — which is where maintenance risk actually lives.")
+
     # ================= CH 4 graph layer
-    chapter(st, "The mechanical graph", sections=["Vocabulary & population","Import chokepoints","Interchanges & dossiers","External surface","Register D — pinned releases"],
-            deck=f"{G['triples']:,} triples of extracted fact on a W3C substrate — the layer "
-            "everything else must answer to.")
+    chapter(st, "The dependency map", sections=["Vocabulary & population","Import chokepoints","Interchanges & dossiers","External surface","Register D — pinned releases"],
+            deck=f"{G['triples']:,} facts measured straight from the code: which files "
+            "the rest of the project leans on, and what it pulls in from outside. "
+            "Every later view is built on this layer.")
     h2(st, "Vocabulary in use")
     st.append(HBars(G["ns"][:8]))
     st.append(figcap("Triples per namespace: mapper vocabularies beside SKOS and "
@@ -1232,17 +1447,29 @@ def build(args):
     h2(st, "Population by class")
     st.append(HBars(G["classes"][:9], color=SLATE))
     st.append(figcap("Instances per class across the graph.", "FACT"))
-    h2(st, "Import chokepoints")
-    rows = [[str(r["in"]), r["file"] + ixn(r["file"]), str(r["out"])] for r in G["chokepoints"][:12]]
-    st.append(data_table(["imported by", "file", "imports"], rows, [0.16, 0.68, 0.16],
-                         aligns={1: "m"}))
-    st.append(figcap("In-degree ranking. Re-export surfaces (__init__) and test "
-                     "infrastructure inflate honestly and are annotated in analysis.",
-                     "FACT"))
+    if G["chokepoints"]:
+        h2(st, "Import chokepoints")
+        p(st, "The question this table answers: if you change one file, how "
+              "far can the change reach? Rank files by how many others import "
+              "them, and the review priorities write themselves.")
+        rows = [[str(r["in"]), r["file"] + ixn(r["file"]), str(r["out"])] for r in G["chokepoints"][:12]]
+        st.append(data_table(["imported by", "file", "imports"], rows, [0.16, 0.68, 0.16],
+                             aligns={1: "m"}))
+        st.append(figcap("In-degree ranking. Re-export surfaces (__init__) and test "
+                         "infrastructure inflate honestly and are annotated in analysis.",
+                         "FACT"))
+        top = G["chokepoints"][0]
+        p(st, f"Concretely: an edit to {cspan(esc(top['file']), 'Mono')} can reach "
+              f"the {top['in']} files that import it. Whoever reviews changes "
+              "there is reviewing on behalf of all of them — a responsibility "
+              "worth naming in the team's review habits, not just in this "
+              "report.")
     h2(st, "Degree distribution")
-    p(st, "How import attention is spread across the source population: most files are "
-          "imported rarely or never; a thin head absorbs the graph's mass. The out-degree "
-          "panel includes tests, whose imports are the evidence of Chapter 05.")
+    p(st, "How widely the code leans on each file: most files are "
+          "imported rarely or never, while a small handful carry most of the "
+          "project's weight — those are the files a change touches everyone "
+          "through. The out-degree panel includes tests, whose imports are the "
+          "evidence of Chapter 05.")
     st.append(KeepTogether([
         Paragraph("IN-DEGREE (TIMES IMPORTED) — SOURCE FILES"
                   + ixs("In-degree (times imported) — source files"), S["h3"]),
@@ -1252,28 +1479,50 @@ def build(args):
                   + ixs("Out-degree (imports made) — source + test files"), S["h3"]),
         HBars(G["deg_hist"]["out"], rowh=5.0 * mm, color=SLATE)]))
     st.append(figcap("Degree histograms over the import graph.", "FACT"))
-    h2(st, "Interchanges — files serving several subsystems")
-    rows = [[i["file"], ", ".join(i["lines"]), str(len(i["lines"]))]
-            for i in G["interchanges"][:10]]
-    st.append(data_table(["core file", "importing subsystems", "n"],
-                         rows, [0.34, 0.54, 0.12], aligns={0: "m"}))
-    st.append(figcap("The connective tissue of the package.", "FACT"))
-    h2(st, "Interchange dossiers")
-    for i in G["interchanges"][:6]:
-        st.append(KeepTogether([Paragraph(
-            f'{cspan(esc(i["file"]), "MonoB", INK, 8)}{ixn(i["file"])}  '
-            f'{cspan("serves " + str(len(i["lines"])) + " subsystems", "Mono", VERM, 7)}<br/>'
-            f'{cspan(esc(", ".join(i["lines"])), "Mono", GREY, 6.8)}', S["cellg"]),
-            Spacer(0, 2.2 * mm)]))
-    st.append(CondPageBreak(70 * mm))
+    if G["interchanges"]:
+        h2(st, "Interchanges — files serving several subsystems")
+        p(st, "A chokepoint is heavily used; an interchange is heavily shared. "
+              "When one file serves several subsystems at once, the people who "
+              "own those subsystems are coupled to each other whether they "
+              "coordinate or not — these are the files where an interface "
+              "change needs the widest conversation.")
+        rows = [[i["file"], ", ".join(i["lines"]), str(len(i["lines"]))]
+                for i in G["interchanges"][:10]]
+        st.append(data_table(["core file", "importing subsystems", "n"],
+                             rows, [0.34, 0.54, 0.12], aligns={0: "m"}))
+        st.append(figcap("Files imported by two or more subsystems.", "FACT"))
+        for i in G["interchanges"][:6]:
+            st.append(KeepTogether([Paragraph(
+                f'{cspan(esc(i["file"]), "MonoB", INK, 8)}{ixn(i["file"])}  '
+                f'{cspan("serves " + str(len(i["lines"])) + " subsystems", "Mono", VERM, 7)}<br/>'
+                f'{cspan(esc(", ".join(i["lines"])), "Mono", GREY, 6.8)}', S["cellg"]),
+                Spacer(0, 2.2 * mm)]))
+        st.append(CondPageBreak(70 * mm))
+    else:
+        p(st, "No file in this repository is imported by two or more "
+              "subsystems. Whatever the subsystems share, they do not share "
+              "code — cross-cutting changes here travel through external "
+              "packages or conventions, not through common modules.")
     h2(st, "External surface")
+    p(st, "Internal structure is only half the dependency story. The chart "
+          "below counts which third-party packages the code actually imports. "
+          "Actually-imported is a more honest measure than "
+          "declared-in-the-manifest, and the gap between the two is usually "
+          "where dead dependencies hide.")
     st.append(HBars([(str(k).replace("pkg/", ""), v) for k, v in G["external"][:12]]))
     st.append(figcap(f"Most-imported external packages; {G['pins_n']} version pins "
                      "recorded in the graph.", "FACT"))
-    h2(st, "Register D — pinned releases, complete")
-    p(st, "Every dependency release the lockfile pins, as recorded in the graph "
-          "(cbm:pinsDependency → PackageRelease). The supply-chain surface, in full.", "cap")
+    if G["external"]:
+        xp, xn = G["external"][0]
+        p(st, f"The heaviest external habit is {cspan(esc(str(xp).replace('pkg/', '')), 'Mono')}, "
+              f"imported by {xn} files. Whoever owns dependency upgrades "
+              "should plan for that one first; the pinned list that follows "
+              "exists for exactly that purpose.")
     if pins_pairs:
+        h2(st, "Register D — pinned releases, complete")
+        p(st, "Every dependency release the lockfile pins, as recorded in the "
+              "graph. This is the project's supply chain stated precisely — the "
+              "list a security review or an upgrade plan starts from.", "cap")
         cols = 4; rows_n = math.ceil(len(pins_pairs) / cols)
         tbl = []
         for r_ in range(rows_n):
@@ -1291,6 +1540,10 @@ def build(args):
         st.append(t)
         st.append(figcap(f"{len(pins_pairs)} pinned releases.", "FACT"))
 
+    p(st, "A dependency map says where a change propagates. Whether the tests "
+          "would catch a bad change is a separate question — and this bundle "
+          "carries two answers that disagree.")
+
     # ================= CH 5 test evidence
     chapter(st, "Test evidence, measured twice", sections=["Two measurements of one question","The precision finding","Where typed evidence lands","Recommendation"],
             deck=f"The shipped heuristic said {te['n']:,}. The typed graph said "
@@ -1306,8 +1559,9 @@ def build(args):
         f0, c0 = te["top_objects"][0]
         st.append(callout("Precision finding",
                           f"{c0} of {te['n']} heuristic cbm:tests edges point at a single "
-                          f"file ({esc(f0)}) — a basename-collision signature. The map "
-                          "was queryable enough to convict its own heuristic. FACT."))
+                          f"file ({esc(f0)}) — the signature of a filename collision, "
+                          "not real coverage. The measured data is good enough to "
+                          "expose its own weakest estimate. FACT."))
     st.append(CondPageBreak(64 * mm))
     h2(st, "Where typed test evidence lands")
     st.append(HBars(tev["top_targets"]))
@@ -1320,10 +1574,24 @@ def build(args):
           + (f"{recall_x}×" if recall_x else "measurable")
           + " evidence gain. PROPOSAL.")
 
+    p(st, "The chapters so far established trust, contents, structure, and "
+          "test reach — in numbers. The next three redraw the same "
+          "measurements as maps: identical facts, but in shapes a person can "
+          "hold in memory and argue over at a whiteboard.")
+
     # ================= CH 6 metro
     chapter(st, "The metro", sections=["The map","Line dossiers, one per subsystem"],
             deck="A transit map of the package: stations earned by import degree, anchors "
-            "measured from the graph, geometry after Beck.")
+            "measured from the graph, geometry in the manner of Harry Beck\u2019s "
+            "Underground map.")
+    p(st, "Rankings tell you which files matter; they do not give you a shape "
+          "to remember. This view borrows the transit diagram because that "
+          "grammar was built for exactly this problem — many stops, few "
+          "crossings, readable at a glance — and because its one dishonesty "
+          "(geometry) is disclosed while everything topological is measured. "
+          "This page is the frozen print of an explorable map: "
+          "`cbm.py cartogram` builds the interactive companion from the same "
+          "bundle, with zoom, search, and per-file relations.")
     st.append(MetroRL(G["_metro"]))
     st.append(figcap("Core line in vermilion; each branch joins at the core file it "
                      "imports most (measured). Dashed = re-export coupling only. "
@@ -1533,12 +1801,17 @@ def build(args):
                            "samples": [str(m).split(":", 1)[-1][:24]
                                        for m in members[:3]]})
 
+    p(st, "The metro is this report's own invention, and it stays inside "
+          "these pages. The next chapter asks the same structural questions "
+          "in the industry's shared drawing language, so the answers can "
+          "travel — into design reviews, wikis, and conversations that never "
+          "see this document.")
     chapter(st, "UML views",
             deck="All fourteen UML 2.5 diagram types, accounted for: seven drawn "
                  "from data, seven refused in print with the missing artifact named. "
                  "Full coverage of the taxonomy \u2014 never at the price of fiction.",
             sections=["Capability across the full UML 2.5 taxonomy",
-                      "Package diagram", "Object diagram \u2014 the substrate, instanced",
+                      "Package diagram", "Object diagram \u2014 real objects from this repository",
                       "Component diagram", "Composite structure \u2014 measured ports",
                       "Class diagrams \u2014 the measured hierarchies",
                       "Activity diagram \u2014 the build's concurrency",
@@ -1586,7 +1859,7 @@ def build(args):
                      "arrows are \u00abimport\u00bb dependencies with measured edge "
                      "counts. Same topology as the metro, different grammar.", "FACT"))
     if obj_data:
-        h2(st, "Object diagram \u2014 the substrate, instanced")
+        h2(st, "Object diagram \u2014 real objects from this repository")
         st.append(UMLObjectRL(obj_data))
         st.append(figcap("One entity from the graph, UML-instanced: underlined "
                          "instance names, literal slots, typed links exactly as the "
@@ -1606,7 +1879,7 @@ def build(args):
                          "the package \u2014 where the world actually plugs in.",
                          "FACT"))
     h2(st, "Class diagrams \u2014 the measured hierarchies")
-    p(st, f"At typesetting time the dossier parsed {files_parsed} main-package source "
+    p(st, f"While generating this dossier, the pipeline parsed {files_parsed} main-package source "
           f"blobs ({parse_fail} syntax failures) and found {len(classes)} classes with "
           f"{sum(1 for a, b in gen_edges if b in classes)} internal generalization "
           "edges. The two largest hierarchies follow; every blob is addressed by its "
@@ -1639,13 +1912,27 @@ def build(args):
           "recorded), state machine (no behavioral model), and deployment (no "
           "runtime topology). The house rule stands: a diagram without data is "
           "fiction. When the enricher gains call-graph extraction, four of the "
-          "seven become measurable at once; until then the refusal is part of the "
-          "deliverable.")
+          "seven become measurable at once; until then, an empty frame would be "
+          "decoration, and the dossier leaves it out.")
+
+    p(st, "Everything drawn so far follows the structure the authors "
+          "declared: imports, packages, classes. The next view sets "
+          "declarations aside and asks what the code itself says.")
 
     # ================= CH 7 districts
-    chapter(st, "The districts", sections=["The semantic city","Method, lineage & limits"],
-            deck="The semantic city: positions from meaning, the directory tree demoted to "
-            "paint — answering the software-city literature's own critique.")
+    chapter(st, "The districts", sections=["The map of meaning","Method, lineage & limits"],
+            deck="Files placed near the files they resemble in meaning — the folder "
+            "tree shows as color only. Neighborhoods here are the ones the "
+            "authors actually built, whether or not the directories agree.")
+    p(st, "Two files can live far apart in the folder tree and still be the "
+          "same kind of code. Embeddings — the numeric encodings from the "
+          "terms pages — make that similarity measurable; the map below "
+          "places every file next to its nearest kin and lets the folder "
+          "tree appear only as color. Where color and position disagree, the "
+          "organization on disk is telling a different story from the code "
+          "itself — and that disagreement is worth a maintainer's attention. "
+          "(To explore rather than inspect, the interactive cartogram — "
+          "`cbm.py cartogram` — renders the same bundle as zoomable regions.)")
     st.append(Scatter(G["_district"], Y))
     st.append(figcap("Each dot a file placed by its embedding centroid (t-SNE, seed 42); "
                      "solid = source sized by length, hollow = tests. Tests settle "
@@ -1689,19 +1976,24 @@ def build(args):
           "neighborhoods, not global distances — separation between far regions is not "
           "a metric." + ixs("t-SNE") + " Lineage: Wettel &amp; Lanza (CodeCity, ICSE\u201908); CodeCharta; "
           "Steinbr\u00fcckner &amp; Lewerentz (Evo-Streets); Kuhn et al. (Software "
-          "Cartography); Bruls et al. (Squarified Treemaps). Stated limits are part of "
-          "the deliverable.")
+          "Cartography); Bruls et al. (Squarified Treemaps).")
+
+    p(st, "Districts group files by overall similarity. The next chapter "
+          "narrows the lens to single words — the vocabulary this team "
+          "actually writes, which is also the vocabulary a new engineer has "
+          "to learn first.")
 
     # ================= CH 8 concepts
-    chapter(st, "The concept stratum", sections=["Atlas — top 120 by breadth"],
-            deck=(f"{n_concepts:,} concepts lexicalized across the corpus — the "
-                  "vocabulary the codebase actually speaks." if n_concepts else
-                  "No L3 concept layer was provided for this run — the absence is "
-                  "reported, not papered over."))
+    chapter(st, "Shared vocabulary", sections=["Atlas — top 120 by breadth"],
+            deck=(f"{n_concepts:,} distinct terms drawn from the names this team "
+                  "writes — the working vocabulary of the codebase, ranked by "
+                  "how far each term reaches." if n_concepts else
+                  "No L3 vocabulary layer was built for this run; this chapter "
+                  "records that absence and nothing else."))
     if conc_top:
         p(st, f"The L3 layer links {n_concepts:,} SKOS concepts to chunks and "
               "paths. The atlas below ranks concepts by breadth: the number of paths in "
-              "which each appears. Breadth is a FACT of the corpus; the concept "
+              "which each appears. Breadth is a FACT measured across the codebase; the concept "
               "inventory itself is DERIVED (lexicalization).")
         third = math.ceil(len(conc_top[:120]) / 3)
         colsets = [conc_top[:third], conc_top[third:2 * third], conc_top[2 * third:120]]
@@ -1721,10 +2013,16 @@ def build(args):
         st.append(t)
         st.append(figcap("Concept atlas — top 120 by path breadth.", "FACT (breadth)"))
 
+    p(st, "Everything to this point was measured or computed. What follows "
+          "is different in kind — it was written, by a model — and the rules "
+          "for reading it change accordingly.")
+
     # ================= CH 9 L4 receipts method
-    chapter(st, "The AI layer and its receipts", sections=["Provenance completeness, measured","Two exemplars","Known gap: the 4,000-character cap"],
-            deck="Every model-written sentence ships with model, prompt hash, timestamp, and "
-            "target hash. Here is the proof, then the ledger.")
+    chapter(st, "What the AI wrote", sections=["Provenance completeness, measured","Two exemplars","Known gap: the 4,000-character cap"],
+            deck="Everything in this chapter was written by a language model, not "
+            "measured — read it as one reviewer's draft. Each sentence ships with "
+            "its receipt (model, prompt hash, timestamp, target hash) so a person "
+            "can check it.")
     if enrich:
         pc = 100 * enrich["provenance_complete"] / max(1, enrich["n"])
         st.append(StatStrip([(enrich["n"], "records"),
@@ -1892,6 +2190,9 @@ def build(args):
     chapter(st, "Findings & recommendations",
             sections=[f"{len(recs)} actions, evidence-ranked"],
             deck="What the measurements demand, in the order a maintainer should act.")
+    p(st, "Nothing below is new evidence. Each recommendation follows from a "
+          "chapter that already made its case; if that chapter did not "
+          "convince you, its recommendation should not either.")
     for i, (t, b, tag) in enumerate(recs, 1):
         st.append(KeepTogether([
             Paragraph(f'{ixs("R" + str(i) + " — " + t)}{cspan(f"R{i}", "MonoB", VERM, 9)}  <b>{esc(t)}</b> '
@@ -1928,8 +2229,8 @@ def build(args):
     # ================= Appendix E: parser disclosure
     if ast:
         chapter(st, "Register E — parser disclosure",
-                deck="Files the extractor could not structure, listed rather than "
-                     "hidden: zero-AST inputs and silent zero-symbol sources.",
+                deck="Every file the extractor could not structure, by name: "
+                     "zero-AST inputs and silent zero-symbol sources.",
                 kicker="REGISTER",
                 sections=["Zero-AST files by language", "Silent zero-symbol list", "Extractor notes"])
         h2(st, "Zero-AST population")
@@ -2000,7 +2301,7 @@ def build(args):
           "SC — all OFL. Palette: Measured Ink. Format A4, margins 16/20 mm. "
           "This document re-verifies its inputs every time it is generated.", "cellg")
 
-    chapter(st, "Remissive index",
+    chapter(st, "Index",
             deck="Every subject and every name — files, subsystems, packages — with "
                  "the pages where its evidence lives. Built from anchors placed "
                  "throughout the dossier and regenerated, like everything here, on "
@@ -2009,7 +2310,7 @@ def build(args):
             sections=["Subjects", "Names — files, subsystems, packages"])
     h2(st, "Subjects")
     st.append(sub_ix)
-    st += [SetChapter(f"{CH['n']:02d}", "Remissive index — names"),
+    st += [SetChapter(f"{CH['n']:02d}", "Index — names"),
            NextPageTemplate("ledger"), PageBreak()]
     st.append(Paragraph("Names — files, subsystems, packages" +
                         ixs("Names — files  subsystems  packages"), S["h2"]))
