@@ -1,0 +1,4 @@
+# Integrity of the vendored third-party dependency. Source files are tracked by git;
+# generated artifacts (data/, *-standalone.html, preview.png) are build outputs, not pinned.
+f2094bbf6141b359722c4fe454eb6c4b0f0e42cc10cc7af921fc158fceb86539  vendor/d3.v7.min.js
+3e6849627f74ff73c257a3ae1efb574015d94fc1035c05ec3c15805165efcbc4  vendor/D3-LICENSE.txt

@@ -51,3 +51,11 @@ docs/reports/
 linux-proc.tar
 drift-risk-map.svg
 drift-risk-map.md
+_process/
+
+# cbm-cartogram — generated / large artifacts (rebuild via `make build-cartogram INVENTORY=...`)
+tools/cbm-cartogram/data/atlas-data.js
+tools/cbm-cartogram/data/atlas-data.json
+tools/cbm-cartogram/cbm-cartogram-standalone.html
+tools/cbm-cartogram/preview.png
+tools/cbm-cartogram/node_modules/

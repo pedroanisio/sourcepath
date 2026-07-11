@@ -114,6 +114,7 @@ REPORTING_TESTS := \
 	$(TESTS_DIR)/test_env_settings.py
 
 CBM_REPORT_MANIFEST := tools/cbm-report/Cargo.toml
+CBM_CARTOGRAM_DIR   := tools/cbm-cartogram
 
 .DEFAULT_GOAL := help
 
@@ -139,7 +140,7 @@ lint: ## Enforce import boundaries (mirrors .github/workflows/lint.yml).
 # ----------------------------------------------------------------- tests
 
 .PHONY: test
-test: test-core test-vocab test-langs test-rust test-llm-offline test-drift test-units test-backend test-docs test-report-rs ## Run the full offline test surface (skips Ollama-dependent verifiers).
+test: test-core test-vocab test-langs test-rust test-llm-offline test-drift test-units test-backend test-docs test-report-rs test-cartogram ## Run the full offline test surface (skips Ollama-dependent verifiers).
 
 .PHONY: test-core
 test-core: ## Core round-trip, L2/L3, xrefs, repo summary.
@@ -212,6 +213,30 @@ test-report-rs: ## Rust cbm-report crate unit tests (disclosed skip when cargo i
 .PHONY: test-ui
 test-ui: ## Frontend (vitest) test suite.
 	cd $(UI_DIR) && npm test
+
+.PHONY: test-cartogram
+test-cartogram: ## Cartogram model tests (Node); disclosed skip when node is absent.
+	@if command -v node >/dev/null 2>&1; then \
+		cd $(CBM_CARTOGRAM_DIR) && node --test tests/*.test.mjs; \
+	else \
+		echo "test-cartogram: node not found — Cartogram tests SKIPPED (disclosed, not silent)"; \
+	fi
+
+.PHONY: lint-cartogram
+lint-cartogram: ## Parse-check Cartogram JS (node --check); disclosed skip when node is absent.
+	@if command -v node >/dev/null 2>&1; then \
+		for f in $(CBM_CARTOGRAM_DIR)/src/*.js $(CBM_CARTOGRAM_DIR)/tools/*.mjs; do node --check "$$f" || exit 1; done; \
+		echo "lint-cartogram: all Cartogram JS parses"; \
+	else \
+		echo "lint-cartogram: node not found — SKIPPED (disclosed, not silent)"; \
+	fi
+
+.PHONY: build-cartogram
+build-cartogram: ## Build the standalone Cartogram HTML from a cbm bundle. Requires INVENTORY=<path/to/inventory.jsonld> (produced by scripts/run_l3.py or run_l4.py).
+	@command -v node >/dev/null 2>&1 || { echo "build-cartogram: node not found — cannot build"; exit 1; }
+	@test -n "$(INVENTORY)" || { echo "build-cartogram: set INVENTORY=<inventory.jsonld> from a run_l3.py/run_l4.py bundle (a bare codebase-mapper L1 bundle has no concepts/chunks and is rejected)"; exit 2; }
+	node $(CBM_CARTOGRAM_DIR)/tools/normalize-inventory.mjs "$(INVENTORY)" $(CBM_CARTOGRAM_DIR)/data/atlas-data.js
+	node $(CBM_CARTOGRAM_DIR)/tools/build-standalone.mjs
 
 # ----------------------------------------------------------------- pipelines
 
