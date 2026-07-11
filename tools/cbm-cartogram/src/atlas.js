@@ -43,6 +43,11 @@
     for (const key of Object.keys(vars)) rootStyle.setProperty(key, vars[key]);
     document.documentElement.style.colorScheme = mode;
     Object.assign(COLORS, CartogramThemes.canvasColors(themeId, mode));
+    const swatchEl = document.querySelector("#theme-swatch");
+    if (swatchEl) {
+      swatchEl.innerHTML = CartogramThemes.swatch(themeId, mode)
+        .map((color) => `<i style="background:${color}"></i>`).join("");
+    }
     writeStored(THEME_STORE, themeId);
     writeStored(MODE_STORE, mode);
     if (redraw !== false && typeof scheduleDraw === "function") scheduleDraw();

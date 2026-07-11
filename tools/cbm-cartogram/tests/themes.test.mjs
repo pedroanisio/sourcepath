@@ -112,3 +112,38 @@ test("unknown theme or mode fails loudly", () => {
   assert.throws(() => Themes.resolve("nope", "dark"), /unknown|not found/i);
   assert.throws(() => Themes.resolve("default", "bogus"), /mode/i);
 });
+
+test("swatch() returns a preview strip drawn from the resolved palette", () => {
+  assert.equal(typeof Themes.swatch, "function");
+  for (const id of PRESETS) {
+    for (const mode of MODES) {
+      const strip = Themes.swatch(id, mode);
+      assert.ok(Array.isArray(strip), `swatch ${id}/${mode} must be an array`);
+      assert.ok(strip.length >= 5 && strip.length <= 8, `swatch ${id}/${mode} length out of range: ${strip.length}`);
+      const palette = new Set(Object.values(Themes.resolve(id, mode)));
+      for (const c of strip) {
+        assert.ok(isColor(c), `swatch ${id}/${mode} has a non-color entry`);
+        assert.ok(palette.has(c), `swatch ${id}/${mode} color ${c} is not part of the resolved palette`);
+      }
+    }
+  }
+});
+
+test("swatch() is mode-sensitive (dark and light previews differ)", () => {
+  for (const id of PRESETS) {
+    const dark = Themes.swatch(id, "dark").join("|");
+    const light = Themes.swatch(id, "light").join("|");
+    assert.notEqual(dark, light, `swatch for ${id} should differ between dark and light`);
+  }
+});
+
+test("swatch() carries the projection identity (import + test hues)", () => {
+  for (const id of PRESETS) {
+    for (const mode of MODES) {
+      const strip = Themes.swatch(id, mode);
+      const tokens = Themes.resolve(id, mode);
+      assert.ok(strip.includes(tokens.importEdge), `swatch ${id}/${mode} must include the import hue`);
+      assert.ok(strip.includes(tokens.testEdge), `swatch ${id}/${mode} must include the test hue`);
+    }
+  }
+});

@@ -94,9 +94,10 @@ semantic facts.
 Cartogram ships six palettes — **Default**, **Crimson Classic**, **Cyan Circuit**,
 **Ultramarine Gold**, **Forest Amber**, **Graphite Magenta** — each with a **dark**
 and **light** mode. Pick one from the top-bar selector; the light/dark toggle sits
-beside it, and your choice persists in `localStorage`. Every color resolves from a
-single source (`src/themes.js`) that drives both the Canvas renderer and the CSS
-chrome, so the two never drift.
+beside it, a live **swatch strip** previews the selected palette, and your choice
+persists in `localStorage`. Every color — including the swatch preview — resolves
+from a single source (`src/themes.js`) that drives both the Canvas renderer and the
+CSS chrome, so the two never drift and the preview can never go stale.
 
 ### Custom palettes (API)
 

@@ -118,6 +118,10 @@
     "--success": "success", "--warning": "warning", "--danger": "danger",
   };
 
+  // Ordered representative colors for a compact palette-preview strip (the
+  // "embed the styling" surface): projection identity first, then accents.
+  const SWATCH_TOKENS = ["importEdge", "secondaryImport", "external", "testEdge", "quality", "node"];
+
   const isColor = (v) => typeof v === "string" && v.trim().length > 0;
   const registry = new Map();
 
@@ -172,6 +176,11 @@
   function canvasColors(id, mode) { return project(CANVAS_MAP, id, mode); }
   function cssVars(id, mode) { return project(CSS_MAP, id, mode); }
 
+  function swatch(id, mode) {
+    const tokens = resolve(id, mode);
+    return SWATCH_TOKENS.map((k) => tokens[k]);
+  }
+
   // register the built-in studies (validates them at load — a typo fails loudly)
   for (const p of PRESETS) {
     register({ id: p.id, label: p.label, inheritDefaults: true, modes: { dark: p.dark, light: p.light } });
@@ -181,6 +190,6 @@
     REQUIRED_TOKENS: Object.freeze(REQUIRED_TOKENS.slice()),
     MODES: Object.freeze(MODES.slice()),
     DEFAULT_ID: "default",
-    list, get, has, resolve, canvasColors, cssVars, register,
+    list, get, has, resolve, canvasColors, cssVars, swatch, register,
   });
 })(typeof window !== "undefined" ? window : globalThis);

@@ -18,8 +18,8 @@ This is a point-in-time snapshot. The authoritative gate is `make test-cartogram
 
 ## Automated model tests
 
-- Tests executed: 19
-- Passed: 19
+- Tests executed: 22
+- Passed: 22
 - Failed: 0
 
 Validated properties (model):
@@ -44,7 +44,10 @@ Validated properties (theme system, `src/themes.js`):
 15. the historical CSS-vs-canvas palette drift is unified to one value per concept;
 16. `register()` accepts a complete custom theme and rejects an incomplete one (guardrail);
 17. `inheritDefaults` layers brand overrides over the default palette without dropping neutrals;
-18. an unknown theme or mode fails loudly.
+18. an unknown theme or mode fails loudly;
+19. `swatch()` returns a preview strip drawn only from the resolved palette;
+20. `swatch()` is mode-sensitive (dark and light previews differ);
+21. `swatch()` carries the projection identity (import + test hues).
 
 ## Browser smoke test
 
