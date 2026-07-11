@@ -26,7 +26,17 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir, "scripts"))
 import cbm  # noqa: E402
 
-ALL_COMMANDS = ("report", "report-rs", "dossier", "pdf", "site", "repair")
+ALL_COMMANDS = tuple(cbm.COMMANDS)
+
+
+def test_docstring_lists_every_command():
+    """M14 drift class, pinned: the module docstring's command table has
+    silently omitted new commands twice (terrain, then walkthrough/verify).
+    Every COMMANDS key must appear in the docstring."""
+    for command in cbm.COMMANDS:
+        assert f"\n    {command} " in cbm.__doc__ or \
+            f"\n    {command}\n" in cbm.__doc__, \
+            f"cbm.py docstring omits {command!r}"
 
 
 def test_no_args_prints_usage_and_exits_2(capsys):

@@ -42,6 +42,8 @@ python scripts/cbm.py <command> [options]
   dossier    A4 PDF dossier, typeset with the Measured Ink design system
   pdf        Render an authored Markdown report to a themed PDF
   site       Generate the static bundle-browser site
+  cartogram    Interactive Cartogram map (regions + import/test flows)
+  verify       Re-verify a bundle's hash claims / quality gate
   repair       Apply post-hoc data-quality fixes to an emitted bundle
   terrain      SourcePath 3D code-terrain map (self-contained HTML)
   walkthrough  Narrated five-scene customer walkthrough (HTML)

@@ -107,3 +107,43 @@ def test_pals_framing_is_present(site):
                       for p in _pages(site) if p.parent == site)
     assert "PALS" in corpus
     assert "unverified" in corpus.lower()
+
+
+def test_l1_bundle_site_has_no_map_page(site):
+    """The Cartogram needs an L3 bundle; on an L1-only bundle the site must
+    skip the Map page (disclosed in the build log), never link a dead nav
+    entry."""
+    assert not (site / "map.html").exists()
+    assert 'map.html' not in (site / "index.html").read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(__import__("shutil").which("node") is None,
+                    reason="node not installed")
+def test_l3_bundle_site_gets_interactive_map_page(tmp_path):
+    """With an L3 bundle and Node available, the site gains the interactive
+    Cartogram as map.html and every page's nav links it."""
+    repo = tmp_path / "repo"
+    (repo / "pkg").mkdir(parents=True)
+    (repo / "pkg" / "__init__.py").write_text("")
+    (repo / "pkg" / "core.py").write_text("def helper():\n    return 42\n")
+    (repo / "app.py").write_text(
+        "from pkg import core\n\ndef main():\n    return core.helper()\n")
+    (repo / "test_app.py").write_text(
+        "import app\n\ndef test_m():\n    assert app.main() == 42\n")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                    "commit", "-qm", "f"], cwd=repo, check=True)
+    bundle = tmp_path / "bundle"
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "run_l3.py"),
+         "--repo", str(repo), "--out", str(bundle), "--backend", "hash"],
+        cwd=ROOT, check=True, capture_output=True)
+
+    out = tmp_path / "site"
+    rc = G.main(["--bundle", str(bundle), "--output", str(out)])
+    assert rc in (0, None)
+    map_page = out / "map.html"
+    assert map_page.is_file() and map_page.stat().st_size > 100_000
+    index = (out / "index.html").read_text(encoding="utf-8")
+    assert 'href="map.html"' in index and ">Map<" in index

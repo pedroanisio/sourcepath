@@ -10,12 +10,16 @@ Usage:
     python scripts/cbm.py <command> --help
 
 Commands:
-    report     Structural report (HTML / MD / JSON) from a bundle
-    report-rs  Rust-rendered PDF report (streams multi-GB inventories)
-    dossier    A4 PDF dossier, typeset with the Measured Ink design system
-    pdf        Render an authored Markdown report to a themed PDF
-    site       Generate the static bundle-browser site
-    repair     Apply post-hoc data-quality fixes to an emitted bundle
+    report       Structural report (HTML / MD / JSON) from a bundle
+    report-rs    Rust-rendered PDF report (streams multi-GB inventories)
+    dossier      A4 PDF dossier, typeset with the Measured Ink design system
+    pdf          Render an authored Markdown report to a themed PDF
+    site         Generate the static bundle-browser site
+    cartogram    Interactive Cartogram map (regions + import/test flows)
+    terrain      3D WebGL code terrain (or --style tolkien, 2D map)
+    walkthrough  Narrated five-scene customer walkthrough (HTML)
+    verify       Re-verify a bundle's hash claims
+    repair       Apply post-hoc data-quality fixes to an emitted bundle
 
 Commands import lazily: a missing optional dependency (e.g. reportlab
 for ``dossier``, weasyprint for ``pdf``) breaks only that command, with
@@ -43,6 +47,8 @@ COMMANDS: dict[str, tuple[str, str]] = {
             "Render an authored Markdown report to a themed PDF"),
     "site": ("generate_static_site",
              "Generate the static bundle-browser site"),
+    "cartogram": ("cbm_cartogram",
+                  "Interactive Cartogram map (regions + import/test flows)"),
     "repair": ("cbm_repair",
                "Apply post-hoc data-quality fixes to an emitted bundle"),
     "verify": ("cbm_verify",

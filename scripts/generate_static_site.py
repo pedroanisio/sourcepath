@@ -335,6 +335,7 @@ def page_shell(page: Page, repo_name: str, generated_at: str) -> str:
             ("files.html", "Files"),
             ("concepts.html", "Concepts"),
             ("graph.html", "Graph"),
+            *_EXTRA_NAV,
         )
     )
     legend = (
@@ -2173,9 +2174,45 @@ def parse_args(argv: list[str] | None = None) -> Options:
     )
 
 
+# Extra nav entries added by optional companion artifacts (today: the
+# interactive Cartogram map). Reset per main() run; page_shell reads it.
+_EXTRA_NAV: list[tuple[str, str]] = []
+
+
+def _try_build_cartogram(bundle_dir: Path, output_dir: Path) -> None:
+    """Build the interactive Cartogram as ``map.html`` when possible.
+
+    The Cartogram is the explorable companion to the site's static pages —
+    same bundle, zoomable regions and import/test flows. It needs Node and
+    an L3 bundle; every skip is disclosed on the build log rather than
+    leaving a silently absent page.
+    """
+    import shutil as _shutil
+
+    if _shutil.which("node") is None:
+        print("[site] cartogram skipped: node not found (interactive map "
+              "needs Node >= 20)")
+        return
+    if not (bundle_dir / "inventory.jsonld").is_file():
+        print("[site] cartogram skipped: bundle has no inventory.jsonld")
+        return
+    import cbm_cartogram
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    rc = cbm_cartogram.main([str(bundle_dir), "-o",
+                             str(output_dir / "map.html")])
+    if rc == 0:
+        _EXTRA_NAV.append(("map.html", "Map"))
+    else:
+        print("[site] cartogram skipped: build failed (reason above; an L1 "
+              "bundle is refused — produce one with scripts/run_l3.py)")
+
+
 def main(argv: list[str] | None = None) -> int:
     opts = parse_args(argv)
     print(f"Loading bundle: {opts.bundle_dir}")
+    _EXTRA_NAV.clear()
+    _try_build_cartogram(opts.bundle_dir, opts.output_dir)
     stats = generate(opts)
     index = opts.output_dir / "index.html"
     print(
