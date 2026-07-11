@@ -29,6 +29,16 @@ sidecars, concept sidecars, `xrefs.jsonl`, `ast_coverage.json`
 (extraction-coverage honesty table — see
 [ast-coverage.md](ast-coverage.md)), and optional `blobs/`.
 
+Import semantics (Python): imports are extracted from **every scope**, and
+each extracted record carries a `scope` tag — `module` (unconditional
+top-level statement), `guarded` (module level inside `if TYPE_CHECKING:`,
+`try/except`, or a loop), or `nested` (inside a function/method/class, i.e.
+a lazy dependency). All three feed `cbm:imports` / `cbm:importsExternal`
+edges: a lazy import is still a real file-to-file dependency. When an
+unresolved top-level name is also a declared dependency, the external
+classification wins over the internal suffix heuristic (name-shadowing
+guard); an exact internal module-path match still wins over both.
+
 `inventory.ttl` is typed by the SHACL shapes shipped alongside it as
 `shapes.shacl.ttl`; the canonical Pydantic mirror for Python consumers
 is

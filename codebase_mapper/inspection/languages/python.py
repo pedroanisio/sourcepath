@@ -122,20 +122,51 @@ def extract_python_ast_summary(content: bytes, path: str) -> tuple[dict | None, 
     funcs: list[str] = []
     classes: list[str] = []
     for node in tree.body:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                imports.append({"kind": "import", "module": alias.name, "lineno": node.lineno})
-        elif isinstance(node, ast.ImportFrom):
-            mod = node.module or ""
-            for alias in node.names:
-                imports.append({
-                    "kind": "from", "module": mod, "name": alias.name,
-                    "level": node.level, "lineno": node.lineno,
-                })
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             funcs.append(node.name)
         elif isinstance(node, ast.ClassDef):
             classes.append(node.name)
+
+    # Imports are extracted from EVERY scope, not just module level, and each
+    # record carries where it was found:
+    #   scope == "module"  — unconditional top-level statement (a hard
+    #                        dependency at import time);
+    #   scope == "guarded" — module level but inside a compound statement
+    #                        (`if TYPE_CHECKING:`, `try/except ImportError`,
+    #                        loops) — real, but conditional at import time;
+    #   scope == "nested"  — inside a function/method/class body (a lazy
+    #                        dependency, paid on call instead of on import).
+    # All three feed import resolution: a lazy import is still a true
+    # file-to-file dependency, and dropping it silently understated the
+    # dependency graph (found by an external recount of a shipped bundle).
+    def _collect(nodes: Any, scope: str) -> None:
+        for node in nodes:
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.append({"kind": "import", "module": alias.name,
+                                    "lineno": node.lineno, "scope": scope})
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                for alias in node.names:
+                    imports.append({
+                        "kind": "from", "module": mod, "name": alias.name,
+                        "level": node.level, "lineno": node.lineno,
+                        "scope": scope,
+                    })
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                   ast.ClassDef)):
+                _collect(node.body, "nested")
+            else:
+                # any other compound construct (If/Try + its ExceptHandlers,
+                # With/For/While, Match + its cases): inner imports exist but
+                # are conditional at import time. Recursing generically keeps
+                # non-stmt containers (excepthandler, match_case) covered.
+                inner = ("guarded"
+                         if scope == "module" and isinstance(node, ast.stmt)
+                         else scope)
+                _collect(ast.iter_child_nodes(node), inner)
+
+    _collect(tree.body, "module")
 
     ast_json: Any = None
     try:
@@ -219,8 +250,18 @@ def build_python_module_index(
 def resolve_python_imports(
     src_path: str, summary: dict, roots: list[str],
     by_module: dict[str, str], by_suffix: dict[str, str],
+    declared_external: frozenset[str] | set[str] = frozenset(),
 ) -> tuple[list[str], list[str]]:
-    """Returns (in_repo_dst_paths, unresolved_top_level_module_names)."""
+    """Returns (in_repo_dst_paths, unresolved_top_level_module_names).
+
+    ``declared_external`` guards the suffix heuristic against name
+    shadowing: the suffix index maps any unique dotted-suffix of an
+    internal module to its file, so a repo file like ``tools/psycopg.py``
+    would silently capture every ``import psycopg`` in the tree. When the
+    top-level name is a declared dependency, the exact-path match still
+    wins but the suffix *heuristic* defers to the external
+    classification.
+    """
     dst: set[str] = set()
     unresolved: set[str] = set()
     src_pkg: list[str] = []
@@ -255,7 +296,8 @@ def resolve_python_imports(
         if module:
             if module in by_module:
                 dst.add(by_module[module])
-            elif module in by_suffix:
+            elif (module in by_suffix
+                  and module.split(".", 1)[0] not in declared_external):
                 dst.add(by_suffix[module])
             else:
                 # Track the top-level name for external-package matching.
