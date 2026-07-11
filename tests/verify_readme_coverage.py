@@ -33,7 +33,7 @@ LEDGER = os.path.join(ROOT, "docs", "goals", "tiobe-top50.yaml")
 
 # First-class languages that are deliberately NOT in the TIOBE-50 ledger
 # (config/markup formats). Kept here as the single source for the extra set.
-NON_TIOBE_FIRST_CLASS = ("HTML", "CSS", "JSON", "YAML")
+NON_TIOBE_FIRST_CLASS = ("HTML", "CSS", "JSON", "YAML", "Shell")
 
 _BLOCK_RE = re.compile(
     r"<!--\s*first-class-langs:start\s*-->(?P<body>.*?)<!--\s*first-class-langs:end\s*-->",

@@ -56,6 +56,7 @@ from .languages.python import (
 )
 from .languages.ruby import extract_ruby_ast_summary, resolve_ruby_imports
 from .languages.rust import extract_rust_ast_summary, resolve_rust_imports
+from .languages.shell import extract_shell_ast_summary, resolve_shell_imports
 from .languages.sql import extract_sql_ast_summary, resolve_sql_imports
 from .languages.swift import extract_swift_ast_summary, resolve_swift_imports
 from .languages.tsjs import (
@@ -315,6 +316,18 @@ class YamlAnalyzer:
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
         return extract_yaml_ast_summary(content, record.path)
+
+
+class ShellAnalyzer:
+    """Shell via a state-machine neutralizer + brace-matched function scan."""
+    name = "lang_shell"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "shell"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_shell_ast_summary(content, record.path)
 
 
 # ---------------------------------------------------------------------------
@@ -670,6 +683,19 @@ class YamlResolver:
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
+class ShellResolver:
+    name = "resolve_shell"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "shell" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_shell_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -718,16 +744,16 @@ _BUILTIN_ANALYZERS = (
     CppAnalyzer, CssAnalyzer, DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, HtmlAnalyzer,
     JavaAnalyzer, JsonAnalyzer,
     KconfigAnalyzer, KotlinAnalyzer, MakeAnalyzer, ObjcAnalyzer,
-    PythonAnalyzer, RubyAnalyzer, RustAnalyzer, SqlAnalyzer, SwiftAnalyzer,
-    TsJsAnalyzer, YamlAnalyzer,
+    PythonAnalyzer, RubyAnalyzer, RustAnalyzer, ShellAnalyzer, SqlAnalyzer,
+    SwiftAnalyzer, TsJsAnalyzer, YamlAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
     CResolver, CfmlResolver, ClojureResolver, CobolResolver, CppResolver,
     CssResolver,
     DartResolver, GoResolver, HtmlResolver, JavaResolver, JsonResolver,
     KotlinResolver, ObjcResolver,
-    PythonResolver, RubyResolver, RustResolver, SqlResolver, SwiftResolver,
-    TsJsResolver, YamlResolver,
+    PythonResolver, RubyResolver, RustResolver, ShellResolver, SqlResolver,
+    SwiftResolver, TsJsResolver, YamlResolver,
 )
 
 

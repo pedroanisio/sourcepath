@@ -92,6 +92,7 @@ SUPPORTED_LANGUAGES: frozenset[str] = frozenset((
     "html",
     "css", "scss",
     "json", "yaml",
+    "shell",
 ))
 
 

@@ -108,6 +108,8 @@ class ChunkExtractor:
             chunks = _chunk_key_members(content, record)
         elif record.language == "yaml":
             chunks = _chunk_key_members(content, record)
+        elif record.language == "shell":
+            chunks = _chunk_shell(content, record)
         elif record.language is not None or record.type_ in {"documentation", "configuration", "test_code", "source_code"}:
             # whole-file chunk for any text file we recognize
             chunks = _whole_file_chunk(content, record.path)
@@ -1096,6 +1098,58 @@ def _chunk_key_members(content: bytes, record: FileRecord) -> list[dict]:
         chunk_bytes = chunk_text.encode("utf-8")
         chunks.append(apply_signature_fields({
             "kind": "class",
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# Shell
+# ---------------------------------------------------------------------------
+
+
+def _chunk_shell(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-function chunks from the Shell analyzer's ``items`` array.
+
+    Shell functions are callables, so they map to the "function" chunk kind
+    (CHUNK_KINDS = class/function/method/file).
+    """
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        if item.get("kind") != "function":
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": "function",
             "symbol": item["name"],
             "parent_symbol": item.get("parent"),
             "byte_start": item["byte_start"],
