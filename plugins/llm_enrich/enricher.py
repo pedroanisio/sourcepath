@@ -88,6 +88,10 @@ SUPPORTED_LANGUAGES: frozenset[str] = frozenset((
     # file summaries.
     "c", "cpp", "objective-c",
     "cfml",
+    "sql",
+    "html",
+    "css", "scss",
+    "json", "yaml",
 ))
 
 

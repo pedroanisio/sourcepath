@@ -49,7 +49,7 @@ languages:
     tiobe_rank_at_first_seen: 8
     first_seen: "2026-07"
     mapper_key: sql
-    status: detected
+    status: first_class
   - tiobe_name: "R"
     tiobe_rank_at_first_seen: 9
     first_seen: "2026-07"

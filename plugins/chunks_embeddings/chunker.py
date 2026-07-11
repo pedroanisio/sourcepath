@@ -98,6 +98,16 @@ class ChunkExtractor:
             chunks = _chunk_kotlin(content, record)
         elif record.language == "swift":
             chunks = _chunk_swift(content, record)
+        elif record.language == "sql":
+            chunks = _chunk_sql(content, record)
+        elif record.language == "html":
+            chunks = _chunk_html(content, record)
+        elif record.language in ("css", "scss"):
+            chunks = _chunk_css(content, record)
+        elif record.language == "json":
+            chunks = _chunk_key_members(content, record)
+        elif record.language == "yaml":
+            chunks = _chunk_key_members(content, record)
         elif record.language is not None or record.type_ in {"documentation", "configuration", "test_code", "source_code"}:
             # whole-file chunk for any text file we recognize
             chunks = _whole_file_chunk(content, record.path)
@@ -857,6 +867,239 @@ def _chunk_dart(content: bytes, record: FileRecord) -> list[dict]:
             "parent_symbol": item.get("parent"),
             "byte_start": byte_start,
             "byte_end": byte_end,
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# SQL
+# ---------------------------------------------------------------------------
+
+
+# SQL object kinds → canonical chunk kind (CHUNK_KINDS = class/function/
+# method/file). Structural objects map to "class"; executable objects
+# (functions, procedures, triggers) map to "function".
+_SQL_TO_CHUNK_KIND = {
+    "table": "class", "view": "class", "materialized_view": "class",
+    "type": "class", "schema": "class", "sequence": "class", "index": "class",
+    "function": "function", "procedure": "function", "trigger": "function",
+}
+_SQL_CHUNKABLE_KINDS = frozenset(_SQL_TO_CHUNK_KIND)
+
+
+def _chunk_sql(content: bytes, record: FileRecord) -> list[dict]:
+    """Build per-object chunks from the SQL analyzer's ``items`` array.
+
+    Same architecture as ``_chunk_dart``: the L1 analyzer is the single
+    source of declarations; this consumer only maps them to chunk records.
+    Falls back to a whole-file chunk when no objects were extracted.
+    """
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _SQL_CHUNKABLE_KINDS:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": _SQL_TO_CHUNK_KIND.get(kind, "class"),
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# HTML
+# ---------------------------------------------------------------------------
+
+
+# Structural HTML elements all map to the "class" chunk kind (CHUNK_KINDS =
+# class/function/method/file); they are containers, not callables.
+_HTML_CHUNKABLE_KINDS = frozenset({"element"})
+
+
+def _chunk_html(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-element chunks from the HTML analyzer's ``items`` array (nested
+    elements yield nested chunks, like class/method spans elsewhere)."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        if item.get("kind") not in _HTML_CHUNKABLE_KINDS:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": "class",
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# CSS / SCSS
+# ---------------------------------------------------------------------------
+
+
+# Rules and at-rule blocks map to "class" (structural); an SCSS @function maps
+# to "function" (CHUNK_KINDS = class/function/method/file).
+_CSS_TO_CHUNK_KIND = {
+    "rule": "class", "media": "class", "keyframes": "class",
+    "font_face": "class", "supports": "class", "at_rule": "class",
+    "mixin": "class", "function": "function",
+}
+_CSS_CHUNKABLE_KINDS = frozenset(_CSS_TO_CHUNK_KIND)
+
+
+def _chunk_css(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-rule chunks from the CSS/SCSS analyzer's ``items`` array."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        kind = item.get("kind")
+        if kind not in _CSS_CHUNKABLE_KINDS:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": _CSS_TO_CHUNK_KIND.get(kind, "class"),
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
+            "line_start": line_start,
+            "line_end": line_end,
+            "text": chunk_text,
+            "content_sha256": hashlib.sha256(chunk_bytes).hexdigest(),
+        }, signature_fields_from_item(item)))
+
+    if not chunks:
+        return _whole_file_chunk(content, record.path)
+    return chunks
+
+
+# ---------------------------------------------------------------------------
+# JSON / YAML (structural key members)
+# ---------------------------------------------------------------------------
+
+
+# JSON object members and YAML mapping keys are structural nodes → "class"
+# (CHUNK_KINDS = class/function/method/file). The JSON and YAML analyzers emit
+# the same {kind:"member", name, parent, spans} item shape, so one chunker
+# serves both.
+_MEMBER_CHUNKABLE_KINDS = frozenset({"member"})
+
+
+def _chunk_key_members(content: bytes, record: FileRecord) -> list[dict]:
+    """Per-key chunks from the JSON/YAML analyzer's ``items`` array."""
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return []
+    summary = record.ast_summary or {}
+    items = summary.get("items") or []
+    if not items:
+        return _whole_file_chunk(content, record.path)
+
+    src_lines = text.splitlines(keepends=True)
+    n_lines = len(src_lines)
+
+    chunks: list[dict] = []
+    for item in items:
+        if item.get("kind") not in _MEMBER_CHUNKABLE_KINDS:
+            continue
+        line_start = item["line_start"]
+        line_end = item["line_end"]
+        if line_end > n_lines:
+            line_end = n_lines
+        if line_start < 1 or line_start > n_lines:
+            continue
+        chunk_text = "".join(src_lines[line_start - 1: line_end])
+        chunk_bytes = chunk_text.encode("utf-8")
+        chunks.append(apply_signature_fields({
+            "kind": "class",
+            "symbol": item["name"],
+            "parent_symbol": item.get("parent"),
+            "byte_start": item["byte_start"],
+            "byte_end": item["byte_end"],
             "line_start": line_start,
             "line_end": line_end,
             "text": chunk_text,

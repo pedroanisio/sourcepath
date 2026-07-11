@@ -1,0 +1,21 @@
+@import "base.css";
+@import url("vendor/reset.css");
+@import "https://fonts.example.com/x.css";
+
+:root {
+  --brand: #ff6b62;
+}
+
+.button {
+  color: var(--brand);
+  padding: 8px 12px;   /* declaration ';' must not split a rule */
+}
+
+@media (max-width: 600px) {
+  .button { padding: 4px; }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

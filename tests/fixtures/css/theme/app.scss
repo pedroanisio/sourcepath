@@ -1,0 +1,9 @@
+@use "sass:math";
+@import "base.css";
+
+.card {
+  color: red;
+  // scss line comment: the ';' inside this comment must not split anything
+  .title { font-weight: bold; }
+  &:hover { color: blue; }
+}

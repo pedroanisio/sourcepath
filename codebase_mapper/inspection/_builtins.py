@@ -34,10 +34,14 @@ from .languages.lightweight import (
     extract_kconfig_summary, extract_make_summary,
 )
 from .languages.cpp import extract_cpp_ast_summary
+from .languages.css import extract_css_ast_summary, resolve_css_imports
 from .languages.dart import extract_dart_ast_summary, resolve_dart_imports
 from .languages.go import (
     extract_go_ast_summary, go_package_root, resolve_go_imports,
 )
+from .languages.html import extract_html_ast_summary, resolve_html_imports
+from .languages.json import extract_json_ast_summary, resolve_json_imports
+from .languages.yaml import extract_yaml_ast_summary, resolve_yaml_imports
 from .languages.java import (
     extract_java_ast_summary, resolve_java_imports,
 )
@@ -52,6 +56,7 @@ from .languages.python import (
 )
 from .languages.ruby import extract_ruby_ast_summary, resolve_ruby_imports
 from .languages.rust import extract_rust_ast_summary, resolve_rust_imports
+from .languages.sql import extract_sql_ast_summary, resolve_sql_imports
 from .languages.swift import extract_swift_ast_summary, resolve_swift_imports
 from .languages.tsjs import (
     extract_tsjs_ast_summary, resolve_tsjs_import, tsjs_bare_package_root,
@@ -252,6 +257,66 @@ class ClojureAnalyzer:
         return extract_clojure_ast_summary(content, record.path)
 
 
+class SqlAnalyzer:
+    name = "lang_sql"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        # Disciplined regex extractor (no tree-sitter), like Dart / COBOL.
+        return record.language == "sql"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_sql_ast_summary(content, record.path)
+
+
+class HtmlAnalyzer:
+    name = "lang_html"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        # Stack-based element parser (no tree-sitter), like Dart / SQL.
+        return record.language == "html"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_html_ast_summary(content, record.path)
+
+
+class CssAnalyzer:
+    """CSS and the SCSS dialect share one brace-scan extractor."""
+    name = "lang_css"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language in ("css", "scss")
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_css_ast_summary(content, record.path)
+
+
+class JsonAnalyzer:
+    """JSON via a hand-written recursive-descent AST parser (stdlib only)."""
+    name = "lang_json"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "json"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_json_ast_summary(content, record.path)
+
+
+class YamlAnalyzer:
+    """YAML via PyYAML's compose_all node AST (multi-document aware)."""
+    name = "lang_yaml"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "yaml"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_yaml_ast_summary(content, record.path)
+
+
 # ---------------------------------------------------------------------------
 # ImportResolver wrappers
 # ---------------------------------------------------------------------------
@@ -279,8 +344,10 @@ class PythonResolver:
         py_roots = ctx.indices["host:python_source_roots"]
         by_module = ctx.indices["host:python_by_module"]
         by_suffix = ctx.indices["host:python_by_suffix"]
+        declared = ctx.indices.get("host:declared_pkgs", set())
         in_repo, external = resolve_python_imports(
             record.path, _summary(record), py_roots, by_module, by_suffix,
+            declared_external=declared,
         )
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
@@ -538,6 +605,71 @@ class ClojureResolver:
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
+class SqlResolver:
+    name = "resolve_sql"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "sql" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_sql_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
+class HtmlResolver:
+    name = "resolve_html"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "html" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_html_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
+class CssResolver:
+    name = "resolve_css"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language in ("css", "scss") and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_css_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
+class JsonResolver:
+    name = "resolve_json"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "json" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_json_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
+class YamlResolver:
+    name = "resolve_yaml"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "yaml" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_yaml_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -583,14 +715,19 @@ class MakeAnalyzer(_LightweightAnalyzer):
 
 _BUILTIN_ANALYZERS = (
     AsmAnalyzer, CAnalyzer, CfmlAnalyzer, ClojureAnalyzer, CobolAnalyzer,
-    CppAnalyzer, DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, JavaAnalyzer,
+    CppAnalyzer, CssAnalyzer, DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, HtmlAnalyzer,
+    JavaAnalyzer, JsonAnalyzer,
     KconfigAnalyzer, KotlinAnalyzer, MakeAnalyzer, ObjcAnalyzer,
-    PythonAnalyzer, RubyAnalyzer, RustAnalyzer, SwiftAnalyzer, TsJsAnalyzer,
+    PythonAnalyzer, RubyAnalyzer, RustAnalyzer, SqlAnalyzer, SwiftAnalyzer,
+    TsJsAnalyzer, YamlAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
     CResolver, CfmlResolver, ClojureResolver, CobolResolver, CppResolver,
-    DartResolver, GoResolver, JavaResolver, KotlinResolver, ObjcResolver,
-    PythonResolver, RubyResolver, RustResolver, SwiftResolver, TsJsResolver,
+    CssResolver,
+    DartResolver, GoResolver, HtmlResolver, JavaResolver, JsonResolver,
+    KotlinResolver, ObjcResolver,
+    PythonResolver, RubyResolver, RustResolver, SqlResolver, SwiftResolver,
+    TsJsResolver, YamlResolver,
 )
 
 

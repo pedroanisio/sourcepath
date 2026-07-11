@@ -40,6 +40,7 @@ DRIFT_VERIFIERS := \
 	$(TESTS_DIR)/verify_report_predicates.py \
 	$(TESTS_DIR)/verify_report_rs_contract.py \
 	$(TESTS_DIR)/verify_requirements_mirror.py \
+	$(TESTS_DIR)/verify_readme_coverage.py \
 	$(TESTS_DIR)/verify_make_wiring.py
 
 CORE_VERIFIERS := \
@@ -66,6 +67,11 @@ VOCAB_VERIFIERS := \
 LANG_VERIFIERS := \
 	$(TESTS_DIR)/verify_cpp.py \
 	$(TESTS_DIR)/verify_dart.py \
+	$(TESTS_DIR)/verify_sql.py \
+	$(TESTS_DIR)/verify_html.py \
+	$(TESTS_DIR)/verify_css.py \
+	$(TESTS_DIR)/verify_json.py \
+	$(TESTS_DIR)/verify_yaml.py \
 	$(TESTS_DIR)/verify_java.py \
 	$(TESTS_DIR)/verify_go.py \
 	$(TESTS_DIR)/verify_clojure.py \

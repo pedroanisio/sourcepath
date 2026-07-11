@@ -222,6 +222,7 @@ python scripts/cbm.py dossier   --bundle _tmp/out   # 100+ page typeset A4 PDF d
 python scripts/cbm.py pdf docs/reports/<name>.md    # authored Markdown -> themed PDF
 python scripts/cbm.py site      --bundle _tmp/out --output _site  # offline static site
 python scripts/cbm.py repair    --bundle _tmp/out   # post-hoc data-quality fixes
+python scripts/cbm.py cartogram _tmp/out           # interactive D3 map (regions + flows)
 python scripts/cbm.py terrain   --bundle _tmp/out   # 3D code-terrain map (one HTML file)
 python scripts/cbm.py walkthrough --bundle _tmp/out # narrated five-scene demo page
 ```
@@ -232,6 +233,10 @@ analytics; `report-rs` ([tools/cbm-report](tools/cbm-report/README.md), Rust)
 streams `inventory.jsonld` from disk and recounts it independently of the
 manifest — built for bundles where a graph load is the bottleneck
 (`cargo build --release --manifest-path tools/cbm-report/Cargo.toml` first).
+
+`cartogram` ([tools/cbm-cartogram](tools/cbm-cartogram/README.md)) renders a
+self-contained D3 HTML map of any repository — directory regions with import
+and test projections — from a bundle's `inventory.jsonld`.
 
 `terrain` renders one self-contained WebGL2 HTML map: geography is a seeded
 t-SNE projection of per-directory mean chunk embeddings, elevation is chunk
@@ -382,10 +387,19 @@ copy-from-here when adding the next tree-sitter language.
 Each registry is iterated in `.name` sort order, so plugin authors use
 prefixes like `l2_20_embeddings` / `l3_20_concepts` to control load order
 across layers (L2 must run before L3 because L3 reads L2's index entry).
-Built-in `LanguageAnalyzer` / `ImportResolver` wrappers for the nine
-supported languages (C, Dart, Go, Kotlin, Python, Ruby, Rust, Swift,
-TS/JS) auto-register at host import; `reset_registries()` re-registers
-them after a clear.
+Built-in `LanguageAnalyzer` / `ImportResolver` wrappers auto-register at host
+import for every supported language; `reset_registries()` re-registers them
+after a clear. First-class languages (detection + analyzer + resolver + chunker
++ L4 summary + a verifier) — the TIOBE-50 first-class set tracked in
+[docs/goals/tiobe-top50.yaml](docs/goals/tiobe-top50.yaml), plus config/markup
+formats — are:
+
+<!-- first-class-langs:start -->
+Python, C, C++, JavaScript, TypeScript, Rust, Go, Swift, Ruby, Kotlin, Objective-C, Dart, CFML, SQL, HTML, CSS/SCSS, JSON, YAML
+<!-- first-class-langs:end -->
+
+`tests/verify_readme_coverage.py` fails `make check` if that list drifts from
+the ledger — a newly first-class language cannot be silently undocumented.
 
 ## Controlled vocabulary
 
@@ -472,6 +486,7 @@ python tests/verify_cpp.py                  # C++ classifier/analyzer/xref cover
 python tests/verify_dart.py                 # Dart analyzer/xref/generated-file coverage
 python tests/verify_dependency_hygiene.py   # dependency hygiene regression guard
 python tests/verify_language_goal.py        # TIOBE-50 goal ledger vs probed language support
+python tests/verify_readme_coverage.py      # README language + tools lists vs ledger/tools (drift guard)
 python tests/verify_doc_hygiene.py         # README disclaimer + active Markdown local links
 python tests/verify_excludes.py             # --exclude flag + .cbmignore behavior
 python tests/verify_java.py                 # Java analyzer/xref coverage
@@ -479,6 +494,11 @@ python tests/verify_objc.py                 # Objective-C / Objective-C++ covera
 python tests/verify_clojure.py              # Clojure analyzer/chunker/import-resolution coverage
 python tests/verify_cobol.py                # COBOL analyzer/chunker/xref coverage (fixed + free format)
 python tests/verify_go.py                   # Go analyzer/xref coverage
+python tests/verify_sql.py                   # SQL analyzer/resolver/chunker first-class coverage
+python tests/verify_html.py                  # HTML element-tree analyzer/resolver/chunker coverage
+python tests/verify_css.py                   # CSS/SCSS rule analyzer/resolver/chunker coverage
+python tests/verify_json.py                  # JSON recursive-descent AST analyzer/resolver/chunker coverage
+python tests/verify_yaml.py                  # YAML (PyYAML node AST) analyzer/resolver/chunker coverage
 python tests/verify_repo_source.py          # local path + Git URL --repo handling
 python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
