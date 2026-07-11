@@ -1,0 +1,24 @@
+name: backlog-governance
+on:
+  pull_request:
+    paths:
+      - "docs/BACKLOG.md"
+      - "docs/backlog.yml"
+      - "docs/schema/backlog.schema.json"
+      - "scripts/check-backlog-governance.mjs"
+  push:
+    branches: [main]
+    paths:
+      - "docs/BACKLOG.md"
+      - "docs/backlog.yml"
+      - "docs/schema/backlog.schema.json"
+      - "scripts/check-backlog-governance.mjs"
+jobs:
+  backlog-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-backlog-governance.mjs

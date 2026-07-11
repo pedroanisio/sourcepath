@@ -1,0 +1,10 @@
+{
+  "recipe": "add-backlog-governance",
+  "paths": [
+    "docs/BACKLOG.md",
+    "docs/backlog.yml",
+    "docs/schema/backlog.schema.json",
+    "scripts/check-backlog-governance.mjs",
+    ".github/workflows/backlog-governance.yml"
+  ]
+}

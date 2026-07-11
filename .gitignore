@@ -59,3 +59,7 @@ tools/cbm-cartogram/data/atlas-data.json
 tools/cbm-cartogram/cbm-cartogram-standalone.html
 tools/cbm-cartogram/preview.png
 tools/cbm-cartogram/node_modules/
+doc-quarantine.sh
+doc-hygiene-report.md
+quarantine-manifest.json
+quarantine-summaries.md

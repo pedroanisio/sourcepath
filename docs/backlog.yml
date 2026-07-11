@@ -1,0 +1,534 @@
+# =====================================================================
+# Backlog — canonical deferred-work registry
+#
+# System of record for deferred features, tech debt, known bugs, research,
+# and infrastructure work. Structure is defined by
+# docs/schema/backlog.schema.json. Validate with:
+#   node scripts/check-backlog-governance.mjs
+#
+# Rules:
+# - no time estimates; effort is complexity only
+# - every item traces to a real source
+# - ownership records the provenance boundary for concurrent work
+# - status claims, especially done, must remain backed by live evidence
+# =====================================================================
+
+disclaimer: |
+  No statement or premise not backed by a real logical definition or
+  verifiable reference should be taken for granted. Items here are grounded
+  in cited sources; where a claim is unverified it must be marked as such.
+
+metadata:
+  schema_version: "1.0.0"
+  generated_by: "recipe-forge add-backlog-governance"
+  generated_on: "2026-07-04"
+  system_of_record: "docs/backlog.yml"
+  total_items: 13
+  id_prefix: "BL"
+  decision_prefix: "D"
+  categories: ["feature","docs","ops","security","testing","tooling"]
+  types: ["feature","tech-debt","bug","infra","research"]
+  statuses: ["parked","ready","blocked","in-progress","done"]
+  complexities: ["XS","S","M","L","XL"]
+  priorities: ["low","medium","high","critical"]
+  owners: ["mine","concurrent","shared","unassigned"]
+
+items:
+  - id: "BL-001"
+    title: "Govern the backlog with schema and drift checks"
+    summary: "Install a canonical backlog registry, rendered view, schema, and validation command."
+    description: |
+      The backlog is a claim about current and deferred work, not a loose note.
+      Keep the structured YAML canonical, render Markdown from it, and validate
+      references, dependencies, ownership, and live evidence as the repo evolves.
+    category: "docs"
+    type: "infra"
+    status: "ready"
+    complexity: "S"
+    priority: "high"
+    rationale: "Backlog drift hides shipped work, duplicate work, and ungrounded requests."
+    acceptance_criteria:
+      - "docs/backlog.yml validates against docs/schema/backlog.schema.json."
+      - "docs/BACKLOG.md lists the same backlog item IDs as the YAML registry."
+      - "Done items with live checks still match the current tree."
+    references:
+      - "docs/BACKLOG.md"
+      - "docs/schema/backlog.schema.json"
+    owner: "shared"
+    source: "Initial backlog governance recipe installation."
+    tags: ["backlog", "governance", "drift"]
+
+  # ===================================================================
+  # UML reconstruction cluster (BL-002..BL-013)
+  # Grounded in the UML gap analysis of the extraction pipeline,
+  # 2026-07-11: what the bundle must additionally capture (or stop
+  # dropping) before correct, full class/sequence diagrams can be
+  # derived from a bundle by query alone. Package diagrams need no
+  # new data (cbm:imports / cbm:importsExternal suffice today).
+  # ===================================================================
+
+  - id: "BL-002"
+    title: "Member containment edges and qualified chunk identity"
+    summary: "Add class-to-member containment edges and queryable qualified chunk symbols so class boxes assemble by graph query, not string joins."
+    description: |
+      Refined 2026-07-11 (verification pass): chunk IRIs already encode file
+      path, parent symbol, and byte span (chunk_id built at
+      plugins/chunks_embeddings/embedder.py:121-129), so same-named classes
+      in different files never collided as IRIs. The real gaps were (1) no
+      containment predicate — cbml2:parentSymbol was a bare string literal,
+      with no memberOf/hasMember edge anywhere in the L2 vocabulary, so one
+      UML class box required a string join on (inFile, parentSymbol); and
+      (2) no queryable qualified name — the qualification lived only inside
+      the opaque URL-quoted chunk IRI. The dossier shows the downstream
+      failure mode: it keys its class tree by bare class name and silently
+      overwrites duplicates (scripts/cbm_dossier.py:1659).
+
+      Shipped: cbml2:memberOf (member chunk -> class chunk, resolved
+      mechanically by same-file symbol match with tightest-enclosing-byte-span
+      disambiguation and a unique-candidate fallback for out-of-line
+      definitions; ambiguity emits nothing) and cbml2:qualifiedSymbol
+      (Parent.symbol for members, symbol otherwise; file-kind chunks carry
+      none). Shapes extended, SHACL golden regenerated via
+      make regen-shacl-golden. Note: no L2 schema-version constant exists to
+      bump (verified repo-wide); the drift guards are the effective gate.
+    category: "feature"
+    type: "feature"
+    status: "done"
+    complexity: "S"
+    priority: "high"
+    rationale: "Without containment edges and a queryable qualified name, class boxes require fragile string joins on parentSymbol literals."
+    acceptance_criteria:
+      - "A single SPARQL query returns every method chunk of a given class chunk via one cbml2:memberOf edge, with no string joins on parentSymbol."
+      - "Two same-named classes in different files of a fixture resolve to distinct IRIs with distinct member sets (tests/test_chunk_containment.py)."
+      - "SHACL golden regenerated; shape/spec drift guards and the L2 end-to-end verifier stay green."
+    evidence_checks:
+      - kind: "grep"
+        path: "plugins/chunks_embeddings/graph_writer.py"
+        pattern: "memberOf"
+        expect: true
+      - kind: "grep"
+        path: "plugins/chunks_embeddings/graph_writer.py"
+        pattern: "qualifiedSymbol"
+        expect: true
+      - kind: "file-exists"
+        path: "tests/test_chunk_containment.py"
+      - kind: "grep"
+        path: "tests/fixtures/shapes_golden.ttl"
+        pattern: "memberOf"
+        expect: true
+    references:
+      - "plugins/chunks_embeddings/graph_writer.py:85-142"
+      - "plugins/chunks_embeddings/graph_writer.py:191-194"
+      - "plugins/chunks_embeddings/embedder.py:121-129"
+      - "tests/test_chunk_containment.py"
+      - "scripts/cbm_dossier.py:1659"
+    owner: "mine"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11; implemented same session (TDD, 11 tests)."
+    tags: ["uml", "l2-chunks", "identity", "graph-model"]
+
+  - id: "BL-003"
+    title: "Extract class fields and attributes with declared types"
+    summary: "Extract data members (fields, properties, instance variables) with their declared types as first-class chunk facts."
+    description: |
+      No language analyzer records class data members. Chunk kinds stop at
+      function/class/method/file (plugins/chunks_embeddings/chunker.py:20);
+      the signature contract has no member-fields entry
+      (plugins/chunks_embeddings/signatures.py:42-45). C++ walks
+      field_declaration_list only to locate methods and explicitly skips
+      plain data members (cpp.py:297, :335-337); Go touches it only to bound
+      the struct signature text (go.py:116-120). Closest existing
+      approximations are C file-scope variables and Clojure record field
+      vectors. Without fields the UML attribute compartment is empty, and
+      association, aggregation, composition, and multiplicity edges have no
+      basis at all — this is the single largest class-diagram gap. Add a
+      field chunk kind (or a members list on class chunks) carrying name,
+      declared type as written, and default, per language: Python AnnAssign
+      and annotated self-assignments, TS/JS class fields, Java/Kotlin/Swift
+      fields, Go and Rust struct fields, C++ member declarations. Honor the
+      omission contract; no inferred types.
+
+      Refined 2026-07-11: the closed kind vocabulary lives in the L2 plugin
+      only — CHUNK_KINDS at plugins/chunks_embeddings/graph_writer.py:60
+      feeds an sh:in shape constraint; emission/domain/inventory_schema.py
+      is L1 and does not constrain chunk kinds. That closure is already
+      leaky: the Clojure chunker emits a fifth kind "var"
+      (chunker.py:1250-1256) outside the sh:in set. A "field" kind must
+      widen CHUNK_KINDS, the shape, and reconcile the Clojure leak.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "M"
+    priority: "critical"
+    rationale: "Largest single UML gap: empty attribute compartments and no basis for association, aggregation, or multiplicity edges."
+    acceptance_criteria:
+      - "Class chunks in mapped fixtures expose field members with declared types via SPARQL."
+      - "Fixtures cover at least Python, TypeScript, Java, Go, and Rust."
+      - "ast_coverage.json discloses which languages lack field extraction."
+    references:
+      - "plugins/chunks_embeddings/chunker.py:20-29"
+      - "plugins/chunks_embeddings/signatures.py:42-45"
+      - "plugins/chunks_embeddings/graph_writer.py:60"
+      - "codebase_mapper/inspection/languages/go.py:116-120"
+      - "codebase_mapper/inspection/languages/cpp.py:297"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "extraction", "fields", "associations"]
+
+  - id: "BL-004"
+    title: "Resolve type literals into references xref edges"
+    summary: "Bind baseType, parameter, and return type literals to their defining class chunks and emit the reserved references xref kind."
+    description: |
+      Type information reaches the graph only as strings written in source:
+      cbml2:baseType, cbml2:returnsType, and the types inside
+      cbml2:paramsJson are never resolved to the chunk that defines the
+      type, so uses-dependencies between classes cannot be drawn. The
+      references kind is already declared in XrefKind
+      (codebase_mapper/emission/models.py:8) and allowed by the xref shapes,
+      but no resolver emits it — the vocabulary slot for exactly this fact
+      exists and is empty. Reuse the per-language import-binding machinery
+      the resolvers already have; tag resolution exact/heuristic/ambiguous
+      as today. Association edges additionally require field types from
+      BL-003.
+
+      Refined 2026-07-11: dropped the BL-002 dependency — a references edge
+      is structurally identical to the already-working subclassOf edge (two
+      chunk IRIs, which were unique before BL-002); the only real
+      prerequisite is BL-003, and only for the association-edge subset.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "M"
+    priority: "high"
+    rationale: "Type facts stay literal strings, so uses-dependencies cannot be drawn; the vocabulary already reserves the edge kind."
+    acceptance_criteria:
+      - "Mapping a fixture emits at least one references edge binding a parameter or return type to an in-repo class chunk."
+      - "Unresolved type names are disclosed through the existing unresolved sidecar with reasons."
+      - "The xref manifest by_kind counts include references."
+    references:
+      - "codebase_mapper/emission/models.py:8"
+      - "plugins/symbol_xrefs/graph_writer.py:68-78"
+      - "plugins/chunks_embeddings/graph_writer.py:105-117"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "xrefs", "type-resolution", "dependencies"]
+
+  - id: "BL-005"
+    title: "Preserve extends vs implements through the chunk contract"
+    summary: "Carry the generalization/realization distinction from analyzers into the graph instead of collapsing it into bases."
+    description: |
+      Java, C++, and Objective-C analyzers already extract extends and
+      implements as separate item fields — and keep them alongside the
+      merged bases list (codebase_mapper/inspection/languages/java.py:383-385,
+      cpp.py:390-396, objc.py:474-477) — but the canonical L2 copy-through
+      propagates only keys in SIGNATURE_FIELDS, which has bases and not
+      extends/implements (plugins/chunks_embeddings/signatures.py:42-45,
+      :57-69), and the TS/JS chunker folds both heritage clauses into one
+      bases list (plugins/chunks_embeddings/chunker.py:496-523). UML renders
+      generalization (solid triangle) and realization (dashed triangle)
+      differently; the distinction is parsed today and then destroyed at the
+      chunk boundary. Widen the canonical contract, emit distinct
+      predicates, and either split the subclassOf xref kind or add an
+      implementsOf kind.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "S"
+    priority: "high"
+    rationale: "The distinction is parsed today and destroyed by the copy-through, losing generalization vs realization arrowheads."
+    acceptance_criteria:
+      - "A Java fixture with class X extends A implements B yields distinguishable graph facts for A versus B."
+      - "A TypeScript class with both heritage clauses yields the same distinction."
+      - "Existing subclassOf consumers keep working or are migrated in the same change."
+    references:
+      - "plugins/chunks_embeddings/signatures.py:42-45"
+      - "plugins/chunks_embeddings/chunker.py:496-523"
+      - "codebase_mapper/inspection/languages/java.py:338-385"
+      - "codebase_mapper/inspection/languages/cpp.py:390-396"
+      - "codebase_mapper/inspection/languages/objc.py:474-477"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "inheritance", "l2-chunks", "signature-contract"]
+
+  - id: "BL-006"
+    title: "Emit abstract, static, and final modifiers as chunk facts"
+    summary: "Surface abstract/static/final as boolean chunk predicates instead of leaving them inside the raw signature string."
+    description: |
+      cbml2:visibility and cbml2:isAsync exist as predicates, but abstract,
+      static, and final live only inside the cbml2:signature text, so a UML
+      renderer must re-parse strings to apply the italics (abstract) and
+      underline (static) conventions. Verified 2026-07-11: no analyzer
+      stores them structurally — Java's _modifier_info yields only
+      visibility and decorators (java.py:83); Dart captures a mods regex
+      group but uses it only to detect factory constructors (dart.py:636,
+      :662); Rust's "static" is a declaration kind, not a modifier
+      (rust.py:66). All three are parse-certain keywords in the languages
+      that have them. Extend the signature contract, the graph writer, and
+      shapes; extract per analyzer where the keyword exists, honoring the
+      omission contract.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "S"
+    priority: "medium"
+    rationale: "Renderers must re-parse signature strings to recover modifiers UML notates as italics and underline."
+    acceptance_criteria:
+      - "An abstract method and a static method in a Java fixture carry the new predicates."
+      - "Predicates are absent when the keyword is absent in source (omission contract)."
+    references:
+      - "plugins/chunks_embeddings/signatures.py:1-45"
+      - "plugins/chunks_embeddings/graph_writer.py:63-77"
+      - "codebase_mapper/inspection/languages/java.py:83"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "modifiers", "signature-contract"]
+
+  - id: "BL-007"
+    title: "Preserve declaration-kind stereotypes in chunk kinds"
+    summary: "Stop flattening interface, struct, enum, protocol, object, and module declarations to kind class so UML stereotypes survive."
+    description: |
+      Refined 2026-07-11 (verification pass) — the flattening happens at TWO
+      layers, so fixing analyzers alone is insufficient:
+
+      1. Analyzers: Kotlin maps interface/object to "class" (kotlin.py:193),
+         Swift maps struct/enum/protocol to "class" (swift.py:177), Ruby
+         maps module to "class" (ruby.py:153). Java (java.py:238-242) and
+         Rust (rust.py:58-61) preserve real kinds at the item layer.
+      2. Chunker: per-language _*_TO_CHUNK_KIND maps re-flatten EVERYTHING
+         structural to "class" — Java's preserved
+         interface/enum/annotation/record kinds never survive into chunks
+         (chunker.py:1122-1130), and the Rust chunker hardcodes "class" for
+         struct/enum/union/trait (chunker.py:688+). So no language reaches
+         the graph with stereotype fidelity today.
+
+      The source keyword survives as free text inside cbml2:signature, so
+      the fix is structuring data that already exists. Constraints: the
+      SHACL sh:in closure on CHUNK_KINDS
+      (plugins/chunks_embeddings/graph_writer.py:60) must widen; the
+      MUST-level clause C2.9.3 in docs/SPEC_FIRST_CLASS_LANGUAGE.md fixes a
+      five-kind vocabulary (with "module", without the rest) and must be
+      amended in the same change; the Clojure chunker already leaks a
+      nonconforming kind "var" (chunker.py:1250-1256) to reconcile.
+      Recommended shape: keep "class" as the shape-parity kind and add a
+      cbml2:declarationKind predicate carrying the source construct.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "Stereotype fidelity is lost for every language at the chunk layer; interface/enum/protocol boxes cannot be labeled by query."
+    acceptance_criteria:
+      - "A Swift protocol, a Kotlin interface, and a Java interface in fixtures are distinguishable from concrete classes by graph query."
+      - "SPEC_FIRST_CLASS_LANGUAGE.md C2.9.3 amended in the same change; SHACL shapes and golden updated; Clojure var kind reconciled."
+      - "Existing consumers of chunk kind are unaffected or migrated in the same change."
+    references:
+      - "codebase_mapper/inspection/languages/kotlin.py:193"
+      - "codebase_mapper/inspection/languages/swift.py:177"
+      - "codebase_mapper/inspection/languages/ruby.py:153"
+      - "codebase_mapper/inspection/languages/java.py:238-242"
+      - "plugins/chunks_embeddings/chunker.py:1122-1130"
+      - "plugins/chunks_embeddings/graph_writer.py:60"
+      - "docs/SPEC_FIRST_CLASS_LANGUAGE.md"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "stereotypes", "chunk-kinds"]
+
+  - id: "BL-008"
+    title: "Close the xref resolver registry gap for six languages"
+    summary: "Add symbol xref resolvers for go, kotlin, swift, ruby, clojure, and c so resolved inheritance and call edges exist beyond the current eight languages."
+    description: |
+      The resolver registry (plugins/symbol_xrefs/__init__.py:56-67) covers
+      cobol, cpp, dart, java, objc, python, rust, and ts/js. Go, Kotlin,
+      Swift, Ruby, Clojure, and C analyzers already produce items and bases
+      literals (go.py:125-128 interface embeds, kotlin.py:144-158,
+      swift.py:137-142, ruby.py:112-133 superclass plus include) but no
+      resolved subclassOf or calls edges are ever emitted for them. One
+      resolver module per language following the existing registry pattern;
+      each language is an independently shippable increment.
+
+      Refined 2026-07-11: this item is the resolver slice of the Tier-1
+      promotion pipeline in docs/SPEC_FIRST_CLASS_LANGUAGE.md sections
+      2.10-2.11 (which also mandates a verify_<lang>_xrefs.py per language);
+      no conflict — the spec's promotion table does not list these six.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "L"
+    priority: "medium"
+    rationale: "Six languages with bases already extracted get no resolved inheritance or call edges at all."
+    acceptance_criteria:
+      - "Each added language emits subclassOf edges for a fixture with local inheritance."
+      - "The xref manifest by_language section reports the new languages."
+      - "Unresolved references carry existing reason codes."
+    references:
+      - "plugins/symbol_xrefs/__init__.py:56-67"
+      - "codebase_mapper/inspection/languages/go.py:125-128"
+      - "codebase_mapper/inspection/languages/kotlin.py:144-158"
+      - "codebase_mapper/inspection/languages/ruby.py:112-133"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "xrefs", "language-coverage"]
+
+  - id: "BL-009"
+    title: "Record call-site position and order on calls edges"
+    summary: "Extend calls xref edges with call-site line and per-caller ordering so interaction sketches can be sequenced."
+    description: |
+      SymbolXrefEdge is deduped on (src, dst, kind, resolver)
+      (codebase_mapper/emission/models.py:20-27; the edge IRI hashes exactly
+      those four fields, plugins/symbol_xrefs/graph_writer.py:59-62) and
+      carries no call-site line, no ordering, and no multiplicity — sequence
+      diagrams are ordered message sends, so no interaction diagram can be
+      derived from the current shape. Reify per-call-site facts (line,
+      ordinal within the caller body, occurrence count) on the edge node;
+      identity must extend to the call site or the new facts become
+      multi-valued on one node.
+
+      Refined 2026-07-11 — scope asymmetry discovered: for Python, source
+      positions are stripped from the stored AST by design (python.py:25-37
+      captures only _fields, not lineno/col_offset), so the resolver cannot
+      read a line off the reconstructed ast.Call node; carrying lines
+      requires extending the ast_json encoding, re-parsing in the resolver,
+      or capturing call sites at analysis time. Ordinal and occurrence
+      count, by contrast, are recoverable now from AST walk order. The
+      line-carrying half drives the raised complexity.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "L"
+    priority: "medium"
+    rationale: "Deduped pair edges cannot order messages, so no interaction diagram can be derived."
+    acceptance_criteria:
+      - "A caller with three ordered calls in a fixture yields three orderable call-site facts."
+      - "Edge identity remains stable across re-maps of an unchanged repo."
+    references:
+      - "codebase_mapper/emission/models.py:20-27"
+      - "plugins/symbol_xrefs/graph_writer.py:59-62"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "sequence-diagrams", "xrefs", "call-graph"]
+
+  - id: "BL-010"
+    title: "Receiver and dispatch resolution for sequence lifelines"
+    summary: "Investigate binding attribute calls and dynamic dispatch to receiver types so sequence-diagram lifelines become derivable."
+    description: |
+      Attribute calls (obj.method()) are explicitly out of resolver scope
+      (plugins/symbol_xrefs/python_resolver.py docstring), and dynamic
+      dispatch is a disclosed unresolved reason — yet these are precisely
+      the message sends sequence diagrams depict. Any solution requires
+      type inference and must stay heuristic-tiered per the precision-first
+      stance in PURPOSE.md. Research deliverable: a feasibility note
+      comparing local type propagation from annotations, self-parameter
+      binding within a class, and LSP-assisted resolution, with a
+      recommended approach and its disclosed error modes.
+    category: "feature"
+    type: "research"
+    status: "parked"
+    complexity: "XL"
+    priority: "low"
+    rationale: "Attribute calls and dynamic dispatch are the message sends sequence diagrams depict; unresolvable without type inference."
+    dependencies: ["BL-009"]
+    acceptance_criteria:
+      - "A written feasibility note with a recommended approach, precision expectations, and disclosed failure modes exists under docs/."
+    references:
+      - "plugins/symbol_xrefs/python_resolver.py:37-44"
+      - "PURPOSE.md"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "sequence-diagrams", "research", "type-inference"]
+
+  - id: "BL-011"
+    title: "Rewire dossier UML views to consume the bundle graph"
+    summary: "Make the cbm_dossier UML sections query the RDF bundle instead of re-parsing Python blobs at render time."
+    description: |
+      Refined 2026-07-11 (verification pass): the re-parse holdout is
+      exactly one view — UMLClassTreeRL. Its data build opens blobs/ and
+      re-parses with pyast at render time (scripts/cbm_dossier.py:1630-1709;
+      parse loop :1639-1659), Python-only and main-package-only (:1640),
+      public methods only (:1653), keyed by bare class name so duplicates
+      silently overwrite (:1659) — ignoring cbml2 signatures,
+      cbml2:baseType, the cbmxr xref layer, and the new cbml2:memberOf /
+      cbml2:qualifiedSymbol facts (BL-002, done). The other UML views are
+      already wired correctly: packages/object/composite query the RDF graph;
+      component/activity read the decomposition YAML sidecar. Rewiring the
+      class view onto the graph extends it to every resolver-covered
+      language and makes the remaining data gaps (BL-003..BL-007) visible as
+      explicit empty query results rather than silent omissions. External
+      bases and unresolved references should render as disclosed gaps,
+      consistent with the report disclaimer framing.
+    category: "tooling"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "high"
+    rationale: "The class-diagram view — the one that needs the new structural facts — is the only UML view bypassing the graph."
+    acceptance_criteria:
+      - "The dossier UML class view is built from SPARQL/graph queries over the bundle with no pyast re-parse of blobs."
+      - "UML views cover non-Python languages present in the mapped repo."
+      - "Unresolved or external bases render as visibly disclosed gaps."
+    references:
+      - "scripts/cbm_dossier.py:1630-1709"
+      - "plugins/symbol_xrefs/graph_writer.py:68-78"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "dossier", "reporting", "graph-consumption"]
+
+  - id: "BL-012"
+    title: "Chunk nested and inner declarations beyond one level"
+    summary: "Extend chunking past one nesting level so inner classes, nested functions, and module-level constants become nodes."
+    description: |
+      Refined 2026-07-11 — this is a Python + TypeScript/JavaScript gap,
+      not a universal chunker limit. The one-nesting-level strategy note
+      (plugins/chunks_embeddings/chunker.py:4-16) describes only the
+      re-parse chunkers: _chunk_python (chunker.py:141+) iterates tree.body
+      and one method level, so a class inside a class is dropped entirely
+      (with all its methods), as are nested functions; _chunk_tsjs has the
+      same shape. The items-based languages already chunk deeper — Java
+      inner classes get their own chunks with parent set
+      (chunker.py:1138-1140), and Kotlin/Swift/Ruby analyzers recurse
+      arbitrarily deep. Fix the two re-parse chunkers; qualified chunk
+      identity (BL-002, done) already prevents deeper-symbol collisions.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "M"
+    priority: "low"
+    rationale: "Inner declarations never become nodes, silently truncating class diagrams of nested designs."
+    dependencies: ["BL-002"]
+    acceptance_criteria:
+      - "A fixture with an inner class and a nested function yields chunks for both, with containment edges to their parents."
+      - "Embedding and xref layers accept the deeper chunks without regression."
+    references:
+      - "plugins/chunks_embeddings/chunker.py:4-16"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "l2-chunks", "nesting"]
+
+  - id: "BL-013"
+    title: "Widen Python xref binding scope"
+    summary: "Bind attribute bases, module-qualified calls, and star imports in the Python resolver to shrink disclosed inheritance holes."
+    description: |
+      The Python resolver defers attribute bases (pkg.Base), import X
+      followed by X.foo(), from X import *, and metaclass bases
+      (plugins/symbol_xrefs/python_resolver.py:37-44) — all common in real
+      codebases, so multiple-inheritance graphs render with holes that are
+      disclosed only in the unresolved sidecar. Module-qualified binding is
+      parse-certain via the existing module index (host:python_by_module);
+      attribute bases on imported modules likewise. Anything requiring type
+      inference stays out of scope here (see BL-010).
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "Common Python idioms leave disclosed holes in inheritance and call graphs."
+    acceptance_criteria:
+      - "class Sub(pkg.Base) with import pkg resolves to a subclassOf edge when pkg is in-repo."
+      - "import X followed by X.foo() resolves to a calls edge when X is in-repo."
+      - "Resolution tier stays exact for module-index-backed binds; anything weaker is tagged heuristic."
+    references:
+      - "plugins/symbol_xrefs/python_resolver.py:37-44"
+      - "codebase_mapper/inspection/languages/python.py:225-248"
+      - "codebase_mapper/inspection/pipeline.py:395"
+      - "plugins/symbol_xrefs/python_resolver.py:105"
+    owner: "unassigned"
+    source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "xrefs", "python", "resolution-scope"]

@@ -53,6 +53,7 @@ cbm:TestsSubjectShape a sh:NodeShape ;
 
 cbml2:ChunkShape a sh:NodeShape ;
     sh:property cbml2:_kindProp,
+        cbml2:_ps_156d480fdfc78c1c,
         cbml2:_ps_1cf9846fb075c27a,
         cbml2:_ps_23bc5b36eb4caea9,
         cbml2:_ps_362ac6bae7cd2b94,
@@ -71,6 +72,7 @@ cbml2:ChunkShape a sh:NodeShape ;
         cbml2:_ps_c00c8c76d5ab64e9,
         cbml2:_ps_e45a1613252be493,
         cbml2:_ps_edfd38e2297c8c84,
+        cbml2:_ps_f0d0ce397e2167bb,
         cbml2:_ps_f7108d2e3bd4d74f ;
     sh:targetClass cbml2:Chunk .
 
@@ -313,6 +315,10 @@ cbml2:_kindProp sh:in cbml2:_kindList ;
     sh:minCount 1 ;
     sh:path cbml2:kind .
 
+cbml2:_ps_156d480fdfc78c1c sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:path cbml2:qualifiedSymbol .
+
 cbml2:_ps_1cf9846fb075c27a sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:path cbml2:parentSymbol .
@@ -395,6 +401,10 @@ cbml2:_ps_edfd38e2297c8c84 sh:datatype xsd:integer ;
     sh:maxCount 1 ;
     sh:minInclusive 0 ;
     sh:path cbml2:embeddingRow .
+
+cbml2:_ps_f0d0ce397e2167bb sh:class cbml2:Chunk ;
+    sh:maxCount 1 ;
+    sh:path cbml2:memberOf .
 
 cbml2:_ps_f7108d2e3bd4d74f sh:datatype xsd:string ;
     sh:path cbml2:typeParam .
