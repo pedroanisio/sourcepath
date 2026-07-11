@@ -18,11 +18,11 @@ This is a point-in-time snapshot. The authoritative gate is `make test-cartogram
 
 ## Automated model tests
 
-- Tests executed: 10
-- Passed: 10
+- Tests executed: 19
+- Passed: 19
 - Failed: 0
 
-Validated properties:
+Validated properties (model):
 
 1. metadata counts match normalized arrays;
 2. all canonical relation endpoints are valid;
@@ -34,6 +34,17 @@ Validated properties:
 8. suite aggregates preserve complete test membership without duplicates;
 9. all chunks remain traceable to valid files;
 10. file, package, concept, and chunk identifiers remain unique.
+
+Validated properties (theme system, `src/themes.js`):
+
+11. the registry exposes its API and the required-token contract;
+12. all five studies plus the default register in both dark and light modes;
+13. every preset resolves a complete token set (no missing tokens);
+14. `canvasColors` / `cssVars` project every renderer color key and `:root` variable;
+15. the historical CSS-vs-canvas palette drift is unified to one value per concept;
+16. `register()` accepts a complete custom theme and rejects an incomplete one (guardrail);
+17. `inheritDefaults` layers brand overrides over the default palette without dropping neutrals;
+18. an unknown theme or mode fails loudly.
 
 ## Browser smoke test
 

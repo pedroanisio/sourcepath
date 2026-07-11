@@ -132,6 +132,20 @@ h1 { margin: 0; font-size: 18px; letter-spacing: .01em; font-weight: 740; }
 }
 .icon-button:hover { background: rgba(255,255,255,.09); border-color: var(--border-strong); transform: translateY(-1px); }
 .icon-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.theme-select {
+  height: 38px;
+  max-width: 152px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .035);
+  color: var(--text);
+  padding: 0 8px;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+}
+.theme-select:hover { border-color: var(--border-strong); }
+#mode-toggle svg { fill: currentColor; stroke: none; }
 
 .left-rail {
   position: absolute;

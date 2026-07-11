@@ -19,35 +19,35 @@
   const searchResults = document.querySelector("#search-results");
   const zoomReadout = document.querySelector("#zoom-readout");
 
-  const COLORS = Object.freeze({
-    background: "#061019",
-    grid: "rgba(151, 190, 207, 0.055)",
-    regionFill: "rgba(39, 67, 81, 0.13)",
-    regionStroke: "rgba(141, 188, 209, 0.24)",
-    directoryStroke: "rgba(152, 189, 205, 0.12)",
-    node: "#cfc4bd",
-    production: "#e2c7ba",
-    documentation: "#7f93a0",
-    test: "#55c7ff",
-    gate: "#738fff",
-    config: "#65cda4",
-    asset: "#899aa5",
-    unknown: "#a9a0a0",
-    import: "#ff6b62",
-    importHot: "#ffd0bb",
-    importDark: "#8f1f31",
-    secondaryImport: "#f1a05a",
-    external: "#ffcc77",
-    test: "#55c7ff",
-    testSoft: "#a9ecff",
-    collection: "#6b8cff",
-    selected: "#ffffff",
-    chunk: "#74e0b6",
-    warning: "#ffbf69",
-    dim: "rgba(180, 198, 207, 0.12)",
-    text: "#edf8fb",
-    muted: "#8fa8b8",
-  });
+  const THEME_STORE = "cartogram.theme";
+  const MODE_STORE = "cartogram.mode";
+  const readStored = (key, fallback) => { try { return window.localStorage.getItem(key) || fallback; } catch (_) { return fallback; } };
+  const writeStored = (key, value) => { try { window.localStorage.setItem(key, value); } catch (_) { /* storage unavailable */ } };
+
+  let activeTheme = readStored(THEME_STORE, CartogramThemes.DEFAULT_ID);
+  let activeMode = readStored(MODE_STORE, "dark");
+  if (!CartogramThemes.has(activeTheme)) activeTheme = CartogramThemes.DEFAULT_ID;
+  if (!CartogramThemes.MODES.includes(activeMode)) activeMode = "dark";
+
+  // Single source of truth for color is themes.js. applyTheme() writes the CSS
+  // custom properties (chrome) and mutates COLORS in place (canvas), so every
+  // COLORS.* reference stays valid and the CSS-vs-JS palette duplication is gone.
+  const COLORS = {};
+  function applyTheme(themeId, mode, redraw) {
+    if (!CartogramThemes.has(themeId)) themeId = CartogramThemes.DEFAULT_ID;
+    if (!CartogramThemes.MODES.includes(mode)) mode = "dark";
+    activeTheme = themeId;
+    activeMode = mode;
+    const vars = CartogramThemes.cssVars(themeId, mode);
+    const rootStyle = document.documentElement.style;
+    for (const key of Object.keys(vars)) rootStyle.setProperty(key, vars[key]);
+    document.documentElement.style.colorScheme = mode;
+    Object.assign(COLORS, CartogramThemes.canvasColors(themeId, mode));
+    writeStored(THEME_STORE, themeId);
+    writeStored(MODE_STORE, mode);
+    if (redraw !== false && typeof scheduleDraw === "function") scheduleDraw();
+  }
+  applyTheme(activeTheme, activeMode, false);
 
   const REGION_COLORS = [
     "#4b7d92", "#715e92", "#8a5c68", "#557c66", "#766747", "#4d678d", "#7c5b7f", "#5d7276",
@@ -490,6 +490,23 @@
       state.detail = event.target.value;
       scheduleDraw();
     });
+    const themeSelect = document.querySelector("#theme-select");
+    if (themeSelect) {
+      themeSelect.innerHTML = CartogramThemes.list()
+        .map((theme) => `<option value="${escapeHtml(theme.id)}">${escapeHtml(theme.label)}</option>`)
+        .join("");
+      themeSelect.value = activeTheme;
+      themeSelect.addEventListener("change", (event) => applyTheme(event.target.value, activeMode, true));
+    }
+    const modeToggle = document.querySelector("#mode-toggle");
+    if (modeToggle) {
+      const syncModeToggle = () => modeToggle.setAttribute("aria-pressed", String(activeMode === "light"));
+      syncModeToggle();
+      modeToggle.addEventListener("click", () => {
+        applyTheme(activeTheme, activeMode === "dark" ? "light" : "dark", true);
+        syncModeToggle();
+      });
+    }
     document.querySelector("#defaults-button").addEventListener("click", resetLayers);
     document.querySelector("#fit-button").addEventListener("click", () => fitAtlas(true));
     document.querySelector("#export-button").addEventListener("click", exportPng);

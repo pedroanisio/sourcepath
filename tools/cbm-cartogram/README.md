@@ -89,6 +89,38 @@ Low zoom uses region bundles as a level-of-detail representation. Zooming restor
 individual mapped relations and per-file symbols; aggregation never removes
 semantic facts.
 
+## Themes
+
+Cartogram ships six palettes — **Default**, **Crimson Classic**, **Cyan Circuit**,
+**Ultramarine Gold**, **Forest Amber**, **Graphite Magenta** — each with a **dark**
+and **light** mode. Pick one from the top-bar selector; the light/dark toggle sits
+beside it, and your choice persists in `localStorage`. Every color resolves from a
+single source (`src/themes.js`) that drives both the Canvas renderer and the CSS
+chrome, so the two never drift.
+
+### Custom palettes (API)
+
+Themes are **presentation-only** — they never change the data or the projection
+semantics. Register your own before the renderer initializes (e.g. an inline
+`<script>` before `atlas.js`):
+
+```js
+CartogramThemes.register({
+  id: "my-brand",
+  label: "My Brand",
+  inheritDefaults: true,            // unspecified tokens fall back to the default palette
+  modes: {
+    dark:  { importEdge: "#e5484d", testEdge: "#3b82f6" },
+    light: { importEdge: "#b91c1c", testEdge: "#1d4ed8" },
+  },
+});
+```
+
+Omit `inheritDefaults` to supply a complete palette — every token in
+`CartogramThemes.REQUIRED_TOKENS`, in both modes; an incomplete theme without it is
+rejected (a guardrail test enforces this). Full API: `list()`, `get(id)`, `has(id)`,
+`resolve(id, mode)`, `canvasColors(id, mode)`, `cssVars(id, mode)`, `register(theme)`.
+
 ## Projection invariants
 
 1. Canonical relation direction is preserved in the normalized data.
@@ -118,6 +150,7 @@ tools/cbm-cartogram/
 ├── index.html                  # source-build entry (scripts loaded in order)
 ├── src/
 │   ├── model.js                # pure, tested projection model
+│   ├── themes.js               # palette token module + customization API
 │   ├── atlas.js                # Canvas + D3 renderer
 │   └── atlas.css               # styles / design tokens
 ├── tools/

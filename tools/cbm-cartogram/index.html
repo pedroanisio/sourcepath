@@ -30,6 +30,10 @@
       </section>
 
       <section class="top-actions">
+        <select id="theme-select" class="theme-select" aria-label="Color theme"></select>
+        <button type="button" class="icon-button" id="mode-toggle" title="Toggle light or dark" aria-label="Toggle light or dark mode" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M20 12.5A8 8 0 0 1 11.5 4a7 7 0 1 0 8.5 8.5Z"/></svg>
+        </button>
         <button type="button" class="icon-button" id="fit-button" title="Fit map (F)" aria-label="Fit map">
           <svg viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5m13 5h5v-5"/></svg>
         </button>
@@ -135,6 +139,7 @@
   <script src="vendor/d3.v7.min.js"></script>
   <script src="data/atlas-data.js"></script>
   <script src="src/model.js"></script>
+  <script src="src/themes.js"></script>
   <script src="src/atlas.js"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@ html = html.replace('<link rel="stylesheet" href="src/atlas.css">', () => `<styl
 html = html.replace(/\n\s*<script src="vendor\/d3\.v7\.min\.js"><\/script>/, () => `\n<script>\n${safeScript(read("vendor/d3.v7.min.js"))}\n</script>`);
 html = html.replace(/\n\s*<script src="data\/atlas-data\.js"><\/script>/, () => `\n<script>\n${safeScript(read("data/atlas-data.js"))}\n</script>`);
 html = html.replace(/\n\s*<script src="src\/model\.js"><\/script>/, () => `\n<script>\n${safeScript(read("src/model.js"))}\n</script>`);
+html = html.replace(/\n\s*<script src="src\/themes\.js"><\/script>/, () => `\n<script>\n${safeScript(read("src/themes.js"))}\n</script>`);
 html = html.replace(/\n\s*<script src="src\/atlas\.js"><\/script>/, () => `\n<script>\n${safeScript(read("src/atlas.js"))}\n</script>`);
 
 const output = process.argv[2] ?? path.join(root, "cbm-cartogram-standalone.html");
