@@ -73,6 +73,7 @@ LANG_VERIFIERS := \
 	$(TESTS_DIR)/verify_json.py \
 	$(TESTS_DIR)/verify_yaml.py \
 	$(TESTS_DIR)/verify_shell.py \
+	$(TESTS_DIR)/verify_php.py \
 	$(TESTS_DIR)/verify_java.py \
 	$(TESTS_DIR)/verify_go.py \
 	$(TESTS_DIR)/verify_clojure.py \

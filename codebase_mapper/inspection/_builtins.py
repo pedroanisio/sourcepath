@@ -51,6 +51,9 @@ from .languages.kotlin import (
 from .languages.objc import (
     OBJC_LANGUAGE_TAGS, extract_objc_ast_summary, resolve_objc_includes,
 )
+from .languages.php import (
+    extract_php_ast_summary, parse_composer_psr4, resolve_php_imports,
+)
 from .languages.python import (
     extract_python_ast_summary, resolve_python_imports,
 )
@@ -328,6 +331,18 @@ class ShellAnalyzer:
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
         return extract_shell_ast_summary(content, record.path)
+
+
+class PhpAnalyzer:
+    """PHP via a state-machine neutralizer + brace-matched declaration scan."""
+    name = "lang_php"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "php"
+
+    def extract(self, record: FileRecord, content: bytes,
+                ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
+        return extract_php_ast_summary(content, record.path)
 
 
 # ---------------------------------------------------------------------------
@@ -696,6 +711,43 @@ class ShellResolver:
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
+def _php_psr4_index(ctx: PipelineCtx) -> dict[str, str]:
+    """Once-per-repo composer.json PSR-4 autoload map, built lazily and stashed
+    on ``ctx`` — mirrors ``_c_basename_index``: never rebuilt per file, and
+    still constructed for bare PipelineCtx contexts that skip the host's index
+    phase. Prefix dirs are anchored at the composer.json's own directory, so a
+    monorepo with per-package composer files resolves correctly.
+    """
+    index = ctx.indices.get("host:php_psr4")
+    if index is None:
+        index = {}
+        for path in sorted(ctx.paths_set):
+            if path != "composer.json" and not path.endswith("/composer.json"):
+                continue
+            try:
+                psr4 = parse_composer_psr4(ctx.read_path(path))
+            except Exception:
+                continue
+            base = path[: -len("composer.json")]   # '' at root, 'pkg/' otherwise
+            for prefix, directory in psr4.items():
+                index[prefix] = base + directory
+        ctx.indices["host:php_psr4"] = index
+    return index
+
+
+class PhpResolver:
+    name = "resolve_php"
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == "php" and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_php_imports(
+            record.path, _summary(record), ctx.paths_set, _php_psr4_index(ctx),
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -743,7 +795,7 @@ _BUILTIN_ANALYZERS = (
     AsmAnalyzer, CAnalyzer, CfmlAnalyzer, ClojureAnalyzer, CobolAnalyzer,
     CppAnalyzer, CssAnalyzer, DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, HtmlAnalyzer,
     JavaAnalyzer, JsonAnalyzer,
-    KconfigAnalyzer, KotlinAnalyzer, MakeAnalyzer, ObjcAnalyzer,
+    KconfigAnalyzer, KotlinAnalyzer, MakeAnalyzer, ObjcAnalyzer, PhpAnalyzer,
     PythonAnalyzer, RubyAnalyzer, RustAnalyzer, ShellAnalyzer, SqlAnalyzer,
     SwiftAnalyzer, TsJsAnalyzer, YamlAnalyzer,
 )
@@ -751,7 +803,7 @@ _BUILTIN_RESOLVERS = (
     CResolver, CfmlResolver, ClojureResolver, CobolResolver, CppResolver,
     CssResolver,
     DartResolver, GoResolver, HtmlResolver, JavaResolver, JsonResolver,
-    KotlinResolver, ObjcResolver,
+    KotlinResolver, ObjcResolver, PhpResolver,
     PythonResolver, RubyResolver, RustResolver, ShellResolver, SqlResolver,
     SwiftResolver, TsJsResolver, YamlResolver,
 )

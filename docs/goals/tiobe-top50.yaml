@@ -79,7 +79,7 @@ languages:
     tiobe_rank_at_first_seen: 14
     first_seen: "2026-07"
     mapper_key: php
-    status: detected
+    status: first_class
   - tiobe_name: "Swift"
     tiobe_rank_at_first_seen: 15
     first_seen: "2026-07"

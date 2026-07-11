@@ -395,7 +395,7 @@ after a clear. First-class languages (detection + analyzer + resolver + chunker
 formats — are:
 
 <!-- first-class-langs:start -->
-Python, C, C++, JavaScript, TypeScript, Rust, Go, Swift, Ruby, Kotlin, Objective-C, Dart, CFML, SQL, HTML, CSS/SCSS, JSON, YAML, Shell
+Python, C, C++, JavaScript, TypeScript, Rust, Go, Swift, Ruby, Kotlin, Objective-C, Dart, CFML, PHP, SQL, HTML, CSS/SCSS, JSON, YAML, Shell
 <!-- first-class-langs:end -->
 
 `tests/verify_readme_coverage.py` fails `make check` if that list drifts from
@@ -500,6 +500,7 @@ python tests/verify_css.py                   # CSS/SCSS rule analyzer/resolver/c
 python tests/verify_json.py                  # JSON recursive-descent AST analyzer/resolver/chunker coverage
 python tests/verify_yaml.py                  # YAML (PyYAML node AST) analyzer/resolver/chunker coverage
 python tests/verify_shell.py                 # Shell function AST (heredoc/quote/comment safe) analyzer/resolver/chunker
+python tests/verify_php.py                   # PHP declaration AST + composer PSR-4 `use` resolution
 python tests/verify_repo_source.py          # local path + Git URL --repo handling
 python tests/verify_timestamps.py           # atime/mtime/ctime + gitCommitTime
 python tests/verify_l2.py --backend hash    # chunks_embeddings contract
