@@ -344,12 +344,12 @@ def _scan_expression(node, content: bytes, row_off: int,
                         imports.append(_import(
                             "createObject", target, node, row_off))
     elif node.type == "new_expression":
-        target = next(
+        target_node = next(
             (c for c in node.children
              if c.type in ("member_expression", "identifier")), None)
-        if target is not None:
+        if target_node is not None:
             imports.append(_import(
-                "new", _dotted_of(target, content), node, row_off))
+                "new", _dotted_of(target_node, content), node, row_off))
 
 
 def _script_component_attrs(node, content: bytes) -> dict[str, str]:

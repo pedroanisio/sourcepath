@@ -141,9 +141,10 @@ def _walk(neu: str, raw: str, start: int, end: int, parent: str | None,
             prelude = _collapse(raw[prelude_start:j])
             if prelude:
                 kind = _classify_prelude(prelude)
+                name = _prelude_name(prelude, kind)
                 item = {
                     "kind": kind,
-                    "name": _prelude_name(prelude, kind),
+                    "name": name,
                     "parent": parent,
                     "line_start": _line_of(prelude_start, lbs),
                     "line_end": _line_of(block_close, lbs),
@@ -153,7 +154,7 @@ def _walk(neu: str, raw: str, start: int, end: int, parent: str | None,
                 }
                 items.append(item)
                 if kind in ("rule", "media", "supports"):
-                    _walk(neu, raw, j + 1, block_close, item["name"], items, lbs)
+                    _walk(neu, raw, j + 1, block_close, name, items, lbs)
             i = block_close + 1
         else:  # ';' (declaration / at-statement) or stray '}'
             i = j + 1

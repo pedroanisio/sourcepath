@@ -165,16 +165,17 @@ def extract_html_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
         attrs = m.group("attrs") or ""
         self_close = attrs.rstrip().endswith("/")
         classes = _attr(attrs, "class")
+        line_start = _line_of(m.start(), lbs)
         el = {
             "tag": otag,
             "byte_start": m.start(),
-            "line_start": _line_of(m.start(), lbs),
+            "line_start": line_start,
             "id": _attr(attrs, "id"),
             "classes": classes.split() if classes else None,
             "parent": _parent_tag(),
             "signature": _collapse(raw[m.start():m.end()])[:160],
         }
-        _collect_import(otag, attrs, el["line_start"], imports)
+        _collect_import(otag, attrs, line_start, imports)
 
         if otag in _VOID or self_close:
             _finalize(el, m.end(), lbs, items)

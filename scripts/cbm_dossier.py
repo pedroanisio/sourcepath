@@ -22,7 +22,7 @@ Usage:
 Requires reportlab (``pip install -e ".[dossier]"``) on top of the core
 project dependencies.
 """
-import argparse, ast as pyast, json, math, os, sys, time
+import argparse, json, math, os, sys, time
 from collections import Counter, defaultdict
 
 import rdflib
@@ -750,6 +750,221 @@ class UMLProfileRL(Flowable):
             c.drawString(x + 2 * mm, yt - 3.6 * mm, "\u00abstereotype\u00bb " + st_)
             c.setFillColor(GREY); c.setFont("Mono", 5.4)
             c.drawString(x + 2 * mm, yt - 7 * mm, "extends " + meta)
+
+# ---------------------------------------------------------------------------
+# UML class forest — graph-backed data build (BL-011). The class view queries
+# the bundle graph (cbml2 chunks + memberOf members + cbmxr subclassOf edges);
+# it never re-parses blobs, so every language the pipeline chunks is covered.
+# ---------------------------------------------------------------------------
+CBML2_D = "https://codebase-mapper.example.org/cbml2#"
+CBMXR_D = "https://codebase-mapper.example.org/cbmxr#"
+
+# Ubiquitous stdlib-ish bases that would clutter every tree as external boxes.
+_BASE_NOISE = {"object", "Generic", "Protocol", "ABC", "Enum", "str", "type",
+               "BaseModel", "Object", "Exception"}
+
+CLASS_TREE_MIN = 4  # components below this size render as a refusal, not a tree
+
+
+def _base_short(name):
+    """Last identifier segment of a base literal, generics stripped —
+    ``pkg.Base<T>`` → ``Base``. Display/name-match only, never an identity."""
+    return name.split("<")[0].split("[")[0].strip().rsplit(".", 1)[-1]
+
+
+def build_class_forest(g, main_prefix, tree_min=CLASS_TREE_MIN):
+    """Class-diagram data from the graph. Returns a dict with label-keyed
+    ``classes``, ``gen_edges`` (child, parent), ``trees`` (UMLClassTreeRL
+    shape, top-2 components of >= tree_min classes), ``refused`` (True when
+    hierarchies exist but none meets tree_min — the prose must refuse
+    instead of promising figures, BL-015), plus counts and provenance:
+    ``edge_source`` is "xrefs" when the bundle carries resolved subclassOf
+    edges, else the disclosed "name-match" fallback (a baseType literal
+    binds only to a repo-unique class symbol)."""
+    # The large-bundle GraphView exposes only subject_objects()/objects() —
+    # stay on that surface so both it and plain rdflib graphs work.
+    _u = rdflib.URIRef
+
+    info, files_meta = {}, {}
+    for c, k in g.subject_objects(_u(CBML2_D + "kind")):
+        if str(k) != "class":
+            continue
+        f = next(iter(g.objects(c, _u(CBML2_D + "inFile"))), None)
+        if f is None:
+            continue
+        if f not in files_meta:
+            files_meta[f] = (
+                str(next(iter(g.objects(f, _u(CR.CBM + "path"))), "")),
+                str(next(iter(g.objects(f, _u(CR.CBM + "language"))), "")))
+        path, lang = files_meta[f]
+        if main_prefix and not path.startswith(main_prefix + "/"):
+            continue
+        sym = str(next(iter(g.objects(c, _u(CBML2_D + "symbol"))), ""))
+        if not sym:
+            continue
+        info[c] = {"symbol": sym, "file": path, "language": lang or None,
+                   "bases": sorted(str(o) for o in
+                                   g.objects(c, _u(CBML2_D + "baseType"))),
+                   "methods": []}
+    n_member_edges = 0
+    member_syms = defaultdict(set)
+    for m, c in g.subject_objects(_u(CBML2_D + "memberOf")):
+        if c not in info:
+            continue
+        n_member_edges += 1
+        ms = str(next(iter(g.objects(m, _u(CBML2_D + "symbol"))), ""))
+        if ms and not ms.startswith("_"):
+            member_syms[c].add(ms)
+    for c, meta in info.items():
+        meta["methods"] = sorted(member_syms.get(c, ()))
+
+    by_sym = defaultdict(list)
+    for c, meta in info.items():
+        by_sym[meta["symbol"]].append(c)
+    label = {}
+    for sym, iris in by_sym.items():
+        if len(iris) == 1:
+            label[iris[0]] = sym
+        else:
+            for c in iris:
+                label[c] = f"{sym} ({os.path.basename(info[c]['file'])})"
+
+    gen_pairs, has_calls = set(), False
+    for e, k in g.subject_objects(_u(CBMXR_D + "kind")):
+        kind = str(k)
+        if kind == "calls":
+            has_calls = True
+            continue
+        if kind != "subclassOf":
+            continue
+        s = next(iter(g.objects(e, _u(CBMXR_D + "src"))), None)
+        d = next(iter(g.objects(e, _u(CBMXR_D + "dst"))), None)
+        if s in info and d in info and s != d:
+            gen_pairs.add((s, d))
+    edge_source = "xrefs"
+    if not gen_pairs:
+        edge_source = "name-match"
+        uniq = {sym: iris[0] for sym, iris in by_sym.items() if len(iris) == 1}
+        for c, meta in info.items():
+            for b in meta["bases"]:
+                t = uniq.get(_base_short(b))
+                if t is not None and t != c:
+                    gen_pairs.add((c, t))
+
+    classes = {label[c]: dict(meta) for c, meta in info.items()}
+    gen_edges = sorted((label[a], label[b]) for a, b in gen_pairs)
+    resolved = defaultdict(set)
+    for a, b in gen_edges:
+        resolved[a].add(_base_short(b.split(" (")[0]))
+
+    adj = defaultdict(set)
+    for a, b in gen_edges:
+        adj[a].add(b); adj[b].add(a)
+    seen, comps = set(), []
+    for n in classes:
+        if n in seen or n not in adj:
+            continue
+        stack, comp = [n], set()
+        while stack:
+            x = stack.pop()
+            if x in comp:
+                continue
+            comp.add(x); seen.add(x); stack += list(adj[x] - comp)
+        comps.append(comp)
+    comps.sort(key=len, reverse=True)
+
+    def mk_tree(comp):
+        nodes = {n: {"methods": classes[n]["methods"], "file": classes[n]["file"]}
+                 for n in comp}
+        edges = [(a, b) for a, b in gen_edges if a in comp and b in comp]
+        ext_used = set()
+        for n in comp:
+            for b in classes[n]["bases"]:
+                short = _base_short(b)
+                if short in _BASE_NOISE or short in resolved[n]:
+                    continue
+                if short not in nodes:
+                    ext_used.add(short)
+                edges.append((n, short))
+        for e in ext_used:
+            nodes[e] = {"methods": [], "external": True}
+        depth = {}
+        def dep(n, guard=0):
+            if n in depth or guard > 12:
+                return depth.get(n, 0)
+            pars = [b for a, b in edges if a == n and b in nodes]
+            depth[n] = 0 if not pars else 1 + max(dep(pp, guard + 1) for pp in pars)
+            return depth[n]
+        for n in nodes:
+            dep(n)
+        maxd = max(depth.values() or [0])
+        levels = [[] for _ in range(maxd + 1)]
+        for n, d in depth.items():
+            levels[d].append(n)
+        levels = [lv for lv in levels if lv]
+        omitted = 0
+        for i, lv in enumerate(levels):
+            if len(lv) > 6:
+                keep = sorted(lv, key=lambda n: -(len(nodes[n].get("methods", []))
+                                                  + sum(1 for a, b in edges if b == n)))[:6]
+                omitted += len(lv) - 6
+                drop = set(lv) - set(keep)
+                levels[i] = keep
+                edges[:] = [(a, b) for a, b in edges if a not in drop and b not in drop]
+                for d in drop:
+                    nodes.pop(d, None)
+        return {"nodes": nodes, "edges": edges, "levels": levels, "omitted": omitted}
+
+    trees = [mk_tree(c) for c in comps[:2] if len(c) >= tree_min]
+    return {
+        "classes": classes,
+        "gen_edges": gen_edges,
+        "edge_source": edge_source,
+        "trees": trees,
+        "refused": bool(comps) and not trees,
+        "tree_min": tree_min,
+        "n_classes": len(classes),
+        "n_member_edges": n_member_edges,
+        "n_components": len(comps),
+        "largest_component": len(comps[0]) if comps else 0,
+        "languages": sorted({m["language"] for m in classes.values()
+                             if m["language"]}),
+        "has_calls": has_calls,
+    }
+
+
+def class_forest_prose(forest):
+    """The class-diagram paragraph — asserts only what is actually rendered
+    (BL-015): figures are promised when trees exist, refused explicitly with
+    the threshold when they don't."""
+    langs = ", ".join(forest["languages"]) or "no recognized languages"
+    src = ("resolved by the bundle's symbol-xref layer"
+           if forest["edge_source"] == "xrefs" else
+           "name-matched to repo-unique class symbols (the bundle carries "
+           "no xref layer; this fallback is a disclosed heuristic)")
+    out = (f"The graph carries {forest['n_classes']} class chunks in the "
+           f"main package ({langs}) with {len(forest['gen_edges'])} internal "
+           f"generalization edges, {src}. ")
+    if forest["n_classes"] and not forest["n_member_edges"]:
+        out += ("Member compartments are empty: this bundle predates the "
+                "memberOf containment layer — re-map to populate them. ")
+    if forest["trees"]:
+        out += (f"The {len(forest['trees'])} largest hierarchies follow; "
+                f"components under {forest['tree_min']} classes are not "
+                f"drawn. Queried from the emitted graph — no source is "
+                f"re-parsed at report time.")
+    elif forest["refused"]:
+        out += (f"No inheritance component reaches the {forest['tree_min']}-"
+                f"class threshold for a legible tree (largest: "
+                f"{forest['largest_component']}), so the hierarchy figures "
+                f"are refused rather than decorated — a diagram without "
+                f"data is fiction.")
+    else:
+        out += ("No internal generalization edges resolve, so there is no "
+                "hierarchy to draw; the figure is refused rather than "
+                "invented.")
+    return out
+
 
 class PaletteSwatches(Flowable):
     """The design system's palette, rendered. Chips and hex labels are both
@@ -1638,78 +1853,11 @@ def build(args):
         if p_ is not None:
             path_sha[str(p_)] = str(o_); path_subj[str(p_)] = s_
     mp = G["_metro"]["main_pkg"]
-    classes, parse_fail, files_parsed = {}, 0, 0
-    for p_, sha_ in sorted(path_sha.items()):
-        if not (p_.endswith(".py") and p_.startswith(mp + "/")):
-            continue
-        bp = os.path.join(args.bundle, "blobs", sha_)
-        if not os.path.exists(bp): continue
-        try:
-            tree_ = pyast.parse(open(bp, encoding="utf-8", errors="replace").read())
-            files_parsed += 1
-        except SyntaxError:
-            parse_fail += 1; continue
-        for nd in pyast.walk(tree_):
-            if isinstance(nd, pyast.ClassDef):
-                meths = [b.name for b in nd.body
-                         if isinstance(b, (pyast.FunctionDef, pyast.AsyncFunctionDef))
-                         and not b.name.startswith("_")]
-                bases = []
-                for b in nd.bases:
-                    while isinstance(b, pyast.Subscript): b = b.value
-                    if isinstance(b, pyast.Name): bases.append(b.id)
-                    elif isinstance(b, pyast.Attribute): bases.append(b.attr)
-                classes[nd.name] = {"methods": meths, "file": p_, "bases": bases}
-    gen_edges = [(nm_, b_) for nm_, nd_ in classes.items() for b_ in nd_["bases"]]
-    adj = defaultdict(set)
-    for a_, b_ in gen_edges:
-        if a_ in classes and b_ in classes:
-            adj[a_].add(b_); adj[b_].add(a_)
-    seen_, comps = set(), []
-    for n_ in classes:
-        if n_ in seen_ or n_ not in adj: continue
-        stack, comp = [n_], set()
-        while stack:
-            x_ = stack.pop()
-            if x_ in comp: continue
-            comp.add(x_); seen_.add(x_); stack += list(adj[x_] - comp)
-        comps.append(comp)
-    comps.sort(key=len, reverse=True)
-    def mk_tree(comp):
-        nodes = {n_: {"methods": classes[n_]["methods"], "file": classes[n_]["file"]}
-                 for n_ in comp}
-        edges, ext_used = [], set()
-        for n_ in comp:
-            for b_ in classes[n_]["bases"]:
-                if b_ in comp: edges.append((n_, b_))
-                elif b_ not in ("object", "Generic", "Protocol", "ABC", "Enum",
-                                "str", "type", "BaseModel"):
-                    ext_used.add(b_); edges.append((n_, b_))
-        for e_ in ext_used:
-            nodes[e_] = {"methods": [], "external": True}
-        depth = {}
-        def dep(n_, guard=0):
-            if n_ in depth or guard > 12: return depth.get(n_, 0)
-            pars = [b for a, b in edges if a == n_ and b in nodes]
-            depth[n_] = 0 if not pars else 1 + max(dep(pp, guard + 1) for pp in pars)
-            return depth[n_]
-        for n_ in nodes: dep(n_)
-        maxd = max(depth.values() or [0])
-        levels = [[] for _ in range(maxd + 1)]
-        for n_, d_ in depth.items(): levels[d_].append(n_)
-        levels = [lv for lv in levels if lv]
-        omitted = 0
-        for i, lv in enumerate(levels):
-            if len(lv) > 6:
-                keep = sorted(lv, key=lambda n: -(len(nodes[n].get("methods", []))
-                                                  + sum(1 for a, b in edges if b == n)))[:6]
-                omitted += len(lv) - 6
-                drop = set(lv) - set(keep)
-                levels[i] = keep
-                edges[:] = [(a, b) for a, b in edges if a not in drop and b not in drop]
-                for d_ in drop: nodes.pop(d_, None)
-        return {"nodes": nodes, "edges": edges, "levels": levels, "omitted": omitted}
-    trees = [mk_tree(c) for c in comps[:2] if len(c) >= 4]
+    # BL-011: the class view queries the emitted graph (cbml2 chunks +
+    # memberOf members + cbmxr subclassOf edges) — no blob re-parse, every
+    # chunked language covered.
+    forest = build_class_forest(g, mp)
+    trees = forest["trees"]
     line_names = [L["name"] for L in G["_metro"]["lines"]]
     lineset = set(line_names)
     subsys_f = G["_district"]["subsystem"]
@@ -1820,7 +1968,9 @@ def build(args):
     h2(st, "Capability across the full UML 2.5 taxonomy")
     st.append(data_table(["family", "uml 2.5 diagram", "supported", "grounding in this bundle"],
         [["Structure", "Class", "yes \u2014 FACT*",
-          "classes + generalization parsed from the verified blob store (contentSha256)"
+          "class chunks + memberOf members queried from the graph; generalization "
+          + ("from resolved subclassOf xrefs" if forest["edge_source"] == "xrefs"
+             else "name-matched (no xref layer in this bundle \u2014 disclosed heuristic)")
           + ("; compensates for symbols_extracted = 0 (see findings)" if sym_tot == 0 else "")],
          ["Structure", "Package", "yes \u2014 FACT",
           "cbm:imports aggregated by subsystem; counts measured"],
@@ -1841,9 +1991,13 @@ def build(args):
          ["Behavior", "State machine", "no",
           "no behavioral state model is extracted"],
          ["Behavior", "Sequence", "no",
-          "imports are not calls; no interactions or traces recorded"],
+          ("calls edges exist in the graph but carry no ordering or call "
+           "sites; sequence needs ordered messages") if forest["has_calls"]
+          else "imports are not calls; no interactions or traces recorded"],
          ["Behavior", "Communication", "no",
-          "same missing artifact as sequence: interactions"],
+          ("same gap as sequence: the calls edges are unordered")
+          if forest["has_calls"]
+          else "same missing artifact as sequence: interactions"],
          ["Behavior", "Interaction overview", "no",
           "composes interactions, which do not exist here"],
          ["Behavior", "Timing", "no",
@@ -1879,11 +2033,7 @@ def build(args):
                          "the package \u2014 where the world actually plugs in.",
                          "FACT"))
     h2(st, "Class diagrams \u2014 the measured hierarchies")
-    p(st, f"While generating this dossier, the pipeline parsed {files_parsed} main-package source "
-          f"blobs ({parse_fail} syntax failures) and found {len(classes)} classes with "
-          f"{sum(1 for a, b in gen_edges if b in classes)} internal generalization "
-          "edges. The two largest hierarchies follow; every blob is addressed by its "
-          "sha-256, so this extraction inherits the bundle's verification.")
+    p(st, class_forest_prose(forest))
     for ti, T in enumerate(trees, 1):
         st.append(UMLClassTreeRL(T))
         roots = ", ".join(sorted(T["levels"][0])[:3])
@@ -1908,12 +2058,21 @@ def build(args):
     h2(st, "What is deliberately not drawn")
     p(st, "Seven of the fourteen types are refused: use case (no actor or "
           "requirement artifacts), sequence, communication, interaction overview "
-          "and timing (imports are not calls \u2014 no interactions or traces are "
-          "recorded), state machine (no behavioral model), and deployment (no "
+          "and timing ("
+          + ("the graph carries unordered calls edges, but ordered "
+             "interactions are not recorded"
+             if forest["has_calls"] else
+             "imports are not calls \u2014 no interactions or traces are recorded")
+          + "), state machine (no behavioral model), and deployment (no "
           "runtime topology). The house rule stands: a diagram without data is "
-          "fiction. When the enricher gains call-graph extraction, four of the "
-          "seven become measurable at once; until then, an empty frame would be "
-          "decoration, and the dossier leaves it out.")
+          "fiction. "
+          + ("When call sites gain ordering, four of the seven become "
+             "measurable at once"
+             if forest["has_calls"] else
+             "When the bundle carries the symbol-xref call graph, four of "
+             "the seven come within reach")
+          + "; until then, an empty frame would be decoration, and the "
+          "dossier leaves it out.")
 
     p(st, "Everything drawn so far follows the structure the authors "
           "declared: imports, packages, classes. The next view sets "

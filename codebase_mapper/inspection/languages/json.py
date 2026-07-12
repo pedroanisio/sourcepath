@@ -261,6 +261,11 @@ def extract_json_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
         "items": items,
         "top_level_keys": [m["key"] for m in root["members"]] if root["type"] == "object" else [],
     }
+    if not items:
+        # Memberless documents ({} / [] / scalar root) are a property of the
+        # source, not an extraction failure — disclose or the coverage gate
+        # counts the file as silent (same convention as c.py/lightweight.py).
+        summary["zero_symbol_reason"] = "document_has_no_members"
     return summary, []
 
 

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from plugins import chunks_embeddings
 from plugins import concept_graph
+from plugins import symbol_xrefs
 from codebase_mapper.emission.application.emit_bundle import emit
 from codebase_mapper.inspection.pipeline import map_codebase
 from codebase_mapper.shared_kernel.extensions import reset_registries
@@ -31,6 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--sbert-model", default="sentence-transformers/all-MiniLM-L6-v2")
     p.add_argument("--no-l2", action="store_true",
                    help="run L3 alone (no chunks, no concept centroids)")
+    p.add_argument("--no-xrefs", action="store_true",
+                   help="skip the symbol-xref layer (subclassOf/calls/"
+                        "overrides edges; registered by default, BL-014)")
     p.add_argument("--no-emit-blobs", action="store_true")
     p.add_argument("--exclude", action="append", default=[],
                    help="POSIX-glob pattern; files matching are dropped. "
@@ -66,6 +70,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             backend = chunks_embeddings.DeterministicHashBackend(args.hash_dim)
         chunks_embeddings.register_all(backend)
+
+    if not args.no_xrefs:
+        if args.no_l2:
+            print("NOTE: --no-l2 disables the symbol-xref layer too "
+                  "(resolvers read L2 chunks); pass --no-xrefs to silence "
+                  "this note.", file=sys.stderr)
+        else:
+            symbol_xrefs.register_all()
 
     if args.no_builtin_vocab:
         l3_vocab = None

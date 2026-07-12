@@ -73,6 +73,10 @@ SIGNATURE_REPEATED_PREDICATES = (
     ("bases", "baseType"),
     ("type_params", "typeParam"),
     ("decorators", "decorator"),
+    # BL-005: generalization vs realization, as written; present only where
+    # the language syntactically distinguishes them. baseType stays merged.
+    ("extends", "extendsType"),
+    ("implements", "implementsType"),
 )
 
 
@@ -221,6 +225,10 @@ SHAPE_SPECS: tuple[NodeShapeSpec, ...] = (
             PropertySpec(path=str(CBML2.isAsync),
                          datatype=str(XSD.boolean), max_count=1),
             PropertySpec(path=str(CBML2.baseType),
+                         datatype=str(XSD.string)),
+            PropertySpec(path=str(CBML2.extendsType),
+                         datatype=str(XSD.string)),
+            PropertySpec(path=str(CBML2.implementsType),
                          datatype=str(XSD.string)),
             PropertySpec(path=str(CBML2.typeParam),
                          datatype=str(XSD.string)),

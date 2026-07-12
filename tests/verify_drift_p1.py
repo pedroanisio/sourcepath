@@ -185,6 +185,12 @@ ENV_INVENTORY_EXCLUSIONS: set[str] = {
     "WITH_SBERT",    # build-time arg
     "CBM_BUNDLE",    # docker-compose mount source (host path, not app cfg)
     "FRONTEND_PORT", # docker-compose host port mapping
+    # Read only by frontend/backend/tests/conftest.py to turn a missing live
+    # bundle into a hard error instead of a silent skip (BL-024). CI sets it;
+    # it configures the *test harness*, never the deployed app. Documented in
+    # .env.example's test-only section and held by verify_ci_live_bundle.py.
+    "CBM_REQUIRE_LIVE_BUNDLE",
+    "HOME",          # read by tests to build a hermetic subprocess env
 }
 
 

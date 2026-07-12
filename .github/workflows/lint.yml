@@ -113,5 +113,14 @@ jobs:
       - name: Generate live fixture bundle
         run: python scripts/run_l3.py --repo tests/fixtures/golden_repo --out _tmp/ci-bundle --backend hash
 
+      # CBM_OUTPUT_DIR must name the bundle the step above just wrote. Without
+      # it the suite looked at its default path, found nothing, skipped every
+      # live-bundle test and reported green — the REST surface was untested in
+      # CI while appearing tested (BL-024). CBM_REQUIRE_LIVE_BUNDLE then makes
+      # a missing bundle a hard error, so this can never silently lapse back
+      # into skipping. Held by tests/verify_ci_live_bundle.py.
       - name: Backend + MCP suites against the live bundle
+        env:
+          CBM_OUTPUT_DIR: _tmp/ci-bundle
+          CBM_REQUIRE_LIVE_BUNDLE: "1"
         run: make test-backend

@@ -22,9 +22,9 @@ source of truth.
 |---|---|---|
 | `codebase-mapper` (console script) | L1 | `codebase_mapper.cli:main`; map + optional roundtrip verify |
 | `python scripts/run_l2.py` | L1+L2 | chunks + embeddings |
-| `python scripts/run_l3.py` | L1–L3 | + concept graph; `--llm-enrich` shorthand for L4 defaults |
-| `python scripts/run_l4.py` | L1–L4 | full pipeline; all L4 knobs surfaced |
-| `python scripts/run_xrefs.py` | +xrefs | symbol cross-references |
+| `python scripts/run_l3.py` | L1–L3+xrefs | + concept graph; xrefs registered by default (`--no-xrefs` opts out); `--llm-enrich` shorthand for L4 defaults |
+| `python scripts/run_l4.py` | L1–L4+xrefs | full pipeline; xrefs registered by default (`--no-xrefs` opts out); all L4 knobs surfaced |
+| `python scripts/run_xrefs.py` | +xrefs | xref-focused runner (L1+L2+xrefs; concepts/L4 opt-in) |
 
 Kernel-scale cost controls on `run_l4.py`: `--skip-shacl` and
 `--no-jsonld` (both disclosed in `run_manifest.json`, never silent).

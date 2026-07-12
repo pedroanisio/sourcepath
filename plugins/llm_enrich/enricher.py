@@ -91,7 +91,9 @@ SUPPORTED_LANGUAGES: frozenset[str] = frozenset((
     "sql",
     "html",
     "css", "scss",
-    "json", "yaml",
+    # NOT json/yaml (nor text/restructuredtext): pure-data languages stay
+    # out of summary scope — tests/test_l4_scope_extension.py pins this
+    # contract; schema files get their own schema_purpose aggregator scope.
     "shell",
     "php",
 ))

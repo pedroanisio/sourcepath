@@ -218,11 +218,105 @@ def test_pipeline_end_to_end(repo: Path) -> None:
           kinds <= {"class", "function", "method", "file"}, f"kinds={kinds}")
 
 
+def test_bases_extraction() -> None:
+    """BL-037 — PHP was the only class-bearing language emitting no inheritance."""
+    print("\n-- inheritance: extends / implements (BL-037) --")
+    path = "src/Models/Admin.php"
+    summary, errors = extract_php_ast_summary((FIX / path).read_bytes(), path)
+    check("bases: Admin.php extracts", summary is not None, f"errors={errors}")
+    if summary is None:
+        return
+    by = {i["name"]: i for i in summary["items"] if i["kind"] in
+          ("class", "interface", "trait", "enum")}
+
+    check("bases: class captures extends AND implements, in order",
+          by["Admin"].get("bases") == ["User", "Identifiable", "App\\Contracts\\Auditable"],
+          f"bases={by['Admin'].get('bases')}")
+    check("bases: interface extends several parents",
+          by["Identifiable"].get("bases") == ["Countable", "Stringable"],
+          f"bases={by['Identifiable'].get('bases')}")
+    check("bases: backed enum keeps the interface and drops the ': string' backing type",
+          by["Status"].get("bases") == ["Identifiable"],
+          f"bases={by['Status'].get('bases')}")
+    check("bases: a trait has no bases key",
+          "bases" not in by["Timestamped"], f"item={by['Timestamped']}")
+    check("bases: a class with no clause has no bases key (peer contract)",
+          "bases" not in by["Bare"], f"item={by['Bare']}")
+
+    # Hazards: neutralization must hold for the header and the bodies.
+    flat = [b for i in by.values() for b in i.get("bases", [])]
+    check("bases: a comment inside the header creates no base",
+          not {"GhostBase", "GhostFace"} & set(flat), f"bases={flat}")
+    check("bases: a string in a body creates no phantom class",
+          "Phantom" not in by, f"names={sorted(by)}")
+    check("bases: a string in a body creates no base",
+          not {"Spectre", "Wraith"} & set(flat), f"bases={flat}")
+    check("bases: `use T;` in a class body is composition, not inheritance",
+          "Timestamped" not in by["Admin"].get("bases", []),
+          f"bases={by['Admin'].get('bases')}")
+
+
+def test_composer_degradation() -> None:
+    """BL-038 — an unreadable composer manifest must disclose, not vanish."""
+    print("\n-- composer manifest failure is disclosed (BL-038) --")
+    from codebase_mapper.inspection._builtins import _php_psr4_index
+    from codebase_mapper.inspection.languages.php import ComposerManifestError
+
+    # Library contract: a corrupt manifest and a manifest with no psr-4 section
+    # are different facts and must not collapse to the same return value.
+    try:
+        parse_composer_psr4(b"{ this is not json ,,, ")
+        raised = False
+    except ComposerManifestError:
+        raised = True
+    check("composer: an unparseable manifest raises a typed error", raised)
+    check("composer: a valid manifest with no psr-4 section is an empty map, not an error",
+          parse_composer_psr4(b'{"name": "acme/app"}') == {})
+
+    def broken(_path: str) -> bytes:
+        return b"{ this is not json ,,, "
+
+    rec = FileRecord(path="src/A.php", git_blob_sha="0" * 40, content_sha256="0" * 64,
+                     size_bytes=1, language="php", type_="source_code", phases=["runtime"])
+    ctx = PipelineCtx(repo=None, commit="", records=[rec], blob_by_path={},
+                      mode_by_path={}, paths_set={"composer.json", rec.path},
+                      read_path=broken)
+
+    index = _php_psr4_index(ctx)
+    check("composer: a malformed manifest yields no PSR-4 prefixes",
+          index == {}, f"index={index}")
+
+    degradations = ctx.scratch.get("degradations", [])
+    mine = [d for d in degradations if d.get("component") == "php_psr4"]
+    check("composer: the failure registers a degradation entry",
+          len(mine) == 1, f"degradations={degradations}")
+    if mine:
+        d = mine[0]
+        check("composer: the entry names the offending file",
+              d.get("path") == "composer.json", f"entry={d}")
+        check("composer: the entry carries a reason and an error excerpt",
+              bool(d.get("reason")) and bool(d.get("error")), f"entry={d}")
+
+    # A healthy manifest must stay silent — no false degradations.
+    good = (FIX / "composer.json").read_bytes()
+    rec2 = FileRecord(path="src/A.php", git_blob_sha="0" * 40, content_sha256="0" * 64,
+                      size_bytes=1, language="php", type_="source_code", phases=["runtime"])
+    ctx2 = PipelineCtx(repo=None, commit="", records=[rec2], blob_by_path={},
+                       mode_by_path={}, paths_set={"composer.json", rec2.path},
+                       read_path=lambda p: good)
+    idx2 = _php_psr4_index(ctx2)
+    check("composer: a healthy manifest still resolves prefixes",
+          idx2.get("App\\") == "src/", f"index={idx2}")
+    check("composer: a healthy manifest registers no degradation",
+          not ctx2.scratch.get("degradations"), f"scratch={ctx2.scratch.get('degradations')}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(); ap.add_argument("--keep", action="store_true"); ap.parse_args()
     print("== PHP first-class verification ==")
     test_ast_extractor(); test_imports_and_use_depth(); test_psr4_and_resolution()
     test_classify(); test_first_class_facets()
+    test_bases_extraction(); test_composer_degradation()
     with tempfile.TemporaryDirectory() as td:
         scratch = Path(td) / "app"
         shutil.copytree(FIX.resolve(), scratch)

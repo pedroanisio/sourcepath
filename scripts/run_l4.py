@@ -36,7 +36,7 @@ from codebase_mapper.emission.application.emit_bundle import emit
 from codebase_mapper.inspection.pipeline import map_codebase
 from codebase_mapper.shared_kernel.extensions import reset_registries
 from codebase_mapper.inspection.repo_source import resolve_repo_source
-from plugins import chunks_embeddings, concept_graph, llm_enrich
+from plugins import chunks_embeddings, concept_graph, llm_enrich, symbol_xrefs
 
 
 # Default model — the benchmark winner from docs/llm-baseline-results.md.
@@ -64,6 +64,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="Skip L2 chunks/embeddings. L4's file_summary "
                         "still works; concept_description loses concept "
                         "centroids but the prompts don't depend on them.")
+    p.add_argument("--no-xrefs", action="store_true",
+                   help="skip the symbol-xref layer (subclassOf/calls/"
+                        "overrides edges; registered by default, BL-014)")
     p.add_argument("--no-emit-blobs", action="store_true")
     p.add_argument("--exclude", action="append", default=[],
                    help="POSIX-glob pattern; files matching are dropped. "
@@ -133,6 +136,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             backend = chunks_embeddings.DeterministicHashBackend(args.hash_dim)
         chunks_embeddings.register_all(backend)
+
+    if not args.no_xrefs:
+        if args.no_l2:
+            print("NOTE: --no-l2 disables the symbol-xref layer too "
+                  "(resolvers read L2 chunks); pass --no-xrefs to silence "
+                  "this note.", file=sys.stderr)
+        else:
+            symbol_xrefs.register_all()
 
     # L3 vocab resolution mirrors run_l3.py exactly.
     if args.no_builtin_vocab:

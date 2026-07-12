@@ -135,6 +135,7 @@ def neutralize(content: bytes, table: MacroTable) -> bytes:
 
         if c == 0x5F or 0x41 <= c <= 0x5A or 0x61 <= c <= 0x7A:  # identifier
             m = _IDENT_RE.match(content, i)
+            assert m is not None  # first char already matched [A-Za-z_]
             tok = m.group()
             name = tok.decode("ascii", "replace")
             end = m.end()

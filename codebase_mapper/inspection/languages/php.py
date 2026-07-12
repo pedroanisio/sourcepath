@@ -170,6 +170,45 @@ _INCLUDE_RE = re.compile(
     r"\b(?:require|include)(?:_once)?\b(?P<expr>[^;]*);")
 _LITERAL_RE = re.compile(r"'(?P<a>[^']*)'|\"(?P<b>[^\"]*)\"")
 
+# --- inheritance (BL-037) -------------------------------------------------
+# The `extends` clause runs until `implements` or the opening brace; the
+# `implements` clause runs to the brace. Both are matched against the
+# *neutralized* header, so a comment or string inside the header contributes
+# nothing. DOTALL because PHP declarations routinely wrap across lines.
+_EXTENDS_RE = re.compile(r"\bextends\b(?P<names>.*?)(?=\bimplements\b|$)", re.S)
+_IMPLEMENTS_RE = re.compile(r"\bimplements\b(?P<names>.*)$", re.S)
+#: A base name: identifier chars plus the namespace separator.
+_BASE_NAME_RE = re.compile(r"[\w\\]+")
+
+
+def _parse_bases(header: str) -> list[str]:
+    """Base types declared in a class-like header, in source order.
+
+    ``header`` is the neutralized text between the declared name and the
+    opening brace, e.g. ``" extends User implements A, B"``.
+
+    Two PHP-specific rules are load-bearing here:
+
+    * A **backed enum** writes its storage type where a base would sit --
+      ``enum Status: string implements X``. Anchoring on the ``extends`` /
+      ``implements`` keywords (rather than "everything after the name") keeps
+      ``string`` out of the base list; it is a backing type, not a parent.
+    * ``use T;`` inside the class *body* is trait composition, not
+      inheritance, and never reaches this function -- it is not in the header.
+
+    Traits themselves declare no parents, so they yield ``[]``.
+    """
+    bases: list[str] = []
+    for pattern in (_EXTENDS_RE, _IMPLEMENTS_RE):
+        m = pattern.search(header)
+        if not m:
+            continue
+        for raw in _BASE_NAME_RE.findall(m.group("names")):
+            name = raw.lstrip("\\")  # \App\Contracts\X and App\Contracts\X are one type
+            if name and name not in bases:
+                bases.append(name)
+    return bases
+
 
 def _match(text: str, open_idx: int, opener: str, closer: str) -> int:
     depth = 0
@@ -224,7 +263,7 @@ def extract_php_ast_summary(content: bytes, path: str) -> tuple[dict | None, lis
             continue
         close = _match(neu, brace, "{", "}")
         b_start, b_end = cb(m.start()), cb(close + 1)
-        items.append({
+        item = {
             "kind": m.group("kw").lower(),
             "name": m.group("name"),
             "parent": None,
@@ -233,7 +272,14 @@ def extract_php_ast_summary(content: bytes, path: str) -> tuple[dict | None, lis
             "byte_start": b_start,
             "byte_end": b_end,
             "signature": _collapse(raw[m.start():brace])[:120],
-        })
+        }
+        # Inheritance (BL-037). Parse the *neutralized* header so a comment or
+        # a string between the name and the brace contributes no base. Peer
+        # contract (java, dart, ...): the key is present only when non-empty.
+        bases = _parse_bases(neu[m.end():brace])
+        if bases:
+            item["bases"] = bases
+        items.append(item)
         class_spans.append((m.group("name"), m.start(), close + 1))
 
     for m in _FUNC_RE.finditer(neu):
@@ -317,13 +363,38 @@ def extract_php_ast_summary(content: bytes, path: str) -> tuple[dict | None, lis
 # ---------------------------------------------------------------------------
 
 
+class ComposerManifestError(ValueError):
+    """A composer.json that cannot be decoded or parsed as JSON.
+
+    Typed rather than swallowed (BL-038). This function used to return ``{}``
+    "for anything unparseable", which made a **corrupt manifest** and a
+    manifest with **no psr-4 section** the same value to every caller. The
+    index builder then had nothing to disclose, so a broken manifest silently
+    un-resolved every ``use`` statement in the package and the bundle reported
+    a PHP repository with no internal imports as though that were the truth.
+
+    Libraries raise typed errors; applications degrade gracefully. The caller
+    (``_builtins._php_psr4_index``) catches this and records a degradation
+    entry, so the loss is disclosed instead of inferred.
+    """
+
+
 def parse_composer_psr4(content: bytes) -> dict[str, str]:
     """Return the merged ``autoload`` + ``autoload-dev`` ``psr-4`` prefix map,
-    e.g. ``{"App\\\\": "src/"}``. Returns ``{}`` for anything unparseable."""
+    e.g. ``{"App\\\\": "src/"}``.
+
+    An empty map means the manifest is valid and simply declares no psr-4
+    prefixes. A manifest that cannot be decoded or parsed raises
+    :class:`ComposerManifestError` — the two are not the same fact and must not
+    return the same value.
+    """
     try:
         data = json.loads(content.decode("utf-8"))
-    except Exception:
-        return {}
+    except Exception as e:
+        raise ComposerManifestError(f"{type(e).__name__}: {e}") from e
+    if not isinstance(data, dict):
+        raise ComposerManifestError(
+            f"top-level JSON is {type(data).__name__}, expected an object")
     out: dict[str, str] = {}
     for section in ("autoload", "autoload-dev"):
         block = data.get(section) or {}

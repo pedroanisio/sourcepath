@@ -148,6 +148,11 @@ def extract_yaml_ast_summary(content: bytes, path: str) -> tuple[dict | None, li
         "imports": imports,
         "items": items,
     }
+    if not items:
+        # Empty/comment-only/scalar documents have no addressable members —
+        # a property of the source, not an extraction failure. Disclose or
+        # the coverage gate counts the file as silent (c.py convention).
+        summary["zero_symbol_reason"] = "document_has_no_members"
     return summary, []
 
 

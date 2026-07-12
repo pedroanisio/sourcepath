@@ -10,8 +10,32 @@ deterministic, and the dispatch is first-match-wins by `.matches()`.
 
 These get auto-registered at package import via codebase_mapper.__init__,
 and re-registered after `reset_registries()` is called.
+
+Availability contract (BL-036 — PALS's Law)
+-------------------------------------------
+``matches()`` decides *which language an analyzer owns*. It must NEVER gate on
+whether a tree-sitter grammar is installed. Availability is an **outcome of
+extraction**, not a property of ownership.
+
+These predicates used to read ``... and TS_AVAILABLE``. With a grammar absent
+the analyzer simply did not match, the first-match-wins loop in
+``pipeline._extract_all`` fell through, ``extract()`` never ran — and the
+``tree_sitter_unavailable`` diagnostic *inside* it became unreachable dead
+code. The file then carried no AST **and** no error marker, which is
+indistinguishable from a file that genuinely defines nothing. That is a silent
+degradation, and this project's whole disclosure discipline exists to forbid
+it (``coverage._FAILURE_MARKERS`` was listing a marker the registry path could
+never emit).
+
+So: claim the language unconditionally, and let ``extract()`` return
+``(None, ["tree_sitter_unavailable"])`` when its grammar is missing. Every
+extractor already implements that branch. Held by
+``tests/verify_grammar_disclosure.py``, which reads the source of every
+``matches()`` and fails if an availability flag reappears.
 """
 from __future__ import annotations
+
+import logging
 
 from ..shared_kernel.extensions import (
     LanguageAnalyzer, ImportResolver, PipelineCtx, ResolveResult,
@@ -21,7 +45,7 @@ from .languages.c import (
     build_c_include_index, extract_c_ast_summary, resolve_c_includes,
 )
 from .languages.cfml import (
-    CFML_TS_AVAILABLE, extract_cfml_ast_summary, resolve_cfml_imports,
+    extract_cfml_ast_summary, resolve_cfml_imports,
 )
 from .languages.clojure import (
     extract_clojure_ast_summary, resolve_clojure_imports,
@@ -66,7 +90,7 @@ from .languages.tsjs import (
     extract_tsjs_ast_summary, resolve_tsjs_import, tsjs_bare_package_root,
 )
 from .models import FileRecord
-from ..ts_setup import TS_AVAILABLE, _ts_grammar_for
+from ..ts_setup import _ts_grammar_for
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +113,7 @@ class TsJsAnalyzer:
     name = "lang_tsjs"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language in ("typescript", "javascript") and TS_AVAILABLE
+        return record.language in ("typescript", "javascript")
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -103,7 +127,7 @@ class RustAnalyzer:
     name = "lang_rust"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "rust" and TS_AVAILABLE
+        return record.language == "rust"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -114,7 +138,7 @@ class RubyAnalyzer:
     name = "lang_ruby"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "ruby" and TS_AVAILABLE
+        return record.language == "ruby"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -125,7 +149,7 @@ class GoAnalyzer:
     name = "lang_go"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "go" and TS_AVAILABLE
+        return record.language == "go"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -136,7 +160,7 @@ class JavaAnalyzer:
     name = "lang_java"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "java" and TS_AVAILABLE
+        return record.language == "java"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -155,7 +179,7 @@ class ObjcAnalyzer:
     name = "lang_objc"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language in OBJC_LANGUAGE_TAGS and TS_AVAILABLE
+        return record.language in OBJC_LANGUAGE_TAGS
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -166,7 +190,7 @@ class CAnalyzer:
     name = "lang_c"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "c" and TS_AVAILABLE
+        return record.language == "c"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -179,14 +203,14 @@ class CAnalyzer:
 class CfmlAnalyzer:
     """CFML — tag syntax and cfscript, via the ``tree-sitter-cfml`` wheel.
 
-    The grammar package is imported by ``languages/cfml.py`` itself (not
-    ts_setup's all-or-nothing block), so ``matches`` gates on the module's
-    own availability flag rather than the global ``TS_AVAILABLE``.
+    The grammar package is imported by ``languages/cfml.py`` itself, not by
+    ts_setup's all-or-nothing block; either way ``matches`` does not consult
+    it (see the module docstring's availability contract).
     """
     name = "lang_cfml"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "cfml" and CFML_TS_AVAILABLE
+        return record.language == "cfml"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -209,7 +233,7 @@ class CppAnalyzer:
     name = "lang_cpp"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "cpp" and TS_AVAILABLE
+        return record.language == "cpp"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -220,7 +244,7 @@ class KotlinAnalyzer:
     name = "lang_kotlin"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "kotlin" and TS_AVAILABLE
+        return record.language == "kotlin"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -231,7 +255,7 @@ class SwiftAnalyzer:
     name = "lang_swift"
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
-        return record.language == "swift" and TS_AVAILABLE
+        return record.language == "swift"
 
     def extract(self, record: FileRecord, content: bytes,
                 ctx: PipelineCtx) -> tuple[dict | None, list[str]]:
@@ -711,12 +735,26 @@ class ShellResolver:
         return ResolveResult(in_repo=list(in_repo), external=list(external))
 
 
+_log = logging.getLogger(__name__)
+
+#: Budget for the error excerpt carried on a PSR-4 degradation entry.
+PSR4_ERROR_EXCERPT_CHARS = 200
+
+
 def _php_psr4_index(ctx: PipelineCtx) -> dict[str, str]:
     """Once-per-repo composer.json PSR-4 autoload map, built lazily and stashed
     on ``ctx`` — mirrors ``_c_basename_index``: never rebuilt per file, and
     still constructed for bare PipelineCtx contexts that skip the host's index
     phase. Prefix dirs are anchored at the composer.json's own directory, so a
     monorepo with per-package composer files resolves correctly.
+
+    A manifest that cannot be read or parsed degrades this index to empty for
+    that package, which silently un-resolves every ``use`` statement that
+    depended on it. That must never pass unannounced (BL-038, PALS's Law): the
+    failure is recorded on ``ctx.scratch["degradations"]`` — the same channel
+    the enrichment layer uses when it self-disables — so the manifest carries a
+    machine-readable record instead of the run reporting a PHP repository with
+    no internal imports as though that were the truth.
     """
     index = ctx.indices.get("host:php_psr4")
     if index is None:
@@ -726,7 +764,19 @@ def _php_psr4_index(ctx: PipelineCtx) -> dict[str, str]:
                 continue
             try:
                 psr4 = parse_composer_psr4(ctx.read_path(path))
-            except Exception:
+            except Exception as e:  # noqa: BLE001 — untrusted file; disclose, don't abort
+                _log.warning(
+                    "php: composer manifest unreadable at %s (%s: %s); "
+                    "PSR-4 imports from this package will not resolve",
+                    path, type(e).__name__, e,
+                )
+                ctx.scratch.setdefault("degradations", []).append({
+                    "component": "php_psr4",
+                    "reason": "composer_manifest_unreadable",
+                    "kind": "import_resolution",
+                    "path": path,
+                    "error": f"{type(e).__name__}: {e}"[:PSR4_ERROR_EXCERPT_CHARS],
+                })
                 continue
             base = path[: -len("composer.json")]   # '' at root, 'pkg/' otherwise
             for prefix, directory in psr4.items():
@@ -755,9 +805,15 @@ class PhpResolver:
 
 class _LightweightAnalyzer:
     """Shared shape for the E2 line-oriented extractors — no tree-sitter
-    dependency, so ``matches`` never gates on TS_AVAILABLE."""
+    dependency, so there is no availability question to answer at all."""
     language = ""
-    _extract = None
+
+    # Overridden by every concrete subclass with a staticmethod wrapping
+    # its extract_*_summary function; typed here so the dispatch call
+    # below is a real callable to mypy.
+    @staticmethod
+    def _extract(content: bytes, path: str) -> tuple[dict | None, list[str]]:
+        raise NotImplementedError
 
     def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
         return record.language == self.language

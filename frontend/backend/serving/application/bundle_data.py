@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 from fastapi import HTTPException
-from rdflib import Graph, Namespace, URIRef
+from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF
 
 CBM = Namespace("https://codebase-mapper.example.org/cbm#")
@@ -404,7 +404,7 @@ def _project_from_rdflib(ttl_path: Path) -> Projection:
                 "returns": _str_or_none(g.value(c, CBML2.returnsType)),
                 "visibility": _str_or_none(g.value(c, CBML2.visibility)),
                 "paramsJson": _str_or_none(g.value(c, CBML2.paramsJson)),
-                "isAsync": bool(is_async and is_async.toPython() is True),
+                "isAsync": bool(isinstance(is_async, Literal) and is_async.toPython() is True),
                 "bases": sorted(str(o) for o in g.objects(c, CBML2.baseType)),
                 "typeParams": sorted(str(o) for o in g.objects(c, CBML2.typeParam)),
                 "decorators": sorted(str(o) for o in g.objects(c, CBML2.decorator)),

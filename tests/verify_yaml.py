@@ -135,7 +135,12 @@ def test_first_class_facets() -> None:
     check("facet: L2 chunker dispatches on yaml",
           "yaml" in set(_re.findall(r'record\.language\s*==\s*"([a-z-]+)"', src)))
     from plugins.llm_enrich.enricher import SUPPORTED_LANGUAGES
-    check("facet: yaml is L4-supported", "yaml" in SUPPORTED_LANGUAGES)
+    # Data languages are DELIBERATELY excluded from L4 summary scope
+    # (tests/test_l4_scope_extension.py pins the contract; schema files get
+    # the separate schema_purpose scope). The promotion facet asserts the
+    # documented exclusion, not the template default.
+    check("facet: yaml is deliberately outside L4 summary scope",
+          "yaml" not in SUPPORTED_LANGUAGES)
 
 
 def test_pipeline_end_to_end(repo: Path) -> None:

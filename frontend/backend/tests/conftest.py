@@ -29,6 +29,20 @@ def pytest_collection_modifyitems(config, items):
     bundle = Path(os.environ.get("CBM_OUTPUT_DIR", DEFAULT_BUNDLE))
     if (bundle / "run_manifest.json").exists():
         return
+
+    # The skip is a convenience for a fresh checkout, not a licence for CI to
+    # report green on an untested REST surface (BL-024). CI generates the
+    # bundle and sets CBM_REQUIRE_LIVE_BUNDLE=1; if the bundle is then missing,
+    # that is a broken pipeline, not a reason to pass quietly.
+    if os.environ.get("CBM_REQUIRE_LIVE_BUNDLE", "").strip() not in ("", "0", "false"):
+        raise pytest.UsageError(
+            f"CBM_REQUIRE_LIVE_BUNDLE is set but no live bundle exists at {bundle} "
+            f"(expected {bundle / 'run_manifest.json'}). Every live-bundle test "
+            f"would have skipped and this run would have reported success. "
+            f"Generate the bundle with scripts/run_l3.py, or unset "
+            f"CBM_REQUIRE_LIVE_BUNDLE to allow skipping."
+        )
+
     skip = pytest.mark.skip(
         reason=f"live bundle not found at {bundle}; "
         "generate one with scripts/run_l3.py or set CBM_OUTPUT_DIR"

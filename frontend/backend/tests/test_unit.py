@@ -137,10 +137,19 @@ def test_semantic_search_runs_when_backend_is_sbert(client, monkeypatch):
             v[0] = bundle.chunk_vectors[0]
             return v
 
-    # patch _get_model so the test never imports sentence_transformers
-    monkeypatch.setattr(app_module, "_get_model", lambda *_a, **_kw: _FakeModel())
-    # the function also does `from sentence_transformers import SentenceTransformer`
-    # at the top of the branch — preempt the import so it can't fail
+    # Patch _get_model so the test never imports sentence_transformers.
+    #
+    # The patch target must be the module the CALL SITE resolves the name in.
+    # `chunks.search_chunks` calls the module-global `_get_model` defined in
+    # serving/application/chunks.py; `app_module` only re-exports it, so
+    # patching app_module here rebinds a name nobody reads — the real
+    # `_get_model` then ran and raised `TypeError: _FakeModel() takes no
+    # arguments` from the SentenceTransformer(name) construction below. The
+    # test was skipped in CI (BL-024), so this rot went unobserved. Every other
+    # test in this file already patches `chunks_app`; match them.
+    monkeypatch.setattr(chunks_app, "_get_model", lambda *_a, **_kw: _FakeModel())
+    # The branch also does `from sentence_transformers import SentenceTransformer`
+    # inside _get_model — preempt the import so it can never reach the real one.
     import types
 
     fake_st = types.ModuleType("sentence_transformers")

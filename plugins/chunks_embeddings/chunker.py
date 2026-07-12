@@ -497,7 +497,11 @@ def _tsjs_class_fields(class_node, content: bytes) -> dict:
     type_params = _tsjs_type_params(class_node, content)
     if type_params:
         fields["type_params"] = type_params
-    bases: list[str] = []
+    # Heritage split (BL-005): extends and implements are collected apart so
+    # generalization vs realization survives into the chunk contract; bases
+    # remains the merged view (extends first, then implements).
+    extends: list[str] = []
+    implements: list[str] = []
     heritage = next((c for c in class_node.children
                      if c.type == "class_heritage"), None)
     if heritage is not None:
@@ -514,15 +518,21 @@ def _tsjs_class_fields(class_node, content: bytes) -> dict:
                     if i + 1 < len(named) and named[i + 1].type == "type_arguments":
                         end = named[i + 1].end_byte
                         i += 1
-                    bases.append(_ws_collapse(
+                    extends.append(_ws_collapse(
                         content[start:end].decode("utf-8", "replace")))
                     i += 1
             elif clause.type == "implements_clause":
-                bases.extend(_ws_collapse(_ts_text(c, content))
-                             for c in clause.children if c.is_named)
+                implements.extend(_ws_collapse(_ts_text(c, content))
+                                  for c in clause.children if c.is_named)
             elif clause.is_named:
-                # JS grammar: class_heritage wraps the expression directly.
-                bases.append(_ws_collapse(_ts_text(clause, content)))
+                # JS grammar: class_heritage wraps the expression directly —
+                # always generalization (JS has no implements).
+                extends.append(_ws_collapse(_ts_text(clause, content)))
+    if extends:
+        fields["extends"] = extends
+    if implements:
+        fields["implements"] = implements
+    bases = extends + implements
     if bases:
         fields["bases"] = bases
     decorators = [_ws_collapse(_ts_text(c, content)).lstrip("@")

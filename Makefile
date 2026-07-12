@@ -41,6 +41,8 @@ DRIFT_VERIFIERS := \
 	$(TESTS_DIR)/verify_report_rs_contract.py \
 	$(TESTS_DIR)/verify_requirements_mirror.py \
 	$(TESTS_DIR)/verify_readme_coverage.py \
+	$(TESTS_DIR)/verify_ci_live_bundle.py \
+	$(TESTS_DIR)/verify_backend_image.py \
 	$(TESTS_DIR)/verify_make_wiring.py
 
 CORE_VERIFIERS := \
@@ -54,6 +56,7 @@ CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_xrefs.py \
 	$(TESTS_DIR)/verify_repository_summary.py \
 	$(TESTS_DIR)/verify_ast_coverage.py \
+	$(TESTS_DIR)/verify_grammar_disclosure.py \
 	$(TESTS_DIR)/verify_progress.py \
 	$(TESTS_DIR)/verify_golden_repo.py \
 	$(TESTS_DIR)/verify_dimension_shapes.py

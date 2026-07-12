@@ -133,7 +133,7 @@ def fixture_records() -> list[FileRecord]:
         rec("b.py"),
         rec("README.md", language="markdown", type_="documentation"),
         rec("c.py"),
-        rec("query.sql", language="sql"),          # unsupported language
+        rec("data.json", language="json"),         # data language: deliberately outside L4 scope
         rec("d.py"),
         rec("logo.bin", language=None, type_="binary"),
         rec("e.py"),

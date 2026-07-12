@@ -58,6 +58,7 @@ cbml2:ChunkShape a sh:NodeShape ;
         cbml2:_ps_23bc5b36eb4caea9,
         cbml2:_ps_362ac6bae7cd2b94,
         cbml2:_ps_41100415d10dd657,
+        cbml2:_ps_4186f53532450dc0,
         cbml2:_ps_4a6e238c3e845ae3,
         cbml2:_ps_4b9a3e0511542747,
         cbml2:_ps_6380aa21972ee85e,
@@ -72,6 +73,7 @@ cbml2:ChunkShape a sh:NodeShape ;
         cbml2:_ps_c00c8c76d5ab64e9,
         cbml2:_ps_e45a1613252be493,
         cbml2:_ps_edfd38e2297c8c84,
+        cbml2:_ps_ee118c22be24cd3d,
         cbml2:_ps_f0d0ce397e2167bb,
         cbml2:_ps_f7108d2e3bd4d74f ;
     sh:targetClass cbml2:Chunk .
@@ -338,6 +340,9 @@ cbml2:_ps_41100415d10dd657 sh:datatype xsd:string ;
     sh:maxCount 1 ;
     sh:path cbml2:embeddingArtifact .
 
+cbml2:_ps_4186f53532450dc0 sh:datatype xsd:string ;
+    sh:path cbml2:implementsType .
+
 cbml2:_ps_4a6e238c3e845ae3 sh:datatype xsd:string ;
     sh:path cbml2:decorator .
 
@@ -401,6 +406,9 @@ cbml2:_ps_edfd38e2297c8c84 sh:datatype xsd:integer ;
     sh:maxCount 1 ;
     sh:minInclusive 0 ;
     sh:path cbml2:embeddingRow .
+
+cbml2:_ps_ee118c22be24cd3d sh:datatype xsd:string ;
+    sh:path cbml2:extendsType .
 
 cbml2:_ps_f0d0ce397e2167bb sh:class cbml2:Chunk ;
     sh:maxCount 1 ;

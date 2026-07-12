@@ -215,3 +215,128 @@ def test_map_chapters_point_to_the_interactive_cartogram():
     districts = src.index('chapter(st, "The districts"')
     assert "cartogram" in src[metro:metro + 2500].lower()
     assert "cartogram" in src[districts:districts + 2500].lower()
+
+
+# ---------------------------------------------------------------------------
+# BL-011 / BL-015 — graph-backed class forest (no blob re-parse)
+# ---------------------------------------------------------------------------
+_CBM_NS = "https://codebase-mapper.example.org/cbm#"
+_L2_NS = "https://codebase-mapper.example.org/cbml2#"
+_XR_NS = "https://codebase-mapper.example.org/cbmxr#"
+
+
+def _forest_graph(classes, methods=(), xref_edges=(), language="python"):
+    """Tiny bundle-graph fixture.
+
+    classes: (chunk_id, path, symbol, bases) tuples
+    methods: (chunk_id, class_chunk_id, symbol) tuples
+    xref_edges: (src_chunk_id, dst_chunk_id) subclassOf pairs
+    """
+    import rdflib
+    g = rdflib.Graph()
+    U, Lit = rdflib.URIRef, rdflib.Literal
+    files = set()
+    for cid, path, sym, bases in classes:
+        f = U("urn:file:" + path)
+        if path not in files:
+            files.add(path)
+            g.add((f, U(_CBM_NS + "path"), Lit(path)))
+            g.add((f, U(_CBM_NS + "language"), Lit(language)))
+        c = U("urn:chunk:" + cid)
+        g.add((c, U(_L2_NS + "kind"), Lit("class")))
+        g.add((c, U(_L2_NS + "inFile"), f))
+        g.add((c, U(_L2_NS + "symbol"), Lit(sym)))
+        g.add((c, U(_L2_NS + "qualifiedSymbol"), Lit(sym)))
+        for b in bases:
+            g.add((c, U(_L2_NS + "baseType"), Lit(b)))
+    for mid, cid, sym in methods:
+        m = U("urn:chunk:" + mid)
+        g.add((m, U(_L2_NS + "kind"), Lit("method")))
+        g.add((m, U(_L2_NS + "symbol"), Lit(sym)))
+        g.add((m, U(_L2_NS + "memberOf"), U("urn:chunk:" + cid)))
+    for i, (s, d) in enumerate(xref_edges):
+        e = U("urn:xref:%d" % i)
+        g.add((e, U(_XR_NS + "kind"), Lit("subclassOf")))
+        g.add((e, U(_XR_NS + "src"), U("urn:chunk:" + s)))
+        g.add((e, U(_XR_NS + "dst"), U("urn:chunk:" + d)))
+    return g
+
+
+_FOUR = [
+    ("c1", "pkg/a.py", "Base", []),
+    ("c2", "pkg/a.py", "Mid", ["Base"]),
+    ("c3", "pkg/b.py", "Leaf", ["Mid"]),
+    ("c4", "pkg/b.py", "Extra", ["Mid"]),
+]
+_METHS = [("m1", "c1", "get"), ("m2", "c1", "put"), ("m3", "c1", "_hidden")]
+_XREFS = [("c2", "c1"), ("c3", "c2"), ("c4", "c2")]
+
+
+def test_forest_uses_xref_edges_and_member_of():
+    g = _forest_graph(_FOUR, _METHS, _XREFS)
+    forest = D.build_class_forest(g, "pkg")
+    assert forest["n_classes"] == 4
+    assert forest["edge_source"] == "xrefs"
+    assert sorted(forest["gen_edges"]) == [
+        ("Extra", "Mid"), ("Leaf", "Mid"), ("Mid", "Base")]
+    assert forest["classes"]["Base"]["methods"] == ["get", "put"]  # _hidden filtered
+    assert len(forest["trees"]) == 1 and forest["refused"] is False
+    assert "Base" in forest["trees"][0]["nodes"]
+
+
+def test_forest_name_match_fallback_is_disclosed():
+    g = _forest_graph(_FOUR, _METHS, xref_edges=())
+    forest = D.build_class_forest(g, "pkg")
+    assert forest["edge_source"] == "name-match"
+    assert sorted(forest["gen_edges"]) == [
+        ("Extra", "Mid"), ("Leaf", "Mid"), ("Mid", "Base")]
+
+
+def test_forest_name_match_skips_ambiguous_symbols():
+    dup = _FOUR + [
+        ("c5", "pkg/a.py", "Dup", []),
+        ("c6", "pkg/b.py", "Dup", []),
+        ("c7", "pkg/b.py", "User", ["Dup"]),
+    ]
+    forest = D.build_class_forest(_forest_graph(dup), "pkg")
+    assert not any(child == "User" for child, _ in forest["gen_edges"]), (
+        "ambiguous base name must not bind in name-match mode")
+    labels = set(forest["classes"])
+    assert "Dup (a.py)" in labels and "Dup (b.py)" in labels
+
+
+def test_forest_scope_filter():
+    extra = _FOUR + [("c9", "other/c.py", "Outside", [])]
+    forest = D.build_class_forest(_forest_graph(extra), "pkg")
+    assert forest["n_classes"] == 4
+    assert "Outside" not in forest["classes"]
+
+
+def test_forest_small_component_is_refused_not_promised():
+    two = [("c1", "pkg/a.py", "Base", []), ("c2", "pkg/a.py", "Mid", ["Base"])]
+    forest = D.build_class_forest(_forest_graph(two, xref_edges=[("c2", "c1")]), "pkg")
+    assert forest["trees"] == []
+    assert forest["refused"] is True
+    assert forest["tree_min"] == 4
+    prose = D.class_forest_prose(forest)
+    assert "refus" in prose.lower()
+    assert str(forest["tree_min"]) in prose
+
+
+def test_forest_prose_promises_only_rendered_trees():
+    g = _forest_graph(_FOUR, _METHS, _XREFS)
+    forest = D.build_class_forest(g, "pkg")
+    prose = D.class_forest_prose(forest)
+    assert "hierarch" in prose.lower()
+    assert "blob" not in prose.lower()  # no re-parse claims
+
+
+def test_dossier_source_has_no_blob_reparse_in_class_view():
+    src_path = os.path.join(os.path.dirname(D.__file__), "cbm_dossier.py")
+    with open(src_path, encoding="utf-8") as fh:
+        src = fh.read()
+    uml = src.index("CH UML views")
+    districts = src.index('chapter(st, "The districts"')
+    section = src[uml:districts]
+    assert "pyast.parse" not in section, (
+        "class view must query the graph, not re-parse blobs (BL-011)")

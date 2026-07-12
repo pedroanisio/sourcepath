@@ -142,7 +142,12 @@ def test_first_class_facets() -> None:
     check("facet: L2 chunker dispatches on json",
           "json" in set(_re.findall(r'record\.language\s*==\s*"([a-z-]+)"', src)))
     from plugins.llm_enrich.enricher import SUPPORTED_LANGUAGES
-    check("facet: json is L4-supported", "json" in SUPPORTED_LANGUAGES)
+    # Data languages are DELIBERATELY excluded from L4 summary scope
+    # (tests/test_l4_scope_extension.py pins the contract; schema files get
+    # the separate schema_purpose scope). The promotion facet asserts the
+    # documented exclusion, not the template default.
+    check("facet: json is deliberately outside L4 summary scope",
+          "json" not in SUPPORTED_LANGUAGES)
 
 
 def test_pipeline_end_to_end(repo: Path) -> None:

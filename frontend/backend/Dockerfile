@@ -29,7 +29,14 @@ COPY codebase_mapper ./codebase_mapper
 RUN pip install --no-deps .
 
 # ── Layer 3: the backend app itself.
+# `app.py` imports the `serving` package (application/, domain/, …) on nearly
+# every route. Copying only app.py produced an image that died at import with
+# `ModuleNotFoundError: No module named 'serving'` (BL-029) — and no CI job
+# built the image, so nothing observed it. tests/verify_backend_image.py now
+# derives this from app.py's imports: any first-party module the app imports
+# must be COPYed here, or the check fails on the commit that adds it.
 COPY frontend/backend/app.py ./app.py
+COPY frontend/backend/serving ./serving
 
 ENV CBM_OUTPUT_DIR=/data \
     PORT=8765

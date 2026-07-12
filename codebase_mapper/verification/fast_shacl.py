@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 
 from collections import defaultdict
+from typing import cast
 
 from rdflib import RDF, Graph, Literal, URIRef
 from rdflib.collection import Collection
@@ -61,9 +62,9 @@ def _parse_shapes(shapes: Graph) -> list[dict]:
                 if p == SH.path:
                     spec["path"] = o
                 elif p == SH.minCount:
-                    spec["min"] = int(o)
+                    spec["min"] = int(cast(Literal, o))
                 elif p == SH.maxCount:
-                    spec["max"] = int(o)
+                    spec["max"] = int(cast(Literal, o))
                 elif p == SH.datatype:
                     spec["datatype"] = o
                 elif p == SH.hasValue:
@@ -71,9 +72,9 @@ def _parse_shapes(shapes: Graph) -> list[dict]:
                 elif p == SH.pattern:
                     spec["pattern"] = re.compile(str(o))
                 elif p == SH.minInclusive:
-                    spec["min_inclusive"] = o.toPython()
+                    spec["min_inclusive"] = cast(Literal, o).toPython()
                 elif p == SH.minLength:
-                    spec["min_length"] = int(o)
+                    spec["min_length"] = int(cast(Literal, o))
                 elif p == URIRef(str(SH) + "class"):
                     spec["cls"] = o
                 elif p == URIRef(str(SH) + "in"):

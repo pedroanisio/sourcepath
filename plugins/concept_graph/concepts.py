@@ -369,6 +369,8 @@ def compute_concept_embeddings(
         sources[cn] = "centroid"
 
     if orphan_ids:
+        # orphan_ids is non-empty only when callable(encode) held above
+        assert callable(encode)
         texts = []
         for cn in orphan_ids:
             meta = concepts[cn]

@@ -313,9 +313,9 @@ def map_codebase(
     for r in records:
         if r.language in ("c", "cpp", "objective-c") and r.type_ in (
                 "source_code", "test_code"):
-            content = content_by_path.get(r.path)
-            if content and b"#" in content:
-                harvest_macros(content, macro_table)
+            c_src = content_by_path.get(r.path)
+            if c_src and b"#" in c_src:
+                harvest_macros(c_src, macro_table)
     ctx.scratch["macro_table"] = macro_table
 
     # Build-evidence include roots (plan E4): a shipped compilation database

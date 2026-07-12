@@ -42,6 +42,11 @@ import ast
 SIGNATURE_FIELDS = (
     "signature", "params", "returns", "bases", "type_params",
     "visibility", "is_async", "decorators",
+    # Heritage split (BL-005): emitted only where the language syntactically
+    # distinguishes generalization from realization (Java/C++/ObjC items,
+    # TS/JS heritage clauses). ``bases`` stays the merged, always-present
+    # view; these two carry the UML extends-vs-implements distinction.
+    "extends", "implements",
 )
 
 
