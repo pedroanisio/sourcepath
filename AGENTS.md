@@ -101,3 +101,17 @@ python tests/verify_drift_p1.py          # doc/code drift checks
 `make test` invokes bare `python`; without the venv on `PATH` it dies
 with `python: not found` — and piping make's output hides the failure
 exit code.
+
+## Backlog governance
+
+```
+node scripts/check-backlog-governance.mjs          # validate docs/backlog.yml + docs/BACKLOG.md
+node scripts/check-backlog-governance.mjs --stats   # counts by status/priority/complexity/category/type/owner,
+                                                     # cross-tabs (status x priority, category x status,
+                                                     # type x status), and complexity-weighted remaining-work size
+node scripts/check-backlog-governance.mjs <path> --stats  # same, against any backlog.yml (even a
+                                                     # differently-schema'd one in another repo)
+node --test scripts/tests/*.test.mjs                # unit tests for the script itself; also `make test-backlog-governance`
+```
+
+Run the validate form after any hand-edit to `docs/backlog.yml`/`docs/BACKLOG.md` (CI runs it too, on the same paths). `--stats` is read-only and safe to run anytime.

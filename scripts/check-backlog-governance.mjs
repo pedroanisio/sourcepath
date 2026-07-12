@@ -3,7 +3,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_BACKLOG = "docs/backlog.yml";
-const BACKLOG_PATH = process.argv[2] ?? DEFAULT_BACKLOG;
 const DONE_STATUSES = new Set(["done"]);
 const BLOCKED_MARKERS = new RegExp("\\b(?:" + ["TO" + "DO", "TB" + "D", "FIX" + "ME"].join("|") + ")\\b|" + "PLACE" + "HOLDER", "i");
 
@@ -188,7 +187,10 @@ export function validate(backlog, rootDir, backlogPath = DEFAULT_BACKLOG) {
     }
   }
 
-  const mdPath = join(rootDir, dirname(backlogPath), "BACKLOG.md");
+  // resolve() (not join()) so an absolute backlogPath — a sibling repo's
+  // backlog.yml, say — isn't concatenated onto rootDir into a broken path.
+  const baseDir = dirname(resolve(rootDir, backlogPath));
+  const mdPath = join(baseDir, "BACKLOG.md");
   if (existsSync(mdPath) && idPrefix) {
     const yamlIds = new Set(items.map((item) => item.id));
     const mdIds = idsInMarkdown(readFileSync(mdPath, "utf8"), idPrefix);
@@ -199,7 +201,7 @@ export function validate(backlog, rootDir, backlogPath = DEFAULT_BACKLOG) {
     }
   }
 
-  const schemaPath = join(rootDir, dirname(backlogPath), "schema/backlog.schema.json");
+  const schemaPath = join(baseDir, "schema/backlog.schema.json");
   if (!existsSync(schemaPath)) {
     errors.push("schema/backlog.schema.json is missing");
   } else {
@@ -214,7 +216,7 @@ export function validate(backlog, rootDir, backlogPath = DEFAULT_BACKLOG) {
 }
 
 export function run(backlogPath = DEFAULT_BACKLOG, rootDir = join(dirname(fileURLToPath(import.meta.url)), "..")) {
-  const fullPath = join(rootDir, backlogPath);
+  const fullPath = resolve(rootDir, backlogPath);
   const backlog = parseBacklog(readFileSync(fullPath, "utf8"));
   const errors = validate(backlog, rootDir, backlogPath);
   if (errors.length > 0) {
@@ -223,10 +225,145 @@ export function run(backlogPath = DEFAULT_BACKLOG, rootDir = join(dirname(fileUR
   return backlog.items.length;
 }
 
+const STATUS_ORDER = ["done", "in-progress", "blocked", "ready", "parked"];
+const PRIORITY_ORDER = ["critical", "high", "medium", "low"];
+const COMPLEXITY_ORDER = ["XS", "S", "M", "L", "XL"];
+const COMPLEXITY_WEIGHT = { XS: 1, S: 2, M: 3, L: 5, XL: 8 };
+const OPEN_STATUSES = new Set(["ready", "in-progress", "blocked"]);
+
+function count(items, field) {
+  const counts = {};
+  for (const item of items) counts[item[field]] = (counts[item[field]] ?? 0) + 1;
+  return counts;
+}
+
+function buildCrossTab(items, rowField, colField) {
+  const table = {};
+  for (const item of items) {
+    const row = (table[item[rowField]] ??= {});
+    row[item[colField]] = (row[item[colField]] ?? 0) + 1;
+  }
+  return table;
+}
+
+/**
+ * Compute summary statistics (counts, cross-tabs, weighted size) over a parsed backlog.
+ */
+export function computeStats(backlog) {
+  const items = backlog.items;
+  const crossTab = buildCrossTab(items, "status", "priority");
+  for (const status of STATUS_ORDER) crossTab[status] ??= {};
+
+  const categoryByStatus = buildCrossTab(items, "category", "status");
+  const typeByStatus = buildCrossTab(items, "type", "status");
+
+  const weightOf = (item) => COMPLEXITY_WEIGHT[item.complexity] ?? 0;
+  const total = items.reduce((sum, item) => sum + weightOf(item), 0);
+  const open = items.filter((item) => OPEN_STATUSES.has(item.status)).reduce((sum, item) => sum + weightOf(item), 0);
+
+  const criticalOpen = items.filter((item) => OPEN_STATUSES.has(item.status) && item.priority === "critical");
+
+  return {
+    total: items.length,
+    status: count(items, "status"),
+    priority: count(items, "priority"),
+    complexity: count(items, "complexity"),
+    category: count(items, "category"),
+    type: count(items, "type"),
+    owner: count(items, "owner"),
+    crossTab,
+    categoryByStatus,
+    typeByStatus,
+    weight: { total, open },
+    criticalOpen,
+  };
+}
+
+function renderBreakdown(title, counts, order) {
+  const keys = order ?? Object.keys(counts).sort((a, b) => (counts[b] ?? 0) - (counts[a] ?? 0));
+  const max = Math.max(1, ...keys.map((k) => counts[k] ?? 0));
+  const lines = [title];
+  for (const key of keys) {
+    const n = counts[key] ?? 0;
+    const barLen = Math.round((n / max) * 40);
+    lines.push(`  ${String(key).padEnd(14)} ${String(n).padStart(3)}  ${"#".repeat(barLen)}`);
+  }
+  return lines.join("\n");
+}
+
+function renderCrossTab(title, table, rowOrder, colOrder, colWidth = 10) {
+  const lines = [title];
+  lines.push("  " + " ".repeat(14) + colOrder.map((c) => String(c).padStart(colWidth)).join("") + "  total");
+  for (const row of rowOrder) {
+    const rowData = table[row] ?? {};
+    const rowTotal = colOrder.reduce((sum, c) => sum + (rowData[c] ?? 0), 0);
+    lines.push(
+      `  ${String(row).padEnd(14)}` +
+        colOrder.map((c) => String(rowData[c] ?? 0).padStart(colWidth)).join("") +
+        String(rowTotal).padStart(7)
+    );
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Render a computeStats() result as a human-readable text report.
+ */
+export function formatStats(stats) {
+  const sections = [`TOTAL ITEMS: ${stats.total}`, ""];
+  sections.push(renderBreakdown("STATUS", stats.status, STATUS_ORDER), "");
+  sections.push(renderBreakdown("PRIORITY", stats.priority, PRIORITY_ORDER), "");
+  sections.push(renderBreakdown("COMPLEXITY", stats.complexity, COMPLEXITY_ORDER), "");
+  sections.push(renderBreakdown("CATEGORY", stats.category), "");
+  sections.push(renderBreakdown("TYPE", stats.type), "");
+  sections.push(renderBreakdown("OWNER", stats.owner), "");
+
+  sections.push("CROSS-TAB: status x priority");
+  sections.push("  " + " ".repeat(12) + PRIORITY_ORDER.map((p) => p.padStart(10)).join(""));
+  for (const status of STATUS_ORDER) {
+    const row = stats.crossTab[status] ?? {};
+    sections.push(`  ${status.padEnd(12)}` + PRIORITY_ORDER.map((p) => String(row[p] ?? 0).padStart(10)).join(""));
+  }
+  sections.push("");
+
+  const categoryOrder = Object.keys(stats.category).sort((a, b) => stats.category[b] - stats.category[a]);
+  sections.push(renderCrossTab("CATEGORY x STATUS", stats.categoryByStatus, categoryOrder, STATUS_ORDER, 12), "");
+
+  const typeOrder = Object.keys(stats.type).sort((a, b) => stats.type[b] - stats.type[a]);
+  sections.push(renderCrossTab("TYPE x STATUS", stats.typeByStatus, typeOrder, STATUS_ORDER, 12), "");
+
+  const pct = stats.weight.total > 0 ? ((stats.weight.open / stats.weight.total) * 100).toFixed(1) : "0.0";
+  sections.push(
+    `COMPLEXITY-WEIGHTED SIZE (XS=1..XL=8): total=${stats.weight.total}, remaining-open=${stats.weight.open} (${pct}% of total weight still open)`,
+    ""
+  );
+
+  sections.push(`CRITICAL + still open: ${stats.criticalOpen.length}`);
+  for (const item of stats.criticalOpen) {
+    sections.push(`  ${item.id}: ${item.title} [${item.status}, ${item.complexity}, owner=${item.owner}]`);
+  }
+
+  return sections.join("\n");
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  const wantsStats = args.includes("--stats");
+  const pathArg = args.find((arg) => !arg.startsWith("--")) ?? DEFAULT_BACKLOG;
+  const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
   try {
-    const count = run(BACKLOG_PATH);
-    console.log(`backlog-governance: ${count} item(s) verified`);
+    if (wantsStats) {
+      // --stats is a read-only report, not a governance decision: it works on
+      // any parseable backlog.yml (e.g. a sibling repo's own, differently
+      // schema'd registry), so it deliberately does not require this repo's
+      // strict validate() (id_prefix, decision_prefix, enum vocab, ...) to pass.
+      const fullPath = resolve(rootDir, pathArg);
+      const backlog = parseBacklog(readFileSync(fullPath, "utf8"));
+      console.log(formatStats(computeStats(backlog)));
+    } else {
+      const count = run(pathArg, rootDir);
+      console.log(`backlog-governance: ${count} item(s) verified`);
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

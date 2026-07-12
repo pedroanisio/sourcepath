@@ -6,6 +6,7 @@ on:
       - "docs/backlog.yml"
       - "docs/schema/backlog.schema.json"
       - "scripts/check-backlog-governance.mjs"
+      - "scripts/tests/check-backlog-governance.test.mjs"
   push:
     branches: [main]
     paths:
@@ -13,6 +14,7 @@ on:
       - "docs/backlog.yml"
       - "docs/schema/backlog.schema.json"
       - "scripts/check-backlog-governance.mjs"
+      - "scripts/tests/check-backlog-governance.test.mjs"
 jobs:
   backlog-governance:
     runs-on: ubuntu-latest
@@ -22,3 +24,4 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/check-backlog-governance.mjs
+      - run: node --test scripts/tests/*.test.mjs

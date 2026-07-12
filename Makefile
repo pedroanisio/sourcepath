@@ -150,7 +150,7 @@ lint: ## Enforce import boundaries (mirrors .github/workflows/lint.yml).
 # ----------------------------------------------------------------- tests
 
 .PHONY: test
-test: test-core test-vocab test-langs test-rust test-llm-offline test-drift test-units test-backend test-docs test-report-rs test-cartogram ## Run the full offline test surface (skips Ollama-dependent verifiers).
+test: test-core test-vocab test-langs test-rust test-llm-offline test-drift test-units test-backend test-docs test-report-rs test-cartogram test-backlog-governance ## Run the full offline test surface (skips Ollama-dependent verifiers).
 
 .PHONY: test-core
 test-core: ## Core round-trip, L2/L3, xrefs, repo summary.
@@ -223,6 +223,14 @@ test-report-rs: ## Rust cbm-report crate unit tests (disclosed skip when cargo i
 .PHONY: test-ui
 test-ui: ## Frontend (vitest) test suite.
 	cd $(UI_DIR) && npm test
+
+.PHONY: test-backlog-governance
+test-backlog-governance: ## Unit tests for the backlog governance/stats script (Node); disclosed skip when node is absent.
+	@if command -v node >/dev/null 2>&1; then \
+		node --test scripts/tests/*.test.mjs; \
+	else \
+		echo "test-backlog-governance: node not found — backlog governance tests SKIPPED (disclosed, not silent)"; \
+	fi
 
 .PHONY: test-cartogram
 test-cartogram: ## Cartogram model tests (Node); disclosed skip when node is absent.
