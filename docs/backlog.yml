@@ -23,7 +23,7 @@ metadata:
   generated_by: "recipe-forge add-backlog-governance"
   generated_on: "2026-07-04"
   system_of_record: "docs/backlog.yml"
-  total_items: 13
+  total_items: 70
   id_prefix: "BL"
   decision_prefix: "D"
   categories: ["feature","docs","ops","security","testing","tooling"]
@@ -43,7 +43,7 @@ items:
       references, dependencies, ownership, and live evidence as the repo evolves.
     category: "docs"
     type: "infra"
-    status: "ready"
+    status: "done"
     complexity: "S"
     priority: "high"
     rationale: "Backlog drift hides shipped work, duplicate work, and ungrounded requests."
@@ -51,20 +51,36 @@ items:
       - "docs/backlog.yml validates against docs/schema/backlog.schema.json."
       - "docs/BACKLOG.md lists the same backlog item IDs as the YAML registry."
       - "Done items with live checks still match the current tree."
+    evidence_checks:
+      - kind: "file-exists"
+        path: "docs/backlog.yml"
+      - kind: "file-exists"
+        path: "docs/BACKLOG.md"
+      - kind: "file-exists"
+        path: "docs/schema/backlog.schema.json"
+      - kind: "file-exists"
+        path: "scripts/check-backlog-governance.mjs"
+      - kind: "grep"
+        path: ".github/workflows/backlog-governance.yml"
+        pattern: "check-backlog-governance"
     references:
       - "docs/BACKLOG.md"
       - "docs/schema/backlog.schema.json"
+      - "scripts/check-backlog-governance.mjs"
+      - ".github/workflows/backlog-governance.yml"
     owner: "shared"
-    source: "Initial backlog governance recipe installation."
+    source: "Initial backlog governance recipe installation; closed 2026-07-11 — registry, rendered view, schema, validation command, and CI job all verified present."
     tags: ["backlog", "governance", "drift"]
 
   # ===================================================================
-  # UML reconstruction cluster (BL-002..BL-013)
+  # UML reconstruction cluster (BL-002..BL-015)
   # Grounded in the UML gap analysis of the extraction pipeline,
   # 2026-07-11: what the bundle must additionally capture (or stop
   # dropping) before correct, full class/sequence diagrams can be
   # derived from a bundle by query alone. Package diagrams need no
   # new data (cbm:imports / cbm:importsExternal suffice today).
+  # BL-014/BL-015 added same day from the doc-ray dossier review
+  # (reports/doc-ray__dossier__20260711T214556Z.pdf).
   # ===================================================================
 
   - id: "BL-002"
@@ -229,9 +245,16 @@ items:
       chunk boundary. Widen the canonical contract, emit distinct
       predicates, and either split the subclassOf xref kind or add an
       implementsOf kind.
+
+      Shipped 2026-07-11: SIGNATURE_FIELDS widened with extends/implements;
+      the TS/JS chunker splits heritage clauses (bases stays the merged
+      back-compat view); ChunkGraphWriter emits cbml2:extendsType /
+      cbml2:implementsType; shapes extended and the SHACL golden
+      regenerated. Resolver-kind split (implementsOf) intentionally not
+      needed: the acceptance criteria are met by the chunk predicates.
     category: "feature"
     type: "tech-debt"
-    status: "ready"
+    status: "done"
     complexity: "S"
     priority: "high"
     rationale: "The distinction is parsed today and destroyed by the copy-through, losing generalization vs realization arrowheads."
@@ -239,13 +262,28 @@ items:
       - "A Java fixture with class X extends A implements B yields distinguishable graph facts for A versus B."
       - "A TypeScript class with both heritage clauses yields the same distinction."
       - "Existing subclassOf consumers keep working or are migrated in the same change."
+    evidence_checks:
+      - kind: "grep"
+        path: "plugins/chunks_embeddings/signatures.py"
+        pattern: "\"extends\", \"implements\""
+        expect: true
+      - kind: "grep"
+        path: "plugins/chunks_embeddings/graph_writer.py"
+        pattern: "extendsType"
+        expect: true
+      - kind: "grep"
+        path: "tests/fixtures/shapes_golden.ttl"
+        pattern: "implementsType"
+        expect: true
+      - kind: "file-exists"
+        path: "tests/test_heritage_split.py"
     references:
       - "plugins/chunks_embeddings/signatures.py:42-45"
       - "plugins/chunks_embeddings/chunker.py:496-523"
       - "codebase_mapper/inspection/languages/java.py:338-385"
       - "codebase_mapper/inspection/languages/cpp.py:390-396"
       - "codebase_mapper/inspection/languages/objc.py:474-477"
-    owner: "unassigned"
+    owner: "mine"
     source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
     tags: ["uml", "inheritance", "l2-chunks", "signature-contract"]
 
@@ -454,9 +492,17 @@ items:
       explicit empty query results rather than silent omissions. External
       bases and unresolved references should render as disclosed gaps,
       consistent with the report disclaimer framing.
+
+      Shipped 2026-07-11: build_class_forest() queries cbml2 class chunks,
+      memberOf members, and cbmxr subclassOf edges (name-match fallback
+      disclosed when a bundle lacks the xref layer); the pyast blob
+      re-parse is deleted; the capability table's Class row and the
+      sequence/communication refusal rows are now grounded in the graph
+      (conditional on calls-edge presence). Verified on a graph-backed
+      bundle: 270 class chunks across 14 languages vs Python-only before.
     category: "tooling"
     type: "tech-debt"
-    status: "ready"
+    status: "done"
     complexity: "M"
     priority: "high"
     rationale: "The class-diagram view — the one that needs the new structural facts — is the only UML view bypassing the graph."
@@ -464,10 +510,23 @@ items:
       - "The dossier UML class view is built from SPARQL/graph queries over the bundle with no pyast re-parse of blobs."
       - "UML views cover non-Python languages present in the mapped repo."
       - "Unresolved or external bases render as visibly disclosed gaps."
+    evidence_checks:
+      - kind: "grep"
+        path: "scripts/cbm_dossier.py"
+        pattern: "def build_class_forest"
+        expect: true
+      - kind: "grep"
+        path: "scripts/cbm_dossier.py"
+        pattern: "pyast"
+        expect: false
+      - kind: "grep"
+        path: "tests/test_cbm_dossier.py"
+        pattern: "build_class_forest"
+        expect: true
     references:
       - "scripts/cbm_dossier.py:1630-1709"
       - "plugins/symbol_xrefs/graph_writer.py:68-78"
-    owner: "unassigned"
+    owner: "mine"
     source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
     tags: ["uml", "dossier", "reporting", "graph-consumption"]
 
@@ -532,3 +591,1862 @@ items:
     owner: "unassigned"
     source: "UML reconstruction gap analysis, Claude Fable 5 via Claude Code, 2026-07-11."
     tags: ["uml", "xrefs", "python", "resolution-scope"]
+
+  - id: "BL-014"
+    title: "Register the xref layer in the enriched-bundle runners"
+    summary: "run_l3.py and run_l4.py never register symbol_xrefs, so enriched bundles ship with no inheritance or call edges at all."
+    description: |
+      Plugin registration is siloed per runner script: only
+      scripts/run_xrefs.py registers the symbol_xrefs plugin
+      (run_xrefs.py:104-105; it can also add concepts and LLM enrichment
+      via flags). The enriched-bundle runners register chunks, concepts,
+      and llm_enrich but never symbol_xrefs (run_l3.py:68-89,
+      run_l4.py:135-166). Evidence: the doc-ray bundle
+      (_tmp/doc-ray, mapped 2026-07-11T18:25:52Z) has zero cbmxr triples
+      in inventory.ttl, no xrefs.jsonl artifact, and no l3_10_xrefs
+      fragment in run_manifest.json extensions — while carrying full
+      chunk, concept, and L4 layers. Downstream, the dossier refuses
+      four UML behavior diagrams with the line "imports are not calls;
+      no interactions recorded", which is true of such bundles but false
+      of the pipeline's capability. Recommended fix: register
+      symbol_xrefs by default in run_l3/run_l4 (opt-out flag), or
+      promote run_xrefs.py to the canonical full-stack runner; either
+      way one runner produces the complete layer set.
+
+      Shipped 2026-07-11: symbol_xrefs registered by default in run_l3.py
+      and run_l4.py with a --no-xrefs opt-out (and a disclosed note when
+      --no-l2 disables the layer implicitly). Verified end-to-end: the
+      re-mapped doc-ray bundle carries 1337 resolved xref edges (was 0).
+      Correction from implementation: the manifest fragment key is
+      l3_50_xrefs_artifact, not l3_10_xrefs as the acceptance criterion
+      guessed.
+    category: "ops"
+    type: "infra"
+    status: "done"
+    complexity: "XS"
+    priority: "high"
+    rationale: "The pipeline's inheritance/call capability exists but never reaches enriched bundles, so every downstream consumer sees a capability gap that is actually a configuration gap."
+    acceptance_criteria:
+      - "A bundle produced by the enriched runner contains cbmxr edges, an xrefs.jsonl artifact, and an l3_10_xrefs fragment in run_manifest.json."
+      - "Re-mapping doc-ray yields a nonzero cbmxr triple count."
+      - "The registration default and its opt-out are documented in the runner help text."
+    evidence_checks:
+      - kind: "grep"
+        path: "scripts/run_l3.py"
+        pattern: "symbol_xrefs.register_all"
+        expect: true
+      - kind: "grep"
+        path: "scripts/run_l4.py"
+        pattern: "symbol_xrefs.register_all"
+        expect: true
+      - kind: "file-exists"
+        path: "tests/test_runner_xref_registration.py"
+    references:
+      - "scripts/run_xrefs.py:104-105"
+      - "scripts/run_l3.py:68-89"
+      - "scripts/run_l4.py:135-166"
+      - "_tmp/doc-ray/run_manifest.json"
+    owner: "mine"
+    source: "doc-ray dossier review (reports/doc-ray__dossier__20260711T214556Z.pdf), Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "xrefs", "runners", "ops"]
+
+  - id: "BL-015"
+    title: "Dossier class-hierarchy text promises figures the tree filter can drop"
+    summary: "The class-diagram section unconditionally prints that hierarchies follow, while the component filter can silently drop every figure."
+    description: |
+      The paragraph at scripts/cbm_dossier.py:1881-1886 always states
+      "The two largest hierarchies follow", but the tree list is built
+      with a size filter — trees = [mk_tree(c) for c in comps[:2] if
+      len(c) >= 4] (cbm_dossier.py:1712) — so a repository whose largest
+      inheritance component has fewer than four classes gets the promise
+      followed by no figure at all. Shipped instance: the doc-ray
+      dossier (reports/doc-ray__dossier__20260711T214556Z.pdf, p.26)
+      reports 123 classes with 1 internal generalization edge and then
+      renders zero hierarchy figures. This violates the chapter's own
+      stated house rule ("a diagram without data is fiction") in the
+      inverse direction: prose asserting figures that do not exist. Fix:
+      condition the paragraph on the tree list; when empty, emit an
+      explicit refusal note naming the threshold; when figures render,
+      disclose the >=4-class filter in the caption. Independent of and
+      not superseded by BL-011 — that rewire replaces the data source,
+      this fixes the prose/figure contract and is shippable now.
+
+      Shipped 2026-07-11 (inside the BL-011 rewrite, which replaced the
+      defective code path): class_forest_prose() promises figures only when
+      trees render and otherwise emits an explicit refusal naming the
+      4-class threshold and the largest component. Verified in a real
+      render: the re-mapped doc-ray dossier refuses with "largest: 2"
+      instead of promising hierarchies that never appear.
+    category: "tooling"
+    type: "bug"
+    status: "done"
+    complexity: "XS"
+    priority: "medium"
+    rationale: "A verification-first report must not assert the presence of figures it did not render."
+    acceptance_criteria:
+      - "A dossier over a bundle whose largest hierarchy has fewer than four classes renders either figures or an explicit refusal note — never the promise with nothing after it."
+      - "The component-size threshold is disclosed wherever hierarchies render."
+      - "The paragraph's class/edge counts remain, sourced as today."
+    evidence_checks:
+      - kind: "grep"
+        path: "scripts/cbm_dossier.py"
+        pattern: "class_forest_prose"
+        expect: true
+      - kind: "grep"
+        path: "scripts/cbm_dossier.py"
+        pattern: "refused rather than"
+        expect: true
+    references:
+      - "scripts/cbm_dossier.py:1712"
+      - "scripts/cbm_dossier.py:1881-1886"
+      - "reports/doc-ray__dossier__20260711T214556Z.pdf"
+    owner: "mine"
+    source: "doc-ray dossier review (reports/doc-ray__dossier__20260711T214556Z.pdf), Claude Fable 5 via Claude Code, 2026-07-11."
+    tags: ["uml", "dossier", "reporting", "disclosure"]
+
+  # ===================================================================
+  # Error-free mapping cluster (BL-016..BL-023)
+  # Source: docs/plan/error-free-mapping.md (2026-07-10) error ledger
+  # E1..E9. E5 (git provenance) is closed by operator decision and is
+  # deliberately not registered. Every budget below is quoted from the
+  # plan's own measured ledger, not re-estimated here.
+  # ===================================================================
+
+  - id: "BL-016"
+    title: "Eliminate tree-sitter parse errors in C-family files"
+    summary: "Half of all C-family source files parse with errors, so their extracted facts are silently partial."
+    description: |
+      The error ledger measures 30,203 of 61,203 source files (49%)
+      carrying 405,660 tree-sitter error nodes, concentrated in the
+      C family. A file that parses with errors still yields records,
+      so the bundle presents partial extraction as complete
+      extraction. Root causes named by the plan include missing
+      preprocessor handling and dialect drift. Until the parse-error
+      budget is met, every downstream count over C-family repositories
+      understates reality without disclosing it.
+    category: "feature"
+    type: "bug"
+    status: "ready"
+    complexity: "L"
+    priority: "high"
+    rationale: "Partial extraction presented as complete extraction is a silent failure, which the project's own disclosure discipline forbids."
+    acceptance_criteria:
+      - "Parse-error node count for C-family files meets the budget stated in the plan's ledger."
+      - "Any file that still parses with errors carries a machine-readable marker in the bundle."
+    references:
+      - "docs/plan/error-free-mapping.md:31"
+    owner: "unassigned"
+    source: "docs/plan/error-free-mapping.md error ledger E1, verified live 2026-07-11."
+    tags: ["error-free-mapping", "extraction", "c-family"]
+
+  - id: "BL-017"
+    title: "Assign a language or an explicit exemption to every file"
+    summary: "31% of files carry no language tag, so they are neither analyzed nor explicitly excluded."
+    description: |
+      The ledger measures 29,012 files (31%) with no language. The
+      target budget is at most 3%, with binary and data files exempt
+      via an explicit type rather than by silent omission. Today an
+      unlanguaged file is indistinguishable from an unsupported one,
+      which hides both classifier gaps and genuine binary content
+      behind the same empty value.
+    category: "feature"
+    type: "bug"
+    status: "ready"
+    complexity: "M"
+    priority: "high"
+    rationale: "An absent language tag conflates 'not supported', 'not detected', and 'not applicable' into one unreadable state."
+    acceptance_criteria:
+      - "Unlanguaged files fall to at most the budget stated in the ledger."
+      - "Every remaining unlanguaged file carries an explicit exemption type."
+    references:
+      - "docs/plan/error-free-mapping.md:32"
+    owner: "unassigned"
+    source: "docs/plan/error-free-mapping.md error ledger E2, verified live 2026-07-11."
+    tags: ["error-free-mapping", "classification"]
+
+  - id: "BL-018"
+    title: "Give every zero-symbol file a machine-readable reason"
+    summary: "7,380 files extract zero symbols with no recorded reason, so real extractor failures look like empty files."
+    description: |
+      The ledger counts 7,380 silent zero-symbol files. The stated
+      budget is zero by definition: a file that yields no symbols must
+      carry an explicit, machine-readable reason (genuinely empty,
+      unsupported construct, parse failure, or exempt type). Without
+      that reason, an extractor regression is indistinguishable from a
+      legitimately empty file, and no verifier can tell them apart.
+    category: "feature"
+    type: "bug"
+    status: "ready"
+    complexity: "M"
+    priority: "high"
+    rationale: "A silent zero result is the failure mode the disclosure discipline exists to prevent."
+    acceptance_criteria:
+      - "Every file with zero extracted symbols carries a reason code in the bundle."
+      - "A verifier fails when any zero-symbol file lacks a reason code."
+    references:
+      - "docs/plan/error-free-mapping.md:33"
+    owner: "unassigned"
+    source: "docs/plan/error-free-mapping.md error ledger E3, verified live 2026-07-11."
+    tags: ["error-free-mapping", "extraction", "disclosure"]
+
+  - id: "BL-019"
+    title: "Resolve or explicitly tier the 40% of unresolved imports"
+    summary: "Two of every five extracted import directives resolve to nothing, with no distinction between ambiguous and wrong."
+    description: |
+      The ledger measures 155,615 unresolved import directives, about
+      40% of those extracted. The plan's target is that hard edges be
+      100% precise and every ambiguous directive be preserved under a
+      distinct vocabulary tier rather than dropped, which requires a
+      cbm:possibleImport predicate and a vocabulary version bump from
+      v1 to v2. Today an import that could not be resolved simply
+      vanishes, so consumers cannot distinguish 'no such edge' from
+      'edge we could not place'.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "L"
+    priority: "high"
+    rationale: "Dropping unresolved directives destroys evidence; tiering them preserves it and keeps hard edges trustworthy."
+    acceptance_criteria:
+      - "A cbm:possibleImport tier exists in the vocabulary and carries ambiguous directives."
+      - "The vocabulary version is bumped and the SHACL shapes accept the new tier."
+      - "Hard cbm:imports edges remain precise."
+    references:
+      - "docs/plan/error-free-mapping.md:34"
+      - "docs/plan/error-free-mapping.md:135"
+    owner: "unassigned"
+    source: "docs/plan/error-free-mapping.md error ledger E4, verified live 2026-07-11."
+    tags: ["error-free-mapping", "imports", "vocabulary"]
+
+  - id: "BL-020"
+    title: "Close the L4 enrichment scope gaps"
+    summary: "Enrichment scope excludes languages and file classes that a complete map should cover, and the data-language boundary is still moving."
+    description: |
+      The ledger records L4 scope gaps: C++ was excluded from file
+      summaries while C was included, and only 59 of 793,210 concepts
+      carry descriptions. The C-family exclusion has since been
+      corrected in plugins/llm_enrich/enricher.py. The remaining scope
+      question is where the boundary for pure-data languages sits:
+      schema_purpose is gated by path prefix (static/schemas/) rather
+      than by language, so a JSON or YAML file outside that prefix
+      receives no L4 enrichment of any kind. Concept description
+      coverage remains far below any usable threshold.
+    category: "feature"
+    type: "tech-debt"
+    status: "in-progress"
+    complexity: "M"
+    priority: "medium"
+    rationale: "Enrichment that silently skips whole languages or file classes makes coverage claims unverifiable."
+    acceptance_criteria:
+      - "Every first-class language is either in an L4 scope or explicitly and testably excluded with a stated reason."
+      - "Concept description coverage meets a stated, measured threshold."
+    dependencies:
+      - "BL-039"
+    references:
+      - "docs/plan/error-free-mapping.md:36"
+      - "plugins/llm_enrich/enricher.py:81"
+      - "plugins/llm_enrich/aggregator.py:110"
+    owner: "concurrent"
+    source: "docs/plan/error-free-mapping.md error ledger E6, verified live 2026-07-11."
+    tags: ["error-free-mapping", "llm-enrich", "scope"]
+
+  - id: "BL-021"
+    title: "Give every concept an embedding or a provenance-tagged fallback"
+    summary: "7,394 concepts carry no embedding, so semantic neighbor queries silently miss them."
+    description: |
+      The ledger counts 7,394 concepts without an embedding against a
+      budget of zero, to be met with a label-embedding fallback that is
+      provenance-tagged so consumers can tell a fallback vector from a
+      real one. A concept with no vector is invisible to semantic
+      search while still appearing in the graph, which is a silent
+      recall failure rather than a disclosed one.
+    category: "feature"
+    type: "bug"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "A concept present in the graph but absent from the vector space is a silent recall hole in every semantic query."
+    acceptance_criteria:
+      - "Every concept has an embedding or a provenance-tagged fallback."
+      - "Fallback vectors are distinguishable from computed vectors in the bundle."
+    references:
+      - "docs/plan/error-free-mapping.md:37"
+    owner: "unassigned"
+    source: "docs/plan/error-free-mapping.md error ledger E7, verified live 2026-07-11."
+    tags: ["error-free-mapping", "embeddings", "concepts"]
+
+  - id: "BL-022"
+    title: "Make emission streaming and validation affordable at kernel scale"
+    summary: "JSON-LD is materialized whole-document in RAM and pySHACL validation takes roughly two hours."
+    description: |
+      The ledger records two emission-cost errors: the JSON-LD writer
+      builds the whole document in memory, and pySHACL validation of a
+      large bundle runs for about two hours. The plan's target is a
+      streaming JSON-LD writer and a fast structural gate that can run
+      on every build, with full SHACL reserved for a slower path. This
+      subsumes the linux flaw map's F9, which remains open by choice and
+      is today mitigated only by an opt-out environment flag.
+    category: "ops"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "L"
+    priority: "medium"
+    rationale: "An emission path that cannot run at scale forces users to disable validation, which removes the guarantee entirely."
+    acceptance_criteria:
+      - "JSON-LD emission streams rather than materializing the whole document."
+      - "A fast structural gate runs on every build; full SHACL runs on a disclosed slower path."
+    references:
+      - "docs/plan/error-free-mapping.md:38"
+      - "docs/reports/linux-flaw-map.md:40"
+    owner: "unassigned"
+    source: "docs/plan/error-free-mapping.md error ledger E8 and docs/reports/linux-flaw-map.md F9, verified live 2026-07-11."
+    tags: ["error-free-mapping", "emission", "scale", "shacl"]
+
+  - id: "BL-023"
+    title: "Wire the verify-bundle gate and the golden corpus"
+    summary: "The bundle gate exists as a module but is not a CLI command, and the golden corpus target does not exist."
+    description: |
+      E9 names the meta-error: the flaws in the ledger were found by
+      hand-audit rather than by the system. The remedy is a
+      cbm verify-bundle gate that fails a run when a budget is missed,
+      plus a golden corpus that grows forever. Verified state today:
+      codebase_mapper/verification/bundle_gate.py exists and its
+      docstring already claims the command, but no cbm.py subcommand
+      exposes it and the Makefile has no test-corpus target, so the gate
+      cannot run and the definition of error-free mapping is not
+      enforceable.
+    category: "testing"
+    type: "infra"
+    status: "ready"
+    complexity: "M"
+    priority: "high"
+    rationale: "A plan whose definition of done is a gate that cannot be invoked has no definition of done."
+    acceptance_criteria:
+      - "cbm verify-bundle is an invocable command that fails on a missed budget."
+      - "A golden corpus target exists and runs in the test suite."
+    references:
+      - "docs/plan/error-free-mapping.md:195"
+      - "docs/plan/error-free-mapping.md:221"
+      - "codebase_mapper/verification/bundle_gate.py:1"
+    owner: "unassigned"
+    source: "docs/plan/error-free-mapping.md error ledger E9, verified live 2026-07-11 (module present, command absent)."
+    tags: ["error-free-mapping", "verification", "gate"]
+
+  # ===================================================================
+  # Enforcement cluster (BL-024..BL-030)
+  # Source: REQUIREMENTS.md §12 gap audit (untracked working-tree doc),
+  # every claim re-verified mechanically against the tree 2026-07-11
+  # before registration. Theme: guarantees that are declared but not
+  # enforced, so CI reports green while checking nothing.
+  # ===================================================================
+
+  - id: "BL-024"
+    title: "Backend live-bundle validation silently skips in CI"
+    summary: "CI builds a fixture bundle to a path the tests never read, so all backend endpoint tests skip and the job still reports green."
+    description: |
+      The drift job writes its fixture bundle to _tmp/ci-bundle, but no
+      step sets CBM_OUTPUT_DIR to that path, and the test suite's
+      default is _tmp/usl-ng-core-map. The paths do not match, so every
+      endpoint integration test skips rather than fails, and CI reports
+      success. This is a false green: the REST surface is effectively
+      untested in CI while appearing tested.
+    category: "testing"
+    type: "bug"
+    status: "done"
+    complexity: "XS"
+    priority: "critical"
+    rationale: "A test that skips silently and reports green is worse than no test, because it manufactures unearned confidence."
+    acceptance_criteria:
+      - "CI sets CBM_OUTPUT_DIR to the fixture bundle path it builds."
+      - "The endpoint tests execute in CI, and a deliberate break fails the job."
+    references:
+      - ".github/workflows/lint.yml"
+      - "frontend/backend/tests/conftest.py"
+    evidence_checks:
+      - kind: "grep"
+        path: ".github/workflows/lint.yml"
+        pattern: "CBM_OUTPUT_DIR"
+      - kind: "grep"
+        path: ".github/workflows/lint.yml"
+        pattern: "CBM_REQUIRE_LIVE_BUNDLE"
+      - kind: "grep"
+        path: "frontend/backend/tests/conftest.py"
+        pattern: "CBM_REQUIRE_LIVE_BUNDLE"
+      - kind: "file-exists"
+        path: "tests/verify_ci_live_bundle.py"
+      - kind: "grep"
+        path: "Makefile"
+        pattern: "verify_ci_live_bundle"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-004, re-verified 2026-07-11: no CBM_OUTPUT_DIR in .github/workflows/lint.yml."
+    tags: ["ci", "false-green", "backend"]
+
+  - id: "BL-025"
+    title: "Declared coverage gates are never enforced"
+    summary: "Three coverage thresholds are declared across backend, core, and UI; none of them gate anything."
+    description: |
+      The backend declares a 90% coverage gate in pytest.ini, but every
+      real call site passes --no-cov, so the gate never runs. The core
+      library has no coverage threshold at all, leaving the 80/60
+      figures in the project guidelines aspirational. The React UI
+      declares a 90%-on-four-metrics gate in vite.config.ts that is not
+      currently met and has no job to run it. A declared gate that never
+      executes is a claim without a check.
+    category: "testing"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "high"
+    rationale: "An unenforced threshold is a statement of intent that reads as a guarantee."
+    acceptance_criteria:
+      - "At least one automated invocation enforces the backend threshold without --no-cov."
+      - "The core library has either a measured threshold or an explicitly documented substitute policy."
+      - "The UI threshold is enforced by a job, or lowered to the level actually met."
+    references:
+      - "frontend/backend/pytest.ini"
+      - "frontend/ui/vite.config.ts"
+      - "pyproject.toml"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-005 / GAP-009 / GAP-011, re-verified 2026-07-11."
+    tags: ["ci", "coverage", "enforcement"]
+
+  - id: "BL-026"
+    title: "CI runs a thin verifier slice and no Rust or Node toolchain"
+    summary: "Most verifier groups, the unit tree, the Rust crate, and the cartogram tool have no CI job at all."
+    description: |
+      CI runs lint, mypy, a drift slice, and the backend suite. The
+      language verifiers, Rust verifiers, vocabulary verifiers, the bulk
+      of the core verifiers, the offline enrichment verifiers, and the
+      unit tree never execute in CI. Neither the Rust report crate nor
+      the Node cartogram tool has any CI job, so both are unbuilt and
+      untested on every push despite having Makefile targets with
+      disclosed-skip fallbacks.
+    category: "testing"
+    type: "infra"
+    status: "ready"
+    complexity: "M"
+    priority: "high"
+    rationale: "The verifier suite is this project's primary quality mechanism; leaving most of it out of CI means regressions land unobserved."
+    acceptance_criteria:
+      - "A CI job runs the full offline test surface, or each currently-unwired group gains a job."
+      - "Rust and Node toolchains have build and test jobs."
+    references:
+      - ".github/workflows/lint.yml"
+      - "Makefile:153"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-010 / GAP-012, re-verified 2026-07-11."
+    tags: ["ci", "verifiers", "toolchain"]
+
+  - id: "BL-027"
+    title: "Lock file freshness is never checked"
+    summary: "uv.lock is committed but CI and Docker install with pip, ignoring the lock entirely."
+    description: |
+      The repository commits uv.lock, yet the CI and container paths
+      install with pip in editable mode, which does not consult the
+      lock. Nothing verifies that the lock still resolves against
+      pyproject.toml, so the lock can drift from the manifest without
+      any signal, and a reproducible install is not actually guaranteed
+      by the artifacts the repository ships.
+    category: "ops"
+    type: "infra"
+    status: "ready"
+    complexity: "XS"
+    priority: "medium"
+    rationale: "A lock file that nothing validates and nothing installs from provides reproducibility in appearance only."
+    acceptance_criteria:
+      - "A check fails when uv.lock is stale relative to pyproject.toml."
+    references:
+      - "drift-risk-map.md:101"
+      - ".github/workflows/lint.yml"
+    owner: "unassigned"
+    source: "drift-risk-map.md M17, re-verified 2026-07-11: no lock-freshness check in CI."
+    tags: ["ci", "supply-chain", "drift"]
+
+  - id: "BL-028"
+    title: "The UI test suite runs in no aggregate target and no wiring guard sees it"
+    summary: "make test omits test-ui, lint omits lint-cartogram, and the wiring verifier only knows about Python test trees."
+    description: |
+      The umbrella test target enumerates eleven groups but not test-ui,
+      even though that target exists, so the five vitest suites never run
+      in the full local surface. The lint target is only the import
+      boundary check, so lint-cartogram never runs either. The wiring
+      verifier that exists to catch exactly this class of omission scans
+      only Python test trees, so it stays green while non-Python suites
+      go unexecuted. The guard needs to cover every test tree, not only
+      the ones it was first written for.
+    category: "testing"
+    type: "bug"
+    status: "ready"
+    complexity: "S"
+    priority: "high"
+    rationale: "A wiring guard that cannot see a whole class of test tree gives false assurance precisely where coverage is thinnest."
+    acceptance_criteria:
+      - "The umbrella test target runs the UI suite; the lint target runs the cartogram lint."
+      - "The wiring verifier fails when any test tree, in any language, is absent from a Makefile group."
+    references:
+      - "Makefile:153"
+      - "Makefile:224"
+      - "tests/verify_make_wiring.py:41"
+    owner: "unassigned"
+    source: "Code sweep 2026-07-11, verified: 'test:' at Makefile:153 lacks test-ui; COVERED_TREES is Python-only."
+    tags: ["testing", "wiring", "drift-guard"]
+
+  - id: "BL-029"
+    title: "The backend container image cannot start"
+    summary: "The backend Dockerfile never copies the serving package, so the image raises an unhandled import error at boot."
+    description: |
+      The backend Dockerfile copies the application entrypoint but never
+      the serving package it imports, and the root package-discovery
+      configuration does not include it either. The resulting image
+      fails at import time with an unhandled module-not-found error. No
+      CI job builds this image, so the break is invisible. This directly
+      contradicts the project guideline that every commit must be
+      deployable.
+    category: "ops"
+    type: "bug"
+    status: "done"
+    complexity: "S"
+    priority: "critical"
+    rationale: "A container image that cannot start is a broken deliverable, and no automation currently observes it."
+    acceptance_criteria:
+      - "The built backend image starts and serves a health check."
+      - "A CI job builds and smoke-tests the image."
+    references:
+      - "frontend/backend/Dockerfile"
+    evidence_checks:
+      - kind: "grep"
+        path: "frontend/backend/Dockerfile"
+        pattern: "COPY frontend/backend/serving"
+      - kind: "file-exists"
+        path: "tests/verify_backend_image.py"
+      - kind: "grep"
+        path: "Makefile"
+        pattern: "verify_backend_image"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-001, re-verified 2026-07-11: no COPY of the serving package."
+    tags: ["docker", "deployability"]
+
+  - id: "BL-030"
+    title: "The root image omits packages and silently degrades language support"
+    summary: "The root image leaves out two declared packages and its unpinned dependency list diverges from the manifest."
+    description: |
+      The root image does not copy the decomposer and recomposer
+      packages although the manifest declares them installable, so the
+      built CLI cannot run either tool. Its dependency list is also
+      unpinned and diverges from the manifest, omitting several
+      tree-sitter grammars, the graph store, the validation model
+      library, and the settings parser. Because the package installs
+      without dependency resolution, those omissions degrade language
+      support and the fast emit path silently inside the image rather
+      than failing loudly.
+    category: "ops"
+    type: "bug"
+    status: "ready"
+    complexity: "S"
+    priority: "high"
+    rationale: "Silent capability loss inside a shipped image is the least observable failure mode this project can produce."
+    acceptance_criteria:
+      - "The image contains every package the manifest declares installable."
+      - "The image dependency list is generated from, or verified against, the manifest."
+    references:
+      - "Dockerfile"
+      - "pyproject.toml"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-002 / GAP-003, re-verified 2026-07-11."
+    tags: ["docker", "dependencies", "degradation"]
+
+  # ===================================================================
+  # Serving-surface cluster (BL-031..BL-035)
+  # ===================================================================
+
+  - id: "BL-031"
+    title: "A malformed sidecar produces a bare unlogged 500"
+    summary: "Bundle loading parses sidecar files with no error handling, so one broken file returns an opaque server error."
+    description: |
+      Bundle loading parses several sidecar files with no guard around
+      the deserialization calls and no registered exception handler. A
+      syntactically broken sidecar therefore surfaces as a bare,
+      unlogged server error with no indication of which file failed or
+      why. The application-layer guidance for this project calls for
+      graceful handling; a 500 with no log line is the opposite.
+    category: "feature"
+    type: "bug"
+    status: "ready"
+    complexity: "S"
+    priority: "medium"
+    rationale: "An operator cannot diagnose a corrupt bundle from an unlogged opaque error."
+    acceptance_criteria:
+      - "A malformed sidecar yields a descriptive error naming the file, and a log entry."
+    references:
+      - "frontend/backend/serving/application/bundle_data.py"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-008, re-verified 2026-07-11."
+    tags: ["backend", "error-handling"]
+
+  - id: "BL-032"
+    title: "Response schemas are incomplete and partly undeclared"
+    summary: "One response field survives only via permissive extras, and two handlers declare no response model at all."
+    description: |
+      The file-detail handler returns an external-imports field that its
+      response model never declares; it reaches the client only because
+      the model permits extra keys, which means the field is invisible
+      to the API field-parity drift guard and can be removed by accident
+      without any test failing. Two further handlers declare no response
+      model at all, so their shapes are absent from the generated
+      schema. The parity guard cannot protect what is not declared.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "XS"
+    priority: "medium"
+    rationale: "A field that exists only by permissiveness is outside every contract the project claims to enforce."
+    acceptance_criteria:
+      - "The external-imports field is declared on its response model and covered by the parity guard."
+      - "Every handler declares a response model, or its omission is justified in the guard's allowlist."
+    references:
+      - "frontend/backend/serving/application/files.py"
+      - "frontend/backend/app.py"
+      - "tests/verify_api_field_parity.py"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-006 / GAP-022, re-verified 2026-07-11."
+    tags: ["backend", "api", "drift-guard"]
+
+  - id: "BL-033"
+    title: "Enrichment sidecars are loaded into memory but no endpoint reads them"
+    summary: "The backend loads L4 enrichment data on every bundle load and never serves any of it."
+    description: |
+      Bundle loading reads the enrichment sidecars into memory on every
+      load, but no REST endpoint reads any of that data. It is either
+      staged-but-unwired or dead weight; today it is pure cost. The
+      equivalent data is already surfaced through the MCP path, so the
+      REST surface is the gap. Resolve by wiring it into a response or
+      removing the unused load.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "S"
+    priority: "medium"
+    rationale: "Paying the load cost of data no caller can reach is either an unfinished feature or dead code, and the two must not be indistinguishable."
+    acceptance_criteria:
+      - "The enrichment data is served by an endpoint, or the load is removed."
+    references:
+      - "frontend/backend/serving/application/bundle_data.py"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-020, re-verified 2026-07-11."
+    tags: ["backend", "llm-enrich", "dead-code"]
+
+  - id: "BL-034"
+    title: "Semantic chunk search hardcodes the embedding model name"
+    summary: "The query embedder ignores the bundle's recorded model, so a bundle built with another model ranks against the wrong vector space."
+    description: |
+      The semantic branch of chunk search hardcodes the sentence-encoder
+      model name rather than reading it from the bundle's embeddings
+      metadata, which does record it. A bundle built with a different
+      encoder would be queried with vectors from an unrelated space: no
+      error is raised and no warning is emitted, only meaningless
+      rankings. This is a silent-correctness failure, the most dangerous
+      class of defect this project recognizes.
+    category: "feature"
+    type: "bug"
+    status: "ready"
+    complexity: "XS"
+    priority: "high"
+    rationale: "Silently ranking against the wrong vector space returns confident nonsense, which is worse than an error."
+    acceptance_criteria:
+      - "The query embedder reads the model name from the bundle metadata and falls back only when it is absent."
+      - "A bundle whose recorded model is unavailable fails loudly rather than ranking."
+    references:
+      - "frontend/backend/serving/application/chunks.py"
+      - "plugins/chunks_embeddings/backends.py"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-023, re-verified 2026-07-11."
+    tags: ["backend", "embeddings", "silent-correctness"]
+
+  - id: "BL-035"
+    title: "The SPARQL escape hatch leaks its on-disk stores"
+    summary: "Each regenerated bundle creates a new temp store directory that is never reclaimed, and the module's own docstring is stale."
+    description: |
+      The read-only SPARQL surface is disabled by default behind an
+      environment flag. When enabled, it opens an on-disk store keyed by
+      inventory identity, and the module states plainly that live stores
+      are not closed: a regenerated inventory produces a new store
+      directory under the temp path while the previous one remains,
+      unbounded across rebuilds. Separately, the module docstring claims
+      oversized results are truncated silently, while the code does set
+      an explicit truncation flag in the response, so the docstring
+      understates the behavior and should be corrected.
+    category: "ops"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "S"
+    priority: "low"
+    rationale: "An unbounded temp-directory leak on a long-lived server is an operational failure that only appears under sustained use."
+    acceptance_criteria:
+      - "Superseded stores are reclaimed, or their growth is bounded and disclosed."
+      - "The docstring matches the implemented truncation behavior."
+    references:
+      - "frontend/mcp_server/sparql.py"
+    owner: "unassigned"
+    source: "Code sweep 2026-07-11, verified against frontend/mcp_server/sparql.py."
+    tags: ["mcp", "sparql", "resource-leak"]
+
+  # ===================================================================
+  # Extraction-truth cluster (BL-036..BL-047)
+  # The disclosure contract this project holds itself to (degradation is
+  # disclosed, never silent) is not upheld in several extraction paths.
+  # BL-037 and BL-038 are defects in first-class PHP support introduced
+  # by this session and are owned accordingly.
+  # ===================================================================
+
+  - id: "BL-036"
+    title: "Missing tree-sitter grammars degrade silently instead of disclosing"
+    summary: "Analyzers gate availability in their match predicate, so an absent grammar yields neither an AST nor an error code."
+    description: |
+      Every tree-sitter analyzer tests grammar availability inside its
+      match predicate. When the grammar package is absent the analyzer
+      does not match, the extraction function never runs, and the
+      unavailable-grammar diagnostic inside it is therefore unreachable.
+      The file receives no AST and no failure marker: it simply looks
+      like a file with nothing in it. The coverage module lists that
+      diagnostic among the failure markers it expects to observe, so it
+      is waiting for a signal the registry path can never emit. This
+      contradicts the project's own commitment that degradation is
+      disclosed rather than silent, and it means a deployment with
+      missing grammars (which the root image demonstrably produces)
+      reports clean extraction over files it never parsed.
+    category: "feature"
+    type: "bug"
+    status: "done"
+    complexity: "M"
+    priority: "critical"
+    rationale: "This is the disclosure contract failing in the exact place it was written to protect, and it compounds the image dependency omission."
+    acceptance_criteria:
+      - "A file whose grammar is unavailable carries an explicit machine-readable diagnostic in the bundle."
+      - "The unavailable-grammar marker is reachable through the registry path and covered by a verifier."
+    dependencies:
+      - "BL-030"
+    references:
+      - "codebase_mapper/inspection/_builtins.py:106"
+      - "codebase_mapper/inspection/languages/rust.py:150"
+      - "codebase_mapper/inspection/coverage.py:48"
+    evidence_checks:
+      - kind: "grep"
+        path: "codebase_mapper/inspection/_builtins.py"
+        pattern: "return record\\.language[^\\n]*and (CFML_)?TS_AVAILABLE"
+        expect: false
+      - kind: "file-exists"
+        path: "tests/verify_grammar_disclosure.py"
+      - kind: "grep"
+        path: "Makefile"
+        pattern: "verify_grammar_disclosure"
+    owner: "unassigned"
+    source: "Code sweep 2026-07-11, verified: match predicates gate on grammar availability, making the diagnostic unreachable."
+    tags: ["extraction", "disclosure", "pals-law", "silent-failure"]
+
+  - id: "BL-037"
+    title: "PHP extracts no inheritance"
+    summary: "The PHP analyzer captures class names but never extends or implements, so PHP can produce no inheritance edges."
+    description: |
+      The PHP class-like pattern stops at the declared name and captures
+      no parent clause, and the analyzer emits no bases key at all. PHP
+      is the only class-bearing first-class language in this state: ten
+      other analyzers emit bases. The consequence is that no PHP
+      repository can yield an inheritance edge, and every downstream
+      view that reconstructs class hierarchies is empty for PHP without
+      saying why. The existing xref registry item covers a different set
+      of languages, all of which already emit bases, so this gap is not
+      covered there. Introduced by this session's PHP promotion.
+    category: "feature"
+    type: "bug"
+    status: "done"
+    complexity: "S"
+    priority: "high"
+    rationale: "A language promoted to first class while silently emitting no inheritance makes the first-class claim partly false."
+    acceptance_criteria:
+      - "The PHP analyzer captures extends and implements clauses and emits bases."
+      - "The PHP verifier asserts inheritance extraction over a fixture with both clauses."
+    references:
+      - "codebase_mapper/inspection/languages/php.py:163"
+      - "tests/verify_php.py"
+    evidence_checks:
+      - kind: "grep"
+        path: "codebase_mapper/inspection/languages/php.py"
+        pattern: "_parse_bases"
+      - kind: "file-exists"
+        path: "tests/fixtures/php/app/src/Models/Admin.php"
+      - kind: "grep"
+        path: "tests/verify_php.py"
+        pattern: "test_bases_extraction"
+    owner: "mine"
+    source: "Code sweep 2026-07-11, verified: zero occurrences of a bases key in the PHP analyzer, against ten peers that emit it."
+    tags: ["php", "extraction", "inheritance", "first-class"]
+
+  - id: "BL-038"
+    title: "A malformed composer manifest silently voids PHP import resolution"
+    summary: "The PSR-4 index swallows every parse failure, so PHP imports go unresolved with no disclosure."
+    description: |
+      The PHP autoload index catches every exception while reading a
+      composer manifest and continues, registering no degradation entry.
+      A malformed or unreadable manifest therefore produces an empty
+      prefix map, every namespace import silently fails to resolve, and
+      the bundle reports a PHP repository with no internal import edges
+      as though that were the truth. The enrichment layer sets the
+      pattern this should follow: it records a machine-readable
+      degradation entry when it self-disables. Introduced by this
+      session's PHP promotion.
+    category: "feature"
+    type: "bug"
+    status: "done"
+    complexity: "XS"
+    priority: "medium"
+    rationale: "Swallowing the failure converts a diagnosable input error into an invisible, wrong result."
+    acceptance_criteria:
+      - "A composer manifest that cannot be parsed registers a degradation entry naming the file."
+      - "A verifier asserts the degradation is recorded rather than swallowed."
+    references:
+      - "codebase_mapper/inspection/_builtins.py:726"
+      - "plugins/llm_enrich/enricher.py:186"
+    evidence_checks:
+      - kind: "grep"
+        path: "codebase_mapper/inspection/languages/php.py"
+        pattern: "ComposerManifestError"
+      - kind: "grep"
+        path: "codebase_mapper/inspection/_builtins.py"
+        pattern: "composer_manifest_unreadable"
+      - kind: "grep"
+        path: "tests/verify_php.py"
+        pattern: "test_composer_degradation"
+    owner: "mine"
+    source: "Code sweep 2026-07-11, verified: broad exception swallow with no degradation entry."
+    tags: ["php", "imports", "disclosure", "pals-law"]
+
+  - id: "BL-039"
+    title: "The first-class L4 facet contradicts the data-language enrichment boundary"
+    summary: "Two live contracts disagree about whether JSON and YAML must be in the file-summary scope, and the language verifiers are red because of it."
+    description: |
+      The first-class language contract requires each first-class
+      language to appear in the L4 summary scope, and the JSON and YAML
+      verifiers assert exactly that. A concurrent change removed the
+      pure-data languages from that scope on the grounds that they get a
+      schema-purpose scope instead, and pinned that with its own test.
+      Both contracts are now live and mutually exclusive: the JSON and
+      YAML verifiers each fail their L4 facet. The schema-purpose scope
+      is real, but it is gated by path prefix rather than by language,
+      so a data file outside that prefix receives no enrichment at all
+      and the substitution does not actually hold in general. Resolution
+      requires deciding what the L4 facet means for a pure-data language
+      and making one contract authoritative, rather than leaving two
+      tests to contradict each other.
+    category: "testing"
+    type: "bug"
+    status: "ready"
+    complexity: "S"
+    priority: "high"
+    rationale: "Two committed contracts asserting opposite things means the suite cannot be green and neither claim is trustworthy."
+    acceptance_criteria:
+      - "One contract is authoritative and the other is amended to match, with the reasoning recorded."
+      - "The JSON and YAML verifiers pass without weakening the first-class definition for code languages."
+    references:
+      - "plugins/llm_enrich/enricher.py:81"
+      - "plugins/llm_enrich/aggregator.py:110"
+      - "tests/verify_json.py"
+      - "tests/verify_yaml.py"
+      - "tests/test_l4_scope_extension.py"
+    owner: "shared"
+    source: "Verified 2026-07-11: verify_json and verify_yaml each fail the L4 facet in the current working tree."
+    tags: ["contract", "llm-enrich", "first-class", "red-test"]
+
+  - id: "BL-040"
+    title: "Macro-generated symbols are structurally uncapturable"
+    summary: "The analyzers run no C preprocessor, so macro-defined functions parse cleanly and contribute no symbol."
+    description: |
+      The coverage module states the limitation plainly: the analyzers do
+      not run a preprocessor, so macro-generated definitions are not
+      function or declaration nodes. They raise no parse error and
+      contribute no symbol, which is why the clean-parse zero-symbol
+      column exists. The gap is therefore measured and disclosed but
+      never registered as work, and it is a large share of the
+      zero-symbol population in kernel-scale C repositories.
+    category: "feature"
+    type: "research"
+    status: "parked"
+    complexity: "XL"
+    priority: "low"
+    rationale: "The limitation is disclosed and bounded; closing it means preprocessing, which is a scope decision the operator should make deliberately."
+    acceptance_criteria:
+      - "A decision is recorded: either a preprocessing path is built, or the limitation is accepted as a permanent, disclosed boundary."
+    references:
+      - "codebase_mapper/inspection/coverage.py:8"
+    owner: "unassigned"
+    source: "Code sweep 2026-07-11, verified against the coverage module's own documented limitation."
+    tags: ["extraction", "c-family", "preprocessor", "boundary"]
+
+  - id: "BL-041"
+    title: "Retire the test-edge stem heuristic in favor of typed-import derivation"
+    summary: "The product's own reports recommend retiring the stem heuristic, but it still runs first and the typed derivation is only a fallback."
+    description: |
+      Test edges are derived first by matching file stems, with a
+      typed-import derivation available only as a later fallback
+      strategy. The generated reports already carry the finding that a
+      large share of the heuristic edges point at a single target, and
+      the report text itself carries a recommendation to derive test
+      evidence from typed imports minus test-infrastructure targets and
+      retire the stem heuristic. The recommendation is shipped to users
+      but exists nowhere as work. Inverting the strategy order is the
+      substance of the change.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "Shipping a recommendation to users while never scheduling it leaves the product arguing against its own output."
+    acceptance_criteria:
+      - "Typed-import derivation is the primary strategy for test edges."
+      - "Precision of the resulting edges is measured against the prior heuristic and recorded."
+    references:
+      - "codebase_mapper/inspection/tests_edges.py:105"
+      - "scripts/cbm_report.py:1177"
+    owner: "unassigned"
+    source: "Code sweep 2026-07-11, verified: stem match is strategy 1; typed-import derivation is the fallback."
+    tags: ["tests-edges", "precision", "heuristic"]
+
+  - id: "BL-042"
+    title: "The import extractor misses proto imports and dynamic Python imports"
+    summary: "Two whole classes of import directive are invisible, so modules reachable only that way show zero inbound edges."
+    description: |
+      The import-edge extractor does not see protocol-buffer import
+      statements, nor dynamic Python imports performed through the import
+      library. At least one production module in this repository is
+      reachable only via dynamic discovery and consequently shows no
+      inbound import edges, which makes it look unreferenced when it is
+      not. This is file-level import extraction, distinct from the
+      symbol-level binding scope covered elsewhere in this backlog.
+    category: "feature"
+    type: "bug"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "A module that is used but shows no inbound edges will be read as dead code by every consumer of the graph."
+    acceptance_criteria:
+      - "Protocol-buffer import statements produce import edges."
+      - "Dynamically imported modules are either resolved or explicitly marked as dynamically reachable."
+    references:
+      - "docs/ONBOARDING.md:134"
+      - "frontend/mcp_server/sparql.py"
+    owner: "unassigned"
+    source: "docs/ONBOARDING.md stated limitation, re-verified 2026-07-11."
+    tags: ["imports", "extraction", "proto", "python"]
+
+  - id: "BL-043"
+    title: "Concept canonicalization is prototype-grade"
+    summary: "Canonicalization is a naive suffix strip with no lemmatizer, which the plugin itself documents."
+    description: |
+      Concept canonicalization lowercases and strips plural and common
+      verb suffixes by pattern. The plugin's own comments state that a
+      real lemmatizer belongs here and that the current approach is a
+      stand-in. The consequence is over- and under-merging of concepts,
+      which propagates into every concept-level view and into the
+      embedding neighborhoods built on top of them.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "low"
+    rationale: "Concept identity is the substrate for every semantic view; a naive merge rule silently distorts all of them."
+    acceptance_criteria:
+      - "Canonicalization uses a real lemmatizer, or the naive rule is measured and accepted with recorded error rates."
+    references:
+      - "plugins/concept_graph/concepts.py:39"
+    owner: "unassigned"
+    source: "plugins/concept_graph/concepts.py self-documented limitation, re-verified 2026-07-11."
+    tags: ["concepts", "canonicalization", "nlp"]
+
+  - id: "BL-044"
+    title: "Regeneration supports four languages of fifteen"
+    summary: "The AST-only regeneration path covers Python, Rust, TypeScript, and JavaScript; every other first-class language reports unsupported."
+    description: |
+      Blob-free regeneration is registered for four languages. Every
+      other first-class language, including the recently promoted ones,
+      has no regenerator and always reports an unsupported-AST result.
+      The blob-based reconstruction path still works for all languages,
+      so this is a narrower fidelity ceiling rather than a silent
+      failure, and it is partly documented. It is nonetheless a growing
+      gap: each language promotion widens it by one.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "L"
+    priority: "medium"
+    rationale: "Every language promotion widens this gap, so leaving it unregistered guarantees it grows unobserved."
+    acceptance_criteria:
+      - "A decision is recorded on which languages get regenerators, and the unsupported result names the reason."
+    references:
+      - "codebase_mapper/emission/application/regenerate.py:29"
+      - "docs/regenerate.md"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-018, re-verified 2026-07-11: registry holds python, rust, typescript, javascript."
+    tags: ["regenerate", "languages", "fidelity"]
+
+  - id: "BL-045"
+    title: "Byte-identical Python regeneration needs a concrete-syntax extractor"
+    summary: "The abstract-syntax extractor discards comments, blank lines, quote style, and trailing commas."
+    description: |
+      Python regeneration is semantic-perfect but not byte-identical:
+      comments, blank lines, string-quote style, and trailing commas are
+      lost because the extractor is built on the abstract syntax tree.
+      The documentation already states that byte-identical output would
+      require swapping in a concrete-syntax library. This is a
+      conditional capability, not a defect, and should be registered as
+      such rather than living only in a README aside.
+    category: "feature"
+    type: "research"
+    status: "parked"
+    complexity: "L"
+    priority: "low"
+    rationale: "The trade-off is understood and documented; it needs an owner and a trigger, not a rewrite today."
+    acceptance_criteria:
+      - "A decision is recorded on whether byte-identical Python output is a requirement."
+    references:
+      - "README.md:308"
+    owner: "unassigned"
+    source: "README.md stated conditional capability, re-verified 2026-07-11."
+    tags: ["regenerate", "python", "fidelity"]
+
+  - id: "BL-046"
+    title: "Thirty-five of fifty TIOBE languages are below first class"
+    summary: "The stated goal is the full TIOBE top fifty; the ledger records fifteen first class, five partial or detected, thirty absent."
+    description: |
+      The project states the goal of fully supporting the TIOBE top
+      fifty, cumulative from 2026, and keeps a machine-readable ledger of
+      per-language status that a verifier holds honest. The ledger
+      currently records fifteen languages at first class. Five are
+      promotable from an existing base: three partial and two
+      detected-only. Thirty have no mapper key at all. The goal is
+      declared in the README and mechanically tracked, but no backlog
+      item carries the remaining work, so the largest single commitment
+      in the project has no register entry. The existing xref-registry
+      item covers resolver gaps for already-supported languages and is
+      not a substitute.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "XL"
+    priority: "high"
+    rationale: "A goal stated in the README and tracked by a verifier, yet absent from the system of record, is the clearest possible registry gap."
+    acceptance_criteria:
+      - "The five languages with an existing base are promoted to first class, or the goal is restated."
+      - "Remaining languages are sequenced, so the ledger has a path rather than only a score."
+    references:
+      - "README.md:16"
+      - "docs/goals/tiobe-top50.yaml"
+      - "tests/verify_language_goal.py"
+    owner: "unassigned"
+    source: "docs/goals/tiobe-top50.yaml status ledger, re-verified 2026-07-11: 15 first_class, 3 partial, 2 detected, 30 none."
+    tags: ["languages", "goal", "tiobe"]
+
+  - id: "BL-047"
+    title: "Seven first-class languages have no dedicated verifier"
+    summary: "Python, TypeScript and JavaScript, Kotlin, Swift, Ruby, C, and CFML ship analyzers and chunkers with no per-language verifier."
+    description: |
+      The six-facet first-class contract requires a per-language
+      verifier, and the recently promoted languages each have one. Seven
+      older first-class languages do not, including the two most heavily
+      used in this repository, both of which ship xref resolvers. Their
+      facets are exercised only indirectly, so a regression in any one of
+      them would not be caught by a dedicated test. The goal verifier
+      probes the ledger rather than substituting for these.
+    category: "testing"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "The contract that every new language must satisfy is not satisfied by the languages that predate it, which makes it unevenly enforced."
+    acceptance_criteria:
+      - "Each of the seven languages has a verifier asserting the same facets required of a new first-class language."
+    references:
+      - "docs/SPEC_FIRST_CLASS_LANGUAGE.md"
+      - "tests/verify_language_goal.py"
+    owner: "unassigned"
+    source: "Code sweep 2026-07-11, verified: no verifier file exists for python, tsjs, kotlin, swift, ruby, c, cfml."
+    tags: ["testing", "languages", "first-class", "parity"]
+
+  # ===================================================================
+  # Cartogram cluster (BL-048..BL-050)
+  # ===================================================================
+
+  - id: "BL-048"
+    title: "Embed the cartogram in the React application"
+    summary: "The cartogram ships as a standalone tool and is not mounted anywhere in the single-page application."
+    description: |
+      The cartogram is a complete standalone visualizer that emits a
+      detached HTML file from a normalized inventory. The single-page
+      application has no route for it and no module in the application
+      source references it. The operator selected standalone-first with
+      the application embed as the explicit follow-on when the tool was
+      adopted; the first half shipped and the second half was never
+      registered. Embedding means mounting the renderer as a component
+      fed by the existing bundle endpoints rather than by a file.
+    category: "tooling"
+    type: "feature"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "This is an explicit operator decision whose second half is unrecorded, which is precisely how a follow-on becomes lost work."
+    acceptance_criteria:
+      - "The application exposes a cartogram view fed by the bundle endpoints."
+      - "The standalone tool and the embedded view share one renderer rather than diverging."
+    references:
+      - "tools/cbm-cartogram/"
+      - "frontend/ui/src/App.tsx"
+    owner: "mine"
+    source: "Operator decision at cartogram adoption (standalone now, application embed as follow-on); verified 2026-07-11 that no application module references it."
+    tags: ["cartogram", "ui", "follow-on"]
+
+  - id: "BL-049"
+    title: "The cartogram can only see import and test edges"
+    summary: "The normalizer reads three predicates, so inheritance and call edges are unreachable from the visualizer."
+    description: |
+      The inventory normalizer projects internal imports, external
+      imports, and test edges. The bundle also carries inheritance and
+      call edges when the xref layer runs, and none of them are
+      projected, so the cartogram cannot render the structure the UML
+      cluster of this backlog exists to produce. As those items land,
+      this becomes the gap between having the facts and being able to
+      see them.
+    category: "tooling"
+    type: "feature"
+    status: "ready"
+    complexity: "S"
+    priority: "low"
+    rationale: "Extraction work that no view can display returns no value to the user."
+    acceptance_criteria:
+      - "The normalizer projects symbol-level edges, and the cartogram can render at least one non-import projection."
+    dependencies:
+      - "BL-014"
+    references:
+      - "tools/cbm-cartogram/tools/normalize-inventory.mjs:136"
+    owner: "mine"
+    source: "Code sweep 2026-07-11, verified: the normalizer reads only imports, external imports, and test edges."
+    tags: ["cartogram", "projections", "xrefs"]
+
+  - id: "BL-050"
+    title: "The cartogram normalizer holds the whole inventory in memory"
+    summary: "The normalizer parses the inventory in one pass into memory, and the ceiling is undocumented."
+    description: |
+      The normalizer deserializes the entire inventory document into
+      memory, unlike the streaming reader the Rust report tool uses for
+      the same file. For kernel-scale inventories this is a real ceiling,
+      and the tool's own documentation does not mention it, so a user
+      meets it as a crash rather than as a limit.
+    category: "tooling"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "XS"
+    priority: "low"
+    rationale: "An undocumented memory ceiling is met as a crash instead of a decision."
+    acceptance_criteria:
+      - "The ceiling is documented, or the normalizer streams."
+    references:
+      - "tools/cbm-cartogram/tools/normalize-inventory.mjs"
+      - "tools/cbm-cartogram/README.md"
+    owner: "mine"
+    source: "REQUIREMENTS.md GAP-019, re-verified 2026-07-11."
+    tags: ["cartogram", "scale"]
+
+  # ===================================================================
+  # Documentation-truth cluster (BL-051..BL-056)
+  # Source: doc-hygiene audit (2026-07-10) and REQUIREMENTS.md §12.3.
+  # The language-list and tools-listing recommendations from that audit
+  # already shipped (README marker block plus verify_readme_coverage)
+  # and are deliberately not re-registered.
+  # ===================================================================
+
+  - id: "BL-051"
+    title: "No changelog exists despite conventional-commit discipline"
+    summary: "Commits follow a conventional format that a generator could consume, but no changelog is produced."
+    description: |
+      The project mandates conventional commits and follows them, which
+      is exactly the input a changelog generator consumes. No changelog
+      and no generator configuration exist, so release history is
+      readable only through the commit log. This is the highest-value
+      unclaimed automation in the repository: the discipline is already
+      paid for and the artifact is simply not being generated.
+    category: "docs"
+    type: "infra"
+    status: "ready"
+    complexity: "S"
+    priority: "medium"
+    rationale: "The cost of the convention is already being paid; not generating the artifact wastes it."
+    acceptance_criteria:
+      - "A changelog is generated from the commit history by a configured tool."
+      - "The generation runs in the release path rather than by hand."
+    references:
+      - "doc-hygiene-report.md:132"
+      - "CLAUDE.md"
+    owner: "unassigned"
+    source: "doc-hygiene audit 2026-07-10, re-verified 2026-07-11: no changelog and no generator config exist."
+    tags: ["docs", "automation", "changelog"]
+
+  - id: "BL-052"
+    title: "The README directory tree is hand-written"
+    summary: "The tree is maintained by memory, so it drifts silently whenever the layout changes."
+    description: |
+      The README carries a hand-written directory tree. Nothing
+      regenerates or checks it, so it drifts whenever a directory is
+      added or moved, and the drift is invisible until a reader is
+      misled. The repository already demonstrates the correct pattern:
+      the first-class language list is generated into a marker block and
+      held by a verifier. The tree should follow the same shape.
+    category: "docs"
+    type: "infra"
+    status: "ready"
+    complexity: "XS"
+    priority: "low"
+    rationale: "Every hand-maintained structural element in a document is a future lie; this one has a known remedy already used in the same file."
+    acceptance_criteria:
+      - "The tree renders into a marker block from the real layout and a check fails on drift."
+    references:
+      - "README.md"
+      - "tests/verify_readme_coverage.py"
+    owner: "unassigned"
+    source: "doc-hygiene audit 2026-07-10, re-verified 2026-07-11: no marker block around the tree."
+    tags: ["docs", "automation", "drift"]
+
+  - id: "BL-053"
+    title: "Shipped features are described as unbuilt in their own documentation"
+    summary: "Four documents and docstrings understate reality, describing live, tested code as a scaffold, a skeleton, or merely designed."
+    description: |
+      The README describes the single-page application as a scaffold in
+      progress, though it is a complete, densely tested application
+      covering every endpoint. The xref and enrichment plugin docstrings
+      describe earlier skeleton phases with empty registries and zero
+      emitted triples, though both are fully implemented with live
+      resolvers and enrichment kinds. The decomposer delivery table marks
+      the recomposer as designed and unbuilt, though it is a complete
+      package with its own working command line. Separately, the natural
+      way to run the backend suite fails at collection and the required
+      invocation is undocumented. Each of these understates the system,
+      which erodes trust in the documentation exactly as much as
+      overstating it would.
+    category: "docs"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "XS"
+    priority: "medium"
+    rationale: "Documentation that understates the system teaches readers to distrust it, which costs as much as an overstatement."
+    acceptance_criteria:
+      - "The four status claims match the implemented state."
+      - "The backend suite's required invocation is documented."
+    references:
+      - "README.md"
+      - "plugins/symbol_xrefs/__init__.py"
+      - "plugins/llm_enrich/__init__.py"
+      - "decomposer/README.md"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-007 / GAP-013 / GAP-014 / GAP-016, re-verified 2026-07-11."
+    tags: ["docs", "staleness", "accuracy"]
+
+  - id: "BL-054"
+    title: "The mandated disclaimer frontmatter is unguarded outside READMEs"
+    summary: "A document under the docs tree still lacks the required frontmatter and no verifier scans arbitrary documents for it."
+    description: |
+      The project guidelines require disclaimer frontmatter on every
+      generated document. The existing hygiene verifier only inspects
+      files named README, for a different and narrower rule, so the
+      requirement is enforced by memory rather than by a check, which is
+      the same failure class this backlog exists to remove. Of the four
+      documents originally found without frontmatter, two already had it,
+      and docs/BACKLOG.md was corrected on 2026-07-11 during the audit
+      that registered this item. docs/analyze.md remains. The residual
+      work is the missing guard, not the remaining file.
+    category: "docs"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "XS"
+    priority: "medium"
+    rationale: "A mandated header that nothing verifies is a convention, not a requirement."
+    acceptance_criteria:
+      - "docs/analyze.md receives the required frontmatter."
+      - "A verifier fails when any document under the docs tree lacks the required frontmatter."
+    references:
+      - "docs/analyze.md"
+      - "tests/verify_doc_hygiene.py"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-017, re-verified 2026-07-11: docs/analyze.md still lacks frontmatter; no verifier scans the docs tree."
+    tags: ["docs", "disclaimer", "drift-guard"]
+
+  - id: "BL-055"
+    title: "Three known drift risks have no guard"
+    summary: "A hand-mirrored vocabulary document, an unguarded schema version constant, and a fifth copy of the service port are all unchecked."
+    description: |
+      The drift risk map records three residual risks with no guard. The
+      vocabulary document is a hand-written mirror of the primitives
+      registry and no test compares them. The schema version constant for
+      the TypeScript and JavaScript analyzer is not covered by the drift
+      verifier that covers the equivalent Python and Rust constants. The
+      service port is duplicated a fifth time in the frontend build
+      config, outside the guard that covers the other four, alongside an
+      orphaned container variable that nothing reads. Each is small; the
+      pattern is the point.
+    category: "testing"
+    type: "infra"
+    status: "ready"
+    complexity: "S"
+    priority: "medium"
+    rationale: "Each of these is a value duplicated across files with no check, which is the exact defect class the drift verifiers exist to eliminate."
+    acceptance_criteria:
+      - "The vocabulary document is generated from, or verified against, the primitives registry."
+      - "The analyzer schema version is covered by the same drift verifier as its peers."
+      - "The port constant has one source, or every copy is guarded."
+    references:
+      - "drift-risk-map.md:95"
+      - "drift-risk-map.md:99"
+      - "drift-risk-map.md:100"
+    owner: "unassigned"
+    source: "drift-risk-map.md M11 / M15 / M16, re-verified 2026-07-11: no guard exists for any of the three."
+    tags: ["drift-guard", "vocabulary", "testing"]
+
+  - id: "BL-056"
+    title: "The document retirement decision is prepared but unexecuted"
+    summary: "Three superseded documents are staged for retirement with summaries written, and the script's commands remain commented out."
+    description: |
+      The hygiene audit proposed three documents for retirement: two
+      self-labelled historical implementation plans and one superseded
+      report. Their summaries are written so the institutional memory
+      survives, the manifest exists, and the quarantine script exists
+      with its commands commented out by design, because retirement is an
+      operator decision rather than an agent one. The decision itself is
+      outstanding. Note that one of the two plans is cited as the target
+      of amendments recorded elsewhere; confirm those landed in the live
+      documents before retiring it.
+    category: "docs"
+    type: "tech-debt"
+    status: "blocked"
+    complexity: "XS"
+    priority: "low"
+    rationale: "Retirement is deliberately an operator decision, so this item is blocked on that decision rather than on any engineering work."
+    acceptance_criteria:
+      - "The operator accepts or rejects the retirement, and the staged artifacts are executed or removed."
+    references:
+      - "doc-quarantine.sh"
+      - "quarantine-manifest.json"
+      - "quarantine-summaries.md"
+    owner: "unassigned"
+    source: "doc-hygiene audit 2026-07-10; verified 2026-07-11 that all three source documents remain in place."
+    tags: ["docs", "retirement", "operator-decision"]
+
+  # ===================================================================
+  # Unregistered plans and roadmaps (BL-057..BL-061)
+  # Two full engineering plans and a framework roadmap live in docs/ with
+  # no entry in the system of record.
+  # ===================================================================
+
+  - id: "BL-057"
+    title: "The build-plan executor mechanization plan is unregistered"
+    summary: "A full phased plan for the recomposer executor exists in the docs and appears nowhere in the registry."
+    description: |
+      A complete phased plan describes mechanizing the build-plan
+      executor from compilation through scheduling, generation, gating,
+      slotting, and ledgering. It carries concrete engineering steps
+      including typed checks, symbol-emitting contracts, gate modules,
+      and test skeletons, and it records a measured gap of over a
+      thousand unowned files in the reference decomposition. The hygiene
+      audit flagged it as possibly executed but unconfirmed. Its status
+      needs to be established and then registered, because a plan whose
+      execution state is unknown is worse than one that is simply open.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "XL"
+    priority: "medium"
+    rationale: "An engineering plan whose execution state nobody can confirm is an unbounded liability in the registry's blind spot."
+    acceptance_criteria:
+      - "The plan's execution state is established against the code."
+      - "Remaining phases are registered, or the plan is retired as superseded."
+    references:
+      - "docs/plan/buildplan-executor-mechanization.md"
+      - "doc-hygiene-report.md:54"
+    owner: "unassigned"
+    source: "docs/plan/buildplan-executor-mechanization.md, verified present and unregistered 2026-07-11."
+    tags: ["recomposer", "plan", "executor"]
+
+  - id: "BL-058"
+    title: "The declarative reporting view model has no executor"
+    summary: "A contract-tested catalog of report components exists as a specification, with no code that runs it and no interface that uses it."
+    description: |
+      The declarative reporting contract defines a component query
+      catalog with a schema and is contract-tested. The documentation
+      states plainly that the executor is not built and that the
+      interface the contract implies does not exist, and the view-model
+      document notes the components need executor code rather than only a
+      query string. It is therefore a specification that passes its own
+      tests while producing nothing, which is a shape worth registering
+      explicitly so it is not mistaken for a shipped feature.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "L"
+    priority: "medium"
+    rationale: "A contract-tested specification with no executor can be mistaken for a delivered capability precisely because its tests pass."
+    acceptance_criteria:
+      - "An executor runs the catalog against a bundle and returns component results."
+    references:
+      - "docs/feature.md:151"
+      - "docs/feature.md:223"
+      - "docs/reporting/reporting-view-model.md:371"
+    owner: "unassigned"
+    source: "docs/feature.md stated limits, re-verified 2026-07-11."
+    tags: ["reporting", "executor", "spec-only"]
+
+  - id: "BL-059"
+    title: "Generalize the confidence layer to all derived edges"
+    summary: "The framework names this the highest-leverage schema addition; it is only partially realized today."
+    description: |
+      The graph-operations framework identifies the confidence layer as
+      its highest-leverage schema addition and states that it is only
+      partially realized. Generalizing a confidence value to all derived
+      edges is what the derived operations and the scenario engine
+      consume, so a large share of the framework's declared capability is
+      gated behind this one change. It is the single most consequential
+      unregistered item in the framework document.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "L"
+    priority: "medium"
+    rationale: "The framework itself names this the highest-leverage addition, and it gates every derived operation downstream."
+    acceptance_criteria:
+      - "Derived edges carry a confidence value, and the vocabulary and shapes admit it."
+    references:
+      - "docs/codebase-graph-operations-framework.md:1929"
+    owner: "unassigned"
+    source: "docs/codebase-graph-operations-framework.md substrate status table, verified 2026-07-11."
+    tags: ["graph-ops", "confidence", "schema"]
+
+  - id: "BL-060"
+    title: "Four graph-operations substrate gaps remain open"
+    summary: "Snapshot diffing, a behavior layer, a clone index, and a conformance model are all absent, gating whole operation families."
+    description: |
+      The framework's substrate status table records four further gaps: a
+      single snapshot gates every time-series operation because snapshot
+      diffing does not exist; the behavior-layer operations are blocked
+      with no control-flow, data-flow, or dependence graph; the clone and
+      similarity layer needs an approximate-nearest-neighbor index and is
+      called a near-term addition; and the conformance operations need a
+      reference-model language and partial mapping that is absent. These
+      are research-scale and should be sequenced deliberately rather than
+      absorbed one at a time.
+    category: "feature"
+    type: "research"
+    status: "parked"
+    complexity: "XL"
+    priority: "low"
+    rationale: "These gate entire operation families and are research-scale, so they need an explicit sequencing decision rather than incidental adoption."
+    acceptance_criteria:
+      - "The four gaps are sequenced, or explicitly declared out of scope."
+    dependencies:
+      - "BL-059"
+    references:
+      - "docs/codebase-graph-operations-framework.md:1919"
+    owner: "unassigned"
+    source: "docs/codebase-graph-operations-framework.md roadmap and substrate table, verified 2026-07-11."
+    tags: ["graph-ops", "roadmap", "research"]
+
+  - id: "BL-061"
+    title: "Kconfig and devicetree are not first-class languages"
+    summary: "The flaw map leaves this open by choice; the caveat layer discloses it but nothing closes it."
+    description: |
+      The kernel-scale flaw map records this as unfixed and outside
+      classifier scope, remaining open by choice and now at least
+      disclosed by the caveat layer. These are not TIOBE languages, so
+      the language goal ledger does not track them, which is precisely
+      why they need a registry entry of their own or they will be
+      tracked nowhere.
+    category: "feature"
+    type: "feature"
+    status: "parked"
+    complexity: "M"
+    priority: "low"
+    rationale: "The goal ledger does not cover non-TIOBE languages, so without an entry here this gap is tracked nowhere at all."
+    acceptance_criteria:
+      - "A decision is recorded on whether these become first-class languages."
+    references:
+      - "docs/reports/linux-flaw-map.md:42"
+      - "docs/reports/linux-flaw-map.md:300"
+    owner: "unassigned"
+    source: "docs/reports/linux-flaw-map.md F11, verified open 2026-07-11."
+    tags: ["languages", "kernel", "boundary"]
+
+  # ===================================================================
+  # Repository hygiene (BL-062..BL-063)
+  # ===================================================================
+
+  - id: "BL-062"
+    title: "The repository has no license"
+    summary: "No license file exists and the manifest declares no license field."
+    description: |
+      There is no license file anywhere in the repository and the package
+      manifest carries no license field. Absent a license, the default is
+      exclusive copyright, so nobody may lawfully use, copy, modify, or
+      distribute the work regardless of the intent implied by publishing
+      it. If the project is meant for external use, this blocks it
+      outright, which makes it a small item with a large consequence.
+    category: "docs"
+    type: "infra"
+    status: "ready"
+    complexity: "XS"
+    priority: "medium"
+    rationale: "Without a license the default is exclusive copyright, so publication does not grant anyone the right to use the work."
+    acceptance_criteria:
+      - "A license file exists and the manifest declares the matching field."
+    references:
+      - "pyproject.toml"
+    owner: "unassigned"
+    source: "REQUIREMENTS.md GAP-021, re-verified 2026-07-11: no license file present."
+    tags: ["legal", "repository"]
+
+  - id: "BL-063"
+    title: "The enrichment record shape is restated in four layers and read by two hand-rolled parsers"
+    summary: "One shape is redeclared across four layers, and the decomposer carries a second hand-rolled reader for the same graph format."
+    description: |
+      The enrichment record shape is restated independently in four
+      layers, so a change to it must be made in four places with no check
+      that they agree. Separately, the decomposer carries its own
+      hand-rolled reader for the graph serialization the core already
+      reads, which is a second implementation of the same parse with its
+      own failure modes. Both are duplications of a contract rather than
+      references to it.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "A contract restated in four places without a check is four opportunities for silent divergence."
+    acceptance_criteria:
+      - "The enrichment shape has one declaration that the other layers reference or are verified against."
+      - "The graph serialization has one reader."
+    references:
+      - "drift-risk-map.md:89"
+      - "drift-risk-map.md:90"
+      - "decomposer/evidence.py"
+    owner: "unassigned"
+    source: "drift-risk-map.md H5 / H6, re-verified 2026-07-11."
+    tags: ["tech-debt", "duplication", "llm-enrich"]
+
+  # ===================================================================
+  # Roadmap-consumption audit (BL-064..BL-065)
+  # Grounded in sourcepath-prompts/docs/prompt-consume-roadmap.md, the
+  # process document an agent uses to select and execute one backlog item.
+  # It asserts two live governance gaps in passing; both re-verified
+  # directly against this repository before registration.
+  # ===================================================================
+
+  - id: "BL-064"
+    title: "The backlog schema's decision-reference fields have no backing registry"
+    summary: "metadata.decision_prefix and items[].related_decisions (D-NNN) exist in the schema, but no decisions file or ADR system backs them anywhere in the repo."
+    description: |
+      docs/schema/backlog.schema.json declares a decision_prefix ("D") and a
+      related_decisions array (pattern ^D-[0-9]{3}$) for backlog items to
+      cite design decisions by. No file in this repository defines a D-NNN
+      decision, and no engineering_decisions.yml or ADR directory exists to
+      hold one — the schema promises traceability to a decisions registry
+      that was never built. This is the same "declared but unbacked
+      contract" pattern as BL-054's disclaimer-frontmatter gap, just in the
+      backlog's own governance layer. The fix is a genuine either/or: build
+      a minimal decisions registry (even a single decisions.yml with
+      id/title/rationale/date), or remove the unused
+      decision_prefix/related_decisions schema surface so the schema stops
+      promising something no item can ever cite.
+    category: "docs"
+    type: "infra"
+    status: "ready"
+    complexity: "S"
+    priority: "medium"
+    rationale: "A schema field that can never be populated is a governance contract nobody can keep; every backlog item implicitly under-cites its own rationale trail until this is resolved one way or the other."
+    acceptance_criteria:
+      - "Either a minimal decisions registry exists and at least one item's related_decisions resolves against it, or decision_prefix/related_decisions are removed from the schema and every referencing doc."
+    references:
+      - "docs/schema/backlog.schema.json:14,22,51"
+      - "docs/backlog.yml:28"
+    owner: "unassigned"
+    source: "sourcepath-prompts/docs/prompt-consume-roadmap.md, section 0.3 ('There is no ADR/engineering_decisions.yml system of record... the backlog schema's related_decisions field points at a D-NNN prefix that has no backing file yet'), re-verified 2026-07-11: no decisions/ADR file found anywhere in the repo."
+    tags: ["backlog", "governance", "documentation-truth"]
+
+  - id: "BL-065"
+    title: "No automated FLAM reader or enforcer exists — rules are convention-only"
+    summary: "Five scripts declare __file_meta__ rules blocks per CLAUDE.md's FLAM contract, but there is no lib.meta_reader-style tool and no general enforcement; only one of the five has a dedicated pinning test."
+    description: |
+      CLAUDE.md's File-Level Agent Metadata (FLAM) section describes a real
+      contract: respect status (frozen/deprecated), honour every rules
+      entry, and — "if the project includes FLAM tooling" — run
+      `python -m lib.meta_reader <file>`. This repository has no such tool:
+      no lib/meta_reader.py or equivalent exists anywhere in the tree. Five
+      scripts (scripts/cbm_cartogram.py, scripts/cbm_report_rs.py,
+      scripts/generate_static_site.py, scripts/report_to_pdf.py,
+      scripts/setup_and_validate_ontology.py) carry real __file_meta__
+      blocks with severity-tagged rules, and only one of those five
+      (report_to_pdf.py's keep-disclaimer rule) is mechanically pinned, by a
+      dedicated test (tests/test_report_to_pdf.py). The other four scripts'
+      rules are enforced by nothing but the convention of an agent reading
+      the block before editing.
+    category: "tooling"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "S"
+    priority: "medium"
+    rationale: "A metadata contract enforced only by an agent choosing to read it, rather than by a mechanical gate, is exactly the 'declared but not enforced' failure mode this project's own drift guards exist to close everywhere else (BL-025, BL-054, BL-055)."
+    acceptance_criteria:
+      - "A general FLAM reader (or a generic pytest walk over every __file_meta__ block) verifies severity: error rules for all five carrying scripts, not just report_to_pdf.py."
+      - "Adding a new __file_meta__ block to a script is covered by the same generic check without a bespoke test per file."
+    references:
+      - "CLAUDE.md (File-Level Agent Metadata / FLAM section)"
+      - "scripts/cbm_cartogram.py"
+      - "scripts/cbm_report_rs.py"
+      - "scripts/generate_static_site.py"
+      - "scripts/report_to_pdf.py"
+      - "scripts/setup_and_validate_ontology.py"
+      - "tests/test_report_to_pdf.py"
+    owner: "unassigned"
+    source: "sourcepath-prompts/docs/prompt-consume-roadmap.md, section 0.5, re-verified 2026-07-11: no lib/meta_reader (or equivalent) found in the repo; only one of five __file_meta__-bearing scripts has a dedicated pinning test."
+    tags: ["flam", "governance", "tooling", "tech-debt"]
+
+  # ===================================================================
+  # LLVM-lessons architecture audit (BL-066..BL-067)
+  # Grounded in a conversational review of what codebase_mapper's own
+  # extension-registry and vocabulary design could learn from LLVM's
+  # PassManager and TableGen conventions (2026-07-11). Both re-verified
+  # directly against the live source before registration.
+  # ===================================================================
+
+  - id: "BL-066"
+    title: "Extension registries order by name-sort alone, with no dependency declaration"
+    summary: "Every one of the 7 extension protocols is scheduled by sorted(key=lambda x: x.name); nothing declares or checks that L2 must run before L3, so a rename can silently break the invariant."
+    description: |
+      codebase_mapper/shared_kernel/extensions.py:138-162 orders every
+      registry (LanguageAnalyzer, ImportResolver, RecordEnricher,
+      Aggregator, GraphContributor, ShapeContributor, ArtifactEmitter)
+      purely by sorted(key=lambda x: x.name) — there is no requires/
+      provides/invalidates concept anywhere in the module (zero grep
+      hits). The L2-before-L3 invariant ("L3's concept aggregator reads
+      L2's chunk index at ctx.indices") holds only because plugin authors
+      remember to prefix names l2_20_embeddings / l3_20_concepts; nothing
+      catches a rename or a new plugin that silently violates the order.
+      LLVM's PassManager solved exactly this with getAnalysisUsage():
+      each pass declares what it requires, preserves, and invalidates,
+      and the manager resolves order (and can reject an unsatisfiable
+      dependency) instead of relying on a naming convention.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "An implicit, string-based ordering convention with no check is a latent correctness risk: a plugin rename or a new plugin with an unlucky name can silently reorder execution and break a cross-layer read with no test failing."
+    acceptance_criteria:
+      - "Each of the 7 extension protocols supports an optional explicit dependency declaration (e.g. requires/provides on registration) alongside the existing name."
+      - "iter_* registry functions resolve order from declared dependencies where present, and raise on a detected cyclic or unsatisfiable dependency rather than silently falling back to name-sort."
+      - "A test demonstrates that reordering plugin names without updating a dependency declaration is caught, not silently accepted."
+    references:
+      - "codebase_mapper/shared_kernel/extensions.py:42-163"
+      - "codebase_mapper/shared_kernel/extensions.py:138-162"
+    owner: "unassigned"
+    source: "LLVM-domain architecture-lessons conversation, 2026-07-11 (LLVM PassManager's getAnalysisUsage vs. this repo's name-sort scheduling), re-verified: extensions.py's iter_* functions are confirmed sorted(key=lambda x: x.name) with zero requires/invalidates/provides references in the file."
+    tags: ["architecture", "extensions", "plugins", "llvm-lessons"]
+
+  - id: "BL-067"
+    title: "Controlled vocabularies are declared twice and drift-tested, not generated from one source"
+    summary: "FileType/Phase are declared independently in shared_kernel/vocabulary.py and the Pydantic inventory schema, kept in sync only by a drift test — the same duplicate-then-detect pattern as BL-063, applied to the core vocabulary."
+    description: |
+      tests/test_inventory_schema.py::test_vocabularies_match_constants
+      exists specifically because FileType and Phase are declared twice:
+      once as RDF controlled-vocabulary terms in
+      codebase_mapper/shared_kernel/vocabulary.py, and again as Pydantic
+      enums in codebase_mapper/emission/domain/inventory_schema.py. A test
+      catches divergence after the fact; nothing prevents it structurally.
+      LLVM's TableGen convention takes the opposite approach for its own
+      instruction/intrinsic/attribute tables: declare the facts once, and
+      generate every consumer (enum, switch, docs) from that single
+      table, so drift is structurally impossible rather than merely
+      detected. BL-063 already tracks this exact class of problem for the
+      L4 enrichment record shape; this item is the same pattern applied to
+      the core FileType/Phase vocabulary.
+    category: "feature"
+    type: "tech-debt"
+    status: "ready"
+    complexity: "M"
+    priority: "medium"
+    rationale: "A drift test is a detection mechanism, not a prevention mechanism; declaring a controlled vocabulary exactly once and generating (or directly importing) every consumer from it eliminates the class of bug BL-063 and this item both currently only guard against after the fact."
+    acceptance_criteria:
+      - "FileType and Phase have exactly one authored declaration; the RDF vocabulary terms and the Pydantic enum are both derived from it (by direct import or codegen), not independently declared."
+      - "test_vocabularies_match_constants is either removed as structurally unnecessary or reduced to a triviality check, since the two can no longer diverge by construction."
+    references:
+      - "codebase_mapper/shared_kernel/vocabulary.py"
+      - "codebase_mapper/emission/domain/inventory_schema.py"
+      - "tests/test_inventory_schema.py:96"
+    owner: "unassigned"
+    source: "LLVM-domain architecture-lessons conversation, 2026-07-11 (TableGen single-source-of-truth codegen vs. declare-twice-and-drift-test), re-verified: test_vocabularies_match_constants exists at tests/test_inventory_schema.py:96 precisely because the two declarations are independent. Same class of problem as BL-063, applied to a different pair."
+    tags: ["architecture", "vocabulary", "drift", "llvm-lessons"]
+
+  # ===================================================================
+  # Backlog tooling (BL-068)
+  # ===================================================================
+
+  - id: "BL-068"
+    title: "Add a --stats mode to the backlog governance script"
+    summary: "check-backlog-governance.mjs had no way to summarize the backlog (counts by status/priority/complexity/category/type/owner, cross-tabs including category/type by status, weighted remaining-work size); the only way to get those numbers was an ad hoc one-off script."
+    description: |
+      Operators had no CLI to answer "how much of the backlog is left, and
+      how urgent is it" beyond hand-counting rows in docs/BACKLOG.md. Added
+      computeStats()/formatStats() to scripts/check-backlog-governance.mjs
+      and a `--stats` CLI flag (the default, argument-less invocation is
+      unchanged and still only validates). Covered by a new TDD test suite
+      (scripts/tests/check-backlog-governance.test.mjs, run via `node --test`
+      or `make test-backlog-governance`, wired into the `test` aggregate and
+      into .github/workflows/backlog-governance.yml).
+
+      Amendment (2026-07-12): the operator asked whether --stats would work
+      against a sibling repo's own backlog.yml (/home/admin/codebases/doc-ray).
+      It didn't — two real defects, found by actually running it rather than
+      assuming: (1) path resolution used path.join(rootDir, pathArg), and
+      join() does not special-case an absolute second argument, so an
+      absolute path concatenated into a broken, nonexistent path (ENOENT);
+      (2) --stats called run(), which enforces this repo's own strict
+      validate() (id_prefix, decision_prefix, six enum-vocabulary lists) —
+      doc-ray's backlog.yml has none of those fields (a differently-shaped,
+      independently-governed schema) and failed with 260 validation errors,
+      so --stats never reached the point of printing anything. Fixed both:
+      path construction now uses path.resolve() (which does treat an absolute
+      argument as an override), and --stats now calls parseBacklog() directly
+      instead of run(), since a read-only summary shouldn't require a foreign
+      project's backlog to conform to this repo's own governance schema.
+      Default (non-stats) mode is unchanged and still enforces full
+      validation. Two new tests lock this in with a hermetic foreign-schema
+      fixture (no dependency on doc-ray actually existing on the test
+      machine).
+
+      Amendment (2026-07-12, same day): operator asked for a category/type
+      breakdown by status, not just status x priority. Added a generic
+      buildCrossTab(items, rowField, colField) and renderCrossTab() (STATUS
+      columns, rows sorted by total count descending, a per-row total
+      column), reused for two new sections — CATEGORY x STATUS and
+      TYPE x STATUS — alongside the existing status x priority cross-tab.
+      Fixed an alignment regression the refactor introduced (row-label
+      column width for the status x priority table) before it shipped.
+    category: "tooling"
+    type: "feature"
+    status: "done"
+    complexity: "S"
+    priority: "medium"
+    rationale: "A backlog with no summary view is hard to prioritize from at a glance; this reuses the script's existing hand-rolled YAML parser rather than adding a dependency or a second tool. A stats command that only works on this one repo's own backlog is a much narrower tool than one that works on any backlog.yml, and the gap was concrete and cheap to close once found."
+    acceptance_criteria:
+      - "node scripts/check-backlog-governance.mjs --stats prints status/priority/complexity/category/type/owner breakdowns, a status x priority cross-tab, and a complexity-weighted remaining-work percentage."
+      - "The default (no --stats) invocation's output and exit behavior are unchanged."
+      - "A test suite covers computeStats/formatStats and both CLI modes, wired to a make target."
+      - "--stats accepts an absolute path to a backlog.yml outside this repo and prints its stats even when that file doesn't satisfy this repo's own governance schema (no id_prefix/decision_prefix/enum-vocabulary lists)."
+      - "The default (validating) mode still rejects a schema-incompatible backlog rather than silently accepting it."
+      - "--stats prints a CATEGORY x STATUS and a TYPE x STATUS cross-tab, each row-totaled, alongside the existing status x priority cross-tab."
+    evidence_checks:
+      - kind: "file-exists"
+        path: "scripts/tests/check-backlog-governance.test.mjs"
+      - kind: "grep"
+        path: "scripts/check-backlog-governance.mjs"
+        pattern: "wantsStats"
+      - kind: "grep"
+        path: "scripts/check-backlog-governance.mjs"
+        pattern: 'resolve\(rootDir, backlogPath\)'
+      - kind: "grep"
+        path: "scripts/check-backlog-governance.mjs"
+        pattern: "categoryByStatus"
+      - kind: "grep"
+        path: "scripts/check-backlog-governance.mjs"
+        pattern: "typeByStatus"
+      - kind: "grep"
+        path: "Makefile"
+        pattern: "test-backlog-governance"
+      - kind: "grep"
+        path: ".github/workflows/backlog-governance.yml"
+        pattern: "node --test scripts/tests"
+      - kind: "grep"
+        path: "scripts/tests/check-backlog-governance.test.mjs"
+        pattern: "absolute path to a backlog outside this repo"
+      - kind: "grep"
+        path: "scripts/tests/check-backlog-governance.test.mjs"
+        pattern: "category-by-status cross-tab"
+    references:
+      - "scripts/check-backlog-governance.mjs"
+      - "scripts/tests/check-backlog-governance.test.mjs"
+      - "Makefile"
+      - ".github/workflows/backlog-governance.yml"
+      - "AGENTS.md"
+      - "docs/BACKLOG.md"
+    owner: "mine"
+    source: "Direct operator request, 2026-07-12: 'do we have an option to output the full statistics of the complete backlog?' — built as a --stats flag on the existing governance script (operator's chosen option 1 of 2). Amended same day after the operator asked whether it would also work against /home/admin/codebases/doc-ray/docs/backlog.yml — it did not, for two verified reasons (absolute-path join bug; --stats required this repo's own strict schema) — both fixed and test-covered."
+    tags: ["backlog", "tooling", "governance"]
+
+  # ===================================================================
+  # Python-fundamentals coverage audit (BL-069..BL-070)
+  # Grounded in the python-fundamentals skill's solid/glossary-only/absent
+  # coverage-ceiling lens, applied to codebase_mapper's own Python analyzer
+  # rather than to the reference textbook it was built from (2026-07-12).
+  # ===================================================================
+
+  - id: "BL-069"
+    title: "Generator functions get no distinct tag in the Python AST summary"
+    summary: "def f(): yield x is captured identically to any other function — no is_generator (or similar) field exists anywhere in the Python signature schema."
+    description: |
+      codebase_mapper/inspection/languages/python.py and
+      plugins/chunks_embeddings/signatures.py have zero references to
+      yield/generator/is_generator (verified by direct grep — the only
+      "yield" hits are the English word in unrelated docstrings/comments,
+      e.g. "simply yield an empty dict"). tests/test_signatures_python.py
+      explicitly tests decorators, async functions, positional-only params,
+      and PEP 695 generics, but never a generator function. A consumer
+      cannot query "which functions in this repo are generators" — they
+      look identical to ordinary functions in the emitted graph.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "S"
+    priority: "low"
+    rationale: "Generators are a real, named Python construct with distinct runtime semantics (lazy iteration, statefulness) that the current signature schema has no way to express, unlike async (already tracked via is_async)."
+    acceptance_criteria:
+      - "The Python signature schema gains an is_generator (or equivalent) field, set when the function body contains a yield/yield-from at the top level."
+      - "tests/test_signatures_python.py covers at least one generator function and one generator that is also async (async def with yield)."
+    references:
+      - "codebase_mapper/inspection/languages/python.py"
+      - "plugins/chunks_embeddings/signatures.py:44,105,124"
+      - "tests/test_signatures_python.py"
+    owner: "unassigned"
+    source: "python-fundamentals skill coverage-ceiling audit of codebase_mapper's own Python analyzer, 2026-07-12 — re-verified by direct grep across the analyzer, signature schema, and test file (zero hits for generator-awareness in any of the three)."
+    tags: ["python", "signatures", "extraction"]
+
+  - id: "BL-070"
+    title: "Operator-overloading dunder methods have no protocol-level tag"
+    summary: "__add__, __eq__, __radd__, etc. are captured as ordinary methods; nothing in the data model distinguishes a method that overloads an operator from any other method."
+    description: |
+      Zero hits for dunder/operator-overload handling anywhere across
+      codebase_mapper/inspection/languages/python.py,
+      plugins/chunks_embeddings/signatures.py, or
+      plugins/symbol_xrefs/python_resolver.py. A class implementing
+      operator overloading (Python's own curriculum devotes a full,
+      dedicated chapter to this — "Operator Overloading") is
+      indistinguishable, in the emitted graph, from a class with an
+      ordinary method that happens to be named "__add__". There is no way
+      to query "which classes in this repo overload arithmetic/comparison
+      operators" or which specific operator/protocol a given dunder
+      implements.
+    category: "feature"
+    type: "feature"
+    status: "ready"
+    complexity: "S"
+    priority: "low"
+    rationale: "This is a named, well-defined Python protocol (the data model), not an incidental naming convention; recognizing it costs a lookup table (dunder name -> operator/protocol) and a tag on the existing method fact, not a new extraction pass."
+    acceptance_criteria:
+      - "A method whose name matches a known operator-protocol dunder (__add__, __radd__, __sub__, __eq__, __lt__, __len__, __getitem__, etc.) is tagged with the operator/protocol it implements."
+      - "A test covers at least one overloaded arithmetic operator and one overloaded comparison operator on the same class."
+    references:
+      - "codebase_mapper/inspection/languages/python.py"
+      - "plugins/chunks_embeddings/signatures.py"
+      - "plugins/symbol_xrefs/python_resolver.py"
+    owner: "unassigned"
+    source: "python-fundamentals skill coverage-ceiling audit of codebase_mapper's own Python analyzer, 2026-07-12 — re-verified by direct grep across the analyzer, signature schema, and xref resolver (zero hits for dunder/operator-overload awareness in any of the three). Related: BL-047 (Python has no dedicated per-language verifier at all) — this finding is about missing extraction capability, a prerequisite to any such verifier covering it."
+    tags: ["python", "signatures", "extraction"]
