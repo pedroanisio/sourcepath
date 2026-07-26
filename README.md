@@ -1,4 +1,4 @@
-# codebase_mapper
+# sourcepath (aka: codebase_mapper)
 
 ## Disclaimer
 
