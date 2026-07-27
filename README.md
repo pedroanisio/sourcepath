@@ -178,6 +178,34 @@ vendor/**
 docs/_build/**
 ```
 
+### MCP server
+
+Register the read-only bundle server for MCP clients such as Claude Code
+with a project-scope `.mcp.json` at the repo root (machine-local by design —
+`.gitignore` excludes it, so each checkout creates its own):
+
+```json
+{
+  "mcpServers": {
+    "cbm": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "frontend.mcp_server"],
+      "env": { "CBM_BUNDLES_ROOT": "_tmp" }
+    }
+  }
+}
+```
+
+The server speaks stdio and serves every bundle under `_tmp/<name>`.
+Generate one first (see the commands above), e.g.:
+
+```bash
+python scripts/run_l3.py --repo . --out _tmp/sourcepath --name sourcepath
+```
+
+Tool surface, resources, prompts, auth modes, and the HTTP transport are
+documented in [frontend/mcp_server/README.md](frontend/mcp_server/README.md).
+
 ## Visualize
 
 `frontend/backend` is a FastAPI service that reads an output bundle and exposes
@@ -603,3 +631,9 @@ In-flight design work lives under [docs/](docs/):
 Historical implementation plans and generated snapshot reports live under
 [docs/archive/](docs/archive/). They are provenance records, not active
 implementation guidance.
+
+## License
+
+This project is licensed under the MIT License — see [LICENSE](./LICENSE)
+for the full text. The `tools/cbm-report` crate declares the same license
+in its `Cargo.toml`.

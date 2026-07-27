@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+# setuptools>=77 is the floor for the PEP 639 SPDX `license` string below.
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,6 +11,8 @@ name = "codebase-mapper"
 version = "0.5.0"
 description = "Map source code repositories into RDF graphs with a pluggable extension surface (chunks/embeddings, concept graph)."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 # Pins on packages shared with the Docker requirements files must match them
 # exactly — enforced by tests/verify_requirements_mirror.py (drift-risk H8),
