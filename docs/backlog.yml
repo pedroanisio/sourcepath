@@ -23,7 +23,7 @@ metadata:
   generated_by: "recipe-forge add-backlog-governance"
   generated_on: "2026-07-04"
   system_of_record: "docs/backlog.yml"
-  total_items: 70
+  total_items: 71
   id_prefix: "BL"
   decision_prefix: "D"
   categories: ["feature","docs","ops","security","testing","tooling"]
@@ -2450,3 +2450,76 @@ items:
     owner: "unassigned"
     source: "python-fundamentals skill coverage-ceiling audit of codebase_mapper's own Python analyzer, 2026-07-12 — re-verified by direct grep across the analyzer, signature schema, and xref resolver (zero hits for dunder/operator-overload awareness in any of the three). Related: BL-047 (Python has no dedicated per-language verifier at all) — this finding is about missing extraction capability, a prerequisite to any such verifier covering it."
     tags: ["python", "signatures", "extraction"]
+
+  - id: "BL-071"
+    title: "Ollama-served embedding backend for L2, plus capability-aware L4 model resolution"
+    summary: "Adds --backend ollama as a third L2 embedding backend and fixes two defects that left the existing L4 Ollama surface silently disabled on hosts without a qwen2.5-coder tag."
+    description: |
+      L2 gained OllamaEmbeddingBackend (POST /api/embed at $OLLAMA_HOST,
+      default nomic-embed-text, recorded in bundles as "ollama:<model>"),
+      wired through build_backend() into run_l2/run_l3/run_l4/run_xrefs.
+      Server output is treated as untrusted input: rows are re-normalized
+      client-side and row-count / dimension mismatches raise rather than
+      propagating garbage, so the L2 contract (float32, L2-normalized)
+      holds regardless of server behavior. Three typed errors, including
+      one surfacing the server's own message for the observed Ollama
+      0.32.1 HTTP 501 "This server does not support embeddings" returned
+      for a generation-only tag.
+
+      Query-side parity: the FastAPI search endpoint, the MCP
+      semantic_neighbors tool, and the cbm_walkthrough question panel all
+      re-embed queries through the bundle's own model and degrade to
+      lexical when the server is unavailable, disclosing which path
+      answered via the response "mode" field. The query-embed timeout
+      (6 s) sits under the MCP 10 s dispatch budget so a slow server
+      degrades instead of timing out the whole call.
+
+      Two root-cause L4 fixes, both observed live on a host with no
+      qwen2.5-coder tag installed. (1) The fallback chain was
+      coder-family-only, so a host with a capable general model emitted
+      zero enrichments; resolve_model now falls back to models the server
+      *reports* as completion-capable via /api/tags — evidence, not
+      name-matching, so an embedding-only tag is never selected and a
+      server too old to report capabilities yields no substitution rather
+      than a guess. (2) run_l4.py --llm-model defaulted to the
+      DEFAULT_MODEL literal, passing a non-None "explicit" model on every
+      run and silently killing $CBM_LLM_MODEL, which .env.example
+      advertised as working.
+    category: "feature"
+    type: "feature"
+    status: "done"
+    complexity: "M"
+    priority: "medium"
+    rationale: "Semantic bundles previously required the sentence-transformers/torch stack in-process; Ollama is already a hard dependency of the L4 layer, so reusing it for embeddings adds a real-vector option at no new dependency cost. The L4 resolution defects made the shipped Ollama surface emit zero enrichments on an otherwise healthy host."
+    acceptance_criteria:
+      - "--backend ollama is accepted by run_l2, run_l3, run_l4, and run_xrefs, and the bundle's embeddings_meta.json records backend.name as 'ollama:<model>'."
+      - "Server responses are validated: row-count and dimension mismatches raise, and every emitted row is L2-normalized client-side."
+      - "tests/verify_l2.py --backend ollama passes the full L2 contract suite against a live server, including byte-identical determinism across two runs."
+      - "FastAPI search, MCP semantic_neighbors, and the walkthrough panel embed queries through the bundle's model and fall back to lexical when the server is unavailable."
+      - "resolve_model selects a completion-capable model reported by the server when the curated family chain misses, and never selects an embedding-only tag."
+      - "run_l4.py --llm-model defaults to None so $CBM_LLM_MODEL is honored."
+    evidence_checks:
+      - kind: "grep"
+        path: "plugins/chunks_embeddings/backends.py"
+        pattern: "class OllamaEmbeddingBackend"
+      - kind: "grep"
+        path: "plugins/llm_enrich/model_resolver.py"
+        pattern: "def completion_capable_models"
+      - kind: "file-exists"
+        path: "tests/test_ollama_embedding_backend.py"
+      - kind: "grep"
+        path: "frontend/backend/serving/application/chunks.py"
+        pattern: "_embed_query_ollama"
+    references:
+      - "plugins/chunks_embeddings/backends.py"
+      - "plugins/chunks_embeddings/__init__.py"
+      - "plugins/llm_enrich/model_resolver.py"
+      - "plugins/llm_enrich/client.py"
+      - "frontend/backend/serving/application/chunks.py"
+      - "scripts/cbm_walkthrough.py"
+      - "tests/test_ollama_embedding_backend.py"
+      - "tests/test_llm_enrich_model_resolver.py"
+      - "docs/analyze.md"
+    owner: "mine"
+    source: "Session request 'build all the ollama backend', 2026-07-26/27. Verified live against Ollama 0.32.1: run_l2 --backend ollama emits a SHACL-conforming bundle; tests/verify_l2.py --backend ollama passes 18/18; the four online L4 verifiers (79 checks) pass on a host with no qwen2.5-coder tag, where they previously could not run. Commit fdfe943."
+    tags: ["l2", "l4", "embeddings", "ollama", "degradation"]

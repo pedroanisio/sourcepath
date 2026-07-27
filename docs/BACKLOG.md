@@ -110,6 +110,7 @@ node scripts/check-backlog-governance.mjs /path/to/other/backlog.yml --stats
 | BL-068 | Add a --stats mode to the backlog governance script | tooling | feature | done | S | medium | mine |
 | BL-069 | Generator functions get no distinct tag in the Python AST summary | feature | feature | ready | S | low | unassigned |
 | BL-070 | Operator-overloading dunder methods have no protocol-level tag | feature | feature | ready | S | low | unassigned |
+| BL-071 | Ollama-served embedding backend for L2, plus capability-aware L4 model resolution | feature | feature | done | M | medium | mine |
 
 ## Clusters
 
