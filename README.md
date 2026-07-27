@@ -220,12 +220,20 @@ python scripts/cbm.py report    --bundle _tmp/out   # structural X-ray: HTML / M
 python scripts/cbm.py report-rs _tmp/out            # Rust-rendered PDF (multi-GB bundles)
 python scripts/cbm.py dossier   --bundle _tmp/out   # 100+ page typeset A4 PDF dossier
 python scripts/cbm.py pdf docs/reports/<name>.md    # authored Markdown -> themed PDF
-python scripts/cbm.py site      --bundle _tmp/out --output _site  # offline static site
+python scripts/cbm.py site      --bundle _tmp/out   # offline static site (tree)
 python scripts/cbm.py repair    --bundle _tmp/out   # post-hoc data-quality fixes
 python scripts/cbm.py cartogram _tmp/out           # interactive D3 map (regions + flows)
 python scripts/cbm.py terrain   --bundle _tmp/out   # 3D code-terrain map (one HTML file)
 python scripts/cbm.py walkthrough --bundle _tmp/out # narrated five-scene demo page
 ```
+
+Every generator writes to `CBM_REPORTS_DIR` (default `reports/`, gitignored)
+unless you pass an explicit output path. Names are standardized —
+`<source>__<kind>__<UTC-timestamp>[.ext]`, with a `-N` bump so two runs never
+overwrite each other — and `site` uses the same stem as its tree root. Bundle
+directories therefore hold only measured artifacts; every derived render lands
+in one predictable place. The one exception is `repair`, which reconstructs a
+bundle's own sidecars and must write them beside `inventory.ttl`.
 
 Two structural read paths exist by design: `report`/`dossier` (Python) load
 the graph through a per-bundle persistent pyoxigraph store and do the graph

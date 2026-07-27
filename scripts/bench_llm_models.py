@@ -75,6 +75,10 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from codebase_mapper.shared_kernel.settings import (  # noqa: E402
+    default_report_path,
+    load_env,
+)
 from plugins.llm_enrich.cache import hash_text  # noqa: E402
 from plugins.llm_enrich.client import resolve_host  # noqa: E402
 from plugins.llm_enrich.enricher import (  # noqa: E402
@@ -83,6 +87,16 @@ from plugins.llm_enrich.enricher import (  # noqa: E402
 )
 from plugins.llm_enrich.aggregator import SCHEMA_CONTENT_BUDGET  # noqa: E402
 from plugins.llm_enrich.prompts import PROMPT_REGISTRY  # noqa: E402
+
+
+def default_out(ext: str, when=None) -> Path:
+    """Standardized default output: <reports_dir>/llm-bench__bench__<UTC-ts>.<ext>.
+
+    The raw-call sink used to default to ``./bench_results.jsonl`` in the
+    repo root — a generated artifact dropped into the source tree, which
+    a second run then overwrote.
+    """
+    return default_report_path("llm-bench", "bench", ext=ext, when=when)
 
 
 DEFAULT_SEED = 42
@@ -858,7 +872,7 @@ def run_benchmark(args: argparse.Namespace) -> int:
               file=sys.stderr)
 
         results: list[CallResult] = []
-        out_path = args.out_jsonl.resolve()
+        out_path = (args.out_jsonl or default_out("jsonl")).resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", encoding="utf-8") as sink:
             for model in args.models:
@@ -979,13 +993,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
                         "warm-call determinism. <2 disables.")
     p.add_argument("--pull", action="store_true",
                    help="Auto-pull any requested model that is not installed.")
-    p.add_argument("--out-jsonl", type=Path,
-                   default=_REPO_ROOT / "bench_results.jsonl",
+    p.add_argument("--out-jsonl", type=Path, default=None,
                    help="Where to write per-call raw outputs (for human "
-                        "review). Default: ./bench_results.jsonl.")
+                        "review). Default: "
+                        "$CBM_REPORTS_DIR/llm-bench__bench__<timestamp>.jsonl.")
     p.add_argument("--report-md", type=Path, default=None,
                    help="Optional Markdown report path (carries the "
-                        "mandatory disclaimer frontmatter).")
+                        "mandatory disclaimer frontmatter). Explicit paths "
+                        "are honored verbatim.")
     p.add_argument("--json", action="store_true",
                    help="Also print a machine-readable summary to stdout.")
     return p
@@ -993,6 +1008,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
     try:
         return run_benchmark(args)
     except BenchError as e:

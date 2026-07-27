@@ -20,6 +20,11 @@ strongest import edges, dotted frontiers separate top-level realms, crossed
 swords mark high-stress routes and wyrms mark import cycles. The identical
 epistemic disclosures apply and are printed on the chart itself.
 
+Output lands under ``CBM_REPORTS_DIR`` (default ``reports/``) as
+``<repo>__<style>__<UTC-timestamp>.html`` unless ``--out`` says otherwise:
+a bundle directory holds measured artifacts, and a rendered map is a
+derived view of them, not one of them.
+
 Usage:
     python scripts/cbm_terrain.py --bundle _tmp/<repo> [--out map.html]
         [--style terrain|tolkien] [--max-segments N | 0=auto]
@@ -45,7 +50,21 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from codebase_mapper.shared_kernel.settings import (  # noqa: E402
+    default_report_path,
+    load_env,
+)
 from decomposer.metrics import build_order, cycles as graph_cycles  # noqa: E402
+
+
+def default_out(repo: str, style: str, when=None) -> Path:
+    """Standardized default output: <reports_dir>/<repo>__<style>__<UTC-ts>.html.
+
+    The style is the report *kind* so the two renderers of one repo land
+    side by side instead of overwriting each other.
+    """
+    return default_report_path(repo, style, ext="html", when=when)
+
 
 TEMPLATES = {
     "terrain": Path(__file__).parent / "site_assets" / "terrain_template.html",
@@ -305,7 +324,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--bundle", required=True, type=Path,
                    help="Bundle directory (contains run_manifest.json).")
     p.add_argument("--out", type=Path, default=None,
-                   help="Output HTML path (default: <bundle>/<repo>-<style>.html).")
+                   help="Output HTML path (default: "
+                        "$CBM_REPORTS_DIR/<repo>__<style>__<timestamp>.html).")
     p.add_argument("--style", choices=sorted(TEMPLATES), default="terrain",
                    help="Output renderer: 'terrain' = WebGL2 3D terrain "
                         "(default); 'tolkien' = 2D hand-drawn fantasy chart "
@@ -325,6 +345,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--title", default=None,
                    help="Display name (default: repo name, capitalized).")
     args = p.parse_args(argv)
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
 
     if not (args.bundle / "run_manifest.json").exists():
         p.error(f"not a bundle directory (no run_manifest.json): {args.bundle}")
@@ -346,7 +367,8 @@ def main(argv: list[str] | None = None) -> int:
         p.error(f"template for --style {args.style} not found: {template}")
     html = render_html(payload, repo_title=args.title or repo.capitalize(),
                        template_text=template.read_text())
-    out = args.out or (args.bundle / f"{repo}-{args.style}.html")
+    out = args.out or default_out(repo, args.style)
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html)
     print(f"wrote {args.style} map -> {out} "
           f"({len(html) // 1024} KB, {payload['meta']['modules']} settlements, "

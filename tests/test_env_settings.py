@@ -13,10 +13,14 @@ Pins the contracts introduced by ``codebase_mapper.shared_kernel.settings``:
 - Report naming: ``<source>__<kind>__<YYYYMMDDTHHMMSSZ>[.ext]`` — source
   and kind are slugged, the timestamp is UTC second-resolution, and
   ``default_report_path`` bumps a ``-N`` suffix instead of colliding.
-- Wiring: cbm_report / cbm_dossier / cbm_report_rs derive their default
-  output from the shared helper; ``cbm.py`` loads ``.env`` on every run;
-  ``.env.example`` documents the new key (verify_drift_p1 enforces the
-  full inventory).
+- Wiring: EVERY file-producing report tool derives its default output from
+  the shared helper — cbm_report, cbm_dossier, cbm_report_rs, cbm_terrain,
+  report_to_pdf, generate_static_site, bench_llm_models (cbm_cartogram and
+  cbm_walkthrough are pinned by their own suites). No tool may default to
+  writing next to its input: a bundle directory holds measured facts, and
+  derived renders belong under ``CBM_REPORTS_DIR``.
+- ``cbm.py`` loads ``.env`` on every run; ``.env.example`` documents the
+  new key (verify_drift_p1 enforces the full inventory).
 
 Run from the repo root:  python -m pytest tests/test_env_settings.py
 """
@@ -305,6 +309,100 @@ def test_cbm_report_rs_respects_explicit_out(clean_env):
     import cbm_report_rs
     argv = cbm_report_rs.inject_default_out(["_tmp/graphite", "-o", "mine.pdf"])
     assert argv == ["_tmp/graphite", "-o", "mine.pdf"]
+
+
+def test_cbm_terrain_default_out_uses_standard_naming(tmp_path, clean_env):
+    import cbm_terrain
+    os.environ["CBM_REPORTS_DIR"] = str(tmp_path / "reports")
+    out = cbm_terrain.default_out("graphite", "terrain", when=WHEN)
+    assert out == (tmp_path / "reports"
+                   / "graphite__terrain__20260710T031500Z.html").resolve()
+
+
+def test_cbm_terrain_style_distinguishes_the_stem(tmp_path, clean_env):
+    """Two styles of the same repo are different renders — and must not
+    collide on one filename."""
+    import cbm_terrain
+    os.environ["CBM_REPORTS_DIR"] = str(tmp_path / "reports")
+    terrain = cbm_terrain.default_out("graphite", "terrain", when=WHEN)
+    tolkien = cbm_terrain.default_out("graphite", "tolkien", when=WHEN)
+    assert terrain.name == "graphite__terrain__20260710T031500Z.html"
+    assert tolkien.name == "graphite__tolkien__20260710T031500Z.html"
+
+
+def test_report_to_pdf_default_out_uses_reports_dir(tmp_path, clean_env):
+    """The authored-Markdown renderer must not drop PDFs next to the
+    source .md (docs/reports/ is authored input, not generated output)."""
+    pytest.importorskip("weasyprint")
+    import report_to_pdf
+    os.environ["CBM_REPORTS_DIR"] = str(tmp_path / "reports")
+    out = report_to_pdf.default_out(Path("docs/reports/graphite-xray.md"),
+                                    when=WHEN)
+    assert out == (tmp_path / "reports"
+                   / "graphite-xray__authored__20260710T031500Z.pdf").resolve()
+
+
+def test_static_site_default_output_is_a_directory_under_reports(tmp_path, clean_env):
+    """`site` fans out to a tree, so the standardized stem is used as a
+    directory name — same naming, no extension."""
+    import generate_static_site
+    os.environ["CBM_REPORTS_DIR"] = str(tmp_path / "reports")
+    out = generate_static_site.default_out("graphite", when=WHEN)
+    assert out == (tmp_path / "reports"
+                   / "graphite__site__20260710T031500Z").resolve()
+    assert out.suffix == ""
+
+
+def test_static_site_output_defaults_when_flag_omitted(tmp_path, clean_env):
+    import generate_static_site
+    os.environ["CBM_REPORTS_DIR"] = str(tmp_path / "reports")
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "run_manifest.json").write_text("{}")
+    opts = generate_static_site.parse_args(["-b", str(bundle)])
+    assert opts.output_dir.parent == (tmp_path / "reports").resolve()
+    assert opts.output_dir.name.startswith("bundle__site__")
+
+
+def test_bench_llm_models_default_jsonl_under_reports(tmp_path, clean_env):
+    """The bench's raw-output sink defaulted to the repo root; it is a
+    generated artifact like any other."""
+    import bench_llm_models
+    os.environ["CBM_REPORTS_DIR"] = str(tmp_path / "reports")
+    out = bench_llm_models.default_out("jsonl", when=WHEN)
+    assert out == (tmp_path / "reports"
+                   / "llm-bench__bench__20260710T031500Z.jsonl").resolve()
+
+
+# Commands that legitimately do NOT route to CBM_REPORTS_DIR, with the
+# reason. Anything else added to cbm.COMMANDS must wire the shared helper.
+_NO_REPORT_OUTPUT = {
+    "verify": "a pass/fail gate — prints and exits, writes no artifact",
+    "repair": "reconstructs a bundle's own sidecars (run_manifest.json, "
+              "enrichments.jsonl, concepts.json) which must sit beside "
+              "inventory.ttl inside the bundle, not in reports/",
+}
+
+
+def test_every_file_producing_cbm_command_routes_to_reports_dir():
+    """Coverage contract: a new reporting command cannot silently default
+    to writing next to its input. Either it imports the shared helper, or
+    it is listed in _NO_REPORT_OUTPUT with a reason."""
+    import cbm
+    unrouted = []
+    for command, (module, _desc) in cbm.COMMANDS.items():
+        if command in _NO_REPORT_OUTPUT:
+            continue
+        src = (REPO_ROOT / "scripts" / f"{module}.py").read_text(encoding="utf-8")
+        if "default_report_path" not in src:
+            unrouted.append(command)
+    assert unrouted == []
+
+
+def test_no_report_output_exemptions_are_still_real_commands():
+    """The exemption list must not rot into stale names."""
+    import cbm
+    assert set(_NO_REPORT_OUTPUT) <= set(cbm.COMMANDS)
 
 
 def test_cbm_cli_loads_dotenv_on_every_run(tmp_path, clean_env, monkeypatch, capsys):

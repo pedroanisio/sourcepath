@@ -25,8 +25,12 @@ Three tiers of data are visually distinguished on every page:
 
 Usage
 -----
-    python scripts/generate_static_site.py --bundle _tmp/code-base-mapper \\
-        --output _site
+    python scripts/generate_static_site.py --bundle _tmp/code-base-mapper
+
+Without ``--output`` the site tree is rooted at
+``$CBM_REPORTS_DIR/<bundle>__site__<UTC-timestamp>/`` (default reports dir:
+``reports/``) — the same standardized naming every other render uses, so
+successive runs never overwrite one another.
 
 See ``--help`` for all options.
 
@@ -108,6 +112,21 @@ except Exception as exc:  # pragma: no cover - actionable failure
         f"{_BACKEND_ROOT}. Run this script from a checkout of the "
         f"codebase-mapper repository.\nUnderlying error: {exc!r}"
     )
+
+from codebase_mapper.shared_kernel.settings import (  # noqa: E402
+    default_report_path,
+    load_env,
+)
+
+
+def default_out(source: str, when=None) -> Path:
+    """Standardized default output ROOT: <reports_dir>/<source>__site__<UTC-ts>/.
+
+    The site fans out to a tree rather than a single file, so the shared
+    stem names a directory (no extension); the ``-N`` collision bump still
+    applies, so two runs never write into each other's tree.
+    """
+    return default_report_path(source, "site", when=when)
 
 TIER_MECHANICAL = "mechanical"
 TIER_INFERRED = "inferred"
@@ -2122,10 +2141,10 @@ def parse_args(argv: list[str] | None = None) -> Options:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python scripts/generate_static_site.py -b _tmp/code-base-mapper -o _site\n"
+            "  python scripts/generate_static_site.py -b _tmp/code-base-mapper\n"
             "  python scripts/generate_static_site.py -b _tmp/code-base-mapper -o _site "
             "--no-inline-source\n"
-            "  # then open _site/index.html in a browser (works over file://)\n"
+            "  # then open <output>/index.html in a browser (works over file://)\n"
         ),
     )
     p.add_argument(
@@ -2133,8 +2152,9 @@ def parse_args(argv: list[str] | None = None) -> Options:
         help="Path to a bundle output directory (containing run_manifest.json).",
     )
     p.add_argument(
-        "-o", "--output", required=True, type=Path,
-        help="Directory to write the static site into.",
+        "-o", "--output", type=Path, default=None,
+        help="Directory to write the static site into (default: "
+             "$CBM_REPORTS_DIR/<bundle>__site__<timestamp>/).",
     )
     p.add_argument(
         "--no-inline-source", dest="inline_source", action="store_false",
@@ -2157,16 +2177,18 @@ def parse_args(argv: list[str] | None = None) -> Options:
         help="Remove the output directory before generating.",
     )
     ns = p.parse_args(argv)
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
 
     bundle_dir = ns.bundle.resolve()
     if not (bundle_dir / "run_manifest.json").exists():
         p.error(f"{bundle_dir} does not look like a bundle (no run_manifest.json).")
-    if ns.clean and ns.output.exists():
-        shutil.rmtree(ns.output)
+    output = ns.output or default_out(bundle_dir.name)
+    if ns.clean and output.exists():
+        shutil.rmtree(output)
 
     return Options(
         bundle_dir=bundle_dir,
-        output_dir=ns.output.resolve(),
+        output_dir=output.resolve(),
         inline_source=ns.inline_source,
         max_source_bytes=ns.max_source_bytes,
         graph_nodes=ns.graph_nodes,

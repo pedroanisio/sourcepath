@@ -57,6 +57,22 @@ import lazily, so a missing optional dependency (reportlab for
 `dossier`, weasyprint for `pdf`) fails that command only, with an
 install hint.
 
+**Output routing.** Every generator defaults to `CBM_REPORTS_DIR`
+(default `reports/`) with the standardized name
+`<source>__<kind>__<UTC-timestamp>[.ext]` from
+`codebase_mapper.shared_kernel.settings.default_report_path`; a `-N`
+suffix is bumped in rather than overwriting a prior run. `site` fans
+out to a tree, so the same stem names its root directory. An explicit
+`--out` / `-o` / `--output` always wins. Kinds in use: `xray`
+(`report`), `report` (`report-rs`), `dossier`, `authored` (`pdf`),
+`site`, `cartogram`, `terrain` / `tolkien` (by `--style`),
+`walkthrough`, `bench` (`bench_llm_models.py`). Two commands do not
+route and must not: `verify` writes nothing (it is a pass/fail gate),
+and `repair` reconstructs a bundle's own sidecars, which belong beside
+`inventory.ttl` inside the bundle. `tests/test_env_settings.py`
+enforces this — a new file-producing command that skips the shared
+helper fails the coverage contract.
+
 Two structural read paths exist by design — pick by bundle size:
 
 - `report` / `dossier` (Python) load the inventory through a persistent

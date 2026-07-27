@@ -73,7 +73,16 @@ def test_missing_node_gives_actionable_error(monkeypatch, tmp_path, capsys):
     assert "Traceback" not in err
 
 
-def test_missing_inventory_gives_actionable_error(tmp_path, capsys):
+@pytest.fixture()
+def _node_present(monkeypatch):
+    """Stub the node probe: the bundle-validation and output-naming
+    contracts below are pure path logic and must be verifiable on a host
+    without Node (the node gate runs first in ``main``)."""
+    monkeypatch.setattr(cbm_cartogram.shutil, "which",
+                        lambda name: "/usr/bin/node" if name == "node" else None)
+
+
+def test_missing_inventory_gives_actionable_error(tmp_path, capsys, _node_present):
     rc = cbm_cartogram.main([str(tmp_path)])
     assert rc != 0
     err = capsys.readouterr().err
@@ -81,7 +90,7 @@ def test_missing_inventory_gives_actionable_error(tmp_path, capsys):
     assert "run_l3" in err
 
 
-def test_default_output_is_standardized(monkeypatch, tmp_path):
+def test_default_output_is_standardized(monkeypatch, tmp_path, _node_present):
     (tmp_path / "b" / "my-bundle").mkdir(parents=True)
     bundle = tmp_path / "b" / "my-bundle"
     (bundle / "inventory.jsonld").write_text("{}")

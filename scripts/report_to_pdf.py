@@ -46,6 +46,10 @@ Usage:
     uv run python scripts/report_to_pdf.py docs/reports/<name>.md
     uv run python scripts/report_to_pdf.py <in.md> -o <out.pdf> [--theme <css>] [--html]
 
+Without ``-o`` the PDF lands under ``CBM_REPORTS_DIR`` (default ``reports/``)
+as ``<stem>__authored__<UTC-timestamp>.pdf`` — ``docs/reports/`` holds the
+authored Markdown, which is version-controlled input, not build output.
+
 ARCHITECTURAL REQUIREMENT (PALS's LAW): LLMs will always produce some form of
 error. Absence of output verification is a design defect, not a runtime bug.
 Reports authored with LLM assistance must keep their provenance/disclaimer
@@ -82,6 +86,13 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from codebase_mapper.shared_kernel.settings import (  # noqa: E402
+    default_report_path,
+    load_env,
+)
+
 try:
     import yaml
     from markdown_it import MarkdownIt
@@ -94,6 +105,16 @@ except ModuleNotFoundError as exc:  # graceful: this is an application, not a li
     )
 
 DEFAULT_THEME = Path(__file__).resolve().parent / "site_assets" / "report_theme.css"
+
+
+def default_out(src: Path, when=None) -> Path:
+    """Standardized default output: <reports_dir>/<stem>__authored__<UTC-ts>.pdf.
+
+    Rendering used to land beside the source Markdown; ``docs/reports/`` is
+    authored *input* under version control, so the generated PDF belongs in
+    the reports directory with every other render.
+    """
+    return default_report_path(Path(src).stem, "authored", ext="pdf", when=when)
 
 _FRONTMATTER = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
 _OPEN = re.compile(r"^:::\s+(\w+)\s*(.*?)\s*$")   # ::: <type> [title...]
@@ -504,16 +525,19 @@ def render(src: Path, out: Path, theme: Path, dump_html: bool) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input", type=Path, help="source Markdown report")
-    ap.add_argument("-o", "--output", type=Path, help="output PDF (default: input with .pdf)")
+    ap.add_argument("-o", "--output", type=Path,
+                    help="output PDF (default: "
+                         "$CBM_REPORTS_DIR/<stem>__authored__<timestamp>.pdf)")
     ap.add_argument("--theme", type=Path, default=DEFAULT_THEME, help="theme CSS (default: house theme)")
     ap.add_argument("--html", action="store_true", help="also write the intermediate HTML")
     args = ap.parse_args(argv)
+    load_env()  # .env (repo-scoped) fills gaps; real environment always wins
 
     if not args.input.is_file():
         sys.exit(f"input not found: {args.input}")
     if not args.theme.is_file():
         sys.exit(f"theme not found: {args.theme}")
-    out = args.output or args.input.with_suffix(".pdf")
+    out = args.output or default_out(args.input)
     out.parent.mkdir(parents=True, exist_ok=True)
     render(args.input, out, args.theme, args.html)
     return 0

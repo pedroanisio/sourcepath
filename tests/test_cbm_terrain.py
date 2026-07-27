@@ -155,3 +155,63 @@ def test_cli_rejects_missing_bundle(tmp_path):
     with pytest.raises(SystemExit) as exc:
         main(["--bundle", str(tmp_path / "nope")])
     assert exc.value.code == 2
+
+
+def _stub_bundle(tmp_path, monkeypatch):
+    """Minimal bundle + stubbed loaders: exercises main()'s output routing
+    without running the real bundle loader or t-SNE."""
+    from scripts import cbm_terrain as T
+
+    bundle = tmp_path / "graphite"
+    bundle.mkdir()
+    (bundle / "run_manifest.json").write_text("{}")
+    fom, ew, ids, vecs = _synthetic()
+
+    class _MG:
+        files_of_module, edge_weight = fom, ew
+
+    monkeypatch.setattr(
+        T, "_load_module_graph",
+        lambda d: (_MG(), {"repo_name": "graphite", "commit_sha": "abc123def456789",
+                           "generated_at": "2026-07-10T00:00:00Z"}))
+    monkeypatch.setattr(T.np, "load",
+                        lambda *a, **k: {"ids": ids, "vectors": vecs})
+    return bundle
+
+
+def test_cli_default_out_lands_in_reports_dir_not_the_bundle(tmp_path, monkeypatch):
+    """Regression: the map used to be written INTO the bundle directory,
+    mixing a derived render in with the measured artifacts."""
+    from scripts.cbm_terrain import main
+
+    bundle = _stub_bundle(tmp_path, monkeypatch)
+    reports = tmp_path / "reports"
+    monkeypatch.setenv("CBM_REPORTS_DIR", str(reports))
+
+    assert main(["--bundle", str(bundle)]) == 0
+    hits = list(reports.glob("graphite__terrain__*.html"))
+    assert len(hits) == 1
+    assert list(bundle.glob("*.html")) == []
+
+
+def test_cli_style_selects_the_report_kind(tmp_path, monkeypatch):
+    from scripts.cbm_terrain import main
+
+    bundle = _stub_bundle(tmp_path, monkeypatch)
+    reports = tmp_path / "reports"
+    monkeypatch.setenv("CBM_REPORTS_DIR", str(reports))
+
+    assert main(["--bundle", str(bundle), "--style", "tolkien"]) == 0
+    assert len(list(reports.glob("graphite__tolkien__*.html"))) == 1
+
+
+def test_cli_explicit_out_still_wins(tmp_path, monkeypatch):
+    from scripts.cbm_terrain import main
+
+    bundle = _stub_bundle(tmp_path, monkeypatch)
+    monkeypatch.setenv("CBM_REPORTS_DIR", str(tmp_path / "reports"))
+    mine = tmp_path / "elsewhere" / "mine.html"
+
+    assert main(["--bundle", str(bundle), "--out", str(mine)]) == 0
+    assert mine.is_file()
+    assert not (tmp_path / "reports").exists()

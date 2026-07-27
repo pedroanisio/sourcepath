@@ -43,7 +43,13 @@ _site/
 /reports/
 .claude/settings.json
 _delete/chromium/
-docs/reports/
+# docs/reports/ holds AUTHORED Markdown (version-controlled input), not
+# build output — every renderer now writes to CBM_REPORTS_DIR instead.
+# Ignoring the whole directory kept _report_template.md — the file
+# report_to_pdf.py's own error message points at — off every fresh clone.
+# Only genuinely generated artifacts are ignored here.
+docs/reports/*.pdf
+docs/reports/*.html
 .mcp.json
 
 # Claude Code local state (permissions, agent worktrees)
@@ -63,3 +69,5 @@ doc-quarantine.sh
 doc-hygiene-report.md
 quarantine-manifest.json
 quarantine-summaries.md
+_ephemerous/
+*.tar
