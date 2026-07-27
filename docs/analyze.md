@@ -115,6 +115,15 @@ tries `origin/<branch>`.
 
 ## Embedding Backends
 
+Three choices, all writing their identity into `embeddings_meta.json` so
+downstream consumers know what produced the vectors.
+
+| `--backend` | Vectors | Needs | Use when |
+|---|---|---|---|
+| `hash` | SHA-256 pseudo-vectors, **no semantics** | nothing | fast, fully deterministic runs and verifiers |
+| `sbert` | real, in-process | `sentence-transformers` (+ torch) | semantic search without a server |
+| `ollama` | real, over HTTP | a running Ollama server | semantic search without the torch stack, or to use a model Ollama hosts |
+
 Use `hash` for fast, deterministic output:
 
 ```bash
@@ -133,6 +142,32 @@ download model files on first use. Override the model with:
 ```bash
 --sbert-model sentence-transformers/all-MiniLM-L6-v2
 ```
+
+Use `ollama` to embed through a running Ollama server instead:
+
+```bash
+--backend ollama
+--backend ollama --ollama-embed-model mxbai-embed-large
+```
+
+The default tag is `nomic-embed-text` (768-dim). The server address comes
+from `$OLLAMA_HOST` (default `http://localhost:11434`), the same variable
+the L4 enrichment layer uses. Pull the model first — `ollama pull
+nomic-embed-text` — and pick a tag the server reports as
+embedding-capable: a generation-only tag answers `/api/embed` with an
+error (observed on Ollama 0.32.1: HTTP 501, *"This server does not
+support embeddings"*), which the backend surfaces verbatim rather than
+guessing.
+
+The backend name recorded in the bundle is `ollama:<model>`. The FastAPI
+search endpoint, the MCP `semantic_neighbors` tool, and the walkthrough
+question panel all re-embed queries through that same model, and each
+degrades to lexical matching when the server is unreachable.
+
+Determinism honesty: `hash` is byte-identical everywhere. `sbert` and
+`ollama` are deterministic forward passes, so repeated runs against the
+same warm model reproduce, but bit-identity across machines or GPU
+builds is not guaranteed for either.
 
 ## Excluding Files
 

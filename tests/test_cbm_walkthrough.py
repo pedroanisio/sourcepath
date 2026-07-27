@@ -21,6 +21,7 @@ Run from the repo root:  python -m pytest tests/test_cbm_walkthrough.py
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -35,6 +36,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 pytest.importorskip("rdflib")
 
 import cbm  # noqa: E402
+import cbm_report as R  # noqa: E402
 import cbm_walkthrough as W  # noqa: E402
 
 from plugins.chunks_embeddings.embedder import _chunk_id  # noqa: E402
@@ -183,6 +185,79 @@ def test_evidence_banner_and_pals_framing(page) -> None:
 def test_question_panel_falls_back_to_lexical_on_hash_backend(page) -> None:
     assert "lexical" in page
     assert "validate an incoming request payload" in page
+
+
+# ---------------------------------------------------------------- ollama panel
+@pytest.fixture(scope="module")
+def ollama_bundle(bundle, tmp_path_factory):
+    """A copy of the fixture bundle relabeled as an ``ollama:`` backend.
+    Vectors are the hash backend's — irrelevant here, since what's under
+    test is which code path the backend *name* selects."""
+    import shutil
+
+    import numpy as np
+
+    work = tmp_path_factory.mktemp("ollama") / "bundle"
+    shutil.copytree(bundle, work)
+    dim = int(np.load(work / "embeddings.npz")["vectors"].shape[1])
+    (work / "embeddings_meta.json").write_text(json.dumps(
+        {"backend": {"name": "ollama:nomic-embed-text", "dimension": dim,
+                     "normalized": True},
+         "normalized": True}))
+    return work, dim
+
+
+def _semantic_with_encoder(ollama_bundle, monkeypatch, encoder):
+    work, dim = ollama_bundle
+    monkeypatch.setattr(W, "_encode_query_ollama", encoder)
+    found = {k: str(work / k) for k in
+             ("inventory.ttl", "embeddings.npz", "embeddings_meta.json",
+              "concepts.json")
+             if (work / k).exists()}
+    A = W.analyze(R.load_graph(found, R.resolve_cache_dir(str(work), None)))
+    return W.semantic(found, A, "validate an incoming request payload"), dim
+
+
+def test_question_panel_uses_semantic_mode_on_ollama_backend(
+        ollama_bundle, monkeypatch) -> None:
+    """An ``ollama:<model>`` bundle must take the semantic path — before
+    this, the panel tested for '/' in the model name and silently
+    downgraded every Ollama bundle to lexical."""
+    import numpy as np
+
+    seen = {}
+    _work, dim = ollama_bundle
+
+    def _enc(model, query):
+        seen["model"] = model
+        v = np.ones(dim, dtype="float32")
+        return v / np.linalg.norm(v)
+
+    res, _ = _semantic_with_encoder(ollama_bundle, monkeypatch, _enc)
+    assert seen["model"] == "nomic-embed-text"  # "ollama:" prefix stripped
+    assert res["mode"] == "semantic"
+    assert res["model"] == "ollama:nomic-embed-text"
+
+
+def test_ollama_panel_degrades_to_lexical_when_server_fails(
+        ollama_bundle, monkeypatch) -> None:
+    def _boom(model, query):
+        raise RuntimeError("connection refused")
+
+    res, _ = _semantic_with_encoder(ollama_bundle, monkeypatch, _boom)
+    assert res["mode"] == "lexical"
+
+
+def test_ollama_panel_degrades_to_lexical_on_dimension_mismatch(
+        ollama_bundle, monkeypatch) -> None:
+    """A query vector of the wrong width would rank noise."""
+    import numpy as np
+
+    _work, dim = ollama_bundle
+    res, _ = _semantic_with_encoder(
+        ollama_bundle, monkeypatch,
+        lambda m, q: np.ones(dim + 7, dtype="float32"))
+    assert res["mode"] == "lexical"
 
 
 def test_offline_invariant_no_external_fetches(page) -> None:

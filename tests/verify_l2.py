@@ -105,8 +105,10 @@ def main(argv: list[str] | None = None) -> int:
     global PASS, FAIL
     p = argparse.ArgumentParser()
     p.add_argument("--keep", action="store_true", help="don't delete the workdir on exit")
-    p.add_argument("--backend", choices=["hash", "sbert"], default="hash",
-                   help="hash is faster and exercises full determinism; sbert is real")
+    p.add_argument("--backend", choices=["hash", "sbert", "ollama"], default="hash",
+                   help="hash is faster and exercises full determinism; sbert is "
+                        "real; ollama needs a live server ($OLLAMA_HOST) with "
+                        "nomic-embed-text pulled")
     args = p.parse_args(argv)
 
     work = Path(tempfile.mkdtemp(prefix="verify_l2_"))

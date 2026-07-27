@@ -54,7 +54,7 @@ A **layered, plugin-registry pipeline** produces the bundle:
 
 ```
 L1 (host, codebase_mapper/)      → classify files, extract AST per language, resolve imports/deps
-L2 (plugins/chunks_embeddings/)  → source chunks + embeddings (sbert or deterministic hash)
+L2 (plugins/chunks_embeddings/)  → source chunks + embeddings (sbert, Ollama-served, or deterministic hash)
 L3 (plugins/concept_graph/)      → identifier-derived concept graph + curated SKOS vocabulary
    (plugins/symbol_xrefs/)       → symbol-level call/subclass/override edges (co-resident with L3)
 L4 (plugins/llm_enrich/)         → optional Ollama-backed LLM annotations (file summaries, concept
@@ -187,7 +187,7 @@ generated/cache/vendor directories and are excluded (not inventoried).
 | Module / Directory | Files | Asset Type | Objective | Key Components |
 |---|---|---|---|---|
 | `codebase_mapper/` | 79 | Source — core library | L1 pipeline: classify → extract AST (18+ languages) → resolve imports → emit RDF/JSON-LD + SHACL | `inspection/pipeline.py` (`map_codebase`), `emission/application/{emit_bundle,regenerate,reconstruct}.py`, `shared_kernel/extensions.py`, `cli.py` |
-| `plugins/chunks_embeddings/` | ~10 | Source — plugin (L2) | Source chunking + embeddings (sbert/hash) | `chunker.py`, `embedder.py`, `backends.py`, `graph_writer.py` |
+| `plugins/chunks_embeddings/` | ~10 | Source — plugin (L2) | Source chunking + embeddings (sbert/ollama/hash) | `chunker.py`, `embedder.py`, `backends.py`, `graph_writer.py` |
 | `plugins/concept_graph/` | ~9 | Source — plugin (L3) | Identifier splitting, curated SKOS vocabulary, concept co-occurrence | `splitter.py`, `concepts.py`, `graph_writer.py` |
 | `plugins/symbol_xrefs/` | ~13 | Source — plugin (L3-adjacent) | Symbol-level call/subclass/override edges, 10 language resolvers | `aggregator.py`, `{python,tsjs,cobol,…}_resolver.py`, `graph_writer.py` |
 | `plugins/llm_enrich/` | ~10 + `prompts/` | Source — plugin (L4, opt-in) | Ollama-backed file/concept/schema annotations with full provenance + graceful degradation | `client.py`, `enricher.py`, `aggregator.py`, `cache.py`, `model_resolver.py`, `prompts.py` |
@@ -496,7 +496,7 @@ Most resolve against an in-process `Bundle` object (dict/BFS lookups); `sparql` 
 | `CBM_MCP_TOKEN` | Gates whether the backend mounts the MCP server at `/mcp/` | unset (mount skipped) | `app.py:381-389` |
 | `CBM_ENABLE_SPARQL` | Enables the MCP `sparql` tool | disabled | `sparql.py:51-52` |
 | `CBM_WATCH_INTERVAL` | Manifest-watcher poll interval (stdio transport) | 30s | `frontend/mcp_server/subscriptions.py` |
-| `OLLAMA_HOST` | Ollama server address for L4 | `http://localhost:11434` | `plugins/llm_enrich/client.py:36-41` |
+| `OLLAMA_HOST` | Ollama server address for L4 enrichment, the L2 `ollama` embedding backend, and query embedding in the serving layer | `http://localhost:11434` | `plugins/llm_enrich/client.py:36-41`, `plugins/chunks_embeddings/backends.py` |
 | `CBM_LLM_CACHE` | Override L4 cache directory | `~/.cache/cbm-llm/` | `plugins/llm_enrich/cache.py:63-66` |
 | `CBM_CONCEPT_TOP_N` | L4 concept-description corpus-top-N selection size | 200 | `plugins/llm_enrich/aggregator.py` |
 | `CBM_EXTRACT_WORKERS` | AST extraction thread count | CPU count | `codebase_mapper/inspection/pipeline.py` |

@@ -300,14 +300,22 @@ def test_chunk_blob_round_trip(live_bundle, bundle_name):
 
 
 def test_semantic_neighbors_mode_matches_backend(live_bundle, bundle_name):
-    """When the bundle's embeddings backend is sbert-shaped we expect
-    ``semantic`` mode and real cosine scores; otherwise lexical fallback."""
+    """A backend carrying real semantics yields ``semantic`` mode with
+    cosine scores; a hash bundle falls back to lexical.
+
+    ``ollama:`` bundles are semantic only when the server answers — the
+    degradation path is deliberate, so either mode is contract-valid and
+    only the scores-present invariant is asserted for them."""
     summary = dispatch("bundle_summary", {"bundle": bundle_name})
     backend = (summary.get("embeddings_backend") or "").lower()
     is_sbert = any(s in backend for s in ("sentence-transformer", "sbert", "minilm"))
+    is_ollama = backend.startswith("ollama:")
 
     p = dispatch("semantic_neighbors", {"bundle": bundle_name, "q": "schema", "k": 5})
-    if is_sbert:
+    if is_ollama:
+        assert p["mode"] in ("semantic", "lexical")
+        assert all(c.get("score") is not None for c in p["chunks"])
+    elif is_sbert:
         assert p["mode"] == "semantic"
         assert all(c.get("score") is not None for c in p["chunks"])
     else:

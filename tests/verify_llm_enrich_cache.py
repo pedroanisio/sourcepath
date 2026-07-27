@@ -55,6 +55,7 @@ from plugins.llm_enrich.client import (
     OllamaUnreachable,
     resolve_host,
 )
+from plugins.llm_enrich.model_resolver import completion_capable_models
 
 
 PASS = 0
@@ -284,12 +285,16 @@ def test_client_lists_models() -> None:
 def test_client_chat_returns_text_and_time() -> None:
     c = OllamaClient()
     try:
-        # Use any installed model — pick the smallest we expect.
-        avail = c.available_models()
-        if not avail:
-            check("chat needs at least one installed model", False)
+        # Pick a model the server *reports* as completion-capable. Taking
+        # available_models()[0] assumed every installed tag can chat —
+        # false the moment an embedding-only model (nomic-embed-text) is
+        # pulled, which made this test fail on a healthy server.
+        capable = completion_capable_models(c.model_catalog())
+        if not capable:
+            check("chat needs at least one completion-capable model", False,
+                  f"installed: {c.available_models()}")
             return
-        model = avail[0]
+        model = capable[0]
         text, dt = c.chat(
             model=model,
             system="Reply with exactly one word.",

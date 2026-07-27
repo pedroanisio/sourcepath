@@ -189,6 +189,98 @@ def test_get_model_lazy_import_is_cached(monkeypatch):
     assert calls["n"] == 1
 
 
+# ---------------------------------------- ollama semantic search path
+def test_semantic_search_runs_when_backend_is_ollama(client, monkeypatch):
+    """An ``ollama:<model>`` bundle takes the semantic branch when the
+    query embedding succeeds."""
+    bundle = app_module.get_bundle()
+    bundle.embeddings_meta["backend"] = {"name": "ollama:nomic-embed-text"}
+    if bundle.chunk_vectors is None or len(bundle.chunks) == 0:
+        pytest.skip("bundle has no chunk vectors to project against")
+
+    def _fake_embed(model: str, q: str):
+        assert model == "nomic-embed-text"  # prefix stripped, model passed through
+        return bundle.chunk_vectors[0].astype("float32")
+
+    monkeypatch.setattr(chunks_app, "_embed_query_ollama", _fake_embed)
+
+    r = client.post("/api/chunks/search", json={"q": "anything", "k": 3})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["mode"] == "semantic"
+    assert body["backend"] == "ollama:nomic-embed-text"
+    assert len(body["chunks"]) > 0
+    assert body["chunks"][0]["score"] is not None
+
+
+def test_ollama_search_degrades_to_lexical_when_embedding_fails(client, monkeypatch):
+    """Server down / model missing -> _embed_query_ollama returns None and
+    the endpoint answers lexically instead of erroring."""
+    bundle = app_module.get_bundle()
+    bundle.embeddings_meta["backend"] = {"name": "ollama:nomic-embed-text"}
+
+    monkeypatch.setattr(chunks_app, "_embed_query_ollama", lambda *_a: None)
+
+    r = client.post("/api/chunks/search", json={"q": "anything", "k": 3})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "lexical"
+
+
+def test_ollama_search_degrades_to_lexical_on_dimension_mismatch(client, monkeypatch):
+    """A query vector whose dimension differs from the bundle's vectors
+    would rank noise — the endpoint must fall back to lexical."""
+    bundle = app_module.get_bundle()
+    bundle.embeddings_meta["backend"] = {"name": "ollama:nomic-embed-text"}
+    if bundle.chunk_vectors is None:
+        pytest.skip("bundle has no chunk vectors")
+    wrong_dim = bundle.chunk_vectors.shape[1] + 5
+
+    monkeypatch.setattr(
+        chunks_app, "_embed_query_ollama",
+        lambda *_a: np.ones(wrong_dim, dtype="float32"))
+
+    r = client.post("/api/chunks/search", json={"q": "anything", "k": 3})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "lexical"
+
+
+def test_embed_query_ollama_normalizes_and_survives_failure(monkeypatch):
+    """Direct unit test of the query embedder: normalization on success,
+    None (never an exception) on transport failure."""
+    import types
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"embeddings": [[3.0, 4.0]]}
+
+    seen = {}
+    fake_httpx = types.ModuleType("httpx")
+
+    def _post(url, json=None, timeout=None):  # noqa: A002 - httpx kwarg name
+        seen["url"] = url
+        seen["body"] = json
+        return _Resp()
+
+    fake_httpx.post = _post  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "httpx", fake_httpx)
+    monkeypatch.setenv("OLLAMA_HOST", "http://ollama-test:11434")
+
+    vec = chunks_app._embed_query_ollama("m", "query text")
+    assert seen["url"] == "http://ollama-test:11434/api/embed"
+    assert seen["body"] == {"model": "m", "input": ["query text"]}
+    assert vec is not None
+    assert abs(float(np.linalg.norm(vec)) - 1.0) < 1e-6  # 3-4-5 normalized
+
+    def _post_boom(url, json=None, timeout=None):  # noqa: A002
+        raise RuntimeError("connection refused")
+
+    fake_httpx.post = _post_boom  # type: ignore[attr-defined]
+    assert chunks_app._embed_query_ollama("m", "query text") is None
+
+
 def test_bundle_data_sidecar_helpers_parse_and_filter(tmp_path: Path):
     rust = tmp_path / "rust_items.jsonl"
     rust.write_text("\nnot-json\n{}\n" + dumps({"path": "src/lib.rs", "name": "demo"}) + "\n")

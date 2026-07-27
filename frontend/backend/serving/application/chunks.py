@@ -1,6 +1,8 @@
 """Chunk endpoints application logic."""
 from __future__ import annotations
 
+import logging
+import os
 from functools import lru_cache
 from typing import Any
 
@@ -8,6 +10,15 @@ import numpy as np
 from fastapi import HTTPException
 
 from .bundle_data import chunk_payload, get_bundle, xref_row
+
+logger = logging.getLogger("cbm.backend.chunks")
+
+# Must stay comfortably under the MCP server's 10 s dispatch budget for
+# semantic_neighbors (frontend/mcp_server/observability.py::TIMEOUTS) —
+# a query embed that outlives the budget kills the whole call instead of
+# degrading to lexical. 6 s covers a cold embedding-model load with room
+# for the cosine pass and the fallback.
+_OLLAMA_QUERY_TIMEOUT_SECONDS = 6.0
 
 
 def list_chunks_response(
@@ -44,7 +55,30 @@ def search_chunks_response(q: str, k: int, bundle: str | None = None) -> dict[st
         or "sbert" in lowered
         or "minilm" in lowered
     )
-    if not is_sbert or b.chunk_vectors is None:
+    is_ollama = lowered.startswith("ollama:")
+
+    q_vec: np.ndarray | None = None
+    if b.chunk_vectors is not None:
+        if is_sbert:
+            # Embed the query with the model the bundle was built with —
+            # a different model would rank in the wrong vector space. The
+            # name is a loadable model id only when it has an org prefix.
+            name = (backend_name if "/" in backend_name
+                    else "sentence-transformers/all-MiniLM-L6-v2")
+            model = _get_model(name)
+            q_vec = model.encode([q], normalize_embeddings=True)[0].astype("float32")
+        elif is_ollama:
+            # "ollama:<model>" — embed via the Ollama server. On any
+            # failure (server down, model gone, dimension drift) this
+            # returns None and the endpoint degrades to lexical mode.
+            q_vec = _embed_query_ollama(backend_name.split(":", 1)[1], q)
+            if q_vec is not None and q_vec.shape[0] != b.chunk_vectors.shape[1]:
+                logger.warning(
+                    "ollama query dim %d != bundle dim %d — lexical fallback",
+                    q_vec.shape[0], b.chunk_vectors.shape[1])
+                q_vec = None
+
+    if q_vec is None:
         ql = q.lower()
         scored = [
             (
@@ -64,8 +98,6 @@ def search_chunks_response(q: str, k: int, bundle: str | None = None) -> dict[st
             "mode": "lexical",
         }
 
-    model = _get_model("sentence-transformers/all-MiniLM-L6-v2")
-    q_vec = model.encode([q], normalize_embeddings=True)[0].astype("float32")
     sims = b.chunk_vectors @ q_vec
     top_idx = np.argsort(-sims)[:k]
     chunk_by_row = {
@@ -90,6 +122,38 @@ def _get_model(name: str):
     from sentence_transformers import SentenceTransformer  # type: ignore
 
     return SentenceTransformer(name)
+
+
+def _embed_query_ollama(model: str, q: str) -> np.ndarray | None:
+    """Embed one query through the bundle's recorded Ollama model.
+
+    POST /api/embed on $OLLAMA_HOST (default localhost:11434). Returns a
+    L2-normalized float32 vector, or None on any failure — the serving
+    layer is an application, so it degrades to lexical search instead of
+    surfacing a 500 when the embedding server is unavailable.
+    """
+    host = os.environ.get("OLLAMA_HOST") or "http://localhost:11434"
+    try:
+        import httpx
+
+        r = httpx.post(
+            f"{host}/api/embed",
+            json={"model": model, "input": [q]},
+            timeout=_OLLAMA_QUERY_TIMEOUT_SECONDS,
+        )
+        r.raise_for_status()
+        rows = r.json().get("embeddings") or []
+        if len(rows) != 1:
+            logger.warning("ollama /api/embed returned %d rows for 1 input", len(rows))
+            return None
+        vec = np.asarray(rows[0], dtype="float32")
+        norm = float(np.linalg.norm(vec))
+        if norm <= 0:
+            return None
+        return vec / norm
+    except Exception as e:
+        logger.warning("ollama query embedding failed (%s) — lexical fallback", e)
+        return None
 
 
 def get_chunk_blob_response(sha: str, bundle: str | None = None) -> dict[str, str]:

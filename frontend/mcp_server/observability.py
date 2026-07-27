@@ -43,7 +43,10 @@ from .validators import INTERNAL, ToolError
 
 DEFAULT_TIMEOUT_SECONDS = 5.0
 TIMEOUTS: dict[str, float] = {
-    # sbert loads ~100 MB of weights on first call and runs a cosine NN
+    # sbert loads ~100 MB of weights on first call and runs a cosine NN;
+    # an ollama-backed bundle instead spends one HTTP round-trip on the
+    # query embed, capped below this budget so it degrades to lexical
+    # rather than timing out the dispatch.
     "semantic_neighbors": 10.0,
     # SPARQL queries can scan the whole graph; tight cap is the safety net
     "sparql": 10.0,

@@ -27,9 +27,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--name", default=None)
     p.add_argument("--state", default="HEAD")
-    p.add_argument("--backend", choices=["sbert", "hash"], default="sbert")
+    p.add_argument("--backend", choices=["sbert", "hash", "ollama"], default="sbert")
     p.add_argument("--hash-dim", type=int, default=256)
     p.add_argument("--sbert-model", default="sentence-transformers/all-MiniLM-L6-v2")
+    p.add_argument("--ollama-embed-model",
+                   default=chunks_embeddings.DEFAULT_OLLAMA_EMBED_MODEL,
+                   help="Ollama embedding model tag (backend=ollama), "
+                        "e.g. nomic-embed-text, mxbai-embed-large.")
     p.add_argument("--no-l2", action="store_true",
                    help="run L3 alone (no chunks, no concept centroids)")
     p.add_argument("--no-xrefs", action="store_true",
@@ -65,10 +69,9 @@ def main(argv: list[str] | None = None) -> int:
     reset_registries()
 
     if not args.no_l2:
-        if args.backend == "sbert":
-            backend = chunks_embeddings.SentenceTransformerBackend(args.sbert_model)
-        else:
-            backend = chunks_embeddings.DeterministicHashBackend(args.hash_dim)
+        backend = chunks_embeddings.build_backend(
+            args.backend, hash_dim=args.hash_dim, sbert_model=args.sbert_model,
+            ollama_model=args.ollama_embed_model)
         chunks_embeddings.register_all(backend)
 
     if not args.no_xrefs:

@@ -21,6 +21,16 @@ default, then a descending same-family fallback chain. If the server is
 reachable but no candidate is installed — or the server is unreachable —
 it returns ``None`` so callers degrade *knowingly* (skip the test / wire
 the runtime degradation path) rather than failing blind.
+
+Second observed instance of the same root cause: a host with *no*
+qwen2.5-coder tag at all but a capable general model installed
+(``qwen2.5:14b-instruct``) still emitted zero enrichments, because the
+fallback chain was coder-family-only. The fix keeps the curated chain
+authoritative and adds a capability-verified last resort: models the
+server itself reports as ``completion``-capable via ``/api/tags``.
+Evidence, not name-matching — an ``embedding``-only tag such as
+``nomic-embed-text`` is never selected, and a server too old to report
+capabilities yields no substitution rather than a guess.
 """
 from __future__ import annotations
 
@@ -47,7 +57,60 @@ FALLBACK_MODELS: tuple[str, ...] = (
     "qwen2.5-coder:0.5b",
 )
 
+#: Ollama capability tokens (reported per model by ``/api/tags`` on
+#: servers >= 0.32). ``completion`` is the one an enrichment chat call
+#: needs; an ``embedding``-only model 501s or errors on every call.
+COMPLETION_CAPABILITY = "completion"
+
+#: Substrings marking a code-specialized tag. The L4 prompts annotate
+#: source, so a code model beats a larger general one for this task —
+#: consistent with the family chain above being coder-only. This is a
+#: naming heuristic applied *only to rank already-capability-verified
+#: models*; it never admits a model on its own.
+_CODE_TAG_HINTS = ("coder", "code", "codestral", "starcoder", "deepseek-coder")
+
+_PARAM_SIZE_UNITS = {"K": 1e3, "M": 1e6, "B": 1e9, "T": 1e12}
+
 _log = logging.getLogger("cbm.llm_enrich")
+
+
+def _parameter_count(entry: dict) -> float:
+    """Parse ``details.parameter_size`` ("33.4B", "137M") to a number.
+
+    Returns 0.0 when absent or unparsable, which sorts the entry last
+    rather than crashing the sweep.
+    """
+    raw = str((entry.get("details") or {}).get("parameter_size") or "").strip()
+    if not raw:
+        return 0.0
+    unit = _PARAM_SIZE_UNITS.get(raw[-1].upper(), 1.0)
+    try:
+        return float(raw[:-1] if raw[-1].upper() in _PARAM_SIZE_UNITS else raw) * unit
+    except ValueError:
+        return 0.0
+
+
+def completion_capable_models(catalog: list[dict]) -> list[str]:
+    """Installed tags the server *reports* as completion-capable, best first.
+
+    Ranking: code-specialized tags before general ones, then larger
+    parameter count first. Entries without a ``capabilities`` list are
+    skipped — an older server omitting the field is missing evidence, not
+    evidence of capability, and admitting it on a name guess is the
+    unverified-premise failure this project forbids.
+    """
+    ranked: list[tuple[int, float, str]] = []
+    for entry in catalog:
+        name = entry.get("name")
+        caps = entry.get("capabilities")
+        if not name or not isinstance(caps, list):
+            continue
+        if COMPLETION_CAPABILITY not in caps:
+            continue
+        is_code = any(h in name.lower() for h in _CODE_TAG_HINTS)
+        ranked.append((0 if is_code else 1, -_parameter_count(entry), name))
+    ranked.sort()
+    return [name for _code, _size, name in ranked]
 
 
 def preferred_model(explicit: str | None = None) -> str:
@@ -87,13 +150,15 @@ def resolve_model(
     ==========================================  ==================================
     ``client is None``                          ``None``  (no-op wiring)
     reachable, a candidate installed            that tag  (auto-solved)
-    reachable, no candidate installed           ``None``  (degrade cleanly)
+    reachable, chain misses, capability known   best completion-capable tag
+    reachable, nothing usable                   ``None``  (degrade cleanly)
     unreachable                                 ``None``  (degrade cleanly)
     ==========================================  ==================================
 
     A substitution away from the preferred tag is logged at WARNING so an
     operator can see the pipeline auto-solved a model mismatch rather than
-    silently using a different (and lower-quality) model.
+    silently using a different (and lower-quality) model. The cross-family
+    capability fallback logs that its output quality is unbenchmarked.
     """
     if client is None:
         return None
@@ -130,6 +195,30 @@ def resolve_model(
                     candidates[0], cand, sorted(installed),
                 )
             return cand
+
+    # Last resort: the curated family chain missed entirely, but the
+    # server may still host a completion-capable model. Substituting on
+    # *reported capability* (never on a name guess) is what keeps a host
+    # with, say, only `qwen2.5:14b-instruct` from emitting a bundle with
+    # zero L4 enrichments. Quality is unbenchmarked here — hence WARNING.
+    try:
+        catalog = client.model_catalog()
+    except Exception as exc:  # noqa: BLE001 — contract: never raise
+        _log.warning(
+            "llm_enrich: capability probe failed (%s: %s)",
+            type(exc).__name__, exc,
+        )
+        catalog = []
+    capable = completion_capable_models(catalog)
+    if capable:
+        _log.warning(
+            "llm_enrich: none of %s installed; falling back to %r — the "
+            "server reports it completion-capable, but it is outside the "
+            "benchmarked set (docs/llm-baseline-results.md), so treat its "
+            "output quality as unvalidated. Other candidates: %s",
+            candidates, capable[0], capable[1:] or "none",
+        )
+        return capable[0]
 
     _log.warning(
         "llm_enrich: no suitable model installed "

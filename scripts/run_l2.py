@@ -26,11 +26,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--name", default=None)
     p.add_argument("--state", default="HEAD")
-    p.add_argument("--backend", choices=["sbert", "hash"], default="sbert",
+    p.add_argument("--backend", choices=["sbert", "hash", "ollama"], default="sbert",
                    help="sbert = sentence-transformers/all-MiniLM-L6-v2 (real, 384-dim). "
-                        "hash = deterministic SHA-256 fake (256-dim, no semantics).")
+                        "hash = deterministic SHA-256 fake (256-dim, no semantics). "
+                        "ollama = embedding model served by Ollama ($OLLAMA_HOST).")
     p.add_argument("--hash-dim", type=int, default=256)
     p.add_argument("--sbert-model", default="sentence-transformers/all-MiniLM-L6-v2")
+    p.add_argument("--ollama-embed-model",
+                   default=chunks_embeddings.DEFAULT_OLLAMA_EMBED_MODEL,
+                   help="Ollama embedding model tag (backend=ollama), "
+                        "e.g. nomic-embed-text, mxbai-embed-large.")
     p.add_argument("--no-emit-blobs", action="store_true")
     p.add_argument("--exclude", action="append", default=[],
                    help="POSIX-glob pattern; files matching are dropped. "
@@ -41,10 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     # plugins. In a fresh subprocess this is a no-op but cheap insurance.
     reset_registries()
 
-    if args.backend == "sbert":
-        backend = chunks_embeddings.SentenceTransformerBackend(args.sbert_model)
-    else:
-        backend = chunks_embeddings.DeterministicHashBackend(args.hash_dim)
+    backend = chunks_embeddings.build_backend(
+        args.backend, hash_dim=args.hash_dim, sbert_model=args.sbert_model,
+        ollama_model=args.ollama_embed_model)
     chunks_embeddings.register_all(backend)
 
     with resolve_repo_source(args.repo, args.state, work_dir=args.out.resolve().parent) as repo:

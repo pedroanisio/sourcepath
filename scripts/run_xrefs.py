@@ -56,11 +56,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--name", default=None)
     p.add_argument("--state", default="HEAD")
-    p.add_argument("--backend", choices=["sbert", "hash"], default="hash",
+    p.add_argument("--backend", choices=["sbert", "hash", "ollama"], default="hash",
                    help="hash = deterministic SHA-256 fake (fast, verifier-friendly). "
-                        "sbert = sentence-transformers/all-MiniLM-L6-v2 (real).")
+                        "sbert = sentence-transformers/all-MiniLM-L6-v2 (real). "
+                        "ollama = embedding model served by Ollama ($OLLAMA_HOST).")
     p.add_argument("--hash-dim", type=int, default=256)
     p.add_argument("--sbert-model", default="sentence-transformers/all-MiniLM-L6-v2")
+    p.add_argument("--ollama-embed-model",
+                   default=chunks_embeddings.DEFAULT_OLLAMA_EMBED_MODEL,
+                   help="Ollama embedding model tag (backend=ollama), "
+                        "e.g. nomic-embed-text, mxbai-embed-large.")
     p.add_argument("--concepts", action="store_true",
                    help="Also register the L3 concept_graph plugin.")
     p.add_argument("--concept-vocab", type=Path, default=None,
@@ -97,10 +102,9 @@ def main(argv: list[str] | None = None) -> int:
                      or args.llm_enrich)
 
     reset_registries()
-    if args.backend == "sbert":
-        backend = chunks_embeddings.SentenceTransformerBackend(args.sbert_model)
-    else:
-        backend = chunks_embeddings.DeterministicHashBackend(args.hash_dim)
+    backend = chunks_embeddings.build_backend(
+        args.backend, hash_dim=args.hash_dim, sbert_model=args.sbert_model,
+        ollama_model=args.ollama_embed_model)
     chunks_embeddings.register_all(backend)
     symbol_xrefs.register_all()
     if want_concepts:

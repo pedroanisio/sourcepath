@@ -102,11 +102,13 @@ to any directory containing a codebase-mapper output bundle and restart.
 | `/dashboard` | repo + run metadata, counts, language/type histograms, SHACL status |
 | `/files` | top-N files by import degree, force-directed; colored by language |
 | `/concepts` | top-N concepts by frequency with skos:related cooccurrence edges |
-| `/chunks` | search chunks; semantic NN if sbert backend, lexical otherwise |
+| `/chunks` | search chunks; semantic NN if the bundle carries real vectors, lexical otherwise |
 
 ## Notes
 
-- For real semantic search, regenerate the bundle with `--backend sbert`.
-  Hash-backend bundles fall back to substring matching on chunk symbols.
+- For real semantic search, regenerate the bundle with `--backend sbert`
+  or `--backend ollama`. Hash-backend bundles fall back to substring
+  matching on chunk symbols, as does an `ollama:` bundle whose server is
+  unreachable — the response's `mode` field always says which path answered.
 - The cytoscape `cose` layout struggles past ~1500 nodes; the file graph
   is server-side ranked by import degree before truncation.

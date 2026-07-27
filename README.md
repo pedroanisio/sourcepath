@@ -104,8 +104,12 @@ python scripts/run_xrefs.py --repo /path/to/repo --out /tmp/out --backend hash -
 python scripts/run_l4.py --repo /path/to/repo --out /tmp/out
 ```
 
-`--backend sbert` uses `sentence-transformers/all-MiniLM-L6-v2`; `--backend hash`
-uses a deterministic SHA-256 fake (no semantics, useful for contract tests).
+`--backend sbert` uses `sentence-transformers/all-MiniLM-L6-v2` in-process;
+`--backend ollama` embeds through a running Ollama server at `$OLLAMA_HOST`
+(default model `nomic-embed-text`, override with `--ollama-embed-model`) for
+real vectors without the torch stack; `--backend hash` uses a deterministic
+SHA-256 fake (no semantics, useful for contract tests). See
+[docs/analyze.md](docs/analyze.md#embedding-backends) for the trade-offs.
 
 `--repo` accepts either a local path or a Git URL. GitHub HTTPS, SSH, and the
 `github.com/OWNER/REPO` shorthand are supported. Remote repositories are cloned

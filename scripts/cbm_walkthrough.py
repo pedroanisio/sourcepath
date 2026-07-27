@@ -189,30 +189,62 @@ def concept_story(found, keystone_path):
 
 
 # ----------------------------------------------------------------------------
-# semantic search (sbert over embeddings.npz) — the "ask it a question" panel
+# semantic search over embeddings.npz — the "ask it a question" panel
+def _encode_query_ollama(model, query):
+    """Embed the query through the Ollama model the bundle was built with.
+    Returns a float32 vector, or None so the caller answers lexically."""
+    import os
+
+    import httpx
+    import numpy as np
+
+    host = os.environ.get("OLLAMA_HOST") or "http://localhost:11434"
+    r = httpx.post(f"{host}/api/embed",
+                   json={"model": model, "input": [query]}, timeout=30.0)
+    r.raise_for_status()
+    rows = r.json().get("embeddings") or []
+    if len(rows) != 1:
+        return None
+    v = np.asarray(rows[0], dtype="float32")
+    n = float(np.linalg.norm(v))
+    return v / n if n > 0 else None
+
+
 def semantic(found, A, query, k=8):
     if not (found.get("embeddings.npz") and query):
         return None
     meta = json.load(open(found["embeddings_meta.json"])) if found.get("embeddings_meta.json") else {}
     name = meta.get("backend", {}).get("name") or "sentence-transformers/all-MiniLM-L6-v2"
-    # A hash backend's vectors carry no semantics — encoding the query with a
-    # sentence-transformer against them would rank noise. Model-id backends
-    # ("org/model") get the semantic path; anything else answers lexically.
-    if "/" not in name:
-        log(f"backend {name!r} is not a sentence-transformer — lexical panel")
+    # A hash backend's vectors carry no semantics — encoding the query
+    # against them would rank noise. Two backend families carry real
+    # semantics: sentence-transformer model ids ("org/model") and Ollama
+    # tags ("ollama:<model>"). Anything else answers lexically.
+    is_ollama = name.startswith("ollama:")
+    if "/" not in name and not is_ollama:
+        log(f"backend {name!r} carries no semantics — lexical panel")
         return _lexical(A, query, k)
     try:
         import numpy as np
-        from sentence_transformers import SentenceTransformer
     except Exception as e:
-        log("sbert unavailable — semantic panel falls back to lexical:", e)
+        log("numpy unavailable — semantic panel falls back to lexical:", e)
         return _lexical(A, query, k)
     try:
         M = np.load(found["embeddings.npz"])["vectors"].astype("float32")
-        model = SentenceTransformer(name)
-        q = model.encode([query], normalize_embeddings=True).astype("float32")[0]
+        if is_ollama:
+            q = _encode_query_ollama(name.split(":", 1)[1], query)
+            if q is None:
+                log("ollama returned no query embedding — lexical fallback")
+                return _lexical(A, query, k)
+            if q.shape[0] != M.shape[1]:
+                log(f"ollama query dim {q.shape[0]} != bundle dim {M.shape[1]}"
+                    " — lexical fallback")
+                return _lexical(A, query, k)
+        else:
+            from sentence_transformers import SentenceTransformer
+            model = SentenceTransformer(name)
+            q = model.encode([query], normalize_embeddings=True).astype("float32")[0]
     except Exception as e:
-        log("sbert encode failed — lexical fallback:", e); return _lexical(A, query, k)
+        log("query encode failed — lexical fallback:", e); return _lexical(A, query, k)
     Mn = M / (np.linalg.norm(M, axis=1, keepdims=True) + 1e-9) if not meta.get("normalized") else M
     scores = Mn @ q
     top = np.argsort(-scores)[:k]

@@ -235,13 +235,15 @@ DESCRIPTIONS: dict[str, str] = {
     "list_chunks": (
         "Browse chunks with optional lexical filter. Paginated. Prefer "
         "``semantic_neighbors`` when you have a natural-language query and "
-        "an sbert-backed bundle."
+        "a bundle built with a real embedding backend (sbert or ollama)."
     ),
     "semantic_neighbors": (
-        "Top-k semantic neighbors for a query string. Uses sbert vectors "
-        "when the bundle's backend supports it; falls back to lexical match "
-        "on symbol/path otherwise. Response's ``mode`` field tells you "
-        "which."
+        "Top-k semantic neighbors for a query string. Embeds the query "
+        "with the bundle's own embedding backend — sbert in-process, or "
+        "``ollama:<model>`` via the Ollama server — and falls back to "
+        "lexical match on symbol/path when the backend carries no "
+        "semantics (hash) or is unavailable. Response's ``mode`` field "
+        "tells you which path answered."
     ),
     "concept_detail": (
         "Inspect a SKOS concept: frequency, alt-labels, components, top-k "

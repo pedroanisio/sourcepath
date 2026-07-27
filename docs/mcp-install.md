@@ -180,7 +180,7 @@ From a shell, you can also run the test suite to confirm the install:
 | HTTP `401 invalid_token` | Token expired, signature bad, or audience/issuer mismatch. |
 | HTTP `403 insufficient_scope` | Token valid but missing `bundle:read` (or whatever `CBM_MCP_REQUIRED_SCOPE` is set to). |
 | Tool returns `timeout` | Per-tool budget exceeded. Override with `CBM_MCP_TIMEOUT_<TOOL_NAME>=<seconds>`. |
-| `semantic_neighbors` slow first call | sbert model loads ~100 MB on first use; default budget for this tool is 10 s. |
+| `semantic_neighbors` slow first call | sbert model loads ~100 MB on first use; default budget for this tool is 10 s. An `ollama:` bundle instead pays one query-embed round-trip (capped at 6 s, then lexical fallback). |
 
 For the full env-var reference and security model, see
 [frontend/mcp_server/README.md](../frontend/mcp_server/README.md).

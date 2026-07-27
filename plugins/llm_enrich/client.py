@@ -111,16 +111,27 @@ class OllamaClient:
         except Exception:
             return False
 
-    def available_models(self) -> list[str]:
-        """List installed model tags. Raises OllamaUnreachable if the
-        server is down."""
+    def model_catalog(self) -> list[dict[str, Any]]:
+        """Raw ``/api/tags`` entries for every installed model.
+
+        Ollama >= 0.32 reports a ``capabilities`` list per entry (e.g.
+        ``["completion", "tools"]`` vs ``["embedding"]``) plus
+        ``details.parameter_size``. Older servers omit ``capabilities``;
+        callers must treat its absence as "unknown", never as a
+        capability claim. Raises OllamaUnreachable if the server is down.
+        """
         try:
             r = self._http().get("/api/tags", timeout=10.0)
             r.raise_for_status()
         except (httpx.HTTPError, httpx.TimeoutException) as e:
             raise OllamaUnreachable(f"GET /api/tags failed: {e}") from e
-        data = r.json()
-        return [m["name"] for m in data.get("models", [])]
+        models = r.json().get("models", [])
+        return [m for m in models if isinstance(m, dict)]
+
+    def available_models(self) -> list[str]:
+        """List installed model tags. Raises OllamaUnreachable if the
+        server is down."""
+        return [m["name"] for m in self.model_catalog() if "name" in m]
 
     def chat(
         self, model: str, system: str, user: str,

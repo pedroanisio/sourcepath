@@ -30,7 +30,7 @@ containing `run_manifest.json`, `inventory.ttl`, `embeddings.npz`,
 | `GET /api/symbol-graph?limit=N&kind=K` | Symbol-level xref graph |
 | `GET /api/concept-graph?limit=N&min_edge=K` | Top-N concepts by frequency + cooccurrence edges with weight ≥ K |
 | `GET /api/chunks?q=&limit=&offset=` | Browse/lexically search chunks |
-| `POST /api/chunks/search` `{q, k}` | Semantic nearest neighbors (sbert backend) or lexical fallback (hash backend) |
+| `POST /api/chunks/search` `{q, k}` | Semantic nearest neighbors (sbert or `ollama:` backend) or lexical fallback (hash backend, or Ollama unreachable) |
 | `GET /api/concept/{name}` | Concept detail + the files that lexicalize it |
 | `GET /api/chunk-blob/{sha}` | Raw text of a chunk's content blob (truncated to 20 KB) |
 | `GET /api/file/{path}` | File detail + imports/tests/chunks/concepts/xrefs |

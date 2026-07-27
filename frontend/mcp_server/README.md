@@ -39,7 +39,7 @@ includes a "when to use" hint.
 | `file_impact` | Transitive dependency closure for a file up to `depth` hops. |
 | `imports_of` / `imported_by` | One-hop slices. Cheap. |
 | `chunk_detail` / `chunk_blob` / `list_chunks` | Chunk navigation. |
-| `semantic_neighbors` | Cosine NN if bundle has sbert vectors; lexical fallback otherwise. |
+| `semantic_neighbors` | Cosine NN if the bundle has real vectors (sbert or `ollama:`); lexical fallback otherwise. |
 | `concept_detail` | SKOS concept: frequency, alt-labels, cooccurrence, files, chunks. |
 | `concept_neighborhood` | k-hop cooccurrence walk (bounded `depth ≤ 3`). |
 | `sparql` | Read-only SPARQL escape hatch, disabled unless `CBM_ENABLE_SPARQL=1`. |
@@ -163,7 +163,7 @@ timeout error; the orphan thread eventually completes and is GC'd.
 | Tool | Budget |
 |---|---|
 | (default) | 5 s |
-| `semantic_neighbors` | 10 s (sbert loads ~100 MB on first call) |
+| `semantic_neighbors` | 10 s (sbert loads ~100 MB on first call; an `ollama:` bundle spends one query-embed round-trip, capped at 6 s so it degrades to lexical inside the budget) |
 
 Override per tool via env: `CBM_MCP_TIMEOUT_<TOOL_NAME>=2.5`.
 

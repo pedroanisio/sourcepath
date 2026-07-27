@@ -87,8 +87,12 @@ surface.
 
 - L2 chunks + embeddings ([plugins/chunks_embeddings/](../plugins/chunks_embeddings/)):
   symbol-level chunks (Python/TS/JS) or whole-file chunks; backends
-  `sbert` (all-MiniLM-L6-v2, 384-dim normalized) and `hash` (deterministic,
-  dependency-free); embedding truncation disclosed per chunk.
+  `sbert` (all-MiniLM-L6-v2, 384-dim normalized), `ollama` (any
+  embedding model the server hosts, default `nomic-embed-text`, 768-dim,
+  recorded as `ollama:<model>`), and `hash` (deterministic,
+  dependency-free); embedding truncation disclosed per chunk. Every
+  backend L2-normalizes client-side, so cosine = dot product holds
+  regardless of what the server returns.
 - L3 concept graph ([plugins/concept_graph/](../plugins/concept_graph/)):
   identifier splitting → canonical SKOS concept set with co-occurrence
   edges; curated controlled vocabulary (`software_primitives.yaml`) with
