@@ -41,6 +41,7 @@ from codebase_mapper.shared_kernel.progress import ProgressReporter
 
 from .cache import Cache, hash_text
 from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
+from .validation import validate
 from .model_resolver import DEFAULT_MODEL
 
 #: Corpus-tier size: top-N concepts by (frequency, file spread) described in
@@ -134,6 +135,7 @@ class LlmAggregator:
     # Per-run kill switch — flips True on first OllamaUnreachable /
     # OllamaModelMissing, then every subsequent attempt is skipped.
     _disabled: bool = field(default=False, init=False, repr=False)
+    _rejections: dict = field(default_factory=dict, init=False, repr=False)
 
     # ----------------------------------------------------------------
 
@@ -191,6 +193,34 @@ class LlmAggregator:
             "skipped": skipped,
             "error": error[:ERROR_EXCERPT_CHARS],
         })
+
+    def _reject(
+        self, ctx: "PipelineCtx", kind: str, target: str, reason: str,
+    ) -> None:
+        """Drop one invalid annotation and disclose it, without disabling.
+
+        Mirrors LlmEnricher._reject. A validation failure means the model
+        produced unusable text for *this* target, not that the client is
+        down — so the run continues and only the drop is recorded. One entry
+        per kind accumulates the count and a per-rule tally, so the manifest
+        shows how the model failed rather than merely that output is missing.
+        """
+        entry = self._rejections.get(kind)
+        if entry is None:
+            entry = {
+                "component": "llm_enrich",
+                "reason": "output_failed_validation",
+                "kind": kind,
+                "skipped": 0,
+                "by_rule": {},
+                "examples": [],
+            }
+            ctx.scratch.setdefault("degradations", []).append(entry)
+            self._rejections[kind] = entry
+        entry["skipped"] += 1
+        entry["by_rule"][reason] = entry["by_rule"].get(reason, 0) + 1
+        if len(entry["examples"]) < 5:
+            entry["examples"].append({"target": target, "rule": reason})
 
     def _do_concept_descriptions(
         self, ctx: "PipelineCtx", out: dict[str, dict],
@@ -294,7 +324,18 @@ class LlmAggregator:
                 return
 
             reporter.update(name, cached=was_hit)
-            out[name] = {**record, "was_cache_hit": was_hit,
+            # PALS's Law gate — see LlmEnricher.enrich for why this sits on
+            # the read side rather than inside compute().
+            verdict = validate("concept_description", record.get("text", ""))
+            if not verdict.ok:
+                _log.warning(
+                    "llm_enrich: dropped concept_description for %s — "
+                    "failed validation (%s)", name, verdict.reason,
+                )
+                self._reject(ctx, "concept_description", name, verdict.reason)
+                continue
+            out[name] = {**record, "text": verdict.text,
+                         "was_cache_hit": was_hit,
                          "selection": selection}
 
     # ----------------------------------------------------------------
@@ -373,7 +414,16 @@ class LlmAggregator:
                 return
 
             reporter.update(record.path, cached=was_hit)
-            out[record.path] = {**record_d, "was_cache_hit": was_hit}
+            verdict = validate("schema_purpose", record_d.get("text", ""))
+            if not verdict.ok:
+                _log.warning(
+                    "llm_enrich: dropped schema_purpose for %s — "
+                    "failed validation (%s)", record.path, verdict.reason,
+                )
+                self._reject(ctx, "schema_purpose", record.path, verdict.reason)
+                continue
+            out[record.path] = {**record_d, "text": verdict.text,
+                                "was_cache_hit": was_hit}
 
 
 # ----------------------------------------------------------------------

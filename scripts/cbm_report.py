@@ -293,6 +293,19 @@ def graph_analytics(g, man):
     def _ranked(counter, limit=None):
         items = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
         return items[:limit] if limit else items
+
+    def _top(counter, limit=None, key=lambda k: k):
+        """Rank by count desc, then `key` asc — a *total* order.
+
+        `Counter.most_common()` leaves equal counts in insertion order, and
+        insertion order here follows the RDF engine's iteration order. The
+        rdflib and oxigraph paths therefore emitted different analytics for
+        the same graph whenever two entries tied, which is neither rare nor
+        deterministic. Every ranking in this function goes through `_ranked`
+        or `_top` so the two engines agree byte for byte.
+        """
+        items = sorted(counter.items(), key=lambda kv: (-kv[1], key(kv[0])))
+        return items[:limit] if limit else items
     ftype = {s: str(o).split("#")[-1] for s, o in g.subject_objects(U(CBM + "type"))}
     src = {s for s, t in ftype.items() if t == "source_code"}
     tst = {s for s, t in ftype.items() if t == "test_code"}
@@ -307,21 +320,24 @@ def graph_analytics(g, man):
     for f in src: mass[top(name_of(f))] += indeg[f]
     roots = [r.strip("/").split("/")[0] for r in (man.get("python_source_roots") or [])
              if r and r.strip("/") not in (".", "", "src")]
-    cand = [r for r in roots if mass.get(r)] or [k for k, _ in mass.most_common(3)]
-    main_pkg = max(cand, key=lambda k: mass.get(k, 0)) if cand else ""
+    cand = [r for r in roots if mass.get(r)] or [k for k, _ in _top(mass, 3)]
+    # min on (-mass, name): highest mass wins, name breaks the tie. `max` would
+    # have returned whichever candidate the engine happened to yield first.
+    main_pkg = min(cand, key=lambda k: (-mass.get(k, 0), k)) if cand else ""
     def subsystem(p):
         if main_pkg and p.startswith(main_pkg + "/"):
             q = p.split("/")
             return f"{main_pkg}/{q[1]}" if len(q) > 2 else f"{main_pkg} core"
         return top(p)
     # chokepoints & interchanges
-    chokepoints = [{"file": name_of(f), "in": c, "out": outdeg[f]} for f, c in indeg.most_common(12)]
+    chokepoints = [{"file": name_of(f), "in": c, "out": outdeg[f]}
+                   for f, c in _top(indeg, 12, name_of)]
     cross = defaultdict(set)
     for s, o in edges:
         ss, so = subsystem(name_of(s)), subsystem(name_of(o))
         if so == f"{main_pkg} core" and ss != so: cross[name_of(o)].add(ss)
     interchanges = sorted(((f, sorted(l)) for f, l in cross.items() if len(l) >= 2),
-                          key=lambda x: -len(x[1]))
+                          key=lambda x: (-len(x[1]), x[0]))
     # test evidence: shipped heuristic vs typed-import derivation
     tests_edges = [(name_of(s), name_of(o)) for s, o in g.subject_objects(U(CBM + "tests"))]
     te_objs = Counter(o for _, o in tests_edges)
@@ -340,7 +356,7 @@ def graph_analytics(g, man):
     for s, o in g.subject_objects(U(C4 + "fileSummaryPromptSha")): psha[s] = str(o)
     for s, o in g.subject_objects(U(C4 + "fileSummaryGeneratedAt")): gat[s] = str(o)
     receipts = []
-    for f in sorted(summ, key=lambda f: -(indeg[f] + outdeg[f]))[:3]:
+    for f in sorted(summ, key=lambda f: (-(indeg[f] + outdeg[f]), name_of(f)))[:3]:
         receipts.append({"file": name_of(f), "summary": summ[f], "model": model.get(f, ""),
                          "prompt_sha": psha.get(f, ""), "generated_at": gat.get(f, "")})
     # districts input
@@ -363,10 +379,10 @@ def graph_analytics(g, man):
             anchor_votes[ss][o] += 1
     metro = {"main_pkg": main_pkg, "interchanges": [f for f, _ in interchanges], "lines": []}
     for ln in line_names:
-        rk = sorted(subs[ln], key=lambda f: -(indeg[f] + outdeg[f]))
+        rk = sorted(subs[ln], key=lambda f: (-(indeg[f] + outdeg[f]), name_of(f)))
         metro["lines"].append({
             "name": ln,
-            "anchor": name_of(anchor_votes[ln].most_common(1)[0][0]) if anchor_votes[ln] else None,
+            "anchor": name_of(_top(anchor_votes[ln], 1, name_of)[0][0]) if anchor_votes[ln] else None,
             "stations": [{"file": name_of(f), "in": indeg[f], "out": outdeg[f],
                           "summary": summ.get(f, ""), "model": model.get(f, ""),
                           "sha": psha.get(f, "")[:12]} for f in rk[:8 if ln.endswith("core") else 5]]})
@@ -386,10 +402,10 @@ def graph_analytics(g, man):
             "edges": len(edges), "chokepoints": chokepoints,
             "interchanges": [{"file": f, "lines": l} for f, l in interchanges[:10]],
             "tests_edges": {"n": len(tests_edges),
-                            "top_objects": [(name_of(o), c) for o, c in te_objs.most_common(4)]},
+                            "top_objects": [(name_of(o), c) for o, c in _top(te_objs, 4, name_of)]},
             "test_evidence": {"typed_import_edges": len(t2s),
-                              "top_targets": t2s_targets.most_common(6)},
-            "external": ext.most_common(15), "pins_n": len(pins),
+                              "top_targets": _top(t2s_targets, 6)},
+            "external": _top(ext, 15), "pins_n": len(pins),
             "receipts": receipts,
             "_district": {"files": dfiles, "inFile": inFile, "row": row, "endl": endl,
                           "ftype": ftype, "subsystem": subsystem}, "_metro": metro}

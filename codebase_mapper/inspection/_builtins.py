@@ -56,6 +56,7 @@ from .languages.cobol import (
 from .languages.lightweight import (
     extract_asm_summary, extract_devicetree_summary,
     extract_kconfig_summary, extract_make_summary,
+    resolve_lightweight_imports,
 )
 from .languages.cpp import extract_cpp_ast_summary
 from .languages.css import extract_css_ast_summary, resolve_css_imports
@@ -847,6 +848,46 @@ class MakeAnalyzer(_LightweightAnalyzer):
     _extract = staticmethod(extract_make_summary)
 
 
+class _LightweightResolver:
+    """Shared include resolver for the four line-oriented languages.
+
+    These analyzers shipped without resolvers: they emitted `imports` into
+    `ast_summary` that no `ImportResolver` ever consumed, so the specs never
+    became `cbm:imports` edges and nothing recorded the omission. All four
+    emit the same path-like shape, so one resolver covers them.
+    """
+    language = ""
+
+    def matches(self, record: FileRecord, ctx: PipelineCtx) -> bool:
+        return record.language == self.language and record.ast_summary is not None
+
+    def resolve(self, record: FileRecord, ctx: PipelineCtx) -> ResolveResult:
+        in_repo, external = resolve_lightweight_imports(
+            record.path, _summary(record), ctx.paths_set,
+        )
+        return ResolveResult(in_repo=list(in_repo), external=list(external))
+
+
+class AsmResolver(_LightweightResolver):
+    name = "resolve_asm"
+    language = "asm"
+
+
+class KconfigResolver(_LightweightResolver):
+    name = "resolve_kconfig"
+    language = "kconfig"
+
+
+class DevicetreeResolver(_LightweightResolver):
+    name = "resolve_devicetree"
+    language = "devicetree"
+
+
+class MakeResolver(_LightweightResolver):
+    name = "resolve_make"
+    language = "make"
+
+
 _BUILTIN_ANALYZERS = (
     AsmAnalyzer, CAnalyzer, CfmlAnalyzer, ClojureAnalyzer, CobolAnalyzer,
     CppAnalyzer, CssAnalyzer, DartAnalyzer, DevicetreeAnalyzer, GoAnalyzer, HtmlAnalyzer,
@@ -856,8 +897,8 @@ _BUILTIN_ANALYZERS = (
     SwiftAnalyzer, TsJsAnalyzer, YamlAnalyzer,
 )
 _BUILTIN_RESOLVERS = (
-    CResolver, CfmlResolver, ClojureResolver, CobolResolver, CppResolver,
-    CssResolver,
+    AsmResolver, CResolver, CfmlResolver, ClojureResolver, CobolResolver,
+    CppResolver, CssResolver, DevicetreeResolver, KconfigResolver, MakeResolver,
     DartResolver, GoResolver, HtmlResolver, JavaResolver, JsonResolver,
     KotlinResolver, ObjcResolver, PhpResolver,
     PythonResolver, RubyResolver, RustResolver, ShellResolver, SqlResolver,

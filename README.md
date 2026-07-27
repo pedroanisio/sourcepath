@@ -584,6 +584,9 @@ python tests/verify_report_rs_contract.py   # Rust cbm-report serde keys ⊆ emi
 python tests/verify_requirements_mirror.py  # requirements.txt pins == pyproject pins — one resolved world (drift H8)
 python tests/verify_ci_live_bundle.py       # CI cannot skip the backend suite and report green (BL-024)
 python tests/verify_backend_image.py        # backend image copies every first-party module app.py imports (BL-029)
+python tests/verify_docker_deps.py          # the CLI image installs what the CLI imports — no --no-deps, no shadow list
+python tests/verify_cli_layers.py           # the installed console script reaches the plugins shipped in the wheel
+python tests/verify_resolver_coverage.py    # every analyzer language has an ImportResolver — no dropped import edges
 python tests/verify_grammar_disclosure.py   # a missing tree-sitter grammar discloses, never degrades silently (BL-036)
 python tests/verify_make_wiring.py          # every test/verifier on disk is executed by a make target (drift H9)
 python tests/verify_drift_p1.py             # drift-risk HIGH findings — port/env/response_model/concepts.json/version

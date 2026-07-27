@@ -145,10 +145,6 @@ def write_jsonld_streaming(graph: Graph, dest: Path) -> str:
     used: ``"streaming"`` or ``"rdflib"`` (blank-node fallback — rdflib
     bnode labels are process-random and would break determinism through
     the N-Triples intermediate)."""
-    for s, _p, o in graph:
-        if not isinstance(s, str) or not isinstance(o, (str, bytes)) and \
-                o.__class__.__name__ == "BNode":
-            pass
     from .fast_serializer import _has_bnodes  # same guard as the TTL path
     if _has_bnodes(graph):
         _log.warning("graph contains blank nodes — JSON-LD via rdflib fallback")

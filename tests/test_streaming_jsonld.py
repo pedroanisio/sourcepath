@@ -110,6 +110,57 @@ def test_streamed_bytes_equal_rdflib_path(name, tmp_path):
     assert out.read_text() == expected
 
 
+def test_writer_makes_no_redundant_full_graph_pass(tmp_path):
+    """The writer must scan the graph at most once before streaming.
+
+    ``write_jsonld_streaming`` opened with a full ``for s, _p, o in graph``
+    loop whose body was ``pass``: a complete Python-level pass over every
+    triple that computed nothing, immediately before the real ``_has_bnodes``
+    guard did its own (early-exiting) pass. Its condition was also dead —
+    ``isinstance(s, str)`` is always true for rdflib terms, which subclass
+    ``str``.
+
+    Harmless on fixtures, expensive where it matters: the writer exists for
+    bundles too large to serialize through rdflib, and on the 67M-triple
+    kernel inventory this was an entire wasted traversal.
+
+    Counting iterations rather than grepping for the loop keeps the guard
+    honest if the scan is ever reintroduced in a different shape.
+    """
+    from codebase_mapper.emission.infrastructure.rdf.streaming_jsonld import (
+        write_jsonld_streaming,
+    )
+
+    g = _mapped_graph(tmp_path, FIXTURES["python_and_docs"])
+
+    class CountingGraph:
+        """Delegates to the real graph, tallying full-iteration entries."""
+
+        def __init__(self, inner):
+            self._inner = inner
+            self.iter_count = 0
+
+        def __iter__(self):
+            self.iter_count += 1
+            return iter(self._inner)
+
+        def __len__(self):
+            return len(self._inner)
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    counting = CountingGraph(g)
+    out = tmp_path / "counted.jsonld"
+    assert write_jsonld_streaming(counting, out) == "streaming"
+    assert counting.iter_count <= 1, (
+        f"graph iterated {counting.iter_count} times before streaming; only "
+        "the blank-node guard may scan it"
+    )
+    # Parity is the point of the writer — a cheaper scan must not change bytes.
+    assert out.read_text() == _rdflib_canonical(g)
+
+
 def test_emit_uses_streaming_engine(tmp_path):
     from codebase_mapper.emission.application.emit_bundle import emit
     from codebase_mapper.inspection.pipeline import map_codebase

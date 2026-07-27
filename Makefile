@@ -43,6 +43,9 @@ DRIFT_VERIFIERS := \
 	$(TESTS_DIR)/verify_readme_coverage.py \
 	$(TESTS_DIR)/verify_ci_live_bundle.py \
 	$(TESTS_DIR)/verify_backend_image.py \
+	$(TESTS_DIR)/verify_docker_deps.py \
+	$(TESTS_DIR)/verify_cli_layers.py \
+	$(TESTS_DIR)/verify_resolver_coverage.py \
 	$(TESTS_DIR)/verify_make_wiring.py
 
 CORE_VERIFIERS := \
@@ -206,6 +209,16 @@ regen-shacl-golden: ## Regenerate the SHACL golden after an INTENTIONAL shape ch
 .PHONY: test-backend
 test-backend: ## Frontend service pytest suites (FastAPI backend + MCP server).
 	$(PYTEST) $(FRONTEND_DIR)/backend/tests $(FRONTEND_DIR)/mcp_server/tests -q --no-cov
+
+.PHONY: test-backend-cov
+test-backend-cov: ## Frontend suites WITH their declared coverage gates (CI).
+	# Both frontend pytest.ini files declare --cov-fail-under=90, and both
+	# call sites (this Makefile and the CI job) passed --no-cov — so the
+	# gate never fired anywhere and the declared threshold was decorative.
+	# Each suite runs separately here because a combined invocation resolves
+	# one rootdir config and silently drops the other suite's --cov settings.
+	$(PYTEST) $(FRONTEND_DIR)/backend/tests -q
+	$(PYTEST) $(FRONTEND_DIR)/mcp_server/tests -q
 
 .PHONY: test-docs
 test-docs: ## Documentation hygiene (README disclaimers, local links, stale docs).

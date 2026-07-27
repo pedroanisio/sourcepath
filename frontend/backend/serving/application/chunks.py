@@ -60,13 +60,33 @@ def search_chunks_response(q: str, k: int, bundle: str | None = None) -> dict[st
     q_vec: np.ndarray | None = None
     if b.chunk_vectors is not None:
         if is_sbert:
-            # Embed the query with the model the bundle was built with —
-            # a different model would rank in the wrong vector space. The
-            # name is a loadable model id only when it has an org prefix.
-            name = (backend_name if "/" in backend_name
-                    else "sentence-transformers/all-MiniLM-L6-v2")
-            model = _get_model(name)
-            q_vec = model.encode([q], normalize_embeddings=True)[0].astype("float32")
+            # Embed the query with the model the bundle was actually built
+            # with. A different model places the query in a different vector
+            # space, and cosine scores across two spaces are meaningless —
+            # but they still come back as plausible-looking floats, so the
+            # failure is silent and the results merely look wrong.
+            #
+            # This used to substitute a hardcoded all-MiniLM-L6-v2 whenever
+            # the recorded name had no "/" prefix, while the `is_sbert` gate
+            # admits any name containing "minilm". A bundle built with a
+            # different MiniLM-family model therefore passed the gate and was
+            # searched with the wrong encoder. Never guess the model: use the
+            # recorded name (sentence-transformers resolves bare ids too) and
+            # degrade to lexical if it will not load or does not fit, exactly
+            # as the ollama branch below does.
+            try:
+                model = _get_model(backend_name)
+                q_vec = model.encode([q], normalize_embeddings=True)[0].astype("float32")
+            except Exception as exc:  # noqa: BLE001 - any load failure degrades
+                logger.warning(
+                    "sbert model %r not loadable (%s) — lexical fallback",
+                    backend_name, exc)
+                q_vec = None
+            if q_vec is not None and q_vec.shape[0] != b.chunk_vectors.shape[1]:
+                logger.warning(
+                    "sbert query dim %d != bundle dim %d — lexical fallback",
+                    q_vec.shape[0], b.chunk_vectors.shape[1])
+                q_vec = None
         elif is_ollama:
             # "ollama:<model>" — embed via the Ollama server. On any
             # failure (server down, model gone, dimension drift) this

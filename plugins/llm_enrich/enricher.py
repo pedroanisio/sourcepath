@@ -49,6 +49,7 @@ from .cache import Cache, hash_text
 from .client import OllamaClient, OllamaModelMissing, OllamaUnreachable
 from .model_resolver import DEFAULT_MODEL
 from .prompts import PROMPT_REGISTRY
+from .validation import validate
 
 if TYPE_CHECKING:
     from codebase_mapper.shared_kernel.extensions import PipelineCtx
@@ -148,6 +149,7 @@ class LlmEnricher:
     # sees one entry carrying the final tally. The manifest emitter
     # reads ctx.scratch["degradations"] to surface it in the bundle.
     _degradation: dict | None = field(default=None, init=False, repr=False)
+    _rejection: dict | None = field(default=None, init=False, repr=False)
 
     _reporter_lock: threading.Lock = field(
         default_factory=threading.Lock, init=False, repr=False)
@@ -211,6 +213,39 @@ class LlmEnricher:
             }
             ctx.scratch.setdefault("degradations", []).append(entry)
             self._degradation = entry
+
+    def _reject(self, ctx: "PipelineCtx", path: str, reason: str) -> None:
+        """Drop one invalid annotation and disclose it.
+
+        Distinct from ``_disable``: a validation rejection is not an outage.
+        The client is healthy and the next record may well produce valid
+        output, so enrichment continues — but the drop is never silent. One
+        aggregated entry carries the running count and a per-reason tally, so
+        a manifest reader can see *how* the model failed, not just that
+        something was skipped.
+
+        Thread-safe for the same reason ``_disable`` is: enrichment runs on a
+        worker pool and two records can fail validation concurrently.
+        """
+        with self._reporter_lock:
+            entry = self._rejection
+            if entry is None:
+                entry = {
+                    "component": "llm_enrich",
+                    "reason": "output_failed_validation",
+                    "kind": "file_summary",
+                    "skipped": 0,
+                    "by_rule": {},
+                    "examples": [],
+                }
+                ctx.scratch.setdefault("degradations", []).append(entry)
+                self._rejection = entry
+            by_rule: dict[str, int] = entry["by_rule"]
+            examples: list[dict[str, str]] = entry["examples"]
+            entry["skipped"] = int(entry["skipped"]) + 1
+            by_rule[reason] = by_rule.get(reason, 0) + 1
+            if len(examples) < 5:
+                examples.append({"path": path, "rule": reason})
 
     def enrich(self, record: "FileRecord", content: bytes,
                ctx: "PipelineCtx") -> None:
@@ -293,12 +328,26 @@ class LlmEnricher:
                     "[L4] file_summary", total=eligible)
             self._reporter.update(record.path, cached=was_hit)
 
+        # PALS's Law gate. Applied here rather than inside `compute()` so it
+        # covers cache hits too: an annotation cached before a rule existed
+        # must not slip past it. `validate` is pure, so re-checking a hit
+        # yields the same verdict every run and warm-cache determinism holds.
+        verdict = validate("file_summary", record_dict.get("text", ""))
+        if not verdict.ok:
+            _log.warning(
+                "llm_enrich: dropped file_summary for %s — failed validation (%s)",
+                record.path, verdict.reason,
+            )
+            self._reject(ctx, record.path, verdict.reason)
+            return
+
         # Stash on ctx.scratch under a documented key. Step 4 reads
         # this in LlmGraphWriter.contribute; the artifact emitter
         # mirrors it into enrichments.jsonl.
         bucket: dict = ctx.scratch.setdefault("llm:file_summary", {})
         bucket[record.path] = {
             **record_dict,  # carries v, kind, model, prompt_sha, target_sha, text, generated_at
+            "text": verdict.text,  # normalized (fence unwrapped, stripped)
             "was_cache_hit": was_hit,
         }
 

@@ -12,6 +12,7 @@ functions.
 from __future__ import annotations
 
 import re
+from pathlib import PurePosixPath
 
 _ASM_LABEL_RE = re.compile(rb"^\s*([A-Za-z_.$][\w.$]*):")
 _ASM_ENTRY_RE = re.compile(
@@ -136,3 +137,58 @@ def extract_make_summary(content: bytes, path: str) -> tuple[dict, list[str]]:
             items.append(_item("target", m.group(1).decode("utf-8", "replace"),
                                lineno, start, end))
     return _summary("make", items, imports), []
+
+
+def _normalize_rel(parts: tuple[str, ...]) -> str:
+    norm: list[str] = []
+    for part in parts:
+        if part == "..":
+            if norm and norm[-1] != "..":
+                norm.pop()
+        elif part not in ("", "."):
+            norm.append(part)
+    return "/".join(norm)
+
+
+def resolve_lightweight_imports(
+    src_path: str, summary: dict, paths_set: set[str],
+) -> tuple[list[str], list[str]]:
+    """Resolve include directives to ``(in_repo, external)``.
+
+    The four lightweight languages (asm ``.include``, Kconfig ``source``,
+    devicetree ``/include/`` + ``#include``, make ``include``) all emit
+    path-like specs under the same ``{kind, source, lineno}`` shape, and all
+    four resolve the same way: relative to the including file's directory
+    first, then repo-root-relative.
+
+    They previously had analyzers but no ``ImportResolver``. The specs landed
+    in ``ast_summary`` and stopped there — never becoming ``cbm:imports``
+    edges and never disclosed as a gap. On a kernel-scale repository, where
+    these four formats carry a large share of the build graph, that is a
+    silent under-capture of exactly the kind the coverage machinery exists to
+    surface.
+
+    Unresolvable specs are surfaced as external rather than dropped: an
+    unexpanded variable (``$(SRCTREE)``, ``$VAR``) or an absolute path cannot
+    be resolved statically, and preserving the spec keeps the fact that a
+    dependency exists.
+    """
+    src_dir = PurePosixPath(src_path).parent
+    in_repo: set[str] = set()
+    external: set[str] = set()
+
+    for imp in summary.get("imports", []):
+        spec = str(imp.get("source", "")).strip().strip("\"'<>")
+        if not spec:
+            continue
+        if "$" in spec or "`" in spec or spec.startswith("/"):
+            external.add(spec)
+            continue
+        target = _normalize_rel((src_dir / spec).parts)
+        if target in paths_set:
+            in_repo.add(target)
+        else:
+            external.add(spec)
+
+    in_repo.discard(src_path)
+    return sorted(in_repo), sorted(external)

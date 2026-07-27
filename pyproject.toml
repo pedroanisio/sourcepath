@@ -37,7 +37,6 @@ dependencies = [
     "tree-sitter-swift",
     "tree-sitter-typescript",
     "numpy>=2.0,<3.0",
-    "sentence-transformers>=3.0,<6.0",
     # Canonical SHACL shape model (shared_kernel/shacl_spec.py): the emitter
     # and every plugin shape contributor declare NodeShapeSpec/PropertySpec
     # instances validated at construction time. Same pin as the frontend
@@ -56,6 +55,22 @@ dependencies = [
 codebase-mapper = "codebase_mapper.cli:main"
 
 [project.optional-dependencies]
+# Semantic embedding backend (`--backend sbert`). Optional because every
+# `sentence_transformers` import in the tree is function-local — the hash
+# backend, the whole L1 map, and every report render without it, while the
+# package itself pulls in torch and is an order of magnitude larger than the
+# rest of the install combined.
+#
+# This extra is the single source of truth for "lean image vs semantic
+# image". The root Dockerfile selects between them with `--build-arg
+# WITH_SBERT=1`; before this existed it hand-maintained a parallel package
+# list under `pip install --no-deps`, which silently drifted from the
+# base dependencies above and shipped an image that could not import
+# `pydantic` at all. Pinned identically to
+# frontend/backend/requirements-sbert.txt (H8 mirror).
+sbert = [
+    "sentence-transformers>=3.0,<6.0",
+]
 # Frontend (FastAPI backend + read-only MCP server) runtime dependencies.
 # Single source of truth: mirrors frontend/backend/requirements.txt and
 # frontend/mcp_server/requirements.txt (the Docker images install those
@@ -89,7 +104,10 @@ dev = [
     # scripts/report_to_pdf.py's renderer; declared here so
     # tests/test_report_to_pdf.py runs instead of importorskip-skipping.
     "weasyprint",
-    "codebase-mapper[frontend]",
+    # `sbert` moved out of the base dependencies; keep it in `dev` so
+    # `make install` still resolves the semantic-backend code paths the
+    # L2/L3 verifiers exercise.
+    "codebase-mapper[frontend,sbert]",
 ]
 site = [
     "markdown-it-py",

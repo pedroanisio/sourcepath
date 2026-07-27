@@ -123,4 +123,111 @@ jobs:
         env:
           CBM_OUTPUT_DIR: _tmp/ci-bundle
           CBM_REQUIRE_LIVE_BUNDLE: "1"
-        run: make test-backend
+        # test-backend-cov, not test-backend: both frontend pytest.ini files
+        # declare --cov-fail-under=90 and every call site passed --no-cov, so
+        # the declared gate never fired. Measured at adoption: backend 96%,
+        # MCP server 92%.
+        run: make test-backend-cov
+
+  # The whole pytest tree — ~900 functions covering the emission contracts,
+  # the reporting stack, the decomposer/recomposer, and the perf suites. None
+  # of it ran in CI: `make test-units` was reachable only through `make test`,
+  # which no job invoked, so the largest single body of tests in the
+  # repository depended entirely on contributors running it locally.
+  units:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Unit + contract suites
+        run: make test-units
+
+  # Language, Rust, vocabulary, offline-L4 and goal-ledger verifiers. 35+
+  # verifier scripts that existed, passed, and were never executed by any
+  # job — a per-language regression could land green.
+  verifiers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Language-goal ledger + drift gate
+        run: make check
+
+      - name: Per-language, Rust, vocabulary and offline-L4 verifiers
+        run: make test-vocab test-langs test-rust test-llm-offline test-docs
+
+  # The root image built green and died on every invocation: the Dockerfile
+  # hand-maintained a package list under `pip install --no-deps .`, the list
+  # drifted from pyproject, and the image shipped without pydantic — which
+  # codebase_mapper imports at CLI import time. No job built an image, so
+  # `docker build` succeeding was mistaken for the image working.
+  #
+  # Building is not enough to catch that. This job RUNS the entrypoint.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build the CLI image
+        run: docker build -t codebase-mapper:ci .
+
+      - name: The built image must actually start
+        run: docker run --rm codebase-mapper:ci --help
+
+      - name: The built image must map a real repository
+        run: |
+          mkdir -p _tmp/docker-out
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/_tmp/docker-out:/work" \
+            --entrypoint codebase-mapper codebase-mapper:ci \
+            --repo /src/tests/fixtures/golden_repo --out /work/bundle
+          test -f _tmp/docker-out/bundle/run_manifest.json
+
+  # vitest never ran anywhere in CI, while vite.config.ts declares 90%
+  # thresholds on all four metrics — another gate that only existed on paper.
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: frontend/ui
+        run: npm ci
+
+      - name: Type-check and build
+        working-directory: frontend/ui
+        run: npm run build
+
+      - name: UI test suite
+        working-directory: frontend/ui
+        run: npm test -- --run

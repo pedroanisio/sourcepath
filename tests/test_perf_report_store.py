@@ -31,7 +31,8 @@ import sys
 import pytest
 import rdflib
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir, "scripts"))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+sys.path.insert(0, os.path.join(REPO_ROOT, "scripts"))
 import cbm_report as CR  # noqa: E402
 
 _ENV = {
@@ -120,6 +121,79 @@ def test_store_cache_is_reused_not_rebuilt(bundle, tmp_path):
         assert len(g) > 0
     finally:
         ox.Store.bulk_load = orig
+
+
+ANALYTICS_KEYS = ["triples", "ns", "classes", "top_preds", "n_src", "n_tst",
+                  "edges", "chokepoints", "interchanges", "tests_edges",
+                  "test_evidence", "external", "pins_n", "receipts",
+                  "deg_hist", "_metro"]
+
+
+_ANALYTICS_DRIVER = """
+import json, os, sys
+sys.path.insert(0, os.path.join({root!r}, "scripts"))
+import rdflib
+import cbm_report as CR
+
+with open(os.path.join({bundle!r}, "run_manifest.json")) as fh:
+    man = json.load(fh)
+g = rdflib.Graph()
+g.parse(os.path.join({bundle!r}, "inventory.ttl"), format="turtle")
+got = CR.graph_analytics(g, man)
+print(json.dumps({{k: got[k] for k in {keys!r}}}, sort_keys=True, default=str))
+"""
+
+
+def test_graph_analytics_rankings_survive_hash_randomization(bundle):
+    """Ranking ties must not depend on PYTHONHASHSEED.
+
+    Every ranking in ``graph_analytics`` sorted on a count or a degree alone.
+    ``Counter.most_common()`` and degree-only ``sorted`` calls leave equal
+    entries in the order they were encountered, and that order is set/dict
+    iteration order over ``rdflib.URIRef`` keys — which is *str hash* order,
+    randomized per process. Two files tied on degree therefore came out in a
+    different order run to run, and the rdflib and oxigraph read paths
+    disagreed on the same graph.
+
+    ``test_graph_analytics_equivalent_between_engines`` below only catches
+    that when the two engines happen to land on different orders in one
+    process; it failed roughly one full-suite run in three, reading as
+    flakiness rather than as the determinism defect it was. Re-running the
+    identical analytics under fixed, differing hash seeds reproduces the
+    trigger exactly and fails every time when the total order is missing.
+
+    Byte-identical analytics across seeds is also what the report pipeline
+    already promises: `_ranked` carried a comment claiming ties were broken
+    "count desc, name asc" so both engines agree, but eight rankings bypassed
+    it.
+    """
+    root = str(REPO_ROOT)
+    driver = _ANALYTICS_DRIVER.format(
+        root=root, bundle=str(bundle), keys=ANALYTICS_KEYS,
+    )
+    outputs = {}
+    for seed in ("0", "1", "42", "12345"):
+        env = dict(os.environ, PYTHONHASHSEED=seed)
+        proc = subprocess.run(
+            [sys.executable, "-c", driver],
+            capture_output=True, text=True, env=env, cwd=root,
+        )
+        assert proc.returncode == 0, f"driver failed (seed={seed}): {proc.stderr[-2000:]}"
+        outputs[seed] = proc.stdout.strip()
+
+    baseline_seed, baseline = next(iter(outputs.items()))
+    for seed, payload in outputs.items():
+        if payload == baseline:
+            continue
+        differing = [
+            key for key in ANALYTICS_KEYS
+            if json.loads(payload)[key] != json.loads(baseline)[key]
+        ]
+        raise AssertionError(
+            "graph_analytics is hash-seed dependent — ranking ties lack a "
+            f"total order. Seed {seed} differs from seed {baseline_seed} on: "
+            f"{differing}"
+        )
 
 
 def test_graph_analytics_equivalent_between_engines(bundle, tmp_path):

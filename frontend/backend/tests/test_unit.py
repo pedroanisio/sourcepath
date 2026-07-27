@@ -226,6 +226,80 @@ def test_ollama_search_degrades_to_lexical_when_embedding_fails(client, monkeypa
     assert r.json()["mode"] == "lexical"
 
 
+def test_sbert_search_uses_the_bundles_own_model(client, monkeypatch):
+    """The query must be encoded with the model recorded in the bundle.
+
+    The sbert branch used to substitute a hardcoded
+    ``sentence-transformers/all-MiniLM-L6-v2`` whenever the recorded backend
+    name lacked a ``/`` — while the ``is_sbert`` gate admits any name
+    containing ``minilm``. A bundle built with a different MiniLM-family
+    model therefore passed the gate and had its query encoded by the wrong
+    encoder, scoring the query against a vector space it never belonged to.
+    Cosine over two spaces still returns plausible floats, so nothing
+    surfaced: the results were simply wrong.
+    """
+    bundle = app_module.get_bundle()
+    bundle.embeddings_meta["backend"] = {"name": "paraphrase-MiniLM-L3-v2"}
+    if bundle.chunk_vectors is None or len(bundle.chunks) == 0:
+        pytest.skip("bundle has no chunk vectors")
+    dim = bundle.chunk_vectors.shape[1]
+    seen: list[str] = []
+
+    class _FakeModel:
+        def encode(self, _texts, **_kw):
+            v = np.zeros((1, dim), dtype="float32")
+            v[0] = bundle.chunk_vectors[0]
+            return v
+
+    def _record(name):
+        seen.append(name)
+        return _FakeModel()
+
+    monkeypatch.setattr(chunks_app, "_get_model", _record)
+
+    r = client.post("/api/chunks/search", json={"q": "anything", "k": 3})
+    assert r.status_code == 200
+    assert seen == ["paraphrase-MiniLM-L3-v2"], (
+        f"query encoded with {seen!r}, not the bundle's own model"
+    )
+
+
+def test_sbert_search_degrades_to_lexical_when_model_will_not_load(client, monkeypatch):
+    """An unloadable model name must degrade, not fall back to a guess."""
+    bundle = app_module.get_bundle()
+    bundle.embeddings_meta["backend"] = {"name": "sbert-not-a-real-model"}
+    if bundle.chunk_vectors is None:
+        pytest.skip("bundle has no chunk vectors")
+
+    def _boom(_name):
+        raise OSError("no such model")
+
+    monkeypatch.setattr(chunks_app, "_get_model", _boom)
+
+    r = client.post("/api/chunks/search", json={"q": "anything", "k": 3})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "lexical"
+
+
+def test_sbert_search_degrades_to_lexical_on_dimension_mismatch(client, monkeypatch):
+    """Same guard the ollama branch has: a mismatched dim ranks noise."""
+    bundle = app_module.get_bundle()
+    bundle.embeddings_meta["backend"] = {"name": "sentence-transformers/other"}
+    if bundle.chunk_vectors is None:
+        pytest.skip("bundle has no chunk vectors")
+    wrong_dim = bundle.chunk_vectors.shape[1] + 5
+
+    class _WrongDimModel:
+        def encode(self, _texts, **_kw):
+            return np.ones((1, wrong_dim), dtype="float32")
+
+    monkeypatch.setattr(chunks_app, "_get_model", lambda *_a, **_kw: _WrongDimModel())
+
+    r = client.post("/api/chunks/search", json={"q": "anything", "k": 3})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "lexical"
+
+
 def test_ollama_search_degrades_to_lexical_on_dimension_mismatch(client, monkeypatch):
     """A query vector whose dimension differs from the bundle's vectors
     would rank noise — the endpoint must fall back to lexical."""
