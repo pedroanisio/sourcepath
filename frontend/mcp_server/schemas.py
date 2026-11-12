@@ -214,7 +214,17 @@ DESCRIPTIONS: dict[str, str] = {
         "Transitive dependency closure for a file up to ``depth``: every "
         "file it (in)directly imports + every file that (in)directly imports "
         "it, plus the related tests. Use to scope the blast radius of a "
-        "change."
+        "change. Also returns ``symbol_callers``/``symbol_callees`` (the "
+        "symbol-level call/override graph) and, for implementation classes, "
+        "``supertypes`` plus ``dependents_via_supertype`` — callers that "
+        "import an interface this file implements. Read those two for any "
+        "codebase that injects by interface: ``direct_dependents`` is "
+        "import-only, so it is empty for a class nobody imports by name, "
+        "which is every ``*Impl`` under Spring or any other DI container. "
+        "``dependents_via_supertype`` is derived, not an import edge: it is "
+        "keyed by the interface that justified each set, and when an "
+        "interface has several implementations some of those callers reach "
+        "a different one."
     ),
     "imports_of": (
         "Direct outgoing imports from a file (one hop). Use when you only "
@@ -790,12 +800,30 @@ OUTPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             "depth": {"type": "integer", "minimum": 1},
             "direct_dependencies": {"type": "array", "items": {"type": "string"}},
             "direct_dependents": {"type": "array", "items": {"type": "string"}},
+            # Derived from symbol xrefs (subclassOf / overrides), not from an
+            # import edge. Kept beside direct_dependents and never merged into
+            # it: merging would assert an import that is not in the graph.
+            "supertypes": {"type": "array", "items": {"type": "string"}},
+            # Keyed by the supertype that justified each set, so a reader can
+            # judge the DI binding themselves when one interface has several
+            # implementations.
+            "dependents_via_supertype": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
             "transitive_dependencies": {"type": "array", "items": {"type": "string"}},
             "transitive_dependents": {"type": "array", "items": {"type": "string"}},
             "related_tests": {"type": "array", "items": {"type": "string"}},
             "tested_subjects": {"type": "array", "items": {"type": "string"}},
             "concepts": {"type": "array", "items": {"type": "string"}},
             "chunks": {"type": "array", "items": _CHUNK_ROW},
+            # Call-graph neighbours at symbol granularity. impact.py has always
+            # computed these; the handler dropped them before reaching here.
+            "symbol_callers": {"type": "array", "items": _CHUNK_ROW},
+            "symbol_callees": {"type": "array", "items": _CHUNK_ROW},
             "truncated": {"type": "boolean"},
         },
     },

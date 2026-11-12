@@ -625,12 +625,25 @@ def _file_impact(args: dict[str, Any], default: str | None) -> dict[str, Any]:
         "depth": payload["depth"],
         "direct_dependencies": payload["direct_dependencies"],
         "direct_dependents": payload["direct_dependents"],
+        # Interface-mediated dependents. Without these, file_impact answers
+        # "nothing depends on this" for every implementation class in a
+        # DI codebase — see dependents_via_supertype() for why.
+        "supertypes": payload["supertypes"],
+        "dependents_via_supertype": payload["dependents_via_supertype"],
         "transitive_dependencies": payload["transitive_dependencies"],
         "transitive_dependents": payload["transitive_dependents"],
         "related_tests": payload["related_tests"],
         "tested_subjects": payload["tested_subjects"],
         "concepts": payload["concepts"],
         "chunks": [_bundle_chunk_row(b, row) for row in payload["chunks"]],
+        # The backend has computed these from the symbol xrefs all along;
+        # this handler was building its own dict and dropping them, so the
+        # bundle's 679 call/subclassOf/overrides edges never reached a
+        # client. Surfacing them is the whole reason xrefs are emitted.
+        "symbol_callers": [_bundle_chunk_row(b, row)
+                           for row in payload["symbol_callers"]],
+        "symbol_callees": [_bundle_chunk_row(b, row)
+                           for row in payload["symbol_callees"]],
         "truncated": payload["truncated"],
     }
 
