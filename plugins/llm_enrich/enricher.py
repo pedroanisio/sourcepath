@@ -84,6 +84,14 @@ SUPPORTED_LANGUAGES: frozenset[str] = frozenset((
     "typescript", "javascript",
     "rust", "go",
     "ruby", "kotlin", "swift", "dart",
+    # JVM/legacy family: java, clojure and cobol all ship full extractors
+    # under codebase_mapper/*/languages/ and were missing here, so every
+    # file in them passed through L4 and came out with no annotation at
+    # all. Found by running a 254-file Java repo end to end: 3 of 254
+    # files were summarized, and all 3 were SQL. This is the same defect
+    # the C-family note below records, one language family over — the
+    # list is the gate, and a language absent from it fails silently.
+    "java", "clojure", "cobol",
     # C family (error-free-mapping E6): cpp and objective-c were excluded
     # while c was included — genuine C++/ObjC projects silently got no
     # file summaries.

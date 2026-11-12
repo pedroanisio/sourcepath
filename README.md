@@ -565,10 +565,12 @@ python tests/verify_llm_enrich_degradation.py       # L4 self-disable disclosure
 python tests/verify_llm_enrich_cli.py       # L4 CLI surface (scripts/run_l4 + --llm-enrich flags)
 python tests/verify_llm_enrich_ci_determinism.py    # L4 warm-cache determinism via committed cache fixture (no Ollama needed)
 python tests/verify_bench_llm_models.py     # L4 model-benchmark harness contract
+python tests/verify_anthropic_provider.py   # L4 provider toggle + Anthropic client contract (no network)
 python tests/verify_xrefs.py                # symbol-xref schema/vocab/sidecar (Phase 1)
 python tests/verify_xsd_fixture.py          # static/schemas/ classifier coverage
 python tests/verify_proto_fixture.py        # static/proto/ classifier + import coverage
 python tests/verify_repository_summary.py   # MCP repository_summary tool contract
+python tests/verify_impact_via_supertype.py # file_impact interface-mediated dependents (needs a Java bundle)
 python tests/verify_rust_ast.py             # Rust deep-AST items + chunker (Stage 1)
 python tests/verify_rust_xrefs.py           # Rust intra/inter-file call edges (Stage 2)
 python tests/verify_rust_tests_edges.py     # Rust tests-edges use-analysis + inline #[test] (Stage 3)

@@ -86,14 +86,22 @@ def main(argv: list[str] | None = None) -> int:
     # documented chain ($CBM_LLM_MODEL -> DEFAULT_MODEL). Defaulting to
     # the literal here passes a non-None "explicit" model on every run,
     # which silently disables the env var that .env.example advertises.
+    p.add_argument("--llm-provider", default=None,
+                   choices=list(llm_enrich.provider.PROVIDERS),
+                   help="Where L4 enrichment runs. 'ollama' (default) keeps "
+                        "source on this machine; 'anthropic' sends file "
+                        "contents to the Anthropic API and costs money. "
+                        "Unset honors $CBM_LLM_PROVIDER, then 'ollama'.")
     p.add_argument("--llm-model", default=None,
-                   help=f"Ollama model tag for L4 enrichment. Unset honors "
-                        f"$CBM_LLM_MODEL, then {DEFAULT_MODEL!r}; the actual "
-                        f"tag is auto-resolved against what the server has "
+                   help=f"Model for L4 enrichment. Unset honors "
+                        f"$CBM_LLM_MODEL, then the provider's default "
+                        f"({DEFAULT_MODEL!r} for ollama). On ollama the tag "
+                        f"is auto-resolved against what the server has "
                         f"installed.")
     p.add_argument("--llm-host", default=None,
                    help="Ollama base URL. When omitted, honors $OLLAMA_HOST, "
-                        "then falls back to http://localhost:11434.")
+                        "then falls back to http://localhost:11434. Ignored "
+                        "by --llm-provider anthropic.")
     p.add_argument("--llm-scope", default=",".join(DEFAULT_SCOPES),
                    help="Comma-separated subset of "
                         "{files,concepts,schemas}. Default: all three. "
@@ -164,23 +172,44 @@ def main(argv: list[str] | None = None) -> int:
         l3_vocab = concept_graph.USE_BUILTIN
     concept_graph.register_all(vocab=l3_vocab)
 
+    # Kept in scope past the registration block so the run can report
+    # what it spent (remote providers only — see the end of main()).
+    client = None
+    provider = llm_enrich.OLLAMA
+    preferred = ""
+
     if not args.no_llm:
-        client = llm_enrich.OllamaClient(host=args.llm_host) \
-            if args.llm_host else llm_enrich.OllamaClient()
+        # The provider is chosen by $CBM_LLM_PROVIDER (default: local
+        # Ollama). Misconfiguration raises here rather than degrading —
+        # see plugins/llm_enrich/provider.py.
+        client, provider, preferred = llm_enrich.make_client(
+            provider=args.llm_provider, host=args.llm_host,
+            model=args.llm_model,
+        )
         cache = llm_enrich.Cache(
             cache_dir=args.llm_cache_dir.resolve()
                       if args.llm_cache_dir else _default_cache_dir(),
             enabled=not args.llm_no_cache,
         )
         # Preflight: a quick non-fatal probe. The enricher/aggregator
-        # handle unreachable Ollama on their own (plan Commitment #7),
-        # but a CLI hint up-front saves the user from wondering why
+        # handle an unreachable provider on their own (plan Commitment
+        # #7), but a CLI hint up-front saves the user from wondering why
         # there are no cbml4: triples in the output.
         if not client.ping():
             print(
-                f"NOTE: Ollama unreachable at {client.host} — L4 "
+                f"NOTE: {provider} unreachable at {client.host} — L4 "
                 f"enrichment will be skipped, but the pipeline will "
                 f"still emit a SHACL-conforming L1+L2+L3 bundle.",
+                file=sys.stderr,
+            )
+        if llm_enrich.is_remote(provider):
+            # Say it out loud, every run. Enrichment reads source files
+            # and this provider sends them to a third party; an operator
+            # must never discover that from a billing statement.
+            print(
+                f"NOTE: L4 provider is {provider!r} (model {preferred}) — "
+                f"file contents will be sent to the Anthropic API. "
+                f"Unset ${llm_enrich.PROVIDER_ENV_VAR} to keep it local.",
                 file=sys.stderr,
             )
         llm_enrich.register_all(
@@ -200,6 +229,12 @@ def main(argv: list[str] | None = None) -> int:
                         validate_shacl=False if args.skip_shacl else None,
                         emit_jsonld=False if args.no_jsonld else None)
     _print_l4_summary(manifest)
+    # What the run cost, in tokens and (when the model is priced) dollars.
+    # Cache hits never reach the client, so a warm re-run reports zero —
+    # which is the point of the on-disk cache.
+    usage = getattr(client, "usage", None)
+    if usage is not None and usage.calls:
+        print(f"[L4] {provider}: {usage.summary(preferred)}", file=sys.stderr)
     print(json.dumps(manifest, indent=2, sort_keys=True))
     sc = manifest.get("shacl_self_check", {})
     # A skipped self-check (--skip-shacl) is a disclosed cost decision,

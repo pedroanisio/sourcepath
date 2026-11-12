@@ -87,19 +87,69 @@ SENTINELS = {
 
 # Refusal / meta-commentary. A model that declines still returns 200 OK with
 # prose, so this is the only place the decline can be detected.
-_REFUSAL_PATTERNS = [
+#
+# Split into two tiers, because conflating them threw away good output. The
+# concept_description prompt *instructs* the model to decline when the data
+# is too sparse ("insufficient context to characterize this concept"), and
+# the SENTINELS check above matches that phrase exactly. A model that obeys
+# the instruction in its own words — "I cannot characterize this concept
+# from the data provided" — tripped `i cannot` and was discarded as a
+# refusal. Measured on a 216-concept run: 27 annotations (12.5%) lost that
+# way, every one of them the model doing what it was told.
+#
+# Tier 1 never co-occurs with a legitimate answer: it is the model talking
+# about itself or about helping, not about the code.
+_HARD_REFUSAL_PATTERNS = [
     r"\bi'?m sorry\b",
     r"\bi am sorry\b",
     r"\bi apologi[sz]e\b",
-    r"\bi (?:can ?not|can't|cannot)\b",
-    r"\bi'?m (?:unable|not able)\b",
-    r"\bi am (?:unable|not able)\b",
     r"\bas an ai\b",
     r"\bas a language model\b",
     r"\bi don'?t have (?:access|the ability)\b",
     r"\bunable to (?:assist|help|comply)\b",
 ]
+_HARD_REFUSAL_RE = re.compile("|".join(_HARD_REFUSAL_PATTERNS), re.IGNORECASE)
+
+# Tier 2 is a bare inability statement. On its own it is a refusal; paired
+# with an insufficiency marker it is the instructed decline, so the order of
+# the checks in validate() — not the pattern — is what tells them apart.
+_SOFT_REFUSAL_PATTERNS = [
+    r"\bi (?:can ?not|can't|cannot)\b",
+    r"\bi'?m (?:unable|not able)\b",
+    r"\bi am (?:unable|not able)\b",
+]
+_SOFT_REFUSAL_RE = re.compile("|".join(_SOFT_REFUSAL_PATTERNS), re.IGNORECASE)
+
+_REFUSAL_PATTERNS = _HARD_REFUSAL_PATTERNS + _SOFT_REFUSAL_PATTERNS
 _REFUSAL_RE = re.compile("|".join(_REFUSAL_PATTERNS), re.IGNORECASE)
+
+# The instructed decline, in the forms models actually write it. Matching
+# any of these (absent a tier-1 refusal) means the model reached the
+# prompt's own escape hatch, so the output is normalized to the canonical
+# sentinel rather than discarded.
+_INSUFFICIENT_PATTERNS = [
+    r"\binsufficient (?:context|data|information|evidence)\b",
+    r"\bnot enough (?:context|data|information|evidence)\b",
+    r"\btoo sparse\b",
+    r"\btoo little (?:context|data|information|evidence)\b",
+    r"\b(?:context|data|information) (?:is|are) (?:too )?(?:sparse|limited|insufficient)\b",
+    r"\bno (?:context|data|information) (?:is |was )?(?:provided|available)\b",
+    # The commonest real phrasing, and the one that cost the first run:
+    # the model declines *by pointing at the input it was given*, which a
+    # safety refusal never does. "I cannot characterize this concept from
+    # the data provided."
+    r"\b(?:from|with|without|based on|given) (?:the |this )?"
+    r"(?:data|context|information|evidence) (?:provided|given|available|here)\b",
+    r"\bcannot be determined from\b",
+    r"\b(?:data|context|information) (?:provided|given|available) "
+    r"(?:is|are|does|do)\b",
+]
+_INSUFFICIENT_RE = re.compile("|".join(_INSUFFICIENT_PATTERNS), re.IGNORECASE)
+
+# The sentinel a recognized decline normalizes to. Keyed by the exact string
+# in SENTINELS so the two cannot drift: the canonical text is always one the
+# exact-match branch would also have accepted.
+_INSUFFICIENT_SENTINEL = "insufficient context to characterize this concept"
 
 # Prompt echo: the model repeating the scaffolding instead of answering.
 _ECHO_RE = re.compile(r"^\s*(?:SYSTEM|USER|ASSISTANT)\s*:", re.IGNORECASE | re.MULTILINE)
@@ -146,6 +196,37 @@ def _count_sentences(text: str) -> int:
     return max(1, len(parts))
 
 
+#: How many words may precede a decline before it counts as a caveat
+#: rather than the answer. Declines lead with at most a short run-up
+#: ("The data is too sparse…", "There is insufficient context here;" —
+#: two or three words); caveats trail fifteen or more words of anchored
+#: content. Nothing observed lands between, so the threshold is not
+#: delicate.
+_CAVEAT_LEAD_WORDS = 8
+
+
+def _opens_with_decline(text: str) -> bool:
+    """True when the text *is* a decline, False when it merely contains one.
+
+    Sentence position is not enough to tell them apart: a model writing
+    one sentence can put anchored content and its own limit in the same
+    breath — "…a guard condition that branch on it, though without the
+    method bodies I can't say what the guard enforces." That is an answer,
+    not a refusal, and splitting on sentences calls it a refusal.
+
+    What separates them is how much the model said *before* hedging. So
+    find the earliest decline marker of either kind and measure the run-up
+    to it.
+    """
+    starts = [m.start() for m in (_SOFT_REFUSAL_RE.search(text),
+                                  _INSUFFICIENT_RE.search(text))
+              if m is not None]
+    if not starts:
+        return False
+    lead = text[:min(starts)]
+    return len(lead.split()) < _CAVEAT_LEAD_WORDS
+
+
 def validate(kind: str, raw: str) -> ValidationResult:
     """Validate one LLM annotation. Never raises; returns a verdict.
 
@@ -172,7 +253,29 @@ def validate(kind: str, raw: str) -> ValidationResult:
     if any(unicodedata.category(ch) == "Cc" and ch not in "\t\n\r" for ch in text):
         return ValidationResult(False, reason="control_characters")
 
-    if _REFUSAL_RE.search(text):
+    # Order matters here, and is the whole fix. A tier-1 refusal is a
+    # refusal whatever else the text says.
+    if _HARD_REFUSAL_RE.search(text):
+        return ValidationResult(False, reason="refusal")
+
+    # Everything else turns on *where* the decline sits. An answer that
+    # opens by declining is a decline. An answer that opens with content
+    # and closes with "...so I cannot say what the guard enforces" is a
+    # substantive annotation wearing an epistemic caveat — which is
+    # exactly what the prompt asks for ("Do not invent facts"), so
+    # discarding it punishes the model for obeying.
+    #
+    # Measured on one 216-concept run: 14 descriptions lost to a
+    # paraphrased decline and 13 more to a trailing caveat — an eighth of
+    # the layer's output, all of it good. Scanning the whole text cannot
+    # tell the two apart; see :func:`_opens_with_decline`.
+    if _opens_with_decline(text):
+        # The prompt's own escape hatch, in the model's own words:
+        # normalized to the canonical sentinel so the graph carries one
+        # string rather than N paraphrases of it.
+        if (_INSUFFICIENT_SENTINEL in SENTINELS.get(kind, set())
+                and _INSUFFICIENT_RE.search(text)):
+            return ValidationResult(True, text=_INSUFFICIENT_SENTINEL)
         return ValidationResult(False, reason="refusal")
 
     if _ECHO_RE.search(text):

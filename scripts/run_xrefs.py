@@ -120,12 +120,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.llm_enrich:
         from plugins import llm_enrich
-        client = llm_enrich.OllamaClient()
+        # Provider from $CBM_LLM_PROVIDER; 'ollama' (local) by default.
+        client, provider, preferred = llm_enrich.make_client()
         if not client.ping():
             print(
-                f"NOTE: Ollama unreachable at {client.host} — L4 "
+                f"NOTE: {provider} unreachable at {client.host} — L4 "
                 f"enrichment will be skipped, but the pipeline will "
                 f"still emit a SHACL-conforming bundle.",
+                file=sys.stderr,
+            )
+        if llm_enrich.is_remote(provider):
+            print(
+                f"NOTE: L4 provider is {provider!r} (model {preferred}) — "
+                f"file contents will be sent to the Anthropic API. "
+                f"Unset ${llm_enrich.PROVIDER_ENV_VAR} to keep it local.",
                 file=sys.stderr,
             )
         llm_enrich.register_all(

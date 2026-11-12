@@ -71,6 +71,17 @@ codebase-mapper = "codebase_mapper.cli:main"
 sbert = [
     "sentence-transformers>=3.0,<6.0",
 ]
+# Hosted L4 enrichment provider (`CBM_LLM_PROVIDER=anthropic`). Optional
+# because the default provider is local Ollama, which speaks plain HTTP
+# through httpx and needs no SDK: a lean install enriches on localhost
+# and never imports this. Every `import anthropic` in the tree is
+# function-local (plugins/llm_enrich/anthropic_client.py), so its absence
+# is felt only when the toggle is flipped — and then it raises
+# AnthropicNotInstalled at wiring time with the pip line, instead of
+# degrading to a bundle with no L4 triples and no stated cause.
+anthropic = [
+    "anthropic>=1.0,<2.0",
+]
 # Frontend (FastAPI backend + read-only MCP server) runtime dependencies.
 # Single source of truth: mirrors frontend/backend/requirements.txt and
 # frontend/mcp_server/requirements.txt (the Docker images install those

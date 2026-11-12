@@ -41,9 +41,19 @@ from .model_resolver import (
     preferred_model,
     resolve_model,
 )
+from .provider import (
+    ANTHROPIC,
+    OLLAMA,
+    PROVIDER_ENV_VAR,
+    is_remote,
+    make_client,
+    resolve_provider,
+    supports_auto_resolve,
+)
 
 __all__ = [
     "ALL_SCOPES",
+    "ANTHROPIC",
     "Cache",
     "DEFAULT_MODEL",
     "LlmAggregator",
@@ -52,14 +62,20 @@ __all__ = [
     "LlmGraphWriter",
     "LlmShapes",
     "MODEL_ENV_VAR",
+    "OLLAMA",
     "OllamaClient",
+    "PROVIDER_ENV_VAR",
     "SCOPE_CONCEPTS",
     "SCOPE_FILES",
     "SCOPE_SCHEMAS",
     "SIDECAR_FILENAME",
+    "is_remote",
+    "make_client",
     "preferred_model",
     "register_all",
     "resolve_model",
+    "resolve_provider",
+    "supports_auto_resolve",
 ]
 
 
@@ -77,11 +93,18 @@ def register_all(
 
       ``client``   Wired into the enricher + aggregator (``None`` → no-op).
       ``cache``    Wired into the enricher + aggregator.
-      ``model``    Preferred Ollama tag. ``None`` → ``$CBM_LLM_MODEL`` →
-                   :data:`DEFAULT_MODEL`. Used in the cache key and
-                   provenance.
+      ``model``    Preferred model. ``None`` → ``$CBM_LLM_MODEL`` → the
+                   default for the selected provider (see
+                   :mod:`plugins.llm_enrich.provider`): the Ollama tag
+                   :data:`DEFAULT_MODEL`, or the Claude model when
+                   ``$CBM_LLM_PROVIDER=anthropic``. Used in the cache
+                   key and provenance, so flipping the provider
+                   correctly misses the cache rather than serving an
+                   annotation the other model wrote.
       ``scopes``   Which enrichment kinds to opt in to.
-      ``auto_resolve``  When True (default) and a ``client`` is given,
+      ``auto_resolve``  When True (default), a ``client`` is given, and
+                   the provider supports it (Ollama only — a hosted
+                   catalog has no "not installed" failure mode),
                    the *preferred* tag is resolved against the models
                    actually installed on the server via
                    :func:`resolve_model` — if the preferred tag is
@@ -99,10 +122,13 @@ def register_all(
         register_record_enricher,
         register_shape_contributor,
     )
-    preferred = preferred_model(model)
+    from .provider import resolve_preferred_model
+
+    provider = resolve_provider()
+    preferred = resolve_preferred_model(provider, model)
     effective = preferred
-    if auto_resolve and client is not None:
-        effective = resolve_model(client, model) or preferred
+    if auto_resolve and client is not None and supports_auto_resolve(provider):
+        effective = resolve_model(client, preferred) or preferred
     register_record_enricher(LlmEnricher(client=client, cache=cache,
                                          model=effective, scopes=scopes))
     register_aggregator(LlmAggregator(client=client, cache=cache,
