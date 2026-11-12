@@ -58,6 +58,7 @@ CORE_VERIFIERS := \
 	$(TESTS_DIR)/verify_l3.py \
 	$(TESTS_DIR)/verify_xrefs.py \
 	$(TESTS_DIR)/verify_repository_summary.py \
+	$(TESTS_DIR)/verify_impact_via_supertype.py \
 	$(TESTS_DIR)/verify_ast_coverage.py \
 	$(TESTS_DIR)/verify_grammar_disclosure.py \
 	$(TESTS_DIR)/verify_progress.py \
@@ -106,7 +107,8 @@ LLM_OFFLINE_VERIFIERS := \
 	$(TESTS_DIR)/verify_llm_enrich_degradation.py \
 	$(TESTS_DIR)/verify_llm_enrich_cli.py \
 	$(TESTS_DIR)/verify_llm_enrich_ci_determinism.py \
-	$(TESTS_DIR)/verify_bench_llm_models.py
+	$(TESTS_DIR)/verify_bench_llm_models.py \
+	$(TESTS_DIR)/verify_anthropic_provider.py
 
 LLM_ONLINE_VERIFIERS := \
 	$(TESTS_DIR)/verify_llm_enrich_file_summary.py \
